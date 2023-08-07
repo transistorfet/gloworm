@@ -126,8 +126,8 @@ welcome:
 
 
 monitor.bin: $(MONITOR_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tmonitor.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tmonitor.ld -Wl,--oformat=binary -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/monitor/monitor.ld -o $@.elf $^
+	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/monitor/monitor.ld -Wl,--oformat=binary -o $@ $^
 	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
 
 
@@ -138,8 +138,8 @@ boot.bin: $(BOOT_OBJS)
 
 kernel.bin: CFLAGS += -DONEBINARY
 kernel.bin: $(KERNEL_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tkernel.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tkernel.ld -Wl,--oformat=binary -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/kernel/kernel.ld -o $@.elf $^
+	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/kernel/kernel.ld -Wl,--oformat=binary -o $@ $^
 	mkdir -p $(BUILD)
 	cp $@ $(BUILD)
 
