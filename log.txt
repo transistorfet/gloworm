@@ -1,0 +1,6 @@
+
+2023-08-07:
+- I moved the OS out of the computie repository and into its own, with the git history preserved
+- It will now be known as gloworm, named after the 1980s toy, since my Rust OS was already named
+  Ruxpin after Teddy Ruxpin, so I tried to stick to the same theme
+
