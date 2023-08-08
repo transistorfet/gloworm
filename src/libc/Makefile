@@ -1,13 +1,13 @@
 
-ROOT = ../..
+GLOWORM = ../..
 
-include $(ROOT)/config.mk
+include $(GLOWORM)/config.mk
 
 # TODO This works, but you still need a separate place to put object files for each version
 #libc-68k-os.a: CFLAGS += -fPIE
-$(ROOT)/libc-68k-os.a: CFLAGS += -mpcrel
+$(GLOWORM)/libc-68k-os.a: CFLAGS += -mpcrel
 #libc-68k-os.a: ARCH=68k-os
-$(ROOT)/libc-68k-none.a: CFLAGS += -mpcrel
+$(GLOWORM)/libc-68k-none.a: CFLAGS += -mpcrel
 #libc-68k-none.a: ARCH=68k-none
 
 #ARCH = 68k-os
@@ -28,8 +28,8 @@ LIBC_68K_NONE_OBJS = $(patsubst %.c,%.o, $(patsubst %.s,%.o, $(LIBC_68K_NONE_SRC
 LIBC_68K_OS_SRCS = $(wildcard 68k/**/*.[cs]) $(wildcard os/**/*.[cs]) $(wildcard common/**/*.[cs])
 LIBC_68K_OS_OBJS = $(patsubst %.c,%.o, $(patsubst %.s,%.o, $(LIBC_68K_OS_SRCS)))
 
-$(ROOT)/libc-68k-none.a: $(LIBC_68K_NONE_OBJS)
-$(ROOT)/libc-68k-os.a: $(LIBC_68K_OS_OBJS)
+$(GLOWORM)/libc-68k-none.a: $(LIBC_68K_NONE_OBJS)
+$(GLOWORM)/libc-68k-os.a: $(LIBC_68K_OS_OBJS)
 
 
 %.a: $^

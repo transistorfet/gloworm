@@ -1,6 +1,6 @@
 
-ROOT = ../..
-BUILD = $(ROOT)/build
+GLOWORM = ../..
+BUILD = $(GLOWORM)/build
 $(shell mkdir -p $(BUILD)/bin)
 
 AS = m68k-linux-gnu-as
@@ -10,7 +10,7 @@ STRIP = m68k-linux-gnu-strip
 OBJDUMP = m68k-linux-gnu-objdump
 OBJCOPY = m68k-linux-gnu-objcopy
 RANLIB = m68k-linux-gnu-ranlib
-INCLUDE = $(ROOT)/include
+INCLUDE = $(GLOWORM)/include
 ASFLAGS = -m68010 --defsym __mc68010__=1
 CFLAGS = -I$(INCLUDE) -m68010 -nostartfiles -nostdlib -g -mpcrel -Os
 LDFLAGS = -Wl,--build-id=none -Ttext=0
@@ -52,21 +52,21 @@ COMMANDS = 		\
 	httpd.send	\
 	daemontest.send
 
-all: $(ROOT)/libc-68k-os.a $(COMMANDS)
+all: $(GLOWORM)/libc-68k-os.a $(COMMANDS)
 
 
 sh.bin: CFLAGS += -DONEBINARY -DADDMAIN
 #sh.bin: sh.o ps.o
 
 
-$(ROOT)/libc-68k-os.a:
-	make -C $(ROOT)/src/libc clean $@
+$(GLOWORM)/libc-68k-os.a:
+	make -C $(GLOWORM)/src/libc clean $@
 
 %.send: %.bin
-	$(ROOT)/tools/make-send-file $(BUILD)/bin/$* $@ $(notdir $*)
+	$(GLOWORM)/tools/make-send-file $(BUILD)/bin/$* $@ $(notdir $*)
 
 %.bin: %.o 
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $*.elf $^ $(ROOT)/libc-68k-os.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $*.elf $^ $(GLOWORM)/libc-68k-os.a
 	$(STRIP) $*.elf -o $(BUILD)/bin/$*
 	$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $*.elf $@
 

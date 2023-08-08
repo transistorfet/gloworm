@@ -23,7 +23,7 @@ CC = m68k-linux-gnu-gcc
 OBJDUMP = m68k-linux-gnu-objdump
 OBJCOPY = m68k-linux-gnu-objcopy
 RANLIB = m68k-linux-gnu-ranlib
-INCLUDE = $(ROOT)/include
+INCLUDE = $(GLOWORM)/include
 ASFLAGS = $(ASFLAGS_ARCH)
 CFLAGS = -I$(INCLUDE) $(CFLAGS_ARCH) -DBOARD_$(BOARD) -nostartfiles -nostdlib -fno-zero-initialized-in-bss -g -Os
 LDFLAGS = -Wl,--build-id=none

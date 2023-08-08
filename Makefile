@@ -1,7 +1,7 @@
 
-ROOT = .
+GLOWORM = .
 
-include $(ROOT)/config.mk
+include $(GLOWORM)/config.mk
 
 ASLISTING = -alh
 
