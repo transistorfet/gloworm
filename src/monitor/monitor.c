@@ -15,7 +15,7 @@
 #error "Board type not set"
 #endif
 
-#define VERSION		"2023-05-28-" BOARD
+#define VERSION		"2023-09-16-" BOARD
 
 
 extern void init_tty();
@@ -293,6 +293,8 @@ void command_writerom(int argc, char **args)
 
 	if (argc >= 2)
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
+        if (argc >= 3)
+		source = (uint16_t *) strtol(args[2], NULL, 16);
 
 	for (int i = 0; i < ROM_SIZE; i++) {
 		data = dest[i];
@@ -321,6 +323,8 @@ void command_verifyrom(int argc, char **args)
 
 	if (argc >= 2)
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
+        if (argc >= 3)
+		source = (uint16_t *) strtol(args[2], NULL, 16);
 
 	for (int i = 0; i < ROM_SIZE; i++) {
 		if (dest[i] != source[i]) {
