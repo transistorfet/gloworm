@@ -14,10 +14,10 @@ int __mulsi3(int a, int b)
 	"move.l	%%d2, %%d3\n"
 	"swap	%%d3\n"		// d3 <- high b
 
-	"mulu.w	%%d2, %%d0\n"	// d0 <- low b * high b
-	"mulu.w %%d1, %%d2\n"	// d2 <- high a * low b
+	"mulu	%%d2, %%d0\n"	// d0 <- low b * high b
+	"mulu	%%d1, %%d2\n"	// d2 <- high a * low b
 	"move.w	%1, %%d1\n"
-	"mulu.w	%%d3, %%d1\n"	// d1 <- high b * low a
+	"mulu	%%d3, %%d1\n"	// d1 <- high b * low a
 
 	"swap	%%d1\n"		// d1 << 16
 	"clr.w	%%d1\n"

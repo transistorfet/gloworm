@@ -118,7 +118,7 @@ libc-68k-none.a libc-68k-os.a:
 	make -C src/libc ../../$@
 
 
-welcome monitor.bin boot.bin: CFLAGS += -mpcrel
+#welcome monitor.bin boot.bin: CFLAGS += -mpcrel
 
 welcome:
 	$(AS) -m68000 -o welcome.elf src/welcome.s
@@ -126,8 +126,8 @@ welcome:
 
 
 monitor.bin: $(MONITOR_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/monitor/monitor.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/monitor/monitor.ld -Wl,--oformat=binary -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/monitor/monitor.ld -o $@.elf $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/monitor/monitor.ld -Wl,--oformat=binary -o $@ $^
 	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
 
 

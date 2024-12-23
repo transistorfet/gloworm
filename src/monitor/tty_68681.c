@@ -78,7 +78,12 @@ extern void delay(int count);
 
 int init_tty()
 {
-	asm volatile("or.w	#0x0700, %sr");
+	//asm volatile("or.w	#0x0700, %sr");
+	asm volatile(
+	"move.w		%sr, %d0\n"
+	"or.w		#0x0700, %d0\n"
+	"move.w		%d0, %sr\n"
+	);
 
 	*CRA_WR_ADDR = CMD_RESET_MR;
 

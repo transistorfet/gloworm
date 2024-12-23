@@ -164,7 +164,7 @@ void command_info(int argc, char **args)
 	"move.l	%%sp, %0\n"
 	"move.l	(%%sp), %1\n"
 	"move.w	%%sr, %2\n"
-	"bsr	INFO\n"
+	"bsr.w	INFO\n"
 	"INFO:\t"
 	"move.l	(%%sp)+, %3\n"
 	: "=r" (sp), "=r" (sv1), "=r" (flags), "=r" (pc)
@@ -388,7 +388,7 @@ void command_boot(int argc, char **args)
 		entry = (void (*)(char *)) strtol(args[1], NULL, 16);
 	if (argc >= 3)
 		boot_args = args[2];
-	((void (*)()) entry)(boot_args);
+	((void (*)(char *)) entry)(boot_args);
 }
 
 
@@ -512,6 +512,8 @@ int main()
 	//delay(10000);
 
 	fputs("\n\nWelcome to the 68k Monitor!\n\n", stdout);
+
+	uint16_t *vme_address = (uint16_t *) 0xff555555;
 
 	/*
 	int *data = malloc(sizeof(int) * 10);

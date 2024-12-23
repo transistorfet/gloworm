@@ -5,9 +5,9 @@ include $(GLOWORM)/config.mk
 
 # TODO This works, but you still need a separate place to put object files for each version
 #libc-68k-os.a: CFLAGS += -fPIE
-$(GLOWORM)/libc-68k-os.a: CFLAGS += -mpcrel
+#$(GLOWORM)/libc-68k-os.a: CFLAGS += -mpcrel
 #libc-68k-os.a: ARCH=68k-os
-$(GLOWORM)/libc-68k-none.a: CFLAGS += -mpcrel
+#$(GLOWORM)/libc-68k-none.a: CFLAGS += -mpcrel
 #libc-68k-none.a: ARCH=68k-none
 
 #ARCH = 68k-os

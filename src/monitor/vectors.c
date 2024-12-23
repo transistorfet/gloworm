@@ -56,9 +56,9 @@ asm(
 "	move.l	%d0, -(%sp)\n"
 "\n"
 "	move.l	%sp, -(%sp)\n"
-"	bsr	fatal_error\n"
-"	| stop	#0x2700\n"
-"	| Jump to the monitor instead of stopping\n"
+"	bsr.w	fatal_error\n"
+"	/* stop	#0x2700 */\n"
+"	/* Jump to the monitor instead of stopping */\n"
 "	jmp	0x40\n"
 "	rte\n"
 );
@@ -71,7 +71,7 @@ void fatal_error(uint8_t *sp)
 
 	printf("\n\nFatal Error with SP: %x\n", sp);
 	printf("PC: %x\nStack Dump with Registers:\n", *((uint32_t *) &sp[15 * 4 + 2]));
-	dump(sp, 100);
+	//dump(sp, 100);
 	printf("Resetting...\n");
 }
 
