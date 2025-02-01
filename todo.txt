@@ -1,4 +1,11 @@
 
+* omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
+
+* should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>
+
+* can you change the board config flag to be "BOARD=k30" instead of "BOARD_k30"
+* really need to add a config system of some kind, could use Kconfig
+
 
 Operating System:
 

@@ -13,7 +13,7 @@ static char *_monthnames[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", 
 size_t strftime (char* buffer, size_t max, const char *fmt, const struct tm *tp)
 {
 	int i = 0;
-	int value;
+	int value = 0;
 	short width;
 	char padding;
 	char *svalue;

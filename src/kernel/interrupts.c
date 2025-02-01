@@ -15,15 +15,16 @@
 
 #define INTERRUPT_MAX		128
 
-extern void exception_entry();
+extern void exception_entry(void);
 
-void fatal_error();
-void handle_trap_1();
-void handle_trace();
+struct exception_stack_frame;
+void fatal_error(struct exception_stack_frame *frame);
+void handle_trap_1(void);
+void handle_trace(void);
 
 static interrupt_handler_t vector_table[INTERRUPT_MAX];
 
-void init_interrupts()
+void init_interrupts(void)
 {
 	init_bh();
 
@@ -129,7 +130,7 @@ void fatal_error(struct exception_stack_frame *frame)
 
 INTERRUPT_ENTRY(handle_exception);
 
-__attribute__((interrupt)) void handle_exception()
+__attribute__((interrupt)) void handle_exception(void)
 {
 	DISABLE_INTS();
 

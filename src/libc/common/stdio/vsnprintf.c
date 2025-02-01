@@ -5,7 +5,7 @@
 #include <string.h>
 
 
-extern char *itoa_padded(int num, char *buffer, int radix, char width, char zeropad, char is_signed);
+extern char *itoa_padded(unsigned int num, char *buffer, int radix, char width, char zeropad, char is_signed);
 
 
 int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)

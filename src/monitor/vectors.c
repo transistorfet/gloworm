@@ -2,7 +2,13 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#if defined(BOARD_k30)
 #define STACK_POINTER_INIT	0x200000
+#elif defined(BOARD_68k)
+#define STACK_POINTER_INIT	0x200000
+#else
+#error "Board type not set"
+#endif
 
 extern void _start();
 extern void _error();
@@ -71,7 +77,7 @@ void fatal_error(uint8_t *sp)
 
 	printf("\n\nFatal Error with SP: %x\n", sp);
 	printf("PC: %x\nStack Dump with Registers:\n", *((uint32_t *) &sp[15 * 4 + 2]));
-	dump(sp, 100);
+	dump((uint16_t *) sp, 100);
 	printf("Resetting...\n");
 }
 
