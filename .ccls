@@ -1,0 +1,3 @@
+%c -nostdlib
+-isystem/media/work/gloworm/include
+-DBOARD_k30

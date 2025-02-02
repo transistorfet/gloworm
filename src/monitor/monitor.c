@@ -15,7 +15,7 @@
 #error "Board type not set"
 #endif
 
-#define VERSION		"2023-09-16-" BOARD
+#define VERSION		"2025-01-31-" BOARD
 
 
 extern void init_tty();
@@ -74,7 +74,7 @@ int parseline(char *input, char **vargs)
 			vargs[j++] = input;
 		}
 		else
- 			input++;
+			input++;
 	}
 
 	*input = '\0';
@@ -97,10 +97,11 @@ void dump(const uint16_t *addr, short len)
 {
 	char buffer[6];
 
+	len >>= 1; // Adjust the dump size from bytes to words
 	buffer[4] = ' ';
 	buffer[5] = '\0';
 	while (len > 0) {
-		printf("%x: ", addr);
+		printf("%x: ", (unsigned int) addr);
 		for (short i = 0; i < 8 && len > 0; i++, len--) {
 			buffer[0] = hexchar((addr[i] >> 12) & 0xF);
 			buffer[1] = hexchar((addr[i] >> 8) & 0xF);
@@ -123,11 +124,41 @@ void dump(const uint16_t *addr, short len)
 #define ROM_ADDR	0x000000
 #define ROM_SIZE	0x1800
 
-#define RAM_ADDR	0x100000
-#define RAM_SIZE	1024
+#define RAM_ADDR	0x200000
+#define RAM_SIZE	0x100000
 
 #define SUPERVISOR_ADDR	0x200000
 
+
+void command_version(int argc, char **args)
+{
+	printf("version: %s\n", VERSION);
+	return;
+}
+
+void command_info(int argc, char **args)
+{
+	uint32_t pc;
+	uint32_t sp;
+	uint32_t sv1;
+	uint16_t flags;
+
+	asm(
+	"move.l	%%sp, %0\n"
+	"move.l	(%%sp), %1\n"
+	"move.w	%%sr, %2\n"
+	"bsr.w	INFO\n"
+	"INFO:\t"
+	"move.l	(%%sp)+, %3\n"
+	: "=r" (sp), "=r" (sv1), "=r" (flags), "=r" (pc)
+	);
+
+	printf("PC: %x\n", pc);
+	printf("SR: %x\n", flags);
+	printf("SP: %x\n", sp);
+	printf("TOP: %x\n", sv1);
+	return;
+}
 
 void command_dump(int argc, char **args)
 {
@@ -147,34 +178,24 @@ void command_dumpram(int argc, char **args)
 	dump((uint16_t *) RAM_ADDR, 0x1800);
 }
 
-void command_version(int argc, char **args)
+void command_move(int argc, char **args)
 {
-	printf("version: %s\n", VERSION);
-	return;
-}
+	uint16_t data;
+	uint16_t errors = 0;
 
-void command_info(int argc, char **args)
-{
-	uint32_t pc;
-	uint32_t sp;
-	uint32_t sv1;
-	uint16_t flags;
+	if (argc <= 3) {
+		fputs("Must supply a source, destination, and size arguments in hex\n", stdout);
+	} else {
+		uint16_t *source = (uint16_t *) strtol(args[1], NULL, 16);
+		uint16_t *dest = (uint16_t *) strtol(args[2], NULL, 16);
+		uint32_t size = strtol(args[3], NULL, 16);
 
-	asm(
-	"move.l	%%sp, %0\n"
-	"move.l	(%%sp), %1\n"
-	"move.w	%%sr, %2\n"
-	"bsr	INFO\n"
-	"INFO:\t"
-	"move.l	(%%sp)+, %3\n"
-	: "=r" (sp), "=r" (sv1), "=r" (flags), "=r" (pc)
-	);
+		for (int i = 0; i < (size >> 1); i++) {
+			dest[i] = source[i];
+		}
 
-	printf("PC: %x\n", pc);
-	printf("SR: %x\n", flags);
-	printf("SP: %x\n", sp);
-	printf("TOP: %x\n", sv1);
-	return;
+		printf("%d (%x) bytes transferred\n", size, size);
+	}
 }
 
 void command_poke(int argc, char **args)
@@ -186,7 +207,19 @@ void command_poke(int argc, char **args)
 		uint8_t data = (uint8_t) strtol(args[2], NULL, 16);
 		*(address) = data;
 	}
+}
 
+void command_peek(int argc, char **args)
+{
+	if (argc <= 1)
+		fputs("You need an address\n", stdout);
+	else {
+		uint8_t *address = (uint8_t *) strtol(args[1], NULL, 16);
+		//uint8_t data = (uint8_t) strtol(args[2], NULL, 16);
+		//*(address) = data;
+		uint8_t data = *(address);
+		printf("%x\n", data);
+	}
 }
 
 void erase_flash(uint32_t sector)
@@ -250,7 +283,7 @@ void command_eraserom(int argc, char **args)
 	data = dest[0];
 
 	fputs("\nVerifying erase\n\n", stdout);
-	for (int i = 0; i < ROM_SIZE; i++) {
+	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		data = dest[i];
 		if (data != 0xFFFF) {
 			printf("Flash not erased at %x (%x)\n", dest + i, data);
@@ -293,10 +326,10 @@ void command_writerom(int argc, char **args)
 
 	if (argc >= 2)
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
-        if (argc >= 3)
+	if (argc >= 3)
 		source = (uint16_t *) strtol(args[2], NULL, 16);
 
-	for (int i = 0; i < ROM_SIZE; i++) {
+	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		data = dest[i];
 		if (data != 0xFFFF) {
 			printf("Flash not erased at %x (%x)\n", dest + i, data);
@@ -304,7 +337,7 @@ void command_writerom(int argc, char **args)
 		}
 	}
 
-	for (int i = 0; i < ROM_SIZE; i++) {
+	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		program_flash_data(&dest[i], source[i]);
 		delay(200);
 		printf("%x ", dest[i]);
@@ -317,16 +350,19 @@ void command_verifyrom(int argc, char **args)
 {
 	uint16_t data;
 	uint16_t errors = 0;
+	uint32_t size = ROM_SIZE;
 
 	uint16_t *source = (uint16_t *) RAM_ADDR;
 	uint16_t *dest = (uint16_t *) ROM_ADDR;
 
 	if (argc >= 2)
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
-        if (argc >= 3)
+	if (argc >= 3)
 		source = (uint16_t *) strtol(args[2], NULL, 16);
+	if (argc >= 3)
+		size = strtol(args[3], NULL, 16);
 
-	for (int i = 0; i < ROM_SIZE; i++) {
+	for (int i = 0; i < (size >> 1); i++) {
 		if (dest[i] != source[i]) {
 			printf("@%x expected %x but found %x\n", &dest[i], source[i], dest[i]);
 			if (++errors > 100) {
@@ -388,7 +424,7 @@ void command_boot(int argc, char **args)
 		entry = (void (*)(char *)) strtol(args[1], NULL, 16);
 	if (argc >= 3)
 		boot_args = args[2];
-	((void (*)()) entry)(boot_args);
+	((void (*)(char *)) entry)(boot_args);
 }
 
 
@@ -397,8 +433,10 @@ void command_ramtest(int argc, char **args)
 	uint16_t data;
 	uint16_t errors = 0;
 
+	printf("Testing onboard ram from %x to %x\n", RAM_ADDR, RAM_ADDR + RAM_SIZE);
+
 	uint16_t *mem = (uint16_t *) RAM_ADDR;
-	for (int i = 0; i < RAM_SIZE; i++) {
+	for (int i = 0; i < (RAM_SIZE >> 1); i++) {
 		mem[i] = (uint16_t) i;
 	}
 
@@ -408,16 +446,155 @@ void command_ramtest(int argc, char **args)
 	//}
 
 
-	for (int i = 0; i < RAM_SIZE; i++) {
+	for (int i = 0; i < (RAM_SIZE >> 1); i++) {
 		data = (uint16_t) mem[i];
-		printf("%x ", data);
-		if (data != i)
+		if (data != (uint16_t) i) {
+			printf("%08x: %x\n", (unsigned int) &mem[i], data);
 			errors++;
+		}
 	}
 
-	printf("\nErrors: %d", errors);
+	printf("\nErrors: %d\n", errors);
 }
 
+void command_vmetest(int argc, char **args)
+{
+	// Test different VME bus accesses
+	//volatile uint16_t *vme_address = (uint16_t *) 0xff8ABCDE;
+	// *vme_address = (uint16_t) 0xAABB;
+	// *vme_address = 0xaa55;
+	// *vme_address = (uint16_t) ((uint32_t) vme_address >> 12);
+	// *((uint8_t *) vme_address) = 0xaa;
+	// *((uint32_t *) vme_address) = 0xaa55bb44;
+	// *((uint8_t *) vme_address) = 0xaa;
+	// *((uint32_t *) vme_address) = 0xaa55bb44;
+	//printf("%x: %x\n", vme_address, *vme_address);
+
+
+	volatile uint8_t *vme_address_byte = (uint8_t *) 0xFF800020;
+	printf("%x: %x\n", vme_address_byte, *vme_address_byte);
+	//*vme_address_byte = 0x00;
+
+	/*
+	for (int i = 0; i < 0xffff; i += 2)
+	{
+		uint16_t expected = (uint16_t) (i & 0xFF);
+		vme_address_word[i >> 1] = (uint16_t) ((expected << 8) | ((expected + 1) & 0xFF));
+	}
+	*/
+
+	/*
+	volatile uint8_t *vme_address_byte = (uint8_t *) 0xFFC00000;
+	volatile uint16_t *vme_address_word = (uint16_t *) 0xFFC00000;
+	for (int i = 0; i < 0xffff; i++)
+	{
+		vme_address_byte[i] = (uint8_t) i;
+	}
+
+	for (int i = 0; i < 0xffff; i += 2)
+	{
+		uint16_t expected = (uint16_t) (i & 0xFF);
+		uint16_t data = vme_address_word[i >> 1];
+		if (data != ((expected << 8) | ((expected + 1) & 0xFF))) {
+			printf("%08x: %04x\n", &vme_address_byte[i], data);
+		}
+	}
+	*/
+}
+
+#define COMET_VME_CF_CONTROL	((volatile uint8_t *) 0xff800020)
+#define ATA_REG_DEV_CONTROL	((volatile uint8_t *) 0xff80001c)
+#define ATA_REG_DEV_ADDRESS	((volatile uint8_t *) 0xff80001e)
+#define ATA_REG_DATA		((volatile uint16_t *) 0xff800200)
+#define ATA_REG_DATA_BYTE	((volatile uint8_t *) 0xff800000)
+#define ATA_REG_FEATURE		((volatile uint8_t *) 0xff800002)
+#define ATA_REG_ERROR		((volatile uint8_t *) 0xff800002)
+#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) 0xff800004)
+#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) 0xff800006)
+#define ATA_REG_CYL_LOW		((volatile uint8_t *) 0xff800008)
+#define ATA_REG_CYL_HIGH	((volatile uint8_t *) 0xff80000a)
+#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) 0xff80000c)
+#define ATA_REG_STATUS		((volatile uint8_t *) 0xff80000e)
+#define ATA_REG_COMMAND		((volatile uint8_t *) 0xff80000e)
+
+
+#define ATA_CMD_READ_SECTORS	0x20
+#define ATA_CMD_WRITE_SECTORS	0x30
+#define ATA_CMD_IDENTIFY	0xEC
+#define ATA_CMD_SET_FEATURE	0xEF
+
+#define ATA_ST_BUSY		0x80
+#define ATA_ST_DATA_READY	0x08
+#define ATA_ST_ERROR		0x01
+
+
+#define ATA_DELAY(x)		{ for (int delay = 0; delay < (x); delay++) { asm volatile(""); } }
+#define ATA_WAIT()		{ ATA_DELAY(4); while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
+#define ATA_WAIT_FOR_DATA()	{ while (!(*ATA_REG_STATUS) & ATA_ST_DATA_READY) { } }
+
+void command_atatest(int argc, char **args)
+{
+	uint32_t sector = 46842;
+	char buffer[512];
+
+	if (argc >= 2)
+		sector = (uint32_t) strtol(args[1], NULL, 10);
+
+	//printf("Set COMET CompactFlash async mode\n");
+	//*COMET_VME_CF_CONTROL = 0x00;
+	//ATA_DELAY(10);
+	//*COMET_VME_CF_CONTROL = 0xb8;
+	//ATA_DELAY(20);
+
+	// Set 8-bit mode
+	//printf("Set 8-bit mode\n");
+	(*ATA_REG_FEATURE) = 0x01;
+	(*ATA_REG_COMMAND) = ATA_CMD_SET_FEATURE;
+	ATA_WAIT();
+
+	// Read a sector
+	//printf("Setup read\n");
+	(*ATA_REG_DRIVE_HEAD) = 0xE0;
+	//(*ATA_REG_DRIVE_HEAD) = 0xE0 | (uint8_t) ((sector >> 24) & 0x0F);
+	(*ATA_REG_CYL_HIGH) = (uint8_t) (sector >> 16);
+	(*ATA_REG_CYL_LOW) = (uint8_t) (sector >> 8);
+	(*ATA_REG_SECTOR_NUM) = (uint8_t) sector;
+	(*ATA_REG_SECTOR_COUNT) = 1;
+	(*ATA_REG_COMMAND) = ATA_CMD_READ_SECTORS;
+	ATA_WAIT();
+
+	//printf("Read status\n");
+	char status = (*ATA_REG_STATUS);
+	if (status & 0x01) {
+		printf("Error while reading ata: %x\n", (*ATA_REG_ERROR));
+		return;
+	}
+
+	//printf("Wait for data\n");
+	ATA_WAIT();
+	ATA_WAIT_FOR_DATA();
+
+	//printf("Read data\n");
+	for (int i = 0; i < 512; i++) {
+		//((uint16_t *) buffer)[i] = (*ATA_REG_DATA);
+		//asm volatile("rol.w	#8, %0\n" : "+g" (((uint16_t *) buffer)[i]));
+		buffer[i] = (*ATA_REG_DATA_BYTE);
+		//printf("%x ", 0xff & buffer[i]);
+
+		//ATA_WAIT_FOR_DATA();
+		//ATA_WAIT();
+		ATA_DELAY(10);
+	}
+
+	printf("Mem %x:\n", sector);
+	for (int i = 0; i < 512; i++) {
+		printf("%02x ", 0xff & buffer[i]);
+		if ((i & 0x1F) == 0x1F)
+			printf("\n");
+	}
+
+	return;
+}
 
 /**************************
  * Command Line Execution *
@@ -442,13 +619,17 @@ int load_commands(struct command *command_list)
 	add_command("load", command_load);
 	add_command("boot", command_boot);
 	add_command("dump", command_dump);
-	add_command("poke", command_poke);
 	add_command("dumpram", command_dumpram);
+	add_command("move", command_move);
+	add_command("poke", command_poke);
+	add_command("peek", command_peek);
 	add_command("eraserom", command_eraserom);
 	add_command("writerom", command_writerom);
 	add_command("verifyrom", command_verifyrom);
 
 	add_command("ramtest", command_ramtest);
+	add_command("v", command_vmetest);
+	add_command("a", command_atatest);
 
 	return num_commands;
 }
@@ -511,7 +692,7 @@ int main()
 
 	//delay(10000);
 
-	fputs("\n\nWelcome to the 68k Monitor!\n\n", stdout);
+	fputs("\n\nWelcome to the k30-VME Monitor!\n\n", stdout);
 
 	/*
 	int *data = malloc(sizeof(int) * 10);
@@ -534,7 +715,7 @@ int main()
 
 	int *data4 = malloc(sizeof(int) * 10);
 	printf("%x %d\n", data4, *(data4 - 3));
-	
+
 	print_free();
 	*/
 

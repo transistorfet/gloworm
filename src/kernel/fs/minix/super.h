@@ -3,6 +3,7 @@
 #define _SRC_KERNEL_FS_MINIX_SUPER_H
 
 #include <asm/macros.h>
+#include <kernel/printk.h>
 
 #include "../bufcache.h"
 

@@ -126,20 +126,20 @@ welcome:
 
 
 monitor.bin: $(MONITOR_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/monitor/monitor.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/monitor/monitor.ld -Wl,--oformat=binary -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/monitor/monitor.ld -o $@.elf $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/monitor/monitor.ld -Wl,--oformat=binary -o $@ $^
 	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
 
 
 boot.bin: $(BOOT_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=main -Ttext=0x0000 -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=main -Ttext=0x0000 -Wl,--oformat=binary -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=main -Ttext=0x0000 -o $@.elf $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=main -Ttext=0x0000 -Wl,--oformat=binary -o $@ $^
 
 
 kernel.bin: CFLAGS += -DONEBINARY
 kernel.bin: $(KERNEL_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/kernel/kernel.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) --entry=_start -Tsrc/kernel/kernel.ld -Wl,--oformat=binary -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/kernel/kernel.ld -o $@.elf $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/kernel/kernel.ld -Wl,--oformat=binary -o $@ $^
 	mkdir -p $(BUILD)
 	cp $@ $(BUILD)
 

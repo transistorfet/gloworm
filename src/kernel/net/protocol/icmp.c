@@ -2,6 +2,7 @@
 #include <asm/macros.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <kernel/printk.h>
 
 #include "../protocol.h"
 
