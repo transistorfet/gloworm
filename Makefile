@@ -1,191 +1,105 @@
 
-GLOWORM = .
+# disabled make's built-in rules and built-in variables
+MAKEFLAGS += -rR
 
-include $(GLOWORM)/config.mk
+ifneq ($(O),)
+    OUTPUT := $(patsubst %/,%,$(O))/
+endif
 
-ASLISTING = -alh
+# TODO building to another directory doesn't work yet
+#OUTPUT := build
+export OUTPUT
 
+this-makefile := $(lastword $(MAKEFILE_LIST))
+src-root := $(realpath $(dir $(this-makefile)))
 
-BOOT_OBJS = \
-	src/boot/boot.o \
-	libc-68k-none.a
+include $(src-root)/tools/build/Makefile.defaults
 
+-include $(kconfig-file)
 
-MONITOR_OBJS = \
-	src/monitor/crt0.o \
-	src/monitor/monitor.o \
-	src/monitor/vectors.o \
-	src/monitor/tty_68681.o \
-	libc-68k-none.a
+build-root	:= $(if $(OUTPUT),$(shell mkdir -p $(OUTPUT) && cd $(OUTPUT) && pwd))
+export src-root build-root kconfig-file config-h
 
+PHONY += all
+all: generate_config decend
 
-DEVFS_OBJS = \
-	src/kernel/fs/devfs/devfs.o
+PHONY += config
+config:
+	# TODO open config program
 
-PROCFS_OBJS = \
-	src/kernel/fs/procfs/data.o \
-	src/kernel/fs/procfs/procfs.o
+PHONY += generate_config
+generate_config: $(config-h)
 
-MALLOCFS_OBJS = \
-	src/kernel/fs/mallocfs/alloc.o \
-	src/kernel/fs/mallocfs/mallocfs.o
+$(config-h): $(kconfig-file)
+	$(shell mkdir -p $(dir $(config-h)))
+	cat $(kconfig-file) | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $(config-h)
 
-MINIXFS_OBJS = \
-	src/kernel/fs/minix/bitmaps.o \
-	src/kernel/fs/minix/minix.o
-
-FILESYSTEM_OBJS = \
-	$(PROCFS_OBJS) \
-	$(MINIXFS_OBJS)
-
-DRIVER_OBJS = \
-	src/kernel/drivers/tty_68681.o \
-	src/kernel/drivers/tty.o \
-	src/kernel/drivers/partition.o \
-	src/kernel/drivers/mem.o \
-	src/kernel/drivers/ata.o
-
-KERNEL_OBJS = \
-	include/kernel/syscall.h \
-	src/kernel/start.o \
-	src/kernel/main.o \
-	src/kernel/syscall_entry.o \
-	src/kernel/syscall.o \
-	src/kernel/interrupts.o \
-	src/kernel/bh.o \
-	src/kernel/time.o \
-	src/kernel/driver.o \
-	src/kernel/proc/scheduler.o \
-	src/kernel/proc/process.o \
-	src/kernel/proc/timer.o \
-	src/kernel/proc/tasks.o \
-	src/kernel/proc/memory.o \
-	src/kernel/proc/signal.o \
-	src/kernel/proc/filedesc.o \
-	src/kernel/proc/binaries.o \
-	src/kernel/proc/select.o \
-	src/kernel/mm/kmalloc.o \
-	src/kernel/fs/vfs.o \
-	src/kernel/fs/nop.o \
-	src/kernel/fs/pipe.o \
-	src/kernel/fs/device.o \
-	src/kernel/fs/access.o \
-	src/kernel/fs/fileptr.o \
-	src/kernel/fs/bufcache.o \
-	$(FILESYSTEM_OBJS) \
-	$(DRIVER_OBJS) \
-	src/kernel/net/packet.o \
-	src/kernel/net/socket.o \
-	src/kernel/net/protocol.o \
-	src/kernel/net/protocol/inet_af.o \
-	src/kernel/net/protocol/ipv4.o \
-	src/kernel/net/protocol/udp.o \
-	src/kernel/net/protocol/icmp.o \
-	src/kernel/net/protocol/tcp.o \
-	src/kernel/net/if.o \
-	src/kernel/net/if/slip.o \
-	src/commands/init.o \
-	src/commands/sh.o \
-	libc-68k-os.a
-#	src/tests/kernel/tests.o \
-
-
-all: monitor.bin monitor.load boot.bin boot.load kernel.bin kernel.load
-build-system: kernel.bin commands devicefiles otherfiles
-
-term:
-	pyserial-miniterm /dev/ttyUSB0 38400
-
-commands:
-	make -C src/commands clean all
-
-devicefiles:
-	sudo mkdir -p $(BUILD)/dev
-	sudo mknod $(BUILD)/dev/tty0 c 2 0
-	sudo mknod $(BUILD)/dev/tty1 c 2 1
-	sudo mknod $(BUILD)/dev/mem0 c 3 0
-	sudo mknod $(BUILD)/dev/ata0 c 4 0
-
-otherfiles:
-	sudo mkdir -p $(BUILD)/etc
-	sudo mkdir -p $(BUILD)/proc
-	sudo mkdir -p $(BUILD)/home
-	sudo mkdir -p $(BUILD)/media
-	sudo cp -r etc/* $(BUILD)/etc
-
-
-libc-68k-none.a libc-68k-os.a:
-	make -C src/libc ../../$@
-
-
-welcome monitor.bin boot.bin: CFLAGS += -mpcrel
-
-welcome:
-	$(AS) -m68000 -o welcome.elf src/welcome.s
-	$(OBJCOPY) -O binary welcome.elf welcome.bin
-
-
-monitor.bin: $(MONITOR_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/monitor/monitor.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/monitor/monitor.ld -Wl,--oformat=binary -o $@ $^
-	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
-
-
-boot.bin: $(BOOT_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=main -Ttext=0x0000 -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=main -Ttext=0x0000 -Wl,--oformat=binary -o $@ $^
-
-
-kernel.bin: CFLAGS += -DONEBINARY
-kernel.bin: $(KERNEL_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/kernel/kernel.ld -o $@.elf $^
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--entry=_start -Tsrc/kernel/kernel.ld -Wl,--oformat=binary -o $@ $^
-	mkdir -p $(BUILD)
-	cp $@ $(BUILD)
-
-
-boot.load: LOAD_ARGS = 180000
-#kernel.load: LOAD_ARGS = 100000 ata0
-
-
-%.load: %.bin
-	tools/make-load-file $^ $@ $(LOAD_ARGS)
-
-%.send: %.bin
-	tools/make-send-file $^ $@
-
-%.a: $^
-	$(AR) rc $@ $^
-	$(RANLIB) $@
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-%.o: %.s
-	$(AS) $(ASFLAGS) -c -o $@ $<
-
-clean:
-	find . \( -name "*.o" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" \) -delete -print
+PHONY += decend
+decend:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src
 
 
 # TODO 128 is just barely enough for 20 commands, kernel, devfiles
 #BLOCKS = 128
-BLOCKS = 20480
-IMAGE = minix-build.img
-LOOPBACK = /dev/loop8
-MOUNTPOINT = build
+BLOCKS := 20480
+IMAGE := minix-build.img
+LOOPBACK := /dev/loop8
+#MOUNTPOINT := $(OUTPUT)image
+MOUNTPOINT := build/image
+SUDO := sudo
+
+PHONY += create-image build-image-files mount-image umount-image
+
+build-disk-image: decend create-image-dir kernelfile commandfiles devicefiles otherfiles
+
+create-image-dir:
+	mkdir -p $(MOUNTPOINT)
 
 create-image:
 	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
-	sudo losetup $(LOOPBACK) $(IMAGE)
-	sudo mkfs.minix -1 -n 14 $(LOOPBACK) $(BLOCKS)
-	sudo losetup -d $(LOOPBACK)
+	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
+	$(SUDO) mkfs.minix -1 -n 14 $(LOOPBACK) $(BLOCKS)
+	$(SUDO) losetup -d $(LOOPBACK)
 
 mount-image:
-	sudo losetup $(LOOPBACK) $(IMAGE)
-	sudo mount -t minix $(LOOPBACK) $(MOUNTPOINT)
+	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
+	$(SUDO) mount -t minix $(LOOPBACK) $(MOUNTPOINT)
 
 umount-image:
-	sudo umount $(LOOPBACK)
-	sudo losetup -d $(LOOPBACK)
+	$(SUDO) umount $(LOOPBACK)
+	$(SUDO) losetup -d $(LOOPBACK)
 
+kernelfile:
+	$(SUDO) cp $(OUTPUT)src/kernel.bin $(MOUNTPOINT)
+
+commandfiles:
+	$(SUDO) mkdir -p $(MOUNTPOINT)/bin
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src/commands SUDO=$(SUDO) LOCATION=$(MOUNTPOINT)/bin copy-commands
+
+devicefiles:
+	$(SUDO) mkdir -p $(MOUNTPOINT)/dev
+	$(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
+	$(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
+	$(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
+	$(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
+
+otherfiles:
+	$(SUDO) mkdir -p $(MOUNTPOINT)/etc
+	$(SUDO) mkdir -p $(MOUNTPOINT)/proc
+	$(SUDO) mkdir -p $(MOUNTPOINT)/home
+	$(SUDO) mkdir -p $(MOUNTPOINT)/media
+	$(SUDO) cp -r etc/* $(MOUNTPOINT)/etc
+
+
+# TODO need a better clean rule
+clean:
+	rm -f $(config-h)
+	#ifneq ($(OUTPUT),)
+	#	rm -f $(OUTPUT)
+	#endif
+	find . \( -name "*.o" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
+
+PHONY += FORCE
+FORCE:
+
+.PHONY: $(PHONY)

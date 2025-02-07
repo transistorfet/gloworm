@@ -1,0 +1,70 @@
+#
+# Config for Gloworm
+#
+
+# I saw this in linux, haven't looked into the definition, but it could make printk be a dummy function to save space perhaps? headless
+#CONFIG_PRINTK=y
+#CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+# I don't know what these are for but they look like they might be relevant
+#CONFIG_ELF_CORE=y
+#CONFIG_FHANDLE=y
+#CONFIG_MULTIUSER=y
+
+
+#
+# Architecture Options
+#
+# these are how linux is setting the architecture
+#CONFIG_X86_64=y
+#CONFIG_X86=y
+CONFIG_M68K=y
+CONFIG_CPU_BIG_ENDIAN=y
+#CONFIG_M68000=y
+#CONFIG_M68010=y
+CONFIG_M68030=y
+#CONFIG_MMU=n
+#CONFIG_FPU=y
+#CONFIG_CACHE=y
+#CONFIG_CLOCK_FREQ="12500000" # not sure where this is used in linux
+
+#CONFIG_COMPUTIE_68K=y
+#CONFIG_COMPUTIE_K30=y
+#CONFIG_COMPUTIE_K30_VME=y
+#CONFIG_COMET_68K=y
+
+
+#
+# TTY Options
+#
+CONFIG_TTY=y
+CONFIG_TTY_68681=y
+
+#
+# Block Device Options
+#
+CONFIG_ATA=y
+CONFIG_MEM=y
+# TODO these are the names LINUX uses to add and configure the size of the ram disk which in gloworm is mem, and the /dev/mem0 device
+CONFIG_BLK_DEV_RAM=m
+CONFIG_BLK_DEV_RAM_COUNT=16
+CONFIG_BLK_DEV_RAM_SIZE=16384
+
+#
+# File System Options
+#
+CONFIG_MSDOS_PARTITION=y
+#CONFIG_MALLOC_FS=y
+CONFIG_MINIX_FS=y
+
+#
+# Network Options
+#
+CONFIG_NET=y
+CONFIG_SLIP=y
+CONFIG_PACKET=y
+#CONFIG_INET is what linux uses for IPv4/TCPv4 (and I guess UDP? didn't see mention of it, but it seems to be bundled)
+#I could instead have CONFIG_TCPV4, CONFIG_UDPV4, CONFIG_IPV4
+CONFIG_INETV4=y
+
+CONFIG_PSEUDOSHELL=y

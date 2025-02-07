@@ -1,0 +1,120 @@
+
+# disabled make's built-in rules and built-in variables
+MAKEFLAGS += -rR
+
+include $(src-root)/tools/build/Makefile.defaults
+
+include $(kconfig-file)
+
+always-y	:=	# targets that are always build
+obj-y		:=	# targets to be built and included in the in-target
+subdir-y	:=	# subdirectories to be built recursively
+#lib-y		:=
+libex-y		:=	# external libraries to include when linking
+extra-y		:=	# extra targets to build 
+userprogs	:=	# user programs to compile
+ccflags-y	:=
+asflags-y	:=
+ldflags-y	:=
+objprefix	:= $(OUTPUT)$(dir)/
+
+targets		:=
+
+ifeq ($(shell test -e $(build-file) && echo yes),)
+    $(error Missing build file $(build-file))
+endif
+
+all:
+
+include $(build-file)
+
+obj-y		:= $(patsubst %/,%/built-in.o, $(obj-y))
+#subdir-obj-y	:= $(filter %/built-in.o, $(obj-y))
+
+# Executables compiled from a single .c file
+user-csingle	:= $(foreach m, $(userprogs), $(if $($(m)-objs),,$(m)))
+
+# Executables linked based on several .o files
+user-cmulti	:= $(foreach m, $(userprogs), $(if $($(m)-objs),$(m)))
+
+
+# Add prefix to all applicable targets
+obj-y		:= $(addprefix $(objprefix),$(obj-y))
+#subdir-obj-y	:= $(addprefix $(objprefix),$(subdir-obj-y))
+in-target	:= $(objprefix)built-in.o
+user-csingle	:= $(addprefix $(objprefix),$(user-csingle))
+user-cmulti	:= $(addprefix $(objprefix),$(user-cmulti))
+always-y	:= $(addprefix $(objprefix),$(always-y))
+
+subdir-y	:= $(addprefix $(dir)/,$(subdir-y))
+libex-obj-y	:= $(addprefix $(OUTPUT),$(libex-y))
+
+targets		:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOALS)
+
+PHONY += all
+all: $(targets)
+
+$(in-target): $(libex-y) $(obj-y) $(extra-y) $(build-file)
+	$(LD) -r -o $@ $(obj-y) $(libex-obj-y)
+
+PHONY += $(subdir-y)
+$(subdir-y):
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$@
+
+$(libex-y): FORCE
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@))
+
+
+# Build Rules for User Programs
+$(user-csingle): $(OUTPUT)$(dir)/%: $(OUTPUT)$(dir)/%.o $(libex-y) $(libex-obj-y)
+	$(cmd_ld_elf)
+
+$(user-cmulti): $(OUTPUT)$(dir)/%: $(OUTPUT)$(dir)/%/built-in.o $(libex-y) $(libex-obj-y)
+	$(cmd_ld_elf)
+
+
+# Generic Build Rules
+$(OUTPUT)%.load: $(OUTPUT)%.bin
+	tools/make-load-file $< $@ $(LOAD_ARGS)
+
+$(OUTPUT)%.send: $(OUTPUT)%.bin
+	tools/make-send-file $< $@
+
+$(OUTPUT)%.bin: $(OUTPUT)%.elf
+	$(cmd_ld_bin)
+
+#.PRECIOUS: $(OUTPUT)%.elf
+$(OUTPUT)%.elf: $(OUTPUT)%/built-in.o
+	$(cmd_ld_elf)
+
+$(OUTPUT)%/built-in.o:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$* $@
+
+$(OUTPUT)%.a:
+	$(AR) rcs $@ $^
+
+$(OUTPUT)%.o: %.c
+	$(cmd_cc_o)
+
+$(OUTPUT)%.o: %.s
+	$(cmd_as_o)
+
+# Commands
+cmd_ld_elf = $(CC) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -o $@ $^
+cmd_ld_bin = $(CC) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -Wl,--oformat=binary -o $@ $^
+cmd_cc_o = $(CC) $(CFLAGS) $(ccflags-y) -c -o $@ $<
+cmd_as_o = $(AS) $(ASFLAGS) $(asflags-y) -c -o $@ $<
+
+
+obj-dirs := $(sort $(patsubst %/,%, $(dir $(targets))))
+ifneq ($(obj-dirs),)
+$(shell mkdir -p $(obj-dirs))
+endif
+
+
+
+PHONY += FORCE
+FORCE:
+
+.PHONY: $(PHONY)
+.PRECIOUS: $(PRECIOUS)

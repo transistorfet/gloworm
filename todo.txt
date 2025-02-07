@@ -1,4 +1,17 @@
 
+* it's not stripping the elfs or making multiple kinds of outputs for the commands/user programs
+
+* it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
+* ccflags is not applying to recursive builds, so the -DONEBINARY flag isn't applied to all the kernel subdirs, only the toplevel, but it's working enough for now with the recompiled cmds
+* replace the -DBOARD_k30 flag
+* stop it from removing intermediate files using PRECIOUS (but I don't know how to apply it to all elfs)
+* should you replace the libc makefile with subdirs like the kernel?
+* go through and add so many more options
+* add rules to configure, and Kconfig files to be read, could have a dockerfile for the debian utils if it's not found locally
+* make config.k30-SBC, config.68k-SBC, config.k30p-VME, and eventually others
+* make a better clean rule?
+
+
 * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
 
 * should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>

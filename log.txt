@@ -14,3 +14,28 @@
   to the monitor to test the VME bus accesses, and test the CF card, and I've since managed to get the kernel booting on the k30p
   and run the network stack
 
+2025-02-01:
+- I've been trying to add a config system so that it's easier to conditionally compile things, and linux's config system looks
+  simple.  I could try to learn cmake and/or ninja or something, but then anyone building it would have to install those too, and
+  they don't look too straightforward for the kind of config I'd like
+- Kconfig uses a simple file format for describing config settings and their relations, which generates a single file with all the
+  config settings in them.  The config programs are distributed with debian, so they don't have to be included here, and even then,
+  the output config file with eg. `CONFIG_M68K=y` is easily human readable and modifiable, it's valid make and bash syntax, can be
+  parsed easily.  You do have to make sure the dependecies are satisfied when editing the output by hand, but that's minor.
+- A question is whether it's best to try to match the linux config item names, or whether to change some names, like BLK_DEV_RAM
+  calling RAMDISK or something instead.  It probably doesn't matter much since I'll eventually write Kconfig files with
+  descriptions
+- linux seems to not use very many non-bool config items, which makes sense, but I'm thinking of using many more if I can, for
+  parameters like device sizes and maybe address offsets for I/O register addresses.  I can't seem to find where linux configures
+  those, if it has them configurable at all.  For a lot of systems, they'd all be in the same location, but for me, the ATA device
+  on computie is 0x600000 but on computie-vme with the COMET CF Card, it's 0xff800000 or anything in the 0xffxxx000 range I think
+
+2025-02-04:
+- there's a lot of issues to fix, but it at least seems to be compiling the kernel and the monitor enough to boot them
+- it turns out I was looking in tools/build/Makefile.build in the linux source, but it was scripts/Makefile.build that has the
+  more complex build system, which has multiple special variables for targets, and it treats them somewhat specially, so I figured I
+  should do the same so I have more control over what gets built how instead of over-generalizing
+- I added the userprogs variable with pretty much the same rules to separate out single source file programs from multi-file ones,
+  but I haven't tested the multi one yet
+- it's building the final step when it shouldn't, and I still need to add the libc makefiles
+
