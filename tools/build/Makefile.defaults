@@ -14,6 +14,7 @@ AS = m68k-linux-gnu-as
 AR = m68k-linux-gnu-ar
 CC = m68k-linux-gnu-gcc
 LD = m68k-linux-gnu-gcc
+STRIP = m68k-linux-gnu-strip
 OBJDUMP = m68k-linux-gnu-objdump
 OBJCOPY = m68k-linux-gnu-objcopy
 RANLIB = m68k-linux-gnu-ranlib

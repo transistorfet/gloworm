@@ -39,3 +39,9 @@
   but I haven't tested the multi one yet
 - it's building the final step when it shouldn't, and I still need to add the libc makefiles
 
+2025-02-07:
+- finally get the new build system implemented.  I had to make some special cases with subdir-y and others to make it build the
+  right things, or else it would get confused by too many generic rules.  I still don't have it stripping the binaries for the
+  commands yet, but that will come soon
+
+

@@ -31,17 +31,17 @@ commands-y		+= tcpserv
 commands-y		+= httpd
 commands-y		+= daemontest
 
-userprogs		:= $(commands-y)
+#userprogs		:= $(commands-y)
 #userprogs		+= $(foreach name,$(commands-y),$(name).send)
-#userprogs		+= $(foreach name,$(commands-y),$(name).elf)
-#userprogs		+= $(foreach name,$(commands-y),$(name).strip)
+userprogs		+= $(foreach name,$(commands-y),$(name).elf)
+userprogs-stripped	+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(name).strip))
 
 libex-y			+= src/libc/libc-68k-os.a
 
-$(OUTPUT)%.strip: $(OUTPUT)%.elf
-	$(STRIP) $*.elf -o $(BUILD)/bin/$*
-	$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $*.elf $@
+# Strip and copy the user programs to the image
+userprogs-bare := $(addprefix $(objprefix),$(commands-y))
 
-copy-commands:
-	$(SUDO) cp $(addprefix $(objprefix),$(commands-y)) $(LOCATION)
+copy-commands: $(userprogs-bare)
 
+$(userprogs-bare): $(userprogs-stripped)
+	$(SUDO) cp $< $(LOCATION)/$(notdir $@)

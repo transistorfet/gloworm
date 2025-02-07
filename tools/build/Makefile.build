@@ -66,11 +66,15 @@ $(libex-y): FORCE
 
 
 # Build Rules for User Programs
-$(user-csingle): $(OUTPUT)$(dir)/%: $(OUTPUT)$(dir)/%.o $(libex-y) $(libex-obj-y)
+$(user-csingle): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%.o $(libex-y) $(libex-obj-y)
 	$(cmd_ld_elf)
 
-$(user-cmulti): $(OUTPUT)$(dir)/%: $(OUTPUT)$(dir)/%/built-in.o $(libex-y) $(libex-obj-y)
+$(user-cmulti): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%/built-in.o $(libex-y) $(libex-obj-y)
 	$(cmd_ld_elf)
+
+$(OUTPUT)%.strip: $(OUTPUT)%.elf
+	$(STRIP) $< -o $@
+	$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $< $@
 
 
 # Generic Build Rules
