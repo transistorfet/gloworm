@@ -39,9 +39,9 @@ userprogs-stripped	+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(na
 libex-y			+= src/libc/libc-68k-os.a
 
 # Strip and copy the user programs to the image
-userprogs-bare := $(addprefix $(objprefix),$(commands-y))
+userprogs-bare := $(addprefix $(LOCATION)/,$(commands-y))
 
 copy-commands: $(userprogs-bare)
 
-$(userprogs-bare): $(userprogs-stripped)
+$(LOCATION)/%: $(objprefix)%.strip
 	$(SUDO) cp $< $(LOCATION)/$(notdir $@)

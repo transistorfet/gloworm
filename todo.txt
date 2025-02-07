@@ -9,6 +9,7 @@
 * ccflags is not applying to recursive builds, so the -DONEBINARY flag isn't applied to all the kernel subdirs, only the toplevel, but it's working enough for now with the recompiled cmds
 * should you replace the libc makefile with subdirs like the kernel?
 * make a better clean rule?
+* add select-config rule to copy existing config?
 
 
 * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
@@ -17,6 +18,15 @@
 
 * can you change the board config flag to be "BOARD=k30" instead of "BOARD_k30"
 * really need to add a config system of some kind, could use Kconfig
+
+* fix the timing issue with CF Card at the higher CPU speed
+* make ATA driver addresses configurable, so that you can compile for 68k-SBC or k30p-VME and have both images work without modification
+* support minixfs 2 and 3?
+* add ext2 support
+* add virtual memory support
+* add dynamic linking so that you can have a shared libc
+* fix bugs
+* fix warnings
 
 
 Operating System:
