@@ -5,9 +5,6 @@ MAKEFLAGS += -rR
 ifneq ($(O),)
     OUTPUT := $(patsubst %/,%,$(O))/
 endif
-
-# TODO building to another directory doesn't work yet
-#OUTPUT := build
 export OUTPUT
 
 this-makefile := $(lastword $(MAKEFILE_LIST))
@@ -21,14 +18,22 @@ build-root	:= $(if $(OUTPUT),$(shell mkdir -p $(OUTPUT) && cd $(OUTPUT) && pwd))
 export src-root build-root kconfig-file config-h
 
 PHONY += all
-all: generate_config decend
+all: generate-config decend
 
 PHONY += config
 config:
-	# TODO open config program
+	kconfig-conf $(src-root)/Kconfig
 
-PHONY += generate_config
-generate_config: $(config-h)
+PHONY += menuconfig
+menuconfig:
+	kconfig-mconf $(src-root)/Kconfig
+
+PHONY += dconfig
+dconfig:
+	cd tools/config && ./run.sh
+
+PHONY += generate-config
+generate-config: $(config-h)
 
 $(config-h): $(kconfig-file)
 	$(shell mkdir -p $(dir $(config-h)))
@@ -37,6 +42,13 @@ $(config-h): $(kconfig-file)
 PHONY += decend
 decend:
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src
+
+src/%:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src $@
+
+# Build the image that can be written to the 68kSupervisor of computie
+output.txt: $(OUTPUT)src/monitor.bin
+	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
 
 
 # TODO 128 is just barely enough for 20 commands, kernel, devfiles
@@ -98,6 +110,35 @@ clean:
 	#	rm -f $(OUTPUT)
 	#endif
 	find . \( -name "*.o" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
+
+
+PHONY += help
+help:
+	@echo  'Cleaning targets:'
+	@echo  '  clean            - Remove most generated files but keep the config'
+	@echo  ''
+	@echo  'Configuration targets:'
+	@echo  '  config           - Update current config using a terminal program'
+	@echo  '  menuconfig       - Update current config using a ncurses menu'
+	@echo  '  dconfig          - Update current config using a ncurses menu inside a'
+	@echo  '                     docker container, if you do not have the'
+	@echo  '                     `kconfig-frontends` debian package installed'
+	@echo  ''
+	@echo  'Other generic targets:'
+	@echo  '  all              - Build all targets marked with [*]'
+	@echo  '* src/kernel.bin   - Build the kernel'
+	@echo  '* src/monitor.bin  - Build the monitor (loaded into the ROM)'
+	@echo  '* src/commands     - Build all the user programs'
+	@echo  '  src/dir/         - Build all files in dir and below'
+	@echo  '  output.txt       - Build the file included by 68kSupervisor to boot from'
+	@echo  '                     the arduino'
+	@echo  ''
+	@echo  'Disk image targets:'
+	@echo  '  create-image     - Create a new disk image file initialized with minix1 fs'
+	@echo  '  mount-image      - Mount the disk image file to the default location'
+	@echo  '  umount-image     - Unmount the disk image file'
+	@echo  '  build-disk-image - Build `all` and copy the kernel, commands, /etc, and /dev'
+	@echo  '                     to the image mountpoint'
 
 PHONY += FORCE
 FORCE:

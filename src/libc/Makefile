@@ -20,7 +20,6 @@ $(objprefix)libc-68k-os.a: $(LIBC_68K_OS_OBJS)
 # Create all the directories, since we're specifying the objects improperly
 obj-dirs := $(sort $(patsubst %/,%, $(dir $(LIBC_68K_NONE_OBJS) $(LIBC_68K_OS_OBJS))))
 ifneq ($(obj-dirs),)
-$(info creating $(obj-dirs))
 $(shell mkdir -p $(obj-dirs))
 endif
 

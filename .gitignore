@@ -2,6 +2,7 @@
 .*.sw?
 .local.vimrc
 session.vim
+.ccls-cache/
 
 # Source Output Files
 *.o
@@ -15,6 +16,7 @@ session.vim
 *.sym
 *.load
 *.send
+output.txt
 
 # EDA Output Files
 *.gbr
@@ -31,7 +33,7 @@ hardware/**/*-backups
 
 # Build Directory
 /build/
-/include/generate/
+/include/generated/
 
 # Miscellaneous
 /junk/

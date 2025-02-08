@@ -27,7 +27,7 @@ LDFLAGS = -Wl,--build-id=none
 CFLAGS += -z max-page-size=0x10
 
 kconfig-file	:= $(src-root)/.config
-config-h	:= $(src-root)/include/generate/config.h
+config-h	:= $(src-root)/include/generated/config.h
 build-file	:= $(dir)/Makefile
 
 export AS AR CC LD OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS

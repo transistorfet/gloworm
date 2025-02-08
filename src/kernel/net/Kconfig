@@ -1,0 +1,21 @@
+
+menuconfig NET
+	bool "Networking support"
+	help
+	  Include the networking subsystem
+
+if NET
+
+config INETV4
+	bool "TCP/IP v4 networking"
+	help
+	  Include protocol decoders for IPv4, UDPv4, TCPv4, and ICMP
+
+config SLIP
+	bool "SLIP network interface"
+	help
+	  Include support for the SLIP (Serial Line IP) interface, which uses
+	  a character device to send and receive INETV4 packets
+
+endif
+

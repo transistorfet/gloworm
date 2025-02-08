@@ -27,7 +27,7 @@ struct process *create_init_task()
 	proc->map.segments[M_STACK].base = proc->map.segments[M_DATA].base;
 	proc->map.segments[M_STACK].length = stack_size;
 
-	#ifndef ONEBINARY
+	#if !defined(CONFIG_SHELL_IN_KERNEL)
 
 	// TODO this would load and execute an actual binary from the mounted disk
 	void *entry;

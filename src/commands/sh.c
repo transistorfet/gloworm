@@ -20,21 +20,21 @@
 #include <kernel/syscall.h>
 #endif
 
+#include <kernel/kconfig.h>
+
 #include "prototype.h"
 
 
 int f_interactive = 1;
 
-
-#ifdef ADDMAIN
-int sh_task();
+#if !defined(IN_KERNEL)
+int sh_task(int argc, char **argv, char **env);
 
 int main(int argc, char **argv, char **env)
 {
 	return sh_task(argc, argv, env);
 }
 #endif
-
 
 void delay(int count) {
 	while (--count > 0) { asm volatile(""); }
@@ -235,7 +235,7 @@ int command_chdir(int argc, char **argv, char **envp)
 }
 
 
-#ifdef ONEBINARY
+#if (defined(CONFIG_SHELL_WITH_UTILS) && defined(IN_SHELL)) || (defined(CONFIG_SHELL_IN_KERNEL) && defined(IN_KERNEL))
 #include "echo.c"
 #include "cat.c"
 #include "ls.c"
@@ -293,7 +293,7 @@ void init_commands()
 	add_command("hex", 	command_hex);
 	add_command("cd", 	command_chdir);
 
-	#ifdef ONEBINARY
+	#if (defined(CONFIG_SHELL_WITH_UTILS) && defined(IN_SHELL)) || (defined(CONFIG_SHELL_IN_KERNEL) && defined(IN_KERNEL))
 	add_command("echo", 	command_echo);
 	add_command("cat", 	command_cat);
 	add_command("ls", 	command_ls);

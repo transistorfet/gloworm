@@ -55,7 +55,7 @@ int MAIN(init_task)()
 
 		status = execve(argv[0], argv, envp);
 
-		#ifdef ONEBINARY
+		#if defined(CONFIG_SHELL_IN_KERNEL) && defined(IN_KERNEL)
 		// This will only run if the sh binary is not found on disk
 		if (status < 0) {
 			extern void sh_task();

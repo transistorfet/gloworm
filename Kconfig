@@ -1,0 +1,32 @@
+# For a description of the syntax of this configuration file,
+# see the linux kernel's Documentation/kbuild/kconfig-language.rst.
+#
+mainmenu "Gloworm Configuration"
+
+source "src/Kconfig"
+
+source "src/kernel/Kconfig"
+
+config SHELL_IN_KERNEL
+	bool "Include the `init` and `sh` code in the kernel binary"
+	help
+	  This will compile the init process and shell, along with some
+	  utilities such as cat, cp, mv, ps, mount, kill, date, and so on, into
+	  one binary blob.  The kernel will start the first process and call
+	  the init function instead of trying to load the init elf file from
+	  the file system.  The init process will create the first shell
+	  process and the shell will launch the utilities that are built-in
+	  the same way, and any non-built-in commands will be run as normal,
+	  by attempting to load an elf executable from the file system.  This
+	  option is handy when sending the kernel over serial, to a computer
+	  running the monitor from ROM, when no secondary storage is available
+	  or when it's not working correctly.
+
+config SHELL_WITH_UTILS
+	bool "Include the some basic /bin utilities in the shell"
+	help
+	  This will compile some utilities such as cat, cp, mv, ps, mount,
+	  kill, date, and so on, into a single elf.  The commands that are
+	  included will be run in a separate process using the same read-only
+	  memory area.  Any non-built-in commands will be run as normal, by
+	  attempting to load an elf executable from the file system.

@@ -38,6 +38,9 @@ userprogs-stripped	+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(na
 
 libex-y			+= src/libc/libc-68k-os.a
 
+# When other utilities are included into the shell, this flag will tell them not to include a main function
+$(objprefix)sh.o: CFLAGS += -DIN_SHELL
+
 # Strip and copy the user programs to the image
 userprogs-bare := $(addprefix $(LOCATION)/,$(commands-y))
 

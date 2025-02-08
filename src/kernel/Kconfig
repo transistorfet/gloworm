@@ -1,0 +1,10 @@
+
+menu "Kernel configuration"
+
+source "src/kernel/drivers/Kconfig"
+
+source "src/kernel/fs/Kconfig"
+
+source "src/kernel/net/Kconfig"
+
+endmenu

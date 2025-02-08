@@ -1,0 +1,16 @@
+
+menu "File systems"
+
+config MALLOC_FS
+	bool "malloc-backed file system"
+	help
+	  This enables the malloc-backed file system.  This allocates RAM from
+	  the user program space as files are created and written to
+
+config MINIX_FS
+	bool "Minix file system"
+	help
+	  This enables the minix file system support.  Only v1 is supported
+
+endmenu
+

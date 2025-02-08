@@ -1,7 +1,7 @@
 
-obj-$(CONFIG_SLIP)	+= icmp.o
-obj-$(CONFIG_SLIP)	+= inet_af.o
-obj-$(CONFIG_SLIP)	+= ipv4.o
-obj-$(CONFIG_SLIP)	+= tcp.o
-obj-$(CONFIG_SLIP)	+= udp.o
+obj-$(CONFIG_INETV4)	+= icmp.o
+obj-$(CONFIG_INETV4)	+= inet_af.o
+obj-$(CONFIG_INETV4)	+= ipv4.o
+obj-$(CONFIG_INETV4)	+= tcp.o
+obj-$(CONFIG_INETV4)	+= udp.o
 

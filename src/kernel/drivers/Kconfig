@@ -1,0 +1,37 @@
+
+menu "Device drivers"
+
+config ATA
+	bool "ATA device driver"
+	help
+	  This enables the ATA driver, which requires an address where the
+	  ATA registers can be accessed
+
+config MEM
+	bool "Ramdisk support"
+	help
+	  This enables the ramdisk device, which requires a fixed size that
+	  will be reserved
+
+config MSDOS_PARTITION
+	bool "MSDOS Partition"
+	help
+	  This enables the ramdisk device, which requires a fixed size that
+	  will be reserved
+
+menuconfig TTY
+	bool "TTY support"
+	help
+	  Include the TTY subsystem
+
+if TTY
+
+config TTY_68681
+	bool "MC68681"
+	help
+	  This enables the driver for the Morotola MC68681 dual-serial port
+	  controller
+
+endif
+
+endmenu

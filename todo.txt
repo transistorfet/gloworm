@@ -1,12 +1,9 @@
 
-* it's not stripping the elfs or making multiple kinds of outputs for the commands/user programs
 * replace the -DBOARD_k30 flag
 * go through and add so many more options
 * make config.k30-SBC, config.68k-SBC, config.k30p-VME, and eventually others
-* add rules to configure, and Kconfig files to be read, could have a dockerfile for the debian utils if it's not found locally
 
 * it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
-* ccflags is not applying to recursive builds, so the -DONEBINARY flag isn't applied to all the kernel subdirs, only the toplevel, but it's working enough for now with the recompiled cmds
 * should you replace the libc makefile with subdirs like the kernel?
 * make a better clean rule?
 * add select-config rule to copy existing config?
