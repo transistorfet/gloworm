@@ -88,7 +88,8 @@ $(OUTPUT)%.bin: $(OUTPUT)%.elf
 	$(cmd_ld_bin)
 
 #.PRECIOUS: $(OUTPUT)%.elf
-$(OUTPUT)%.elf: $(OUTPUT)%/built-in.o
+$(OUTPUT)%/$(notdir $(dir)).elf: $(OUTPUT)%/built-in.o
+	$(info >> $* $@ $(MAKECMDGOALS))
 	$(cmd_ld_elf)
 
 $(OUTPUT)%/built-in.o:

@@ -1,6 +1,7 @@
 
+* the compiled kernel doesn't work because it doesn't use the ldflags-y, since the binaries are a dir level above
+  monitor is affected too, but it still runs
 * replace the -DBOARD_k30 flag
-* go through and add so many more options
 * make config.k30-SBC, config.68k-SBC, config.k30p-VME, and eventually others
 
 * it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
@@ -8,8 +9,12 @@
 * make a better clean rule?
 * add select-config rule to copy existing config?
 
+* separate out the serial interrupt stuff to make it more generic
+* make the slip device configurable
+
 
 * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
+* go through and add so many more options
 
 * should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>
 

@@ -40,15 +40,24 @@ $(config-h): $(kconfig-file)
 	cat $(kconfig-file) | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $(config-h)
 
 PHONY += decend
-decend:
+decend: generate-config
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src
 
-src/%:
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src $@
+src/%: generate-config
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@)) $@
 
 # Build the image that can be written to the 68kSupervisor of computie
-output.txt: $(OUTPUT)src/monitor.bin
+output.txt: $(OUTPUT)src/monitor/monitor.bin
 	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
+
+# Convenience targets
+PHONY += monitor.load monitor.bin monitor.elf kernel.load kernel.bin kernel.elf
+monitor.load: src/monitor/monitor.load
+monitor.bin: src/monitor/monitor.bin
+monitor.elf: src/monitor/monitor.elf
+kernel.load: src/kernel/kernel.load
+kernel.bin: src/kernel/kernel.bin
+kernel.elf: src/kernel/kernel.elf
 
 
 # TODO 128 is just barely enough for 20 commands, kernel, devfiles
@@ -82,7 +91,7 @@ umount-image:
 	$(SUDO) losetup -d $(LOOPBACK)
 
 kernelfile:
-	$(SUDO) cp $(OUTPUT)src/kernel.bin $(MOUNTPOINT)
+	$(SUDO) cp $(OUTPUT)src/kernel/kernel.bin $(MOUNTPOINT)
 
 commandfiles:
 	$(SUDO) mkdir -p $(MOUNTPOINT)/bin
@@ -126,8 +135,8 @@ help:
 	@echo  ''
 	@echo  'Other generic targets:'
 	@echo  '  all              - Build all targets marked with [*]'
-	@echo  '* src/kernel.bin   - Build the kernel'
-	@echo  '* src/monitor.bin  - Build the monitor (loaded into the ROM)'
+	@echo  '* kernel.bin       - Build the kernel'
+	@echo  '* monitor.bin      - Build the monitor (loaded into the ROM)'
 	@echo  '* src/commands     - Build all the user programs'
 	@echo  '  src/dir/         - Build all files in dir and below'
 	@echo  '  output.txt       - Build the file included by 68kSupervisor to boot from'

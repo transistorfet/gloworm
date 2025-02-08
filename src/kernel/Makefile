@@ -22,6 +22,8 @@ libex-y				+= src/libc/libc-68k-os.a
 
 ldflags-y 			+= -Wl,--entry=_start -Tsrc/kernel/kernel.ld
 
+always-y			+= kernel.elf kernel.bin kernel.load
+
 # Recompile the init and sh user programs into a version without a main() that
 # can be linked into the kernel, to run sh without a working disk drive
 $(objprefix)cmd-sh.o $(objprefix)cmd-init.o: CFLAGS += -DIN_KERNEL
