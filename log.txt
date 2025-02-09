@@ -44,4 +44,16 @@
   right things, or else it would get confused by too many generic rules.  I still don't have it stripping the binaries for the
   commands yet, but that will come soon
 
+2025-02-08:
+- I brought out the k30 and 68k-SMT boards to test the builds on those.  Initially, neither board wanted to boot up.  After a while
+  of trying, I finally got the 68k-SMT to run, but it was getting a lot of mistaken characters, not entirely garbage but adacent
+  lower case letters, so I guess it was the lower data bits that were getting corrupted occasionally.  It seemed to run ok, printing
+  the help text and such, but the characters printed and received were wrong, so maybe something localized to the serial controller
+  or FTDI
+- the k30-SBC just wouldn't do anything, and then it would print the welcome message but not the prompt, and then it would print the
+  prompt but not accept characters, and then it would accept characters but hang when enter was pressed.  Finally I tried a
+  different USB port instead of the one on the monitor stand, I used the one connected by the USB3 type-A extension cable and it
+  worked
+- I was eventually able to get both builds of the kernel and monitor running on them with the ATA drivers using the CONFIG_ATA_BASE
+  select as the only difference, so the new build system should work with those boards
 

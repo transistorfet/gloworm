@@ -28,8 +28,8 @@ PHONY += menuconfig
 menuconfig:
 	kconfig-mconf $(src-root)/Kconfig
 
-PHONY += dconfig
-dconfig:
+PHONY += dockerconfig
+dockerconfig:
 	cd tools/config && ./run.sh
 
 PHONY += generate-config
@@ -71,7 +71,7 @@ SUDO := sudo
 
 PHONY += create-image build-image-files mount-image umount-image
 
-build-disk-image: decend create-image-dir kernelfile commandfiles devicefiles otherfiles
+build-image: decend create-image-dir kernelfile commandfiles devicefiles otherfiles
 
 create-image-dir:
 	mkdir -p $(MOUNTPOINT)
@@ -127,27 +127,27 @@ help:
 	@echo  '  clean            - Remove most generated files but keep the config'
 	@echo  ''
 	@echo  'Configuration targets:'
-	@echo  '  config           - Update current config using a terminal program'
-	@echo  '  menuconfig       - Update current config using a ncurses menu'
-	@echo  '  dconfig          - Update current config using a ncurses menu inside a'
-	@echo  '                     docker container, if you do not have the'
-	@echo  '                     `kconfig-frontends` debian package installed'
+	@echo  '  config        - Update current config using a terminal program'
+	@echo  '  menuconfig    - Update current config using a ncurses menu'
+	@echo  '  dockerconfig  - Update current config using a ncurses menu inside a'
+	@echo  '                  docker container, if you do not have the'
+	@echo  '                  `kconfig-frontends` debian package installed'
 	@echo  ''
 	@echo  'Other generic targets:'
-	@echo  '  all              - Build all targets marked with [*]'
-	@echo  '* kernel.bin       - Build the kernel'
-	@echo  '* monitor.bin      - Build the monitor (loaded into the ROM)'
-	@echo  '* src/commands     - Build all the user programs'
-	@echo  '  src/dir/         - Build all files in dir and below'
-	@echo  '  output.txt       - Build the file included by 68kSupervisor to boot from'
-	@echo  '                     the arduino'
+	@echo  '  all           - Build all targets marked with [*]'
+	@echo  '* kernel.bin    - Build the kernel'
+	@echo  '* monitor.bin   - Build the monitor (loaded into the ROM)'
+	@echo  '* src/commands  - Build all the user programs'
+	@echo  '  src/dir/      - Build all files in dir and below'
+	@echo  '  output.txt    - Build the file included by 68kSupervisor to boot from'
+	@echo  '                  the arduino'
 	@echo  ''
 	@echo  'Disk image targets:'
-	@echo  '  create-image     - Create a new disk image file initialized with minix1 fs'
-	@echo  '  mount-image      - Mount the disk image file to the default location'
-	@echo  '  umount-image     - Unmount the disk image file'
-	@echo  '  build-disk-image - Build `all` and copy the kernel, commands, /etc, and /dev'
-	@echo  '                     to the image mountpoint'
+	@echo  '  create-image  - Create a new disk image file initialized with minix1 fs'
+	@echo  '  mount-image   - Mount the disk image file to the default location'
+	@echo  '  umount-image  - Unmount the disk image file'
+	@echo  '  build-image   - Build `all` and copy the kernel, commands, /etc, and /dev'
+	@echo  '                  to the image mountpoint'
 
 PHONY += FORCE
 FORCE:
