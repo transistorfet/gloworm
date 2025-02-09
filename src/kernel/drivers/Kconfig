@@ -1,11 +1,20 @@
 
 menu "Device drivers"
 
-config ATA
+menuconfig ATA
 	bool "ATA device driver"
 	help
 	  This enables the ATA driver, which requires an address where the
 	  ATA registers can be accessed
+
+if ATA
+
+config ATA_BASE
+	hex "Base address of memory-mapped ATA registers"
+	help
+	  This is the address where the ATA registers are mapped to
+
+endif
 
 config MEM
 	bool "Ramdisk support"

@@ -1,10 +1,7 @@
 
-# disabled make's built-in rules and built-in variables
-MAKEFLAGS += -rR
-
-include $(src-root)/tools/build/Makefile.defaults
-
-include $(kconfig-file)
+# disabled make's built-in rules and built-in variables, and suppress the Enter/Leave message
+# since we'll always stay in the root directory when recursing
+MAKEFLAGS += -rR --no-print-directory
 
 always-y	:=	# targets that are always build
 obj-y		:=	# targets to be built and included in the in-target
@@ -20,10 +17,15 @@ objprefix	:= $(OUTPUT)$(dir)/
 
 targets		:=
 
+include $(kconfig-file)
+
+include $(src-root)/tools/build/Makefile.defaults
+
 ifeq ($(shell test -e $(build-file) && echo yes),)
     $(error Missing build file $(build-file))
 endif
 
+# This will be the first rule to run if none is provided on the command line
 all:
 
 include $(build-file)
@@ -92,7 +94,7 @@ $(OUTPUT)%/$(notdir $(dir)).elf: $(OUTPUT)%/built-in.o
 	$(info >> $* $@ $(MAKECMDGOALS))
 	$(cmd_ld_elf)
 
-$(OUTPUT)%/built-in.o:
+$(OUTPUT)%/built-in.o: FORCE
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$* $@
 
 $(OUTPUT)%.a:

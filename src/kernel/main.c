@@ -73,7 +73,7 @@ struct protocol_ops *protocols[] = {
 };
 
 
-char boot_args[32] = "mem0";
+char boot_args[32] = "ata0";
 device_t root_dev = DEVNUM(DEVMAJOR_MEM, 0);
 
 
@@ -152,6 +152,8 @@ int main()
 	for (char i = 0; protocols[i]; i++)
 		protocols[i]->init();
 
+	// TODO hack because something isn't working
+	root_dev = DEVNUM(DEVMAJOR_ATA, 0);
 
 	printk_safe("minixfs: mounting (%x) at %s\n", root_dev, "/");
 	vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);

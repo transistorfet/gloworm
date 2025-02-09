@@ -8,6 +8,7 @@
 #include <kernel/vfs.h>
 #include <kernel/printk.h>
 #include <kernel/driver.h>
+#include <kernel/kconfig.h>
 
 #include "partition.h"
 #include "../interrupts.h"
@@ -36,19 +37,22 @@ struct driver ata_driver = {
 };
 
 
-#define ATA_REG_DEV_CONTROL	((volatile uint8_t *) 0x60001D)
-#define ATA_REG_DEV_ADDRESS	((volatile uint8_t *) 0x60001F)
-#define ATA_REG_DATA		((volatile uint16_t *) 0x600020)
-#define ATA_REG_DATA_BYTE	((volatile uint8_t *) 0x600021)
-#define ATA_REG_FEATURE		((volatile uint8_t *) 0x600023)
-#define ATA_REG_ERROR		((volatile uint8_t *) 0x600023)
-#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) 0x600025)
-#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) 0x600027)
-#define ATA_REG_CYL_LOW		((volatile uint8_t *) 0x600029)
-#define ATA_REG_CYL_HIGH	((volatile uint8_t *) 0x60002B)
-#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) 0x60002D)
-#define ATA_REG_STATUS		((volatile uint8_t *) 0x60002F)
-#define ATA_REG_COMMAND		((volatile uint8_t *) 0x60002F)
+#define COMET_VME_CF_CONTROL	((volatile uint8_t *) 0xff800020)
+#define ATA_REG_BASE		CONFIG_ATA_BASE
+#define ATA_REG_DEV_CONTROL	((volatile uint8_t *) (ATA_REG_BASE + 0x1c))
+#define ATA_REG_DEV_ADDRESS	((volatile uint8_t *) (ATA_REG_BASE + 0x1e))
+
+#define ATA_REG_DATA		((volatile uint16_t *) (ATA_REG_BASE + 0x0))
+#define ATA_REG_DATA_BYTE	((volatile uint8_t *) (ATA_REG_BASE + 0x0))
+#define ATA_REG_FEATURE		((volatile uint8_t *) (ATA_REG_BASE + 0x2))
+#define ATA_REG_ERROR		((volatile uint8_t *) (ATA_REG_BASE + 0x2))
+#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) (ATA_REG_BASE + 0x4))
+#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) (ATA_REG_BASE + 0x6))
+#define ATA_REG_CYL_LOW		((volatile uint8_t *) (ATA_REG_BASE + 0x8))
+#define ATA_REG_CYL_HIGH	((volatile uint8_t *) (ATA_REG_BASE + 0xa))
+#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) (ATA_REG_BASE + 0xc))
+#define ATA_REG_STATUS		((volatile uint8_t *) (ATA_REG_BASE + 0xe))
+#define ATA_REG_COMMAND		((volatile uint8_t *) (ATA_REG_BASE + 0xe))
 
 
 #define ATA_CMD_READ_SECTORS	0x20
@@ -62,8 +66,8 @@ struct driver ata_driver = {
 
 
 #define ATA_DELAY(x)		{ for (int delay = 0; delay < (x); delay++) { asm volatile(""); } }
-#define ATA_WAIT()		{ ATA_DELAY(4); while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
-#define ATA_WAIT_FOR_DATA()	{ while (!(*ATA_REG_STATUS) & ATA_ST_DATA_READY) { } }
+#define ATA_WAIT()		{ ATA_DELAY(8); while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
+#define ATA_WAIT_FOR_DATA()	{ while (!((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) { ATA_DELAY(8); } }
 
 /*
 static inline void ATA_DELAY(short delay)
@@ -157,7 +161,7 @@ int ata_read_sector(int sector, char *buffer)
 		buffer[i] = (*ATA_REG_DATA_BYTE);
 
 		ATA_WAIT();
-		ATA_DELAY(10);
+		//ATA_DELAY(10);
 	}
 
 	/*
@@ -222,6 +226,7 @@ int ata_write_sector(int sector, const char *buffer)
 	}
 
 	UNLOCK(saved_status);
+
 	return 512;
 }
 
@@ -248,6 +253,8 @@ static inline struct partition *ata_get_device(devminor_t minor)
 
 int ata_init()
 {
+	//*COMET_VME_CF_CONTROL = 0xb8;
+
 	for (short i = 0; i < PARTITION_MAX; i++)
 		drives[0].parts[i].base = 0;
 	register_driver(DEVMAJOR_ATA, &ata_driver);

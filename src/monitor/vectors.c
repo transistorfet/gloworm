@@ -2,13 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#if defined(BOARD_k30)
 #define STACK_POINTER_INIT	0x200000
-#elif defined(BOARD_68k)
-#define STACK_POINTER_INIT	0x200000
-#else
-#error "Board type not set"
-#endif
 
 extern void _start();
 extern void _error();

@@ -6,10 +6,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <kernel/kconfig.h>
 
-#if defined(BOARD_k30)
+#if defined(CONFIG_AM29F040)
 #define BOARD	"k30"
-#elif defined(BOARD_68k)
+#elif defined(CONFIG_DUAL_AM29F040)
 #define BOARD	"68k"
 #else
 #error "Board type not set"
@@ -224,7 +225,7 @@ void command_peek(int argc, char **args)
 
 void erase_flash(uint32_t sector)
 {
-	#ifdef BOARD_k30
+	#if defined(CONFIG_AM29F040)
 	printf("Erasing flash sector %d", sector);
 	*((volatile uint8_t *) 0x555) = 0xAA;
 	putchar('.');
@@ -238,7 +239,7 @@ void erase_flash(uint32_t sector)
 	putchar('.');
 	*((volatile uint8_t *) sector) = 0x30;
 	putchar('.');
-	#else
+	#elif defined(CONFIG_DUAL_AM29F040)
 	printf("Erasing flash sector %d", sector);
 	*((volatile uint16_t *) (0x555 << 1)) = 0xAAAA;
 	putchar('.');
@@ -255,9 +256,9 @@ void erase_flash(uint32_t sector)
 	#endif
 }
 
-#if defined(BOARD_k30)
+#if defined(CONFIG_AM29F040)
 #define SECTOR_SIZE	0x010000
-#elif defined(BOARD_68k)
+#elif defined(CONFIG_DUAL_AM29F040)
 #define SECTOR_SIZE	0x020000
 #else
 #error "No board type given"
@@ -297,7 +298,7 @@ void command_eraserom(int argc, char **args)
 
 void program_flash_data(uint16_t *addr, uint16_t data)
 {
-	#ifdef BOARD_k30
+	#if defined(CONFIG_AM29F040)
 	*((volatile uint8_t *) 0x555) = 0xAA;
 	*((volatile uint8_t *) 0x2AA) = 0x55;
 	*((volatile uint8_t *) 0x555) = 0xA0;
@@ -307,7 +308,7 @@ void program_flash_data(uint16_t *addr, uint16_t data)
 	*((volatile uint8_t *) 0x2AA) = 0x55;
 	*((volatile uint8_t *) 0x555) = 0xA0;
 	*(((volatile uint8_t *) addr) + 1) = (uint8_t) (data & 0xFF);
-	#else
+	#elif defined(CONFIG_DUAL_AM29F040)
 	*((volatile uint16_t *) (0x555 << 1)) = 0xAAAA;
 	*((volatile uint16_t *) (0x2AA << 1)) = 0x5555;
 	*((volatile uint16_t *) (0x555 << 1)) = 0xA0A0;
@@ -502,20 +503,18 @@ void command_vmetest(int argc, char **args)
 	*/
 }
 
-#define COMET_VME_CF_CONTROL	((volatile uint8_t *) 0xff800020)
-#define ATA_REG_DEV_CONTROL	((volatile uint8_t *) 0xff80001c)
-#define ATA_REG_DEV_ADDRESS	((volatile uint8_t *) 0xff80001e)
-#define ATA_REG_DATA		((volatile uint16_t *) 0xff800200)
-#define ATA_REG_DATA_BYTE	((volatile uint8_t *) 0xff800000)
-#define ATA_REG_FEATURE		((volatile uint8_t *) 0xff800002)
-#define ATA_REG_ERROR		((volatile uint8_t *) 0xff800002)
-#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) 0xff800004)
-#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) 0xff800006)
-#define ATA_REG_CYL_LOW		((volatile uint8_t *) 0xff800008)
-#define ATA_REG_CYL_HIGH	((volatile uint8_t *) 0xff80000a)
-#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) 0xff80000c)
-#define ATA_REG_STATUS		((volatile uint8_t *) 0xff80000e)
-#define ATA_REG_COMMAND		((volatile uint8_t *) 0xff80000e)
+#define ATA_REG_BASE		CONFIG_ATA_BASE
+#define ATA_REG_DATA		((volatile uint16_t *) (ATA_REG_BASE + 0x0))
+#define ATA_REG_DATA_BYTE	((volatile uint8_t *) (ATA_REG_BASE + 0x0))
+#define ATA_REG_FEATURE		((volatile uint8_t *) (ATA_REG_BASE + 0x2))
+#define ATA_REG_ERROR		((volatile uint8_t *) (ATA_REG_BASE + 0x2))
+#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) (ATA_REG_BASE + 0x4))
+#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) (ATA_REG_BASE + 0x6))
+#define ATA_REG_CYL_LOW		((volatile uint8_t *) (ATA_REG_BASE + 0x8))
+#define ATA_REG_CYL_HIGH	((volatile uint8_t *) (ATA_REG_BASE + 0xa))
+#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) (ATA_REG_BASE + 0xc))
+#define ATA_REG_STATUS		((volatile uint8_t *) (ATA_REG_BASE + 0xe))
+#define ATA_REG_COMMAND		((volatile uint8_t *) (ATA_REG_BASE + 0xe))
 
 
 #define ATA_CMD_READ_SECTORS	0x20
@@ -582,8 +581,8 @@ void command_atatest(int argc, char **args)
 		//printf("%x ", 0xff & buffer[i]);
 
 		//ATA_WAIT_FOR_DATA();
-		//ATA_WAIT();
-		ATA_DELAY(10);
+		ATA_WAIT();
+		//ATA_DELAY(10);
 	}
 
 	printf("Mem %x:\n", sector);

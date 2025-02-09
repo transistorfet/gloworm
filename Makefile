@@ -118,7 +118,7 @@ clean:
 	#ifneq ($(OUTPUT),)
 	#	rm -f $(OUTPUT)
 	#endif
-	find . \( -name "*.o" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
+	find src/ $(OUTPUT) \( -name "*.o" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
 
 
 PHONY += help

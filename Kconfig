@@ -5,6 +5,10 @@ mainmenu "Gloworm Configuration"
 
 source "src/Kconfig"
 
+source "src/Kconfig.arch"
+
+source "src/monitor/Kconfig"
+
 source "src/kernel/Kconfig"
 
 config SHELL_IN_KERNEL

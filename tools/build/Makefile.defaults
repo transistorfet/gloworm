@@ -1,15 +1,4 @@
 
-BOARD = k30
-#BOARD = 68k
-
-ifeq ($(BOARD), k30)
-CFLAGS_ARCH = -m68030 -msoft-float
-ASFLAGS_ARCH = -m68030 --defsym __mc68010__=1
-else
-CFLAGS_ARCH = -m68010
-ASFLAGS_ARCH = -m68010 --defsym __mc68010__=1
-endif
-
 AS = m68k-linux-gnu-as
 AR = m68k-linux-gnu-ar
 CC = m68k-linux-gnu-gcc
@@ -18,9 +7,17 @@ STRIP = m68k-linux-gnu-strip
 OBJDUMP = m68k-linux-gnu-objdump
 OBJCOPY = m68k-linux-gnu-objcopy
 RANLIB = m68k-linux-gnu-ranlib
+
+
+ccflags-$(CONFIG_MC68030)	+= -m68030 -msoft-float
+asflags-$(CONFIG_MC68030) 	+= -m68030 --defsym __mc68010__=1
+
+ccflags-$(CONFIG_MC68010) 	+= -m68010
+asflags-$(CONFIG_MC68010) 	+= -m68010 --defsym __mc68010__=1
+
 INCLUDE = $(src-root)/include
-ASFLAGS = $(ASFLAGS_ARCH)
-CFLAGS = -I$(INCLUDE) $(CFLAGS_ARCH) -DBOARD_$(BOARD) -nostartfiles -nostdlib -fno-zero-initialized-in-bss -g -Os #-Wall
+ASFLAGS = $(asflags-y)
+CFLAGS = -I$(INCLUDE) $(ccflags-y) -nostartfiles -nostdlib -fno-zero-initialized-in-bss -g -Os #-Wall
 LDFLAGS = -Wl,--build-id=none
 
 # reduce the elf output size by reducing the alignment
