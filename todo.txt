@@ -3,19 +3,17 @@
 
 * there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
   building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
-* it doesn't rebuild if the config.h file changes
+* make it rebuild everything when the config file changes
 
 * fix warnings
-* fix the timing issue with CF Card at the higher CPU speed
 
-* make it so the ata device will time out and fail instead of hanging when it doesn't work
-* make it rebuild everything when the config file changes
-* make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
+
 * make the slip's tty device configurable
-
 * separate out the serial interrupt stuff to make it more generic
 * should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>
 
+* make it so the ata device will time out and fail instead of hanging when it doesn't work
+* make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
 
 * it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
 * should you replace the libc makefile with subdirs like the kernel?
@@ -36,7 +34,7 @@ Operating System:
 
     * turn on all warnings and clean them up
 
-    * something is causing the SLIP serial port to mess up somehow which requires restarting the PC side the setup
+    * something is causing the SLIP serial port to mess up somehow which requires restarting the PC side the setup, It's probably a null characters when turning the device on or off
     * make the tty68681 driver partially write data... right now it'll suspend if the full request can't be buffered, but it should return the partial number, and the read/write syscalls should do
       the actual blocking, and then for writing it can rewrite the syscall during the suspend, so that it'll restart in the proper position.  You then need to add resuming to tty
     * when there's a trailing / to rm or mkdir, it will create something weird

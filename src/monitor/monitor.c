@@ -360,7 +360,7 @@ void command_verifyrom(int argc, char **args)
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
 	if (argc >= 3)
 		source = (uint16_t *) strtol(args[2], NULL, 16);
-	if (argc >= 3)
+	if (argc >= 4)
 		size = strtol(args[3], NULL, 16);
 
 	for (int i = 0; i < (size >> 1); i++) {
@@ -434,20 +434,28 @@ void command_ramtest(int argc, char **args)
 	uint16_t data;
 	uint16_t errors = 0;
 
-	printf("Testing onboard ram from %x to %x\n", RAM_ADDR, RAM_ADDR + RAM_SIZE);
+	uint16_t *dest = (uint16_t *) RAM_ADDR;
+	uint32_t length = RAM_SIZE;
 
-	uint16_t *mem = (uint16_t *) RAM_ADDR;
-	for (int i = 0; i < (RAM_SIZE >> 1); i++) {
+	if (argc >= 2)
+		dest = (uint16_t *) strtol(args[1], NULL, 16);
+	if (length >= 3)
+		length = strtol(args[2], NULL, 16);
+
+	printf("Testing onboard ram from %x to %x\n", (uint32_t) dest, (uint32_t) dest + length);
+
+	uint16_t *mem = (uint16_t *) dest;
+	for (int i = 0; i < (length >> 1); i++) {
 		mem[i] = (uint16_t) i;
 	}
 
-	//uint8_t *mem2 = (uint8_t *) RAM_ADDR;
-	//for (int i = 0; i < RAM_SIZE; i++) {
+	//uint8_t *mem2 = (uint8_t *) dest;
+	//for (int i = 0; i < length; i++) {
 	//	printf("%x ", (uint8_t) mem2[i]);
 	//}
 
 
-	for (int i = 0; i < (RAM_SIZE >> 1); i++) {
+	for (int i = 0; i < (length >> 1); i++) {
 		data = (uint16_t) mem[i];
 		if (data != (uint16_t) i) {
 			printf("%08x: %x\n", (unsigned int) &mem[i], data);

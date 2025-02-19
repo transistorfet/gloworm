@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <kernel/kmalloc.h>
 #include <kernel/printk.h>
+#include <kernel/kconfig.h>
 
 #include "../api.h"
 #include "../interrupts.h"
@@ -27,7 +28,15 @@ struct process *create_init_task()
 	proc->map.segments[M_STACK].base = proc->map.segments[M_DATA].base;
 	proc->map.segments[M_STACK].length = stack_size;
 
-	#if !defined(CONFIG_SHELL_IN_KERNEL)
+	#if defined(CONFIG_SHELL_IN_KERNEL)
+
+	proc->map.segments[M_TEXT].base = NULL;
+	proc->map.segments[M_TEXT].length = 0x10000;
+
+	extern void init_task();
+	reset_stack(proc, init_task, argv, envp);
+
+	#else
 
 	// TODO this would load and execute an actual binary from the mounted disk
 	void *entry;
@@ -35,14 +44,6 @@ struct process *create_init_task()
 	if (error)
 		return NULL;
 	reset_stack(proc, entry, argv, envp);
-
-	#else
-
-	proc->map.segments[M_TEXT].base = NULL;
-	proc->map.segments[M_TEXT].length = 0x10000;
-
-	extern void init_task();
-	reset_stack(proc, init_task, argv, envp);
 
 	#endif
 

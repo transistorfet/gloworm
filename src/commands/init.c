@@ -41,6 +41,17 @@ int MAIN(init_task)()
 		ioctl(STDOUT_FILENO, TIOCSPGRP, &fgpid);
 
 		argv[0] = "/bin/sh";
+
+		#if defined(CONFIG_SHELL_IN_KERNEL) && defined(IN_KERNEL)
+
+		// Run the builtin shell if compiled inside the kernel
+		extern void sh_task();
+		argv[0] = "sh";
+		status = SYSCALL3(SYS_EXECBUILTIN, (int) sh_task, (int) argv, (int) envp);
+
+		#else
+
+		// Run a separate shell to run the rc script
 		argv[1] = "/etc/rc";
 		if (!access(argv[1], X_OK)) {
 			if (!fork()) {
@@ -53,15 +64,9 @@ int MAIN(init_task)()
 		}
 		argv[1] = NULL;
 
+		// Run the shell
 		status = execve(argv[0], argv, envp);
 
-		#if defined(CONFIG_SHELL_IN_KERNEL) && defined(IN_KERNEL)
-		// This will only run if the sh binary is not found on disk
-		if (status < 0) {
-			extern void sh_task();
-			argv[0] = "sh";
-			status = SYSCALL3(SYS_EXECBUILTIN, (int) sh_task, (int) argv, (int) envp);
-		}
 		#endif
 
 		// The exec() system call will only return if an error occurs

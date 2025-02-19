@@ -470,12 +470,12 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 	char buffer[NAME_SIZE];
 	main_t main = NULL;
 
-	fullpath = resolve_file_location(argv[0], buffer, NAME_SIZE);
-	if (fullpath)
-		argv[0] = fullpath;
-	else {
-		main = find_command(argv[0]);
-		if (!main) {
+	main = find_command(argv[0]);
+	if (!main) {
+		fullpath = resolve_file_location(argv[0], buffer, NAME_SIZE);
+		if (fullpath) {
+			argv[0] = fullpath;
+		} else {
 			puts("Command not found");
 			return 1;
 		}
