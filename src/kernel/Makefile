@@ -29,6 +29,6 @@ always-y			+= kernel.elf kernel.bin kernel.load
 $(objprefix)cmd-sh.o $(objprefix)cmd-init.o: CFLAGS += -DIN_KERNEL
 $(objprefix)cmd-init.o: src/commands/init.c
 	$(cmd_cc_o)
-$(objprefix)cmd-sh.o: src/commands/sh.c
+$(objprefix)cmd-sh.o: src/commands/sh.c src/commands/echo.c src/commands/cat.c src/commands/ls.c src/commands/mkdir.c src/commands/pwd.c src/commands/mv.c src/commands/cp.c src/commands/ln.c src/commands/rm.c src/commands/chmod.c src/commands/date.c src/commands/ps.c src/commands/kill.c src/commands/mount.c src/commands/umount.c src/commands/sync.c
 	$(cmd_cc_o)
 

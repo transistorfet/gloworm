@@ -47,6 +47,7 @@ in-target	:= $(objprefix)built-in.o
 user-csingle	:= $(addprefix $(objprefix),$(user-csingle))
 user-cmulti	:= $(addprefix $(objprefix),$(user-cmulti))
 always-y	:= $(addprefix $(objprefix),$(always-y))
+extra-y		:= $(addprefix $(objprefix),$(extra-y))
 
 subdir-y	:= $(addprefix $(dir)/,$(subdir-y))
 libex-obj-y	:= $(addprefix $(OUTPUT),$(libex-y))

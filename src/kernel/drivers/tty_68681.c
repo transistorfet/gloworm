@@ -298,6 +298,14 @@ static void tty_68681_process_input(void *_unused)
 			//if (_buf_is_empty(&channels[i].rx))
 			//	ASSERT_CTS(&channels[i]);
 		}
+
+		// Resume any blocked processes once the transmit buffer has been emptied
+		if (_buf_is_empty(&channels[i].tx)) {
+			// TODO this fixes the bug where processes wouldn't wake up if they blocked on send,
+			// but a more generic solution would be nice, or a nicer way of waking up processes
+			resume_blocked_procs(VFS_POLL_WRITE, NULL, DEVNUM(DEVMAJOR_TTY68681, i));
+			resume_blocked_procs(VFS_POLL_WRITE, NULL, DEVNUM(DEVMAJOR_TTY, i));
+		}
 	}
 }
 
@@ -611,8 +619,9 @@ int tty_68681_write(devminor_t minor, const char *buffer, offset_t offset, size_
 
 	// TODO with this method, each write's size must always be smaller than buffer size
 	if (_buf_free_space(&channel->tx) < size) {
-		if (!(channel->open_mode & O_NONBLOCK))
+		if (!(channel->open_mode & O_NONBLOCK)) {
 			suspend_current_syscall(VFS_POLL_WRITE);
+		}
 		return 0;
 	}
 

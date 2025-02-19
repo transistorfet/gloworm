@@ -57,3 +57,49 @@
 - I was eventually able to get both builds of the kernel and monitor running on them with the ATA drivers using the CONFIG_ATA_BASE
   select as the only difference, so the new build system should work with those boards
 
+2025-02-16 [from retroverse logs]:
+- I'm kind of getting sidetracked now, I tried to compile the kernel without -O3 in order to test if the optimizations are causing a
+  problem, after reading in the computie logs that I had to add a volatile to strlen in order to get the monitor working previously
+  because otherwise it was hanging.  It's very possible a similar thing is happening here with the kernel, so I thought it would be
+  quick to check, but then I ran into a problem with undefined fwrite, which is almost certainly related to the wrong object files
+  being added to the lib because it compiles both versions of libc.  The only place that fwrite exists that would cause the
+  undefineds is in fputs, which is used by fputs in os/ but not in none/
+- I compiled it with just the kernel and it worked without errors because it was monitor that had the problem
+- trying to load it over serial caused the k30 to reset and run the monitor and start printing out the data instead of reading it
+  in.  It was working before I used the unoptimized kernel.  *sigh*  I feel like I had this recently with one of the 3 boards I've
+  been playing with
+- ok I just checked and it's 100% because the kernel overflows the size that the load script handles (16-bit length) so it loads the
+  first ~0x1800 bytes and then boots, but there's more data to send, so I need to keep that in mind now that I have such a big
+  kernel.  I could modify the format to use a 4 byte number instead, but I guess I'd have to upgrade the roms on the other boards?
+  I'd rather not use a backwards compatible mechanism.
+
+2025-02-17:
+
+- when it works, it switches to the command process and runs that for a while, and before it finishing writing its output, it exits
+  and switches to the shell process to handle the exit code, and then to idle again, which switches a couple of times before the
+  command's output finishing printing.  It would seem odd that it doesn't have to flush the output before the process exits...
+- when it doesn't work, it switches from the command process to the idle process without going through the shell process, and
+  the suspend_proc call is made, so it's suspending without exiting.  One of the cases had it switch back to the same command
+  process once, before switching to the idle process on the next timer interrupt
+- it's calling suspend from the tty write function, which is really just a pass through to the 68681 driver. I don't know why it
+  doesn't suspend in 68681 when the only way it could return 0 is if it suspends, but either way, it's not waking up after the
+  buffer clears
+- it honestly doesn't look hard to add a resume check for tx to the bottom half, or a flush function.  You should make one anyways
+  to wait for output to be send before exiting.  I think that comment about never waking up in pipe either was more specifically
+  about writing more than the total buffer at once rather than just remaining buffer, or it was before i had the bh stuff. I want
+  to clean up the various parts of that
+
+2025-02-18:
+
+- an extra print statement shows it does return 0 like normal from tty_68681_write but it skips the suspend step because O_NONBLOCK
+  is set, probably to make the tty driver work correctly, which is why tty_write is the one that suspends.  Either way, it should be
+  possible to add a resume
+- I added a very quick "if buf not full then call resume_suspended_procs" to the bottom half handler of the tty68681 driver.  At
+  first I added one that passes in the tty68681 major device number, and that didn't work because it's the tty driver that suspends,
+  but adding a second call that passes in the tty major fixed it up a treat.  It can now print the entire bin listing, suspending at
+  least twice during the process, but being woken up both times once the buffer is empty.  So that was the entire problem with the
+  listing hanging
+- I don't know why I didn't do it earlier.  Maybe I just didn't like doing a double call to resume and wanted to instead put it in
+  the tty driver.  It is true that's it's not the most clean, but it's not that unusual since the tty68681 driver is really a
+  subdriver of the tty subsystem.  Maybe there's a cleaner way, but at least it doesn't hang anymore
+

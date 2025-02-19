@@ -144,7 +144,7 @@ int pipe_write(struct vfile *file, const char *buf, size_t nbytes)
 	// TODO you need to detect a broken pipe and raise SIGPIPE
 
 	if (nbytes > PIPE_BUFFER_MAX - file->position) {
-		// TODO this will work for now, but any write operation that's larger than the buffer size wont ever complete.  Same issue in tty driver's suspend
+		// TODO this will work for now, but any write operation that's larger than the buffer size wont ever complete
 		// Trying to write more bytes than are available in the buffer, so block until the reader has caught up
 		suspend_current_syscall(VFS_POLL_WRITE);
 		return 0;

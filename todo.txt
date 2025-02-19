@@ -1,4 +1,10 @@
 
+* should the process wait until all output is flushed before exiting?  What happens on linux with a slow tty?
+
+* there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
+  building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
+* it doesn't rebuild if the config.h file changes
+
 * fix warnings
 * fix the timing issue with CF Card at the higher CPU speed
 

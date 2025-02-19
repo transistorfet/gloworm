@@ -165,9 +165,9 @@ int ata_read_sector(int sector, char *buffer)
 	}
 
 	/*
-	printk_safe("Mem %x:\n", sector);
+	printk_safe("reading sector %x:\n", sector);
 	for (int i = 0; i < 512; i++) {
-		printk_safe("%x ", 0xff & buffer[i]);
+		printk_safe("%02x ", 0xff & buffer[i]);
 		if ((i & 0x1F) == 0x1F)
 			printk_safe("\n");
 	}

@@ -37,6 +37,7 @@ userprogs		+= $(foreach name,$(commands-y),$(name).elf)
 userprogs-stripped	+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(name).strip))
 
 libex-y			+= src/libc/libc-68k-os.a
+extra-y			+= echo.c cat.c ls.c mkdir.c pwd.c mv.c cp.c ln.c rm.c chmod.c date.c ps.c kill.c mount.c umount.c sync.c
 
 # When other utilities are included into the shell, this flag will tell them not to include a main function
 $(objprefix)sh.o: CFLAGS += -DIN_SHELL
@@ -48,3 +49,4 @@ copy-commands: $(userprogs-bare)
 
 $(LOCATION)/%: $(objprefix)%.strip
 	$(SUDO) cp $< $(LOCATION)/$(notdir $@)
+
