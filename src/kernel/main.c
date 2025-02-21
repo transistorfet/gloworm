@@ -15,12 +15,15 @@
 #include <kernel/driver.h>
 #include <kernel/printk.h>
 #include <kernel/scheduler.h>
+#include <kernel/kconfig.h>
 
 #include "proc/tasks.h"
 #include "proc/process.h"
 
+#if defined(CONFIG_NET)
 #include "net/if.h"
 #include "net/protocol.h"
+#endif
 
 #include "api.h"
 #include "interrupts.h"
@@ -34,10 +37,18 @@ extern struct driver mem_driver;
 extern struct driver ata_driver;
 
 struct driver *drivers[] = {
+	#if defined(CONFIG_TTY)
+	#if defined(CONFIG_TTY_68681)
 	&tty_68681_driver,
+	#endif
 	&tty_driver,
+	#endif
+	#if defined(CONFIG_MEM)
 	&mem_driver,
+	#endif
+	#if defined(CONFIG_ATA)
 	&ata_driver,
+	#endif
 	NULL	// Null Termination
 };
 
@@ -47,15 +58,20 @@ extern struct mount_ops procfs_mount_ops;
 
 struct mount_ops *filesystems[] = {
 	//&mallocfs_mount_ops,
+	#if defined(CONFIG_MINIX_FS)
 	&minix_mount_ops,
+	#endif
 	&procfs_mount_ops,
 	NULL	// Null Termination
 };
 
+#if defined(CONFIG_NET)
 extern struct if_ops slip_if_ops;
 
 struct if_ops *interfaces[] = {
+	#if defined(CONFIG_SLIP)
 	&slip_if_ops,
+	#endif
 	NULL	// Null Termination
 };
 
@@ -71,6 +87,7 @@ struct protocol_ops *protocols[] = {
 	&tcp_protocol_ops,
 	NULL	// Null Termination
 };
+#endif
 
 
 char boot_args[32] = "ata0";
@@ -145,6 +162,8 @@ int main()
 	for (short i = 0; filesystems[i]; i++)
 		filesystems[i]->init();
 
+	// Initialize the networking subsystem
+	#if defined(CONFIG_NET)
 	init_net_if();
 	init_net_protocol();
 
@@ -155,6 +174,7 @@ int main()
 	// Initialize specific network protocols
 	for (short i = 0; protocols[i]; i++)
 		protocols[i]->init();
+	#endif
 
 	// TODO hack because something isn't working
 	root_dev = DEVNUM(DEVMAJOR_ATA, 0);
@@ -181,12 +201,14 @@ int main()
 	//vfs_mount(NULL, "/media", DEVNUM(DEVMAJOR_ATA, 0), &minix_mount_ops, SU_UID);
 
 
+	#if defined(CONFIG_NET)
 	// TODO this is a temporary hack.  The ifup should be done through ifconfig
 	struct if_device *ifdev = net_if_find("slip0", NULL);
 	memset(&ifdev->address, '\0', sizeof(struct sockaddr_in));
 	((struct sockaddr_in *) &ifdev->address)->sin_family = AF_INET;
 	inet_aton("192.168.1.200", &((struct sockaddr_in *) &ifdev->address)->sin_addr);
 	net_if_change_state(ifdev, IFF_UP);
+	#endif
 
 	create_init_task();
 

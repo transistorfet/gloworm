@@ -1,16 +1,14 @@
 
 * should the process wait until all output is flushed before exiting?  What happens on linux with a slow tty?
+* separate out the serial interrupt stuff to make it more generic
+* should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>
+
+* make the slip's tty device configurable
+* make it so the ata device will time out and fail instead of hanging when it doesn't work
 
 * there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
   building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
 * make it rebuild everything when the config file changes
-
-
-* make the slip's tty device configurable
-* separate out the serial interrupt stuff to make it more generic
-* should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>
-
-* make it so the ata device will time out and fail instead of hanging when it doesn't work
 * make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
 
 * it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
@@ -21,6 +19,8 @@
 * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
 * go through and add so many more options
 
+* separate out architecture to port it to another platform
+* clean up how you do partitions and device files related to it
 * support minixfs 2 and 3?
 * add ext2 support
 * add virtual memory support
@@ -30,6 +30,7 @@
 * should I separate libc, kernel, and monitor into their own subproject directories with the include files separated?  Each could use the same build system and
   config system, maybe with some modifications so that CCFLAGS can be defined for a whole subdirectory for the project-specific includes.  It would make it easier
   to use only parts of it, like use libc in other projects, or take just the kernel (monitor doesn't have its own includes outside of itself, so it isn't so relevant)
+* should you rename driver.c to drvmgr.c or something that makes it easier to autocomplete drivers/
 
 
 Operating System:
