@@ -82,9 +82,9 @@ void create_dir_or_panic(const char *path)
 	struct vfile *file;
 	struct vnode *vnode;
 
-	if (!vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode))
+	if (!vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode)) {
 		vfs_release_vnode(vnode);
-	else {
+	} else {
 		if (vfs_open(NULL, path, O_CREAT, S_IFDIR | 0755, SU_UID, &file))
 			panic("Unable to create %s\n", path);
 		vfs_close(file);
@@ -95,21 +95,25 @@ void create_special_or_panic(const char *path, device_t rdev)
 {
 	struct vnode *vnode;
 
-	if (vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode))
+	if (vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode)) {
 		if (vfs_mknod(NULL, path, S_IFCHR | 0755, rdev, SU_UID, &vnode))
 			panic("Unable to create special file %s\n", path);
+	}
 	vfs_release_vnode(vnode);
 }
 
 void parse_boot_args()
 {
 	// TODO this is overly simplistic because there aren't many options yet
-	if (!*boot_args)
+	if (!*boot_args) {
 		root_dev = DEVNUM(DEVMAJOR_MEM, 0);
-	if (!strncmp(boot_args, "mem", 3))
+	}
+
+	if (!strncmp(boot_args, "mem", 3)) {
 		root_dev = DEVNUM(DEVMAJOR_MEM, boot_args[3] - '0');
-	else if (!strncmp(boot_args, "ata", 3))
+	} else if (!strncmp(boot_args, "ata", 3)) {
 		root_dev = DEVNUM(DEVMAJOR_ATA, boot_args[3] - '0');
+	}
 }
 
 int main()
@@ -132,24 +136,24 @@ int main()
 	init_scheduler();
 
 	// Initialize drivers before VFS
-	for (char i = 0; drivers[i]; i++)
+	for (short i = 0; drivers[i]; i++)
 		drivers[i]->init();
 
 	init_vfs();
 
 	// Initialize specific filesystems
-	for (char i = 0; filesystems[i]; i++)
+	for (short i = 0; filesystems[i]; i++)
 		filesystems[i]->init();
 
 	init_net_if();
 	init_net_protocol();
 
 	// Initialize specific network interfaces
-	for (char i = 0; interfaces[i]; i++)
+	for (short i = 0; interfaces[i]; i++)
 		interfaces[i]->init();
 
 	// Initialize specific network protocols
-	for (char i = 0; protocols[i]; i++)
+	for (short i = 0; protocols[i]; i++)
 		protocols[i]->init();
 
 	// TODO hack because something isn't working

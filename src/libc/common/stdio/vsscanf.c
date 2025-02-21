@@ -46,9 +46,9 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				break;
 			    }
 			    case 's': {
-				if (ignore)
+				if (ignore) {
 					for (; !isspace(str[i]); i++) { }
-				else {
+				} else {
 					char *buffer = va_arg(args, char *);
 					for (; !isspace(str[i]); i++)
 						*buffer++ = str[i];
@@ -60,9 +60,9 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				if (!width)
 					width = 1;
 
-				if (ignore)
+				if (ignore) {
 					i += width;
-				else {
+				} else {
 					char *buffer = va_arg(args, char *);
 					for (; width; width--, i++)
 						*buffer++ = str[i];
@@ -74,12 +74,10 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				break;
 			    }
 			}
-		}
-		else if (isspace(fmt[j])) {
+		} else if (isspace(fmt[j])) {
 			// Read any amount of whitespace from the input string
 			for (; isspace(str[i]); i++) { }
-		}
-		else if (fmt[j] != str[i++])
+		} else if (fmt[j] != str[i++])
 			// For any other non-matching character, then fail and return
 			break;
 	}

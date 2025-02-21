@@ -73,11 +73,11 @@ int release_block(struct buf *buf, short dirty)
 	if (--buf->refcount == 0) {
 		// TODO we actually maybe don't want to write until this entry is recycled, or else any bit changes will require an immediate writeback
 		//_write_entry(buf);
-	}
-	else if (buf->refcount < 0) {
+	} else if (buf->refcount < 0) {
 		buf->refcount = 0;
 		printk("Error: possible double free for block %d:%d\n", buf->dev, buf->num);
 	}
+	return 0;
 }
 
 void mark_block_dirty(struct buf *buf)

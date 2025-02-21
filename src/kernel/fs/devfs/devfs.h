@@ -18,7 +18,7 @@ struct devfs_dirent {
 struct devfs_block {
 	union {
 		struct devfs_dirent entries[DEVFS_DIRENT_MAX];
-	}
+	};
 };
 
 struct devfs_data {

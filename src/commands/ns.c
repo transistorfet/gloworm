@@ -75,10 +75,11 @@ int MAIN(command_ns)(int argc, char **argv)
 		return -1;
 	}
 
-	if (f_listen)
+	if (f_listen) {
 		listen_loop(sockfd, f_udp, port, f_verbose);
-	else
+	} else {
 		client_loop(sockfd, f_udp, address, port, f_verbose);
+	}
 
 	shutdown(sockfd, SHUT_RDWR);
 	close(sockfd);
@@ -122,10 +123,11 @@ int client_loop(int sockfd, int f_udp, char *address, int port, int f_verbose)
 			break;
 		}
 
-		if (f_udp)
+		if (f_udp) {
 			error = sendto(sockfd, buffer, nbytes, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr_in));
-		else
+		} else {
 			error = send(sockfd, buffer, nbytes, 0);
+		}
 
 		if (error < 0) {
 			printf("Error sending: %d\n", error);
@@ -140,7 +142,7 @@ int listen_loop(int sockfd, int f_udp, int port, int f_verbose)
 {
 	int nbytes;
 	int error;
-	int sa_len;
+	socklen_t sa_len;
 	char buffer[MAX_INPUT];
 	struct sockaddr_in addr;
 
@@ -178,10 +180,11 @@ int listen_loop(int sockfd, int f_udp, int port, int f_verbose)
 
 	while (1) {
 		sa_len = sizeof(struct sockaddr_in);
-		if (f_udp)
+		if (f_udp) {
 			nbytes = recvfrom(sockfd, buffer, MAX_INPUT, 0, (struct sockaddr *) &addr, &sa_len);
-		else
+		} else {
 			nbytes = recv(sockfd, buffer, MAX_INPUT, 0);
+		}
 
 		if (nbytes <= 0) {
 			if (nbytes != 0 && nbytes != EINTR)
@@ -190,10 +193,11 @@ int listen_loop(int sockfd, int f_udp, int port, int f_verbose)
 		}
 		buffer[nbytes] = '\0';
 
-		if (f_udp)
+		if (f_udp) {
 			fputs(buffer, stdout);
-		else
+		} else {
 			fputs(buffer, stdout);
+		}
 	}
 
 	return 0;

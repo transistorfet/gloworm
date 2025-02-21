@@ -105,7 +105,8 @@ int pipe_close(struct vfile *file)
 int pipe_read(struct vfile *file, char *buf, size_t nbytes)
 {
 	register struct vnode *vnode = file->vnode;
-	register char *buffer = ((struct pipe_data *) &vnode->data)->buffer;
+	struct pipe_data *vnode_data = ((struct pipe_data *) &vnode->data);
+	register char *buffer = vnode_data->buffer;
 
 	if (!buffer)
 		return EIO;
@@ -136,7 +137,8 @@ int pipe_read(struct vfile *file, char *buf, size_t nbytes)
 int pipe_write(struct vfile *file, const char *buf, size_t nbytes)
 {
 	register struct vnode *vnode = file->vnode;
-	register char *buffer = ((struct pipe_data *) &vnode->data)->buffer;
+	struct pipe_data *vnode_data = ((struct pipe_data *) &vnode->data);
+	register char *buffer = vnode_data->buffer;
 
 	if (!buffer)
 		return EIO;

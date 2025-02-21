@@ -2,6 +2,7 @@
 #ifndef _SRC_KERNEL_FS_MINIX_INODES_H
 #define _SRC_KERNEL_FS_MINIX_INODES_H
 
+#include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <kernel/vfs.h>
@@ -14,7 +15,6 @@ static inode_t alloc_inode(struct minix_super *super, mode_t mode, uid_t uid, gi
 {
 	bitnum_t inode_num;
 	struct buf *inode_buf;
-	block_t inode_table_zone;
 	struct minix_v1_inode *inode_table;
 
 	inode_num = bit_alloc(super->dev, MINIX_V1_INODE_BITMAP_START(&super->super_v1), super->super_v1.imap_blocks, 0);
@@ -34,7 +34,7 @@ static inode_t alloc_inode(struct minix_super *super, mode_t mode, uid_t uid, gi
 	inode_table[inode_offset].gid = (uint8_t) gid;
 	inode_table[inode_offset].nlinks = (uint8_t) 1;
 	inode_table[inode_offset].mtime = to_le32(get_system_time());
-	for (char j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
+	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
 		inode_table[inode_offset].zones[j] = NULL;
 	if (S_ISCHR(mode))
 		inode_table[inode_offset].zones[0] = to_le16(rdev);
@@ -52,7 +52,6 @@ static int free_inode(struct minix_super *super, inode_t ino)
 static int read_inode(struct vnode *vnode, inode_t ino)
 {
 	struct buf *inode_buf;
-	block_t inode_table_zone;
 	struct minix_super *super;
 	struct minix_v1_inode *inode_table;
 
@@ -75,7 +74,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	vnode->nlinks = (uint8_t) inode_table[inode_offset].nlinks;
 	vnode->rdev = from_le16(S_ISDEV(vnode->mode) ? inode_table[inode_offset].zones[0] : 0);
 	// NOTE: the zone numbers are stored in little endian in the vnode to make zone lookups easier
-	for (char j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
+	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
 		MINIX_DATA(vnode).zones[j] = inode_table[inode_offset].zones[j];
 
 	vnode->bits &= ~VBF_DIRTY;
@@ -86,7 +85,6 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 static int write_inode(struct vnode *vnode, inode_t ino)
 {
 	struct buf *inode_buf;
-	block_t inode_table_zone;
 	struct minix_super *super;
 	struct minix_v1_inode *inode_table;
 
@@ -107,7 +105,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	if (S_ISCHR(vnode->mode))
 		MINIX_DATA(vnode).zones[0] = to_le16(vnode->rdev);
 	// NOTE: the zone numbers are stored in little endian in the vnode to make zone lookups easier
-	for (char j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
+	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
 		inode_table[inode_offset].zones[j] = MINIX_DATA(vnode).zones[j];
 
 	vnode->bits &= ~VBF_DIRTY;

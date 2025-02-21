@@ -38,6 +38,7 @@ void init_signal_data(struct process *proc)
 int get_signal_action(struct process *proc, int signum, struct sigaction *act)
 {
 	*act = proc->signals.actions[signum - 1];
+	return 0;
 }
 
 int set_signal_action(struct process *proc, int signum, const struct sigaction *act)
@@ -87,10 +88,11 @@ int dispatch_signal(struct process *proc, int signum)
 		return 0;
 	}
 
-	if (proc->signals.actions[signum - 1].sa_handler)
+	if (proc->signals.actions[signum - 1].sa_handler) {
 		run_signal_handler(proc, signum);
-	else
+	} else {
 		run_signal_default_action(proc, signum, sigmask);
+	}
 
 	return 0;
 }
@@ -119,13 +121,11 @@ static inline void run_signal_handler(struct process *proc, int signum)
 
 void cleanup_signal_handler()
 {
-	int signum;
 	struct sigcontext *context;
 
 	current_proc->sp = drop_context(current_proc->sp);
 	context = (struct sigcontext *) current_proc->sp;
 	current_proc->signals.blocked = context->prev_mask;
-	signum = context->signum;
 	current_proc->sp = (((struct sigcontext *) current_proc->sp) + 1);
 
 	// TODO maybe we should restart the syscall anyways, which would then block again if it's not ready, instead of suspending here?
@@ -153,11 +153,11 @@ static inline void run_signal_default_action(struct process *proc, int signum, s
 	if (sigmask & SIG_MASK_DEFAULT_TERMINATE) {
 		exit_proc(proc, -1);
 		resume_waiting_parent(proc);
-	}
-	else if (sigmask & SIG_MASK_DEFAULT_STOP)
+	} else if (sigmask & SIG_MASK_DEFAULT_STOP) {
 		stop_proc(proc);
-	else if (signum == SIGCONT)
+	} else if (signum == SIGCONT) {
 		resume_proc(proc);
+	}
 
 	// Since we don't execute the signal handler cleanup for a default action, we cancel the syscall here instead
 	if (!(current_proc->signals.actions[signum - 1].sa_flags & SA_RESTART))

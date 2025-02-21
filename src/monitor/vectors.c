@@ -69,7 +69,7 @@ void fatal_error(uint8_t *sp)
 	init_tty();
 	set_leds(0x80);
 
-	printf("\n\nFatal Error with SP: %x\n", sp);
+	printf("\n\nFatal Error with SP: %lx\n", (uintptr_t) sp);
 	printf("PC: %x\nStack Dump with Registers:\n", *((uint32_t *) &sp[15 * 4 + 2]));
 	dump((uint16_t *) sp, 100);
 	printf("Resetting...\n");

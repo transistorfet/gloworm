@@ -19,8 +19,7 @@ int main()
 	if (pid) {
 		printf("Detaching\n");
 		return 0;
-	}
-	else {
+	} else {
 		fd = open("/dev/tty1", 0, 0);
 		if (fd < 0) {
 			printf("Unable to open device: %d\n", fd);
@@ -47,9 +46,9 @@ int main()
 				printf("%d: %s\n", i, buffer);
 				process_input(buffer);
 				i = 0;
-			}
-			else
+			} else {
 				i++;
+			}
 		}
 
 		printf("Closing and exiting\n");

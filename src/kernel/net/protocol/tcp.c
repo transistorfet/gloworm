@@ -33,8 +33,8 @@ int tcp_endpoint_listen(struct endpoint *ep, int queue);
 int tcp_endpoint_accept(struct endpoint *ep, struct sockaddr *sockaddr, socklen_t *len, struct endpoint **result);
 int tcp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len);
 int tcp_endpoint_shutdown(struct endpoint *ep, int how);
-int tcp_endpoint_send(struct endpoint *ep, const char *buf, int nbytes);
-int tcp_endpoint_recv(struct endpoint *ep, char *buf, int nbytes);
+int tcp_endpoint_send(struct endpoint *ep, const unsigned char *buf, int nbytes);
+int tcp_endpoint_recv(struct endpoint *ep, unsigned char *buf, int nbytes);
 int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen);
 int tcp_endpoint_set_options(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen);
 int tcp_endpoint_poll(struct endpoint *ep, int events);
@@ -100,6 +100,7 @@ int tcp_init()
 {
 	_queue_init(&tcp_endpoints);
 	net_register_protocol(&tcp_protocol);
+	return 0;
 }
 
 int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)
@@ -264,8 +265,6 @@ int tcp_endpoint_accept(struct endpoint *ep, struct sockaddr *sockaddr, socklen_
 
 int tcp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len)
 {
-	struct packet *pack;
-	struct tcp_header *hdr;
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 	struct sockaddr_in *addr = (struct sockaddr_in *) sockaddr;
 
@@ -295,17 +294,16 @@ int tcp_endpoint_shutdown(struct endpoint *ep, int how)
 
 	tep->fin_sent = 1;
 	tcp_send_packet(tep, FIN | ACK, 0, 0);
-	if (tep->state == TS_CLOSE_WAIT)
+	if (tep->state == TS_CLOSE_WAIT) {
 		tep->state = TS_LAST_ACK;
-	else
+	} else {
 		tep->state = TS_FIN_WAIT1;
+	}
 	return 0;
 }
 
-int tcp_endpoint_send(struct endpoint *ep, const char *buf, int nbytes)
+int tcp_endpoint_send(struct endpoint *ep, const unsigned char *buf, int nbytes)
 {
-	struct packet *pack;
-	struct tcp_header *hdr;
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
 	if (!(tep->remote.port))
@@ -322,7 +320,7 @@ int tcp_endpoint_send(struct endpoint *ep, const char *buf, int nbytes)
 	return nbytes;
 }
 
-int tcp_endpoint_recv(struct endpoint *ep, char *buf, int nbytes)
+int tcp_endpoint_recv(struct endpoint *ep, unsigned char *buf, int nbytes)
 {
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
@@ -401,9 +399,9 @@ static struct tcp_endpoint *tcp_alloc_endpoint(struct protocol *proto, struct so
 	tep->ep.ifdev = ifdev;
 
 	tep->local = *local;
-	if (remote)
+	if (remote) {
 		tep->remote = *remote;
-	else {
+	} else {
 		tep->remote.addr = 0;
 		tep->remote.port = 0;
 	}
@@ -550,8 +548,7 @@ static int tcp_send_packet(struct tcp_endpoint *tep, int flags, int nbytes, int 
 		hdr->seqnum = tep->tx_last_seq - nbytes;
 		_buf_peek(tep->tx, &pack->data[pack->length], _buf_used_space(tep->tx) - nbytes, nbytes);
 		pack->length += nbytes;
-	}
-	else {
+	} else {
 		hdr->seqnum = tep->tx_last_seq;
 		if (flags == SYN || (flags & FIN))
 			tep->tx_last_seq += 1;
@@ -609,9 +606,8 @@ static int tcp_check_waiting_packet(struct tcp_endpoint *tep)
 
 static int tcp_forward_listen(struct tcp_endpoint *tep, struct packet *pack)
 {
-	struct tcp_endpoint *client_ep;
+	//struct tcp_endpoint *client_ep;
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
-	struct ipv4_custom_data *custom = (struct ipv4_custom_data *) pack->custom_data;
 
 	if (hdr->flags != SYN)
 		return PACKET_DROPPED;
@@ -677,7 +673,6 @@ static int tcp_forward_syn_sent(struct tcp_endpoint *tep, struct packet *pack)
 
 static int tcp_forward_established(struct tcp_endpoint *tep, struct packet *pack)
 {
-	struct packet *reply;
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
 	if (tcp_check_close(tep, pack) == PACKET_DELIVERED)
@@ -744,10 +739,11 @@ static int tcp_check_close(struct tcp_endpoint *tep, struct packet *pack)
 		if (hdr->seqnum != tep->rx_last_seq)
 			return PACKET_DROPPED;
 
-		if (tep->state == TS_ESTABLISHED)
+		if (tep->state == TS_ESTABLISHED) {
 			tep->state = TS_CLOSE_WAIT;
-		else
+		} else {
 			tep->state = TS_CLOSING;
+		}
 
 		tcp_send_packet(tep, ACK, 0, 1);
 		net_socket_wakeup(tep->ep.sock, VFS_POLL_READ);

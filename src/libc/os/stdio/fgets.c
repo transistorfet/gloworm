@@ -11,8 +11,7 @@ char *fgets(char *str, int max, FILE *stream)
 		if (str[i] == '\n') {
 			i += 1;
 			break;
-		}
-		else if (str[i] == EOF) {
+		} else if (str[i] == EOF) {
 			if (!i)
 				return NULL;
 			break;

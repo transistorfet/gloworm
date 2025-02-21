@@ -14,7 +14,6 @@
 
 struct process *create_init_task()
 {
-	int error;
 	char *argv[2] = { "init", NULL }, *envp[1] = { NULL };
 
 	struct process *proc = new_proc(INIT_PID, SU_UID);
@@ -52,8 +51,6 @@ struct process *create_init_task()
 
 struct process *create_kernel_task(const char *name, int (*task_start)())
 {
-	int error = 0;
-
 	struct process *proc = new_proc(0, SU_UID);
 	if (!proc)
 		panic("Ran out of procs\n");

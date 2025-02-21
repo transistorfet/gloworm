@@ -48,13 +48,15 @@ int init_devfs()
 {
 	devfs_root = _new_vnode(0, 0755, &devfs_vnode_ops);
 
-	for (char i = 0; i < DEVFS_DIRENT_MAX; i++)
+	for (short i = 0; i < DEVFS_DIRENT_MAX; i++)
 		devices[i].vnode = NULL;
+	return 0;
 }
 
 int devfs_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t uid, struct vnode **result)
 {
 
+	return 0;
 }
 
 int devfs_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t dev, uid_t uid, struct vnode **result)
@@ -95,7 +97,7 @@ int devfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 	if (vnode != devfs_root)
 		return ENOTDIR;
 
-	for (char i = 0; i < DEVFS_DIRENT_MAX; i++) {
+	for (short i = 0; i < DEVFS_DIRENT_MAX; i++) {
 		if (devices[i].vnode && !strcmp(filename, devices[i].name)) {
 			if (*result)
 				vfs_release_vnode(*result);
@@ -109,6 +111,7 @@ int devfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 int devfs_release(struct vnode *vnode)
 {
 
+	return 0;
 }
 
 int devfs_open(struct vfile *file, int flags)
@@ -144,7 +147,7 @@ offset_t devfs_seek(struct vfile *file, offset_t position, int whence)
 
 static inline struct devfs_dirent *_new_dirent()
 {
-	for (char i = 0; i < DEVFS_DIRENT_MAX; i++) {
+	for (short i = 0; i < DEVFS_DIRENT_MAX; i++) {
 		if (!devices[i].vnode)
 			return &devices[i];
 	}
@@ -153,7 +156,7 @@ static inline struct devfs_dirent *_new_dirent()
 
 static struct vnode *_new_vnode(device_t dev, mode_t mode, struct vnode_ops *ops)
 {
-	for (char i = 0; i < MAX_VNODES; i++) {
+	for (short i = 0; i < MAX_VNODES; i++) {
 		if (vnode_table[i].refcount <= 0) {
 			vfs_init_vnode(&vnode_table[i], ops, NULL, mode, 1, 0, 0, 0, dev, 0, 0, 0, 0);
 			DEVFS_DATA(&vnode_table[i]).device = dev;

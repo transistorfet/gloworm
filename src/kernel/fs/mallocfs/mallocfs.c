@@ -172,8 +172,7 @@ int mallocfs_rename(struct vnode *vnode, struct vnode *oldparent, const char *ol
 	if (newdir) {
 		// TODO delete existing file instead of error??
 		return EEXIST;
-	}
-	else {
+	} else {
 		newdir = dir_alloc_entry(newparent, newname);
 		if (!newdir)
 			return ENOSPC;

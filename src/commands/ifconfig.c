@@ -20,12 +20,13 @@ int main(int argc, char **argv)
 
 	up = 0;
 	if (argc >= 3) {
-		if (!strcmp(argv[argc - 1], "up"))
+		if (!strcmp(argv[argc - 1], "up")) {
 			up = 1;
-		else if (!strcmp(argv[argc - 1], "down"))
+		} else if (!strcmp(argv[argc - 1], "down")) {
 			up = 2;
-		else
+		} else {
 			up = -1;
+		}
 	}
 
 	if (up == -1 || argc < 2 || argc > 4) {
@@ -65,8 +66,7 @@ int main(int argc, char **argv)
 			printf("Error bringing device %s: %d\n", up == 1 ? "up" : "down", error);
 			return -1;
 		}
-	}
-	else {
+	} else {
 		strcpy(ifreq.ifr_name, device);
 
 		error = ioctl(sockfd, SIOCGIFFLAGS, &ifreq);

@@ -54,7 +54,7 @@ int MAIN(command_ps)(int argc, char **argv, char **envp)
 
 			close(fd);
 
-			sscanf(buffer, "%*d %s %c %d %d %d %d %d %d\n", cmd, &state, &parent, &pgid, &session, &ctty, &start, &size);
+			sscanf(buffer, "%*d %s %c %d %d %d %d %ld %d\n", cmd, &state, &parent, &pgid, &session, &ctty, &start, &size);
 			printf("%s\t%d\t%c\t%d\t%d\t%s\n", dir.d_name, size, state, parent, pgid, cmd);
 		}
 	}

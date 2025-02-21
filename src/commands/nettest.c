@@ -20,10 +20,9 @@ int MAIN(command_nettest)()
 
 	pid = fork();
 	if (pid) {
-		printf("Detaching\n\0");
+		fputs("Detaching\n\0", stdout);
 		return 0;
-	}
-	else {
+	} else {
 		serverloop();
 	}
 
@@ -35,7 +34,7 @@ int serverloop()
 	int i;
 	int error;
 	int sockfd;
-	int sa_len;
+	socklen_t sa_len;
 	char buffer[MAX_INPUT];
 	struct sockaddr_in addr;
 
@@ -102,8 +101,7 @@ int serverloop()
 			printf("%d: %s\n", i, buffer);
 			process_input(buffer);
 			i = 0;
-		}
-		else
+		} else
 			i++;
 	}
 

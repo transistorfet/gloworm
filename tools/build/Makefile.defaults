@@ -17,7 +17,7 @@ asflags-$(CONFIG_MC68010) 	+= -m68010 --defsym __mc68010__=1
 
 INCLUDE = $(src-root)/include
 ASFLAGS = $(asflags-y)
-CFLAGS = -I$(INCLUDE) $(ccflags-y) -nostartfiles -nostdlib -fno-zero-initialized-in-bss -g -Os #-Wall
+CFLAGS = -I$(INCLUDE) $(ccflags-y) -nostartfiles -nostdlib -fno-zero-initialized-in-bss -g -Os -Wall
 LDFLAGS = -Wl,--build-id=none
 
 # reduce the elf output size by reducing the alignment

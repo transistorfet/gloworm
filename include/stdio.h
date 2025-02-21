@@ -2,9 +2,8 @@
 #ifndef STDIO_H
 #define STDIO_H
 
-#include <stdarg.h>
-
 #include <stddef.h>
+#include <stdarg.h>
 
 #define FOPEN_MAX	20
 #define BUFSIZE		1024

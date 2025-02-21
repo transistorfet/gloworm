@@ -2,6 +2,7 @@
 #ifndef _SRC_KERNEL_FS_MINIX_MINIX_H
 #define _SRC_KERNEL_FS_MINIX_MINIX_H
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <kernel/vfs.h>
 

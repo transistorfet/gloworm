@@ -112,8 +112,7 @@ static inline void tty_read_input(device_t minor)
 				tty_reset_input(minor);
 				send_signal_process_group(tty->pgid, SIGINT);
 				return;
-			}
-			else if (ch == tty->tio.c_cc[VSUSP]) {
+			} else if (ch == tty->tio.c_cc[VSUSP]) {
 				send_signal_process_group(tty->pgid, SIGSTOP);
 				return;
 			}
@@ -122,30 +121,26 @@ static inline void tty_read_input(device_t minor)
 
 		if (ch == '\x1B') {
 			tty->escape = 1;
-		}
-		else if (tty->escape == 1) {
+		} else if (tty->escape == 1) {
 			tty->escape = (ch == '[') ? 2 : 0;
-		}
-		else if (tty->escape == 2) {
+		} else if (tty->escape == 2) {
 			// TODO intepret the next character (or buffer somewhere if not a letter
 			tty->escape = 0;
-		}
-		else if (ch == tty->tio.c_cc[VERASE]) {
+		} else if (ch == tty->tio.c_cc[VERASE]) {
 			if (tty->buf_write >= 1) {
 				tty->buf_write--;
 				if ((tty->tio.c_lflag & ECHOE)) {
-					if (tty->buffer[tty->buf_write] == '\t')
+					if (tty->buffer[tty->buf_write] == '\t') {
 						// TODO proper handling of this might require window dimensions and cursor position tracking
 						dev_write(tty->rdev, "\x08\x08\x08\x08\x08\x08\x08\x08", 0, 8);
-					else
+					} else {
 						dev_write(tty->rdev, "\x08 \x08", 0, 3);
+					}
 				}
 			}
-		}
-		else if (ch == '\r') {
+		} else if (ch == '\r') {
 			// Ignore
-		}
-		else {
+		} else {
 			tty->buffer[tty->buf_write++] = ch;
 			if ((tty->tio.c_lflag & ECHO))
 				dev_write(tty->rdev, &ch, 0, 1);
@@ -183,6 +178,7 @@ int tty_init()
 	register_driver(DEVMAJOR_TTY, &tty_driver);
 	register_bh(BH_TTY, tty_process_input, NULL);
 	enable_bh(BH_TTY);
+	return 0;
 }
 
 int tty_open(devminor_t minor, int mode)
@@ -236,8 +232,7 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 			return 0;
 		}
 		return read;
-	}
-	else {
+	} else {
 		size_t max;
 		size_t count;
 

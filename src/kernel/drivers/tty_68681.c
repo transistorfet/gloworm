@@ -286,7 +286,7 @@ static void tty_68681_process_input(void *_unused)
 		check_timers();
 	}
 
-	for (char i = 0; i < 2; i++) {
+	for (short i = 0; i < 2; i++) {
 		if (channels[i].rx_ready) {
 			channels[i].rx_ready = 0;
 			resume_blocked_procs(VFS_POLL_READ, NULL, DEVNUM(DEVMAJOR_TTY68681, i));
@@ -340,9 +340,9 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 
 	if (isr & ISR_S_TX_READY) {
 		int ch = _buf_get_char(&channels[minor].tx);
-		if (ch != -1)
+		if (ch != -1) {
 			*channels[minor].ports->send = (unsigned char) ch;
-		else {
+		} else {
 			// Disable the channel A transmitter if empty
 			if (*channels[minor].ports->status & SR_TX_EMPTY)
 				*channels[minor].ports->command = CMD_DISABLE_TX;
@@ -358,13 +358,14 @@ void handle_serial_irq()
 
 	register char isr = *ISR_RD_ADDR;
 
-	for (char i = 0; i < 2; i++)
+	for (short i = 0; i < 2; i++)
 		handle_channel_io(isr, i);
 
 
 	if (isr & ISR_TIMER_CHANGE) {
 		// Clear the interrupt bit by reading the stop address
-		register char reset = *STOP_RD_ADDR;
+		volatile register char reset = *STOP_RD_ADDR;
+		reset;	// make the compiler happy
 
 		if (tick) {
 			tick = 0;
@@ -558,6 +559,7 @@ int tty_68681_init()
 	register_driver(DEVMAJOR_TTY68681, &tty_68681_driver);
 	register_bh(BH_TTY68681, tty_68681_process_input, NULL);
 	enable_bh(BH_TTY68681);
+	return 0;
 }
 
 int tty_68681_open(devminor_t minor, int mode)

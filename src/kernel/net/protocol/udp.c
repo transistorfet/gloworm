@@ -33,8 +33,8 @@ int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 
 int udp_destroy_endpoint(struct endpoint *ep);
 int udp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len);
-int udp_endpoint_send_to(struct endpoint *ep, const char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len);
-int udp_endpoint_recv_from(struct endpoint *ep, char *buf, int nbytes, struct sockaddr *sockaddr, socklen_t *len);
+int udp_endpoint_send_to(struct endpoint *ep, const unsigned char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len);
+int udp_endpoint_recv_from(struct endpoint *ep, unsigned char *buf, int nbytes, struct sockaddr *sockaddr, socklen_t *len);
 int udp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen);
 int udp_endpoint_set_options(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen);
 int udp_endpoint_poll(struct endpoint *ep, int events);
@@ -90,6 +90,7 @@ int udp_init()
 {
 	_queue_init(&udp_endpoints);
 	net_register_protocol(&udp_protocol);
+	return 0;
 }
 
 int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)
@@ -263,7 +264,7 @@ int udp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, s
 	return NULL;
 }
 
-int udp_endpoint_send_to(struct endpoint *ep, const char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len)
+int udp_endpoint_send_to(struct endpoint *ep, const unsigned char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len)
 {
 	struct packet *pack;
 	struct ipv4_address dest;
@@ -274,16 +275,16 @@ int udp_endpoint_send_to(struct endpoint *ep, const char *buf, int nbytes, const
 	if (sockaddr) {
 		dest.addr = ((struct sockaddr_in *) sockaddr)->sin_addr.s_addr;
 		dest.port = ((struct sockaddr_in *) sockaddr)->sin_port;
-	}
-	else
+	} else {
 		dest = UDP_ENDPOINT(ep)->dest;
+	}
 
 	pack = udp_create_packet(ep->proto, &UDP_ENDPOINT(ep)->src, &dest, buf, nbytes);
 	net_if_send_packet(ep->ifdev, pack);
 	return nbytes;
 }
 
-int udp_endpoint_recv_from(struct endpoint *ep, char *buf, int nbytes, struct sockaddr *sockaddr, socklen_t *len)
+int udp_endpoint_recv_from(struct endpoint *ep, unsigned char *buf, int nbytes, struct sockaddr *sockaddr, socklen_t *len)
 {
 	struct packet *pack;
 	struct ipv4_custom_data *custom;

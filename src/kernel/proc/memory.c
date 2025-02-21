@@ -56,7 +56,7 @@ char *copy_exec_args(char *stack, char *const argv[], char *const envp[], const 
 	stack -= sizeof(int);
 	*((int *) stack) = argc;
 
-	for (char j = 0; j < PROC_CMDLINE_ARGS; j++)
+	for (short j = 0; j < PROC_CMDLINE_ARGS; j++)
 		proc_args[j] = j < argc ? stack_argv[j] : NULL;
 
 	return stack;
@@ -128,11 +128,12 @@ int clone_process_memory(struct process *parent_proc, struct process *proc)
 	proc->cwd = parent_proc->cwd;
 	dup_fd_table(proc->fd_table, parent_proc->fd_table);
 
-	for (char j = 0; j < PROC_CMDLINE_ARGS; j++) {
-		if (parent_proc->cmdline[j])
+	for (short j = 0; j < PROC_CMDLINE_ARGS; j++) {
+		if (parent_proc->cmdline[j]) {
 			proc->cmdline[j] = proc->map.segments[M_STACK].base + (parent_proc->cmdline[j] - (char *) parent_proc->map.segments[M_STACK].base);
-		else
+		} else {
 			proc->cmdline[j] = NULL;
+		}
 	}
 
 	return 0;

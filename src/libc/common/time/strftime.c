@@ -94,12 +94,13 @@ size_t strftime (char* buffer, size_t max, const char *fmt, const struct tm *tp)
 				// Set width to 0 to skip the itoa call
 				width = 0;
 
-				if (fmt[j] == 'n')
+				if (fmt[j] == 'n') {
 					value = '\n';
-				else if (fmt[j] == 't')
+				} else if (fmt[j] == 't') {
 					value = '\t';
-				else
+				} else {
 					value = fmt[j];
+				}
 				buffer[i++] = value;
 				break;
 			}
@@ -109,17 +110,15 @@ size_t strftime (char* buffer, size_t max, const char *fmt, const struct tm *tp)
 				i += strlen(svalue);
 				if (i > max)
 					i = max - 1;
-			}
-			else if (subfmt) {
+			} else if (subfmt) {
 				i += strftime(&buffer[i], max - i, subfmt, tp);
-			}
-			else if (width && width < max - i) {
+			} else if (width && width < max - i) {
 				itoa_padded(value, &buffer[i], 10, width, padding, 0);
 				i += width;
 			}
-		}
-		else
+		} else {
 			buffer[i++] = fmt[j];
+		}
 	}
 	buffer[i] = '\0';
 

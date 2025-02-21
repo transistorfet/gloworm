@@ -39,7 +39,7 @@ void load_partition(struct boot_drive *drive);
 void load_kernel(struct boot_drive *drive, char *offset);
 int ata_read_sector(int sector, char *buffer);
 
-int main(char *boot_args)
+int start(char *boot_args)
 {
 	struct boot_drive drive;
 
@@ -54,7 +54,7 @@ int main(char *boot_args)
 	load_partition(&drive);
 	load_kernel(&drive, load_address);
 
-	__attribute__((noreturn)) void (*entry)(char *) = (void (*)(char *)) load_address;
+	void (*entry)(char *) = (void (*)(char *)) load_address;
 	entry(boot_args);
 	__builtin_unreachable();
 }
@@ -64,8 +64,7 @@ char *copy_zone_data(struct boot_drive *drive, char *dest, minix_v1_zone_t zone)
 	if (drive->drive_type == 1) {
 		char *src = mem_drive + (zone * MINIX_V1_ZONE_SIZE);
 		memcpy(dest, src, MINIX_V1_ZONE_SIZE);
-	}
-	else {
+	} else {
 		ata_read_sector(drive->ata_lba_start + (zone << 1), dest);
 	}
 
@@ -74,12 +73,10 @@ char *copy_zone_data(struct boot_drive *drive, char *dest, minix_v1_zone_t zone)
 
 char *load_zones(struct boot_drive *drive, minix_v1_zone_t *zones, int max, char *dest)
 {
-	char *src;
-
 	for (short i = 0; i < max; i++) {
 		if (!zones[i])
 			return NULL;
-		src = copy_zone_data(drive, dest, from_le16(zones[i]));
+		copy_zone_data(drive, dest, from_le16(zones[i]));
 		dest += MINIX_V1_ZONE_SIZE;
 		putchar('.');
 	}
@@ -93,7 +90,7 @@ void load_partition(struct boot_drive *drive)
 
 	copy_zone_data(drive, buffer, 0);
 	entry = (struct partition_entry *) &buffer[PARTITION_OFFSET];
-	drive->ata_lba_start = from_le32(entry[drive->partition].lba_start);
+	drive->ata_lba_start = from_le32(entry[(short) drive->partition].lba_start);
 }
 
 void load_kernel(struct boot_drive *drive, char *offset)
@@ -106,7 +103,7 @@ void load_kernel(struct boot_drive *drive, char *offset)
 
 	// Load our target inode and get the zone table in the inode
 	super = (struct minix_v1_superblock *) copy_zone_data(drive, buffer, MINIX_V1_SUPER_ZONE);
-	MINIX_V1_INODE_TABLE_START(super);
+	//MINIX_V1_INODE_TABLE_START(super);
 	minix_v1_zone_t inode_zone = MINIX_V1_BITMAP_ZONES + from_le16((super)->imap_blocks) + from_le16((super)->zmap_blocks);
 
 	// Load our target inode and get the zone table in the inode
@@ -154,7 +151,7 @@ void load_kernel(struct boot_drive *drive, char *offset)
 
 #define ATA_DELAY(x)		{ for (int delay = 0; delay < (x); delay++) { asm volatile(""); } }
 #define ATA_WAIT()		{ while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
-#define ATA_WAIT_FOR_DATA()	{ while (!(*ATA_REG_STATUS) & ATA_ST_DATA_READY) { } }
+#define ATA_WAIT_FOR_DATA()	{ while (!((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) { } }
 
 void ata_wait()
 {
@@ -165,10 +162,11 @@ void ata_wait()
 
 static inline char hexchar(uint8_t byte)
 {
-	if (byte < 10)
+	if (byte < 10) {
 		return byte + 0x30;
-	else
+	} else {
 		return byte + 0x37;
+	}
 }
 
 int ata_read_sector(int sector, char *buffer)
@@ -285,6 +283,7 @@ int init_tty()
 	*ACR_WR_ADDR = ACR_AUX_CONTROL_REG_CONFIG;
 
 	*CRA_WR_ADDR = CMD_ENABLE_TX;
+	return 0;
 }
 
 int putchar(int ch)

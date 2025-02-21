@@ -218,9 +218,9 @@ int minix_unlink(struct vnode *parent, struct vnode *vnode, const char *filename
 	if (vnode->nlinks <= 0) {
 		zone_free_all(vnode);
 		delete_vnode(vnode);
-	}
-	else
+	} else {
 		write_inode(vnode, vnode->ino);
+	}
 	return 0;
 }
 
@@ -234,8 +234,7 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 		// TODO delete existing file instead of error??
 		release_block(newbuf, 0);
 		return EEXIST;
-	}
-	else {
+	} else {
 		newdir = dir_alloc_entry(newparent, newname, &newbuf);
 		if (!newdir)
 			return ENOSPC;
@@ -276,10 +275,11 @@ int minix_update(struct vnode *vnode)
 int minix_release(struct vnode *vnode)
 {
 	// NOTE we only free vnodes who's inode has been deleted.  The vnode cache will release other vnodes when they are pushed out by newer nodes
-	if (vnode->ino == 0)
+	if (vnode->ino == 0) {
 		release_vnode(vnode);
-	else if (vnode->bits & VBF_DIRTY)
+	} else if (vnode->bits & VBF_DIRTY) {
 		write_inode(vnode, vnode->ino);
+	}
 	return 0;
 }
 

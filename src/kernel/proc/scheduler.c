@@ -48,10 +48,11 @@ void exit_proc(struct process *proc, int status)
 		return;
 
 	LOCK(saved_status);
-	if (proc->state == PS_BLOCKED)
+	if (proc->state == PS_BLOCKED) {
 		_queue_remove(&blocked_queue, &proc->node);
-	else
+	} else {
 		_queue_remove(&run_queue, &proc->node);
+	}
 
 	proc->state = PS_EXITED;
 	proc->exitcode = status;
@@ -69,11 +70,11 @@ void stop_proc(struct process *proc)
 	if (proc->state == PS_EXITED || proc->state == PS_STOPPED) {
 		UNLOCK(saved_status);
 		return;
-	}
-	else if (proc->state == PS_RUNNING || proc->state == PS_RESUMING)
+	} else if (proc->state == PS_RUNNING || proc->state == PS_RESUMING) {
 		_queue_remove(&run_queue, &proc->node);
-	else if (proc->state == PS_BLOCKED)
+	} else if (proc->state == PS_BLOCKED) {
 		_queue_remove(&blocked_queue, &proc->node);
+	}
 	proc->state = PS_STOPPED;
 	need_reschedule = 1;
 	UNLOCK(saved_status);
@@ -105,8 +106,7 @@ void resume_proc(struct process *proc)
 	if (proc->state == PS_RUNNING || proc->state == PS_RESUMING || proc->state == PS_EXITED) {
 		UNLOCK(saved_status);
 		return;
-	}
-	else if (proc->state == PS_BLOCKED)
+	} else if (proc->state == PS_BLOCKED)
 		_queue_remove(&blocked_queue, &proc->node);
 	_queue_insert(&run_queue, &proc->node);
 	proc->state = PS_RESUMING;
@@ -211,9 +211,9 @@ void set_proc_return_value(struct process *proc, int ret)
 
 void return_to_current_proc(int ret)
 {
-	if (current_proc->bits & PB_DONT_SET_RETURN_VAL)
+	if (current_proc->bits & PB_DONT_SET_RETURN_VAL) {
 		current_proc->bits &= ~PB_DONT_SET_RETURN_VAL;
-	else if (current_proc->state == PS_RUNNING) {
+	} else if (current_proc->state == PS_RUNNING) {
 		// If the process is still in the ready state, then set the return value in the process's context
 		*((uint32_t *) current_proc->sp) = ret;
 	}
@@ -247,10 +247,11 @@ void schedule()
 
 	LOCK(saved_status);
 	need_reschedule = 0;
-	if (!current_proc || !PROC_IS_RUNNING(current_proc) || !current_proc->node.next)
+	if (!current_proc || !PROC_IS_RUNNING(current_proc) || !current_proc->node.next) {
 		next = (struct process *) run_queue.head;
-	else
+	} else {
 		next = (struct process *) current_proc->node.next;
+	}
 
 	// No processes to run, so run the idle process
 	if (!next)

@@ -25,8 +25,7 @@ int MAIN(command_echo)(int argc, char **argv, char **envp)
 		for (int j = 0; argv[i][j]; j++) {
 			if (argv[i][j] == '\"') {
 				open_quote = !open_quote;
-			}
-			else if (argv[i][j] == '$') {
+			} else if (argv[i][j] == '$') {
 				int l;
 				for (l = ++j; argv[i][l] && isalnum(argv[i][l]); l++) { }
 				tmp = argv[i][l];
@@ -38,9 +37,9 @@ int MAIN(command_echo)(int argc, char **argv, char **envp)
 				}
 				argv[i][l] = tmp;
 				j = l - 1;
-			}
-			else
+			} else {
 				buffer[k++] = argv[i][j];
+			}
 		}
 		buffer[k++] = ' ';
 	}

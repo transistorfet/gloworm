@@ -114,22 +114,20 @@ int procfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resu
 			proc = get_proc(pid);
 			if (!proc)
 				return ENOENT;
-		}
-		else {
+		} else {
 			filenum = _find_filenum_by_name(root_files, filename);
 			if (filenum < 0)
 				return ENOENT;
 		}
-	}
-	else if (PROCFS_DATA(vnode).filenum == PFN_PROCDIR) {
+	} else if (PROCFS_DATA(vnode).filenum == PFN_PROCDIR) {
 		pid = PROCFS_DATA(vnode).pid;
 
 		filenum = _find_filenum_by_name(proc_files, filename);
 		if (filenum < 0)
 			return ENOENT;
-	}
-	else
+	} else {
 		return ENOTDIR;
+	}
 
 	if (*result)
 		vfs_release_vnode(*result);
@@ -144,12 +142,14 @@ int procfs_release(struct vnode *vnode)
 
 int procfs_open(struct vfile *file, int flags)
 {
+	struct procfs_position *position = PROCFS_POSITION(file->position);
+
 	if (PROCFS_DATA(file->vnode).filenum == PFN_ROOTDIR) {
-		PROCFS_POSITION(file->position)->slot = 0;
-		proc_iter_start(&PROCFS_POSITION(file->position)->iter);
-	}
-	else
+		position->slot = 0;
+		proc_iter_start(&position->iter);
+	} else {
 		file->position = 0;
+	}
 	return 0;
 }
 
@@ -202,21 +202,20 @@ offset_t procfs_seek(struct vfile *file, offset_t position, int whence)
 
 int procfs_readdir(struct vfile *file, struct dirent *dir)
 {
-	int i;
 	short slot;
 	struct process *proc;
+	struct procfs_position *position = PROCFS_POSITION(file->position);
 
 	if (!S_ISDIR(file->vnode->mode))
 		return ENOTDIR;
 
 	if (PROCFS_DATA(file->vnode).filenum == PFN_ROOTDIR) {
-		if (PROCFS_POSITION(file->position)->slot == 0 && (proc = proc_iter_next(&PROCFS_POSITION(file->position)->iter))) {
+		if (position->slot == 0 && (proc = proc_iter_next(&position->iter))) {
 			dir->d_ino = file->position;
 			snprintf(dir->d_name, VFS_FILENAME_MAX, "%d", proc->pid);
 			dir->d_name[VFS_FILENAME_MAX - 1] = '\0';
-		}
-		else {
-			slot = ++PROCFS_POSITION(file->position)->slot;
+		} else {
+			slot = ++position->slot;
 
 			if (!root_files[slot - 1].filename)
 				return 0;
@@ -225,16 +224,14 @@ int procfs_readdir(struct vfile *file, struct dirent *dir)
 			strncpy(dir->d_name, root_files[slot - 1].filename, VFS_FILENAME_MAX);
 			dir->d_name[VFS_FILENAME_MAX - 1] = '\0';
 		}
-	}
-	else if (PROCFS_DATA(file->vnode).filenum == PFN_PROCDIR) {
+	} else if (PROCFS_DATA(file->vnode).filenum == PFN_PROCDIR) {
 		if (!proc_files[file->position].filename)
 			return 0;
 		dir->d_ino = (PROCFS_DATA(file->vnode).pid << 8) | proc_files[file->position].filenum;
 		strncpy(dir->d_name, proc_files[file->position].filename, VFS_FILENAME_MAX);
 		dir->d_name[VFS_FILENAME_MAX - 1] = '\0';
 		file->position += 1;
-	}
-	else
+	} else
 		return ENOTDIR;
 	return 1;
 }

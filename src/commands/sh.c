@@ -42,10 +42,11 @@ void delay(int count) {
 
 char hexchar(uint8_t byte)
 {
-	if (byte < 10)
+	if (byte < 10) {
 		return byte + 0x30;
-	else
+	} else {
 		return byte + 0x37;
+	}
 }
 
 void dump_line(const uint16_t *addr, short len)
@@ -68,7 +69,7 @@ void dump_line(const uint16_t *addr, short len)
 void dump(const uint16_t *addr, short len)
 {
 	while (len > 0) {
-		printf("%06x: ", addr);
+		printf("%06lx: ", (uintptr_t) addr);
 		dump_line(addr, len > 8 ? 8 : len);
 		addr += 8;
 		len -= 8;
@@ -83,9 +84,9 @@ void dump(const uint16_t *addr, short len)
 
 int command_dump(int argc, char **argv, char **envp)
 {
-	if (argc <= 1)
+	if (argc <= 1) {
 		puts("You need an address");
-	else {
+	} else {
 		short length = 0x40;
 
 		if (argc >= 3)
@@ -97,9 +98,9 @@ int command_dump(int argc, char **argv, char **envp)
 
 int command_poke(int argc, char **args, char **envp)
 {
-	if (argc <= 2)
+	if (argc <= 2) {
 		puts("You need an address and byte to poke");
-	else {
+	} else {
 		uint8_t *address = (uint8_t *) strtol(args[1], NULL, 16);
 		uint8_t data = (uint8_t) strtol(args[2], NULL, 16);
 		*(address) = data;
@@ -111,7 +112,7 @@ uint16_t fetch_word(char max)
 {
 	char buffer[4];
 
-	for (char i = 0; i < max; i++) {
+	for (short i = 0; i < max; i++) {
 		buffer[i] = getchar();
 		buffer[i] = buffer[i] <= '9' ? buffer[i] - 0x30 : buffer[i] - 0x37;
 	}
@@ -346,14 +347,12 @@ int parseline(char *input, char **vargs)
 			while (*input == ' ' || *input == '\t')
 				input++;
 			vargs[j++] = input;
-		}
-		else if (*input == ' ' || *input == '\t') {
+		} else if (*input == ' ' || *input == '\t') {
 			*input++ = '\0';
 			while (*input == ' ' || *input == '\t')
 				input++;
 			vargs[j++] = input;
-		}
-		else
+		} else
  			input++;
 	}
 
@@ -375,7 +374,7 @@ char *parse_word(char **input)
 
 	for (; **input != '\0' && !isspace(**input); (*input)++) { }
 	**input = '\0';
-	*input++;
+	(*input)++;
 
 	return start;
 }
@@ -391,8 +390,7 @@ int parse_command_line(char *input, struct pipe_command *commands)
 			*input = '\0';
 			j += 1;
 			commands[j].cmd = input + 1;
-		}
-		else if (*input == '>') {
+		} else if (*input == '>') {
 			if (*(input + 1) == '>')
 				commands[j].append = 1;
 			*input++ = '\0';
@@ -403,8 +401,7 @@ int parse_command_line(char *input, struct pipe_command *commands)
 				return -1;
 			}
 			commands[j].stdout_file = parse_word(&input);
-		}
-		else if (*input == '<') {
+		} else if (*input == '<') {
 			*input++ = '\0';
 			if (commands[j].stdin_file) {
 				printf("parse error: stdin is redirected more than once\n");
@@ -486,8 +483,7 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 		waitpid(pid, &status, 0);
 		pid_t fgpid = getpgid(0);
 		tcsetpgrp(STDOUT_FILENO, fgpid);
-	}
-	else {
+	} else {
 		if (setpgid(0, 0))
 			exit(-1);
 		pid_t fgpid = getpgid(0);
@@ -511,9 +507,9 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 			#else
 			status = main(argc, argv, envp);
 			#endif
-		}
-		else
+		} else {
 			status = execve(argv[0], argv, envp);
+		}
 		// The exec() system call will only return if an error occurs
 		printf("Failed to execute %s: %d\n", argv[1], status);
 		exit(-1);
@@ -543,8 +539,7 @@ int read_input(int fin, char *buffer, int max)
 				if (i > 0)
 					break;
 				return 0;
-			}
-			else if (count < 0) {
+			} else if (count < 0) {
 				if (count != EINTR)
 					printf("Error: %d\n", count);
 				return -1;
@@ -568,7 +563,6 @@ int read_loop(int fin)
 {
 	int argc;
 	int result;
-	main_t main;
 	char *argv[ARG_SIZE];
 	char buffer[BUF_SIZE];
 	struct pipe_command commands[PIPE_SIZE];
@@ -577,10 +571,11 @@ int read_loop(int fin)
 	while (1) {
 		memset(commands, 0, sizeof(struct pipe_command) * PIPE_SIZE);
 		result = read_input(fin, buffer, BUF_SIZE);
-		if (!result)
+		if (!result) {
 			break;
-		else if (result < 0)
+		} else if (result < 0) {
 			return result;
+		}
 
 		if (parse_command_line(buffer, commands))
 			continue;
@@ -595,14 +590,15 @@ int read_loop(int fin)
 
 		argc = parseline(commands[0].cmd, argv);
 
-		if (argc <= 0 || !argv[0] || *argv[0] == '\0')
+		if (argc <= 0 || !argv[0] || *argv[0] == '\0') {
 			continue;
-		else if (!strcmp(argv[0], "exit"))
+		} else if (!strcmp(argv[0], "exit")) {
 			break;
-		else if (!strcmp(argv[0], "cd"))
+		} else if (!strcmp(argv[0], "cd")) {
 			command_chdir(argc, argv, envp);
-		else
+		} else {
 			execute_command(&commands[0], argc, argv, envp);
+		}
 	}
 
 	return 0;

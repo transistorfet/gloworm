@@ -42,12 +42,10 @@ void handle_alarm(int signum)
 
 int main(int argc, char **argv)
 {
-	int i;
 	time_t t;
 	int error;
 	int nbytes;
 	int sockfd;
-	int sa_len;
 	struct sigaction act;
 	struct ntp_packet tx;
 	struct ntp_packet rx;
@@ -96,7 +94,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	t = rx.transmit_ts_s - 2208988800;
-	printf("new timestamp: %d\n", t);
+	printf("new timestamp: %ld\n", t);
 	stime(&t);
 
 	close(sockfd);

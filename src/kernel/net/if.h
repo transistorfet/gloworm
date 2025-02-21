@@ -40,7 +40,7 @@ struct if_device {
 	struct if_statistics tx_stats;
 };
 
-void init_net_if();
+int init_net_if();
 int net_if_register_device(struct if_device *ifdev);
 struct if_device *net_if_find(const char *name, struct protocol *proto);
 int net_if_change_state(struct if_device *ifdev, int state);

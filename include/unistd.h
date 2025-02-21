@@ -56,8 +56,8 @@ int mknod(const char *path, mode_t mode, device_t dev);
 int creat(const char *path, mode_t mode);
 int open(const char *path, int flags, mode_t mode);
 int close(int fd);
-size_t read(int fd, char *buf, size_t nbytes);
-size_t write(int fd, const char *buf, size_t nbytes);
+ssize_t read(int fd, void *buf, size_t nbytes);
+ssize_t write(int fd, const void *buf, size_t nbytes);
 int readdir(int fd, struct dirent *dir);
 int ioctl(int fd, unsigned int request, void *argp);
 

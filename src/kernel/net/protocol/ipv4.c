@@ -50,6 +50,7 @@ struct ipv4_header {
 int ipv4_init()
 {
 	net_register_protocol(&ipv4_protocol);
+	return 0;
 }
 
 int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)

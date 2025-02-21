@@ -42,7 +42,6 @@ static void sync_vnodes()
 static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 {
 	int error;
-	struct buf *buf;
 	struct vnode *vnode;
 
 	release_unused_vnodes();
@@ -57,7 +56,7 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 	_queue_insert(&cache, &MINIX_DATA(vnode).node);
 
 	vfs_init_vnode(vnode, &minix_vnode_ops, mp, 0, 1, 0, 0, 0, ino, 0, 0, 0, 0);
-	for (char j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
+	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
 		MINIX_DATA(vnode).zones[j] = NULL;
 
 	error = read_inode(vnode, ino);

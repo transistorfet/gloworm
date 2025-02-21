@@ -23,13 +23,14 @@ static struct process table[PROCESS_MAX];
 extern struct process *current_proc;
 
 
-void init_proc()
+int init_proc()
 {
 	next_pid = 2;
 
 	for (short i = 0; i < PROCESS_MAX; i++) {
 		table[i].pid = 0;
 	}
+	return 0;
 }
 
 struct process *new_proc(pid_t pid, uid_t uid)
@@ -50,8 +51,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 				table[i].pgid = current_proc->pgid;
 				table[i].session = current_proc->session;
 				table[i].ctty = current_proc->ctty;
-			}
-			else {
+			} else {
 				table[i].parent = INIT_PID;
 				table[i].pgid = table[i].pid;
 				table[i].session = table[i].pid;
@@ -61,7 +61,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			table[i].state = PS_RUNNING;
 			table[i].sp = NULL;
 			// Clear memory records
-			for (char j = 0; j < NUM_SEGMENTS; j++) {
+			for (short j = 0; j < NUM_SEGMENTS; j++) {
 				table[i].map.segments[j].base = NULL;
 				table[i].map.segments[j].length = 0;
 			}
@@ -78,7 +78,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			table[i].sys_time = 0;
 
 			table[i].uid = uid;
-			for (char j = 0; j < PROC_CMDLINE_ARGS; j++)
+			for (short j = 0; j < PROC_CMDLINE_ARGS; j++)
 				table[i].cmdline[j] = NULL;
 			table[i].cwd = NULL;
 			table[i].umask = PROC_DEFAULT_UMASK;
@@ -135,13 +135,14 @@ static int on_alarm(struct timer *timer, struct process *proc)
 {
 	proc->bits &= ~PB_ALARM_ON;
 	send_signal(proc->pid, SIGALRM);
+	return 0;
 }
 
 int set_proc_alarm(struct process *proc, uint32_t seconds)
 {
-	if (!seconds)
+	if (!seconds) {
 		remove_timer(&proc->timer);
-	else {
+	} else {
 		proc->bits |= PB_ALARM_ON;
 		proc->timer.argp = proc;
 		proc->timer.callback = (timer_callback_t) on_alarm;

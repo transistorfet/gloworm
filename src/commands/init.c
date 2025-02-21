@@ -57,8 +57,7 @@ int MAIN(init_task)()
 			if (!fork()) {
 				execve(argv[0], argv, envp);
 				exit(0);
-			}
-			else {
+			} else {
 				wait(&status);
 			}
 		}

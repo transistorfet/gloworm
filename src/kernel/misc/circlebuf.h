@@ -36,18 +36,20 @@ static inline int _buf_is_empty(struct circular_buffer *cb)
 
 static inline short _buf_used_space(struct circular_buffer *cb)
 {
-	if (cb->in >= cb->out)
+	if (cb->in >= cb->out) {
 		return cb->in - cb->out;
-	else
+	} else {
 		return cb->max - cb->out + cb->in;
+	}
 }
 
 static inline short _buf_free_space(struct circular_buffer *cb)
 {
-	if (cb->out > cb->in)
+	if (cb->out > cb->in) {
 		return cb->out - cb->in - 1;
-	else
+	} else {
 		return cb->max - cb->in + cb->out - 1;
+	}
 }
 
 static inline int _buf_get_char(struct circular_buffer *cb)

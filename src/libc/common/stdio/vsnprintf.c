@@ -7,7 +7,6 @@
 
 extern char *itoa_padded(unsigned int num, char *buffer, int radix, char width, char zeropad, char is_signed);
 
-
 int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 {
 	int len;
@@ -17,17 +16,15 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 		if (fmt[j] == '%') {
 			char type;
 			char width = 0;
-			char flags = 0;
-			char length = 4;
 			char zeropad = 0;
 			char numprefix = 0;
+			char length = sizeof(unsigned int);
 
 			// Should it be zero padding or spaces
 			if (fmt[j + 1] == '0') {
 				zeropad = 1;
 				j += 1;
-			}
-			else if (fmt[j + 1] == '#') {
+			} else if (fmt[j + 1] == '#') {
 				numprefix = 1;
 				j += 1;
 			}
@@ -42,10 +39,22 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 			// TODO parse out the precision
 
 			// Parse out length of data (for numbers mostly)
-			if (fmt[j + 1] == 'l' || fmt[j + 1] == 'h') {
-				if (fmt[j + 1] == 'h')
-					length = 2;
-				j += 1;
+			if (fmt[j + 1] == 'h') {
+				if (fmt[j + 2] == 'h') {
+					length = sizeof(char);
+					j += 2;
+				} else {
+					length = sizeof(short);
+					j += 1;
+				}
+			} else if (fmt[j + 1] == 'l') {
+				if (fmt[j + 2] == 'l') {
+					length = sizeof(long long);
+					j += 2;
+				} else {
+					length = sizeof(long);
+					j += 1;
+				}
 			}
 
 			// Parse the data type
@@ -71,8 +80,12 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 			    case 'x':
 			    case 'X': {
 				// Extract the data from args based on the requested length
-				unsigned int d;
-				d = va_arg(args, unsigned int);
+				unsigned long long d;
+				if (length <= sizeof(int)) {
+					d = va_arg(args, unsigned int);
+				} else {
+					d = va_arg(args, unsigned long long);
+				}
 
 				// Determine what base to display the number in
 				int radix = 10;
@@ -82,8 +95,7 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 						buffer[i++] = 'x';
 					}
 					radix = 16;
-				}
-				else if (type == 'o') {
+				} else if (type == 'o') {
 					if (numprefix && d)
 						buffer[i++] = '0';
 					radix = 8;
@@ -103,8 +115,7 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 			    default:
 				break;
 			}
-		}
-		else {
+		} else {
 			buffer[i++] = fmt[j];
 		}
 	}

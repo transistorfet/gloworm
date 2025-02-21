@@ -7,7 +7,7 @@
 
 int main(int argc, char **argv)
 {
-	const char *msg = "Hello!\n";
+	//const char *msg = "Hello!\n";
 
 	printf("%d %s\n", argc, argv[0]);
 

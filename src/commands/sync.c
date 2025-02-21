@@ -6,4 +6,5 @@
 int MAIN(command_sync)(int argc, char **argv, char **envp)
 {
 	sync();
+	return 0;
 }

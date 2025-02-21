@@ -13,13 +13,11 @@ long int strtol(const char *str, const char **endptr, int base)
 	if (*str == '-') {
 		sign = -1;
 		str++;
-	}
-	else if (*str == '0') {
+	} else if (*str == '0') {
 		if (str[1] == 'x') {
 			base = 16;
 			str += 2;
-		}
-		else {
+		} else {
 			base = 8;
 			str++;
 		}

@@ -12,6 +12,7 @@ static struct queue timer_list;
 int init_timer_list()
 {
 	_queue_init(&timer_list);
+	return 0;
 }
 
 void init_timer(struct timer *timer)

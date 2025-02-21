@@ -28,7 +28,7 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 int get_data_stat(struct process *proc, char *buffer, int max)
 {
 	return snprintf(buffer, max,
-		"%d %s %c %d %d %d %d %d %d\n",
+		"%d %s %c %d %d %d %d %ld %ld\n",
 		proc->pid,
 		proc->cmdline[0],
 		get_proc_state(proc),
@@ -44,15 +44,15 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 int get_data_statm(struct process *proc, char *buffer, int max)
 {
 	return snprintf(buffer, max,
-		"%d %x %x %x %x %x %x %x\n",
+		"%ld %lx %lx %lx %lx %lx %lx %lx\n",
 		get_proc_size(proc),
-		proc->map.segments[M_TEXT].base,
+		(uintptr_t) proc->map.segments[M_TEXT].base,
 		proc->map.segments[M_TEXT].length,
-		proc->map.segments[M_DATA].base,
+		(uintptr_t) proc->map.segments[M_DATA].base,
 		proc->map.segments[M_DATA].length,
-		proc->map.segments[M_STACK].base,
+		(uintptr_t) proc->map.segments[M_STACK].base,
 		proc->map.segments[M_STACK].length,
-		proc->sp
+		(uintptr_t) proc->sp
 	);
 }
 
@@ -77,7 +77,7 @@ static inline char get_proc_state(struct process *proc)
 static inline size_t get_proc_size(struct process *proc)
 {
 	size_t size = 0;
-	for (char i = 0; i < NUM_SEGMENTS; i++)
+	for (short i = 0; i < NUM_SEGMENTS; i++)
 		size += proc->map.segments[i].length;
 	return size;
 }

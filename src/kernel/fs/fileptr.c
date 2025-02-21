@@ -15,7 +15,7 @@ struct vfile file_table[FILE_TABLE_MAX];
 
 void init_fileptr_table()
 {
-	for (char i = 0; i < FILE_TABLE_MAX; i++) {
+	for (short i = 0; i < FILE_TABLE_MAX; i++) {
 		file_table[i].ops = NULL;
 		file_table[i].vnode = NULL;
 		file_table[i].refcount = 0;
@@ -24,7 +24,7 @@ void init_fileptr_table()
 
 struct vfile *new_fileptr(struct vnode *vnode, int flags)
 {
-	for (char i = 0; i < FILE_TABLE_MAX; i++) {
+	for (short i = 0; i < FILE_TABLE_MAX; i++) {
 		if (!file_table[i].vnode) {
 			file_table[i].ops = vnode->ops->fops;
 			file_table[i].vnode = vnode;
@@ -48,8 +48,7 @@ void free_fileptr(struct vfile *file)
 	--file->refcount;
 	if (file->refcount < 0) {
 		printk("Error: double free of file pointer, %x\n", file);
-	}
-	else if (file->refcount <= 0) {
+	} else if (file->refcount <= 0) {
 		vfs_release_vnode(file->vnode);
 		file->vnode = NULL;
 	}

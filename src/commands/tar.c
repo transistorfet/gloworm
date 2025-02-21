@@ -110,7 +110,7 @@ int tar_verify_checksum(struct tar_header *header, unsigned char *buffer)
 {
 	int zeros;
 	int checksum;
-	int checksum_rec;
+	int checksum_rec = -1;
 
 	// If the checksum is already NUL then don't modify so the zero check still passes
 	if (header->checksum[0] != '\0') {

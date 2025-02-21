@@ -14,12 +14,10 @@
 
 int main(int argc, char **argv)
 {
-	int i;
 	int error;
-	int nbytes;
-	int sa_len;
 	int sockfd;
 	int listenfd;
+	socklen_t sa_len;
 	struct sigaction act;
 	char buffer[MAX_INPUT];
 	struct sockaddr_in addr;
@@ -82,26 +80,21 @@ int main(int argc, char **argv)
 					printf("Error sending: %d\n", error);
 					return -1;
 				}
-			}
-			else if (!strcmp(buffer, "light_on\n")) {
+			} else if (!strcmp(buffer, "light_on\n")) {
 				int data = 0x01;
 				if (!ioctl(STDIN_FILENO, TSETLEDS, &data)) {
 					send(sockfd, "ok\n", 3, 0);
-				}
-				else {
+				} else {
 					send(sockfd, "error\n", 6, 0);
 				}
-			}
-			else if (!strcmp(buffer, "light_off\n")) {
+			} else if (!strcmp(buffer, "light_off\n")) {
 				int data = 0x00;
 				if (!ioctl(STDIN_FILENO, TSETLEDS, &data)) {
 					send(sockfd, "ok\n", 3, 0);
-				}
-				else {
+				} else {
 					send(sockfd, "error\n", 6, 0);
 				}
-			}
-			else if (!strcmp(buffer, "exit\n")) {
+			} else if (!strcmp(buffer, "exit\n")) {
 				break;
 			}
 		}

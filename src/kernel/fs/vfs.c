@@ -39,6 +39,7 @@ int init_vfs()
 
 	init_bufcache();
 	init_fileptr_table();
+	return 0;
 }
 
 void vfs_mount_iter_start(struct mount_iter *iter)
@@ -67,9 +68,9 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 	if (uid != SU_UID)
 		return EPERM;
 
-	if (!root_fs)
+	if (!root_fs) {
 		vnode = NULL;
-	else {
+	} else {
 		error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
 		if (error)
 			return error;
@@ -100,10 +101,11 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 				return error;
 			}
 
-			if (vnode)
+			if (vnode) {
 				vnode->bits |= VBF_MOUNTED;
-			else
+			} else {
 				root_fs = &mountpoints[i];
+			}
 			return 0;
 		}
 	}
@@ -139,9 +141,9 @@ int vfs_unmount(device_t dev, uid_t uid)
 	if (mp->mount_node) {
 		mp->mount_node->bits &= ~VBF_MOUNTED;
 		vfs_release_vnode(mp->mount_node);
-	}
-	else
+	} else {
 		root_fs = NULL;
+	}
 	mp->ops = NULL;
 	mp->dev = 0;
 	return 0;
@@ -158,6 +160,7 @@ int vfs_sync(device_t dev)
 				return error;
 		}
 	}
+	return 0;
 }
 
 
@@ -280,9 +283,9 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 				vfs_close(file);
 				vfs_release_vnode(cur);
 				return error;
-			}
-			else if (error == 0)
+			} else if (error == 0) {
 				break;
+			}
 
 			if (dir.d_ino == cur->ino && strcmp(dir.d_name, ".") && strcmp(dir.d_name, "..")) {
 				len = strlen(dir.d_name);
@@ -323,10 +326,11 @@ int vfs_access(struct vnode *cwd, const char *path, int mode, uid_t uid)
 	if (error)
 		return error;
 
-	if (mode && !verify_mode_access(uid, mode, vnode->uid, vnode->gid, vnode->mode))
+	if (mode && !verify_mode_access(uid, mode, vnode->uid, vnode->gid, vnode->mode)) {
 		error = EPERM;
-	else
+	} else {
 		error = 0;
+	}
 	vfs_release_vnode(vnode);
 	return error;
 }
@@ -391,8 +395,7 @@ int vfs_mknod(struct vnode *cwd, const char *path, mode_t mode, device_t dev, ui
 	if (error == 0) {
 		vfs_release_vnode(vnode);
 		return EEXIST;
-	}
-	else if (error != ENOENT) {
+	} else if (error != ENOENT) {
 		vfs_release_vnode(vnode);
 		return error;
 	}
@@ -426,9 +429,9 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 
 	// If the target exists, then return an error
 	error = parent->ops->lookup(parent, filename, &tmpvnode);
-	if (error == ENOENT)
+	if (error == ENOENT) {
 		error = 0;
-	else {
+	} else {
 		if (!error)
 			vfs_release_vnode(tmpvnode);
 		error = EEXIST;
@@ -677,10 +680,11 @@ int vfs_release_vnode(struct vnode *vnode)
 	if (!vnode)
 		return 0;
 	vnode->refcount--;
-	if (vnode->refcount < 0)
+	if (vnode->refcount < 0) {
 		printk("Error: double free of vnode, %x\n", vnode);
-	else if (vnode->refcount == 0)
+	} else if (vnode->refcount == 0) {
 		return vnode->ops->release(vnode);
+	}
 	return 0;
 }
 

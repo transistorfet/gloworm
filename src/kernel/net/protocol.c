@@ -19,6 +19,7 @@ int init_net_protocol()
 {
 	for (short i = 0; i < PROTOCOLS_MAX; i++)
 		proto_list[i] = NULL;
+	return 0;
 }
 
 int net_register_protocol(struct protocol *proto)

@@ -45,22 +45,25 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 			revents = vfs_poll(proc->fd_table[fd], VFS_POLL_READ | VFS_POLL_WRITE | VFS_POLL_ERROR);
 
 			if (readfds && (readfds->fds_bits[word] & bit)) {
-				if (revents & VFS_POLL_READ)
+				if (revents & VFS_POLL_READ) {
 					ready += 1;
-				else if (mark_ready)
+				} else if (mark_ready) {
 					readfds->fds_bits[word] &= ~bit;
+				}
 			}
 			if (writefds && (writefds->fds_bits[word] & bit)) {
-				if (revents & VFS_POLL_WRITE)
+				if (revents & VFS_POLL_WRITE) {
 					ready += 1;
-				else if (mark_ready)
+				} else if (mark_ready) {
 					writefds->fds_bits[word] &= ~bit;
+				}
 			}
 			if (exceptfds && (exceptfds->fds_bits[word] & bit)) {
-				if (revents & VFS_POLL_ERROR)
+				if (revents & VFS_POLL_ERROR) {
 					ready += 1;
-				else if (mark_ready)
+				} else if (mark_ready) {
 					exceptfds->fds_bits[word] &= ~bit;
+				}
 			}
 
 			if (!mark_ready && ready)
@@ -81,6 +84,7 @@ int select_wait_check(struct process *proc, int events, struct vnode *vnode, dev
 static int select_timeout(struct timer *timer, struct process *proc)
 {
 	resume_proc(proc);
+	return 0;
 }
 
 int enter_select(struct process *proc, int max, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)

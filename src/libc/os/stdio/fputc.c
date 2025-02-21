@@ -7,6 +7,6 @@ int fputc(int ch, FILE *stream)
 {
 	// TODO this is unbuffered atm
 	unsigned char c = ch;
-	write(stream->fd, &c, 1);
+	return write(stream->fd, &c, 1);
 }
 

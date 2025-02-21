@@ -1,3 +1,4 @@
-%c -nostdlib
+%c -nostdlib -Wall
+-target
+m68k-linux-gnu
 -isystem/media/work/gloworm/include
--DBOARD_k30

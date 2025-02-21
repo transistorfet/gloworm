@@ -73,8 +73,7 @@ int parseline(char *input, char **vargs)
 			while (*input == ' ')
 				input++;
 			vargs[j++] = input;
-		}
-		else
+		} else
 			input++;
 	}
 
@@ -88,10 +87,11 @@ int parseline(char *input, char **vargs)
 
 char hexchar(uint8_t byte)
 {
-	if (byte < 10)
+	if (byte < 10) {
 		return byte + 0x30;
-	else
+	} else {
 		return byte + 0x37;
+	}
 }
 
 void dump(const uint16_t *addr, short len)
@@ -163,9 +163,9 @@ void command_info(int argc, char **args)
 
 void command_dump(int argc, char **args)
 {
-	if (argc <= 1)
+	if (argc <= 1) {
 		fputs("You need an address\n", stdout);
-	else {
+	} else {
 		short length = 0x40;
 
 		if (argc >= 3)
@@ -181,9 +181,6 @@ void command_dumpram(int argc, char **args)
 
 void command_move(int argc, char **args)
 {
-	uint16_t data;
-	uint16_t errors = 0;
-
 	if (argc <= 3) {
 		fputs("Must supply a source, destination, and size arguments in hex\n", stdout);
 	} else {
@@ -201,9 +198,9 @@ void command_move(int argc, char **args)
 
 void command_poke(int argc, char **args)
 {
-	if (argc <= 2)
+	if (argc <= 2) {
 		fputs("You need an address and byte to poke\n", stdout);
-	else {
+	} else {
 		uint8_t *address = (uint8_t *) strtol(args[1], NULL, 16);
 		uint8_t data = (uint8_t) strtol(args[2], NULL, 16);
 		*(address) = data;
@@ -212,9 +209,9 @@ void command_poke(int argc, char **args)
 
 void command_peek(int argc, char **args)
 {
-	if (argc <= 1)
+	if (argc <= 1) {
 		fputs("You need an address\n", stdout);
-	else {
+	} else {
 		uint8_t *address = (uint8_t *) strtol(args[1], NULL, 16);
 		//uint8_t data = (uint8_t) strtol(args[2], NULL, 16);
 		//*(address) = data;
@@ -287,7 +284,7 @@ void command_eraserom(int argc, char **args)
 	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		data = dest[i];
 		if (data != 0xFFFF) {
-			printf("Flash not erased at %x (%x)\n", dest + i, data);
+			printf("Flash not erased at %lx (%x)\n", (unsigned long) (dest + i), data);
 			return;
 		}
 	}
@@ -320,7 +317,6 @@ void program_flash_data(uint16_t *addr, uint16_t data)
 void command_writerom(int argc, char **args)
 {
 	uint16_t data;
-	uint16_t errors = 0;
 
 	uint16_t *dest = (uint16_t *) ROM_ADDR;
 	uint16_t *source = (uint16_t *) RAM_ADDR;
@@ -333,7 +329,7 @@ void command_writerom(int argc, char **args)
 	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		data = dest[i];
 		if (data != 0xFFFF) {
-			printf("Flash not erased at %x (%x)\n", dest + i, data);
+			printf("Flash not erased at %lx (%x)\n", (unsigned long) (dest + i), data);
 			return;
 		}
 	}
@@ -349,7 +345,6 @@ void command_writerom(int argc, char **args)
 
 void command_verifyrom(int argc, char **args)
 {
-	uint16_t data;
 	uint16_t errors = 0;
 	uint32_t size = ROM_SIZE;
 
@@ -365,7 +360,7 @@ void command_verifyrom(int argc, char **args)
 
 	for (int i = 0; i < (size >> 1); i++) {
 		if (dest[i] != source[i]) {
-			printf("@%x expected %x but found %x\n", &dest[i], source[i], dest[i]);
+			printf("@%lx expected %x but found %x\n", (unsigned long) &dest[i], source[i], dest[i]);
 			if (++errors > 100) {
 				fputs("Bailing out\n", stdout);
 				break;
@@ -380,7 +375,7 @@ uint16_t fetch_word(char max)
 {
 	char buffer[4];
 
-	for (char i = 0; i < max; i++) {
+	for (short i = 0; i < max; i++) {
 		buffer[i] = getchar();
 		buffer[i] = buffer[i] <= '9' ? buffer[i] - 0x30 : buffer[i] - 0x37;
 	}
@@ -481,7 +476,7 @@ void command_vmetest(int argc, char **args)
 
 
 	volatile uint8_t *vme_address_byte = (uint8_t *) 0xFF800020;
-	printf("%x: %x\n", vme_address_byte, *vme_address_byte);
+	printf("%lx: %x\n", (unsigned long) vme_address_byte, *vme_address_byte);
 	//*vme_address_byte = 0x00;
 
 	/*
@@ -537,7 +532,7 @@ void command_vmetest(int argc, char **args)
 
 #define ATA_DELAY(x)		{ for (int delay = 0; delay < (x); delay++) { asm volatile(""); } }
 #define ATA_WAIT()		{ ATA_DELAY(4); while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
-#define ATA_WAIT_FOR_DATA()	{ while (!(*ATA_REG_STATUS) & ATA_ST_DATA_READY) { } }
+#define ATA_WAIT_FOR_DATA()	{ while (!((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) { } }
 
 void command_atatest(int argc, char **args)
 {
@@ -661,14 +656,12 @@ void serial_read_loop()
 
 		if (!strcmp(args[0], "test")) {
 			fputs("this is only a test\n", stdout);
-		}
-		else if (!strcmp(args[0], "help")) {
+		} else if (!strcmp(args[0], "help")) {
 			for (int i = 0; i < num_commands; i++) {
 				fputs(command_list[i].name, stdout);
 				putchar('\n');
 			}
-		}
-		else {
+		} else {
 			for (i = 0; i < num_commands; i++) {
 				if (!strcmp(args[0], command_list[i].name)) {
 					command_list[i].func(argc, args);

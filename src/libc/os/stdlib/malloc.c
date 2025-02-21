@@ -67,9 +67,9 @@ retry:
 
 	// Add the new block to the free list
 	cur->size = last_increase;
-	if (prev)
+	if (prev) {
 		prev->next = cur;
-	else {
+	} else {
 		cur->next = main_heap.free_blocks;
 		main_heap.free_blocks = cur;
 	}
@@ -84,7 +84,7 @@ void free(void *ptr)
 
 	for (struct block *cur = main_heap.free_blocks; cur; prev = cur, cur = cur->next) {
 		if (cur->next == block) {
-			printf("Double free detected at %x! Halting...\n", cur);
+			printf("Double free detected at %x! Halting...\n", (unsigned int) cur);
 			return;
 		}
 
@@ -102,10 +102,11 @@ void free(void *ptr)
 
 		if (cur >= block) {
 			// Insert the free'd block into the list
-			if (prev)
+			if (prev) {
 				prev->next = block;
-			else
+			} else {
 				main_heap.free_blocks = block;
+			}
 			block->next = cur;
 
 			// If this block is adjacent to the next free block, then merge them

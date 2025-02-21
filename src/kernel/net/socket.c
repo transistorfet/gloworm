@@ -169,9 +169,9 @@ int net_socket_accept(struct vfile *file, struct sockaddr *addr, socklen_t *addr
 	if (error == EWOULDBLOCK) {
 		suspend_current_syscall(VFS_POLL_READ);
 		return 0;
-	}
-	else if (error)
+	} else if (error) {
 		return error;
+	}
 
 	error = net_socket_create(sock->domain, sock->type, sock->proto->protocol, uid, &newfile);
 	if (error)
@@ -187,7 +187,6 @@ int net_socket_accept(struct vfile *file, struct sockaddr *addr, socklen_t *addr
 
 int net_socket_shutdown(struct vfile *file, int how)
 {
-	int result;
 	struct socket *sock = SOCKET(file->vnode);
 
 	if (!sock->ep)
@@ -298,7 +297,7 @@ int net_socket_wakeup(struct socket *sock, int events)
 
 int net_socket_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
 {
-	struct socket *sock = SOCKET(file->vnode);
+	//struct socket *sock = SOCKET(file->vnode);
 
 	if (!S_ISSOCK(file->vnode->mode))
 		return EBADF;

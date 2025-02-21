@@ -11,3 +11,7 @@ ccflags-y 		+= -mpcrel
 
 always-y		+= monitor.elf monitor.bin monitor.load
 
+# TODO [2025-02-20] this is because the flash programming code raises a warning 
+# (gcc-14): "array subscript 0 is outside array bounds of ‘volatile uint8_t[0]’"
+ccflags-y		+= -Warray-bounds=0
+

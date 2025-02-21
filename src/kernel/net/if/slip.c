@@ -65,6 +65,7 @@ int slip_if_init()
 	register_bh(BH_SLIP, slip_if_process_input, NULL);
 	for (short i = 0; i < SLIP_DEVICES; i++)
 		net_if_register_device((struct if_device *) &devices[i]);
+	return 0;
 }
 
 int slip_if_up(struct if_device *ifdev)
@@ -151,16 +152,16 @@ static void slip_decode_packet(struct slip_if_device *ifdev, short length)
 	}
 
 	for (i = 0, j = 0; i < length; i++, j++) {
-		if (ifdev->rx_buffer[i] == SLIP_FRAME_END)
+		if (ifdev->rx_buffer[i] == SLIP_FRAME_END) {
 			break;
-		else if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC) {
+		} else if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC) {
 			i += 1;
-			if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC_END)
+			if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC_END) {
 				pack->data[j] = SLIP_FRAME_END;
-			else if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC_ESC)
+			} else if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC_ESC) {
 				pack->data[j] = SLIP_FRAME_ESC;
-		}
-		else
+			}
+		} else
 			pack->data[j] = ifdev->rx_buffer[i];
 	}
 	pack->length = j;
@@ -187,7 +188,7 @@ static void slip_if_write_data(struct slip_if_device *ifdev)
 			slip_encode_packet(ifdev);
 
 		if (ifdev->tx_read < ifdev->tx_write) {
-			written = dev_write(ifdev->rdev, &ifdev->tx_buffer[ifdev->tx_read], 0, ifdev->tx_write - ifdev->tx_read);
+			written = dev_write(ifdev->rdev, (const char *) &ifdev->tx_buffer[ifdev->tx_read], 0, ifdev->tx_write - ifdev->tx_read);
 			if (written < 0) {
 				//devices[i].error = read;
 				return;
@@ -206,7 +207,7 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 {
 	int read;
 
-	read = dev_read(ifdev->rdev, &ifdev->rx_buffer[ifdev->rx_write], 0, SLIP_MTU_MAX - ifdev->rx_write);
+	read = dev_read(ifdev->rdev, (char *) &ifdev->rx_buffer[ifdev->rx_write], 0, SLIP_MTU_MAX - ifdev->rx_write);
 	if (read < 0) {
 		//devices[i].error = read;
 		return;
@@ -225,9 +226,9 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 				memcpy(ifdev->rx_buffer, &ifdev->rx_buffer[ifdev->rx_read], ifdev->rx_write - ifdev->rx_read);
 			ifdev->rx_write -= ifdev->rx_read;
 			ifdev->rx_read = 0;
-		}
-		else
+		} else {
 			ifdev->rx_read++;
+		}
 	}
 
 	ifdev->rx_read = ifdev->rx_write;

@@ -33,8 +33,7 @@ int main()
 
 		if (!strcmp(buffer, "exit")) {
 			break;
-		}
-		else if (!strcmp(buffer, "test")) {
+		} else if (!strcmp(buffer, "test")) {
 			puts("A User Program Test");
 		}
 	}

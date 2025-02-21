@@ -12,11 +12,9 @@
 
 int main(int argc, char **argv)
 {
-	int i;
 	int error;
 	int nbytes;
 	int sockfd;
-	int sa_len;
 	char buffer[MAX_INPUT];
 	struct sockaddr_in addr;
 

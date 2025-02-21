@@ -173,9 +173,9 @@ int do_exec(const char *path, char *const argv[], char *const envp[])
 		exit_proc(current_proc, -1);
 		resume_waiting_parent(current_proc);
 		return error;
-	}
-	else if (error)
+	} else if (error) {
 		return error;
+	}
 
 	reset_stack(current_proc, entry, argv, envp);
 
@@ -203,22 +203,24 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
 	if (!proc) {
 		current_proc->bits |= PB_WAITING;
 		suspend_current_syscall(0);
-	}
-	else {
+	} else {
 		current_proc->bits &= ~PB_WAITING;
 		*status = proc->exitcode;
 		pid = proc->pid;
 		cleanup_proc(proc);
 		return pid;
 	}
+
+	return -1;
 }
 
 int do_kill(pid_t pid, int sig)
 {
-	if (pid < 0)
+	if (pid < 0) {
 		return send_signal_process_group(-pid, sig);
-	else
+	} else {
 		return send_signal(pid, sig);
+	}
 }
 
 int do_sigreturn()
@@ -292,9 +294,9 @@ int do_setpgid(pid_t pid, pid_t pgid)
 	if (!proc || (proc != current_proc && proc->pid != current_proc->parent))
 		return ESRCH;
 
-	if (pgid == 0)
+	if (pgid == 0) {
 		proc->pgid = proc->pid;
-	else {
+	} else {
 		struct process *pg;
 
 		pg = get_proc(pgid);
@@ -355,7 +357,7 @@ int do_mount(const char *source, const char *target, struct mount_opts *opts)
 	struct mount_ops *fsptr = NULL;
 
 	if (opts && opts->fstype) {
-		for (char i = 0; filesystems[i]; i++) {
+		for (short i = 0; filesystems[i]; i++) {
 			if (!strcmp(filesystems[i]->fstype, opts->fstype)) {
 				fsptr = filesystems[i];
 				break;
@@ -610,7 +612,7 @@ int do_pipe(int pipefd[2])
 	// Find two unused file descriptor slots in the current process's fd table (no need to free them until set_fd())
 	pipefd[PIPE_READ_FD] = find_unused_fd(current_proc->fd_table);
 	// TODO this is terrible and I shouldn't do this, but at least it works for the time being
-	set_fd(current_proc->fd_table, pipefd[PIPE_READ_FD], 1);
+	set_fd(current_proc->fd_table, pipefd[PIPE_READ_FD], (struct vfile *) 1);
 	pipefd[PIPE_WRITE_FD] = find_unused_fd(current_proc->fd_table);
 	set_fd(current_proc->fd_table, pipefd[PIPE_READ_FD], NULL);
 

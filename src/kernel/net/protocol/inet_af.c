@@ -36,8 +36,7 @@ int inet_resolve_address(const struct sockaddr *requested, socklen_t len, const 
 			return EINVAL;
 		ipv4->addr = requested_sin->sin_addr.s_addr;
 		ipv4->port = requested_sin->sin_port;
-	}
-	else {
+	} else {
 		ipv4->addr = INADDR_ANY;
 		ipv4->port = 0;
 	}

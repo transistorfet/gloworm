@@ -2,6 +2,8 @@
 #ifndef _SRC_KERNEL_FS_MINIX_MKFS_H
 #define _SRC_KERNEL_FS_MINIX_MKFS_H
 
+#include <errno.h>
+
 #include "dir.h"
 
 static int minix_mkfs(device_t dev)
@@ -18,7 +20,7 @@ static int minix_mkfs(device_t dev)
 	super_v1->zmap_blocks = 1;
 	super_v1->first_zone = 6;
 	super_v1->log_zone_size = MINIX_V1_LOG_ZONE_SIZE;
-	super_v1->max_file_size;	//?????
+	super_v1->max_file_size = 67108864;
 	super_v1->magic = 0x137F;
 	super_v1->state = 0x0001;
 

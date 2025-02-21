@@ -44,9 +44,10 @@ struct icmp_header {
 int icmp_init()
 {
 	net_register_protocol(&icmp_protocol);
+	return 0;
 }
 
-static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, struct ipv4_address *src, struct ipv4_address *dest, char *data, int length)
+static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, struct ipv4_address *src, struct ipv4_address *dest, unsigned char *data, int length)
 {
 	int error;
 	struct icmp_header *hdr;
@@ -67,7 +68,7 @@ static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, s
 	return 0;
 }
 
-static struct packet *icmp_create_packet(struct protocol *proto, uint8_t type, uint8_t code, struct ipv4_address *src, struct ipv4_address *dest, char *data, int length)
+static struct packet *icmp_create_packet(struct protocol *proto, uint8_t type, uint8_t code, struct ipv4_address *src, struct ipv4_address *dest, unsigned char *data, int length)
 {
 	struct packet *pack;
 

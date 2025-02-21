@@ -13,6 +13,7 @@ int register_driver(devmajor_t major, struct driver *driver)
 		return -1;
 
 	drv_table[major] = driver;
+	return 0;
 }
 
 int dev_open(device_t dev, int access)

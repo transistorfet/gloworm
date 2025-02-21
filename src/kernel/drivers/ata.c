@@ -104,9 +104,9 @@ int ata_detect()
 			if (status & ATA_ST_DATA_READY) {
 				ATA_DELAY(100);
 				return 1;
-			}
-			else
+			} else {
 				return 0;
+			}
 		}
 	}
 	return 0;
@@ -242,7 +242,7 @@ static struct ata_drive drives[ATA_MAX_DRIVES];
 
 static inline struct partition *ata_get_device(devminor_t minor)
 {
-	char drive = minor >> 4;
+	short drive = minor >> 4;
 	minor &= 0xf;
 
 	if (drive >= ATA_MAX_DRIVES || minor > PARTITION_MAX || drives[drive].parts[minor].base == 0)

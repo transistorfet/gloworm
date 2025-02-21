@@ -121,11 +121,13 @@ int init_tty()
 
 	// Assert CTS
 	*OUT_SET_ADDR = 0x01;
+
+	return 0;
 }
 
 int getchar(void)
 {
-	char in;
+	char in = 0;
 	char status;
 
 	// Assert CTS
@@ -170,6 +172,7 @@ int getchar(void)
 		}
 		*/
 	}
+	return 0;
 }
 
 int putchar(int ch)

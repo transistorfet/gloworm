@@ -19,26 +19,29 @@
 static struct if_device *active_ifdevs[IFDEV_MAX];
 static void net_if_process_bh(void *_unused);
 
-void init_net_if()
+int init_net_if()
 {
-	for (char i = 0; i < IFDEV_MAX; i++)
+	for (short i = 0; i < IFDEV_MAX; i++)
 		active_ifdevs[i] = NULL;
 
 	register_bh(BH_NET, net_if_process_bh, NULL);
 	enable_bh(BH_NET);
+
+	return 0;
 }
 
 int net_if_register_device(struct if_device *ifdev)
 {
-	for (char i = 0; i < IFDEV_MAX; i++) {
+	for (short i = 0; i < IFDEV_MAX; i++) {
 		if (!active_ifdevs[i])
 			active_ifdevs[i] = ifdev;
 	}
+	return 0;
 }
 
 struct if_device *net_if_find(const char *name, struct protocol *proto)
 {
-	for (char i = 0; i < IFDEV_MAX; i++) {
+	for (short i = 0; i < IFDEV_MAX; i++) {
 		if ((!name || !strcmp(active_ifdevs[i]->name, name)) && (!proto || active_ifdevs[i]->incoming_proto == proto))
 			return active_ifdevs[i];
 	}
@@ -67,8 +70,7 @@ int net_if_change_state(struct if_device *ifdev, int state)
 		error = ifdev->ops->up(ifdev);
 		if (error)
 			return error;
-	}
-	else {
+	} else {
 		printk_safe("%s: bringing interface down\n", ifdev->name);
 		error = ifdev->ops->down(ifdev);
 		if (error)
@@ -144,8 +146,7 @@ static void net_if_process_bh(void *_unused)
 				if (error == PACKET_DROPPED) {
 					printk_safe("packet dropped\n");
 					active_ifdevs[i]->rx_stats.dropped += 1;
-				}
-				else if (error == PACKET_ERROR) {
+				} else if (error == PACKET_ERROR) {
 					printk_safe("packet error\n");
 					active_ifdevs[i]->rx_stats.errors += 1;
 				}

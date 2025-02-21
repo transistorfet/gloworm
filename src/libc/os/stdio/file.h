@@ -14,7 +14,7 @@ struct _FILE {
 	char *buf;
 };
 
-extern FILE _file_table[];
+extern struct _FILE _file_table[];
 
 #endif
 

@@ -28,9 +28,9 @@ int run_server();
 
 int main(int argc, char **argv)
 {
+	/*
 	int pid;
 
-	/*
 	pid = fork();
 	if (pid < 0)
 		return pid;
@@ -110,7 +110,7 @@ void close_connection(struct connection *conn)
 int handle_connection(int listenfd)
 {
 	int sockfd;
-	int sa_len;
+	socklen_t sa_len;
 	struct sockaddr_in addr;
 
 	sa_len = sizeof(struct sockaddr_in);
@@ -134,8 +134,7 @@ int handle_read(struct connection *conn)
 	if (error == 0) {
 		printf("client closed connection\n");
 		return 1;
-	}
-	else if (error < 0) {
+	} else if (error < 0) {
 		printf("Error receiving: %d\n", error);
 		return -1;
 	}
@@ -159,7 +158,7 @@ int handle_read(struct connection *conn)
 	i += snprintf(&response[i], MAX_HEADERS - i, "\r\n");
 	i += snprintf(&response[i], MAX_HEADERS - i, data);
 
-	printf("sending:\n%s\n", i, response);
+	printf("sending %d characters:\n%s\n", i, response);
 
 	error = send(conn->fd, response, i, 0);
 	if (error < 0)

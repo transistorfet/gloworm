@@ -41,10 +41,10 @@ struct endpoint_ops {
 	int (*accept)(struct endpoint *ep, struct sockaddr *sockaddr, socklen_t *len, struct endpoint **result);
 	int (*connect)(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len);
 	int (*shutdown)(struct endpoint *ep, int how);
-	int (*send)(struct endpoint *ep, const char *buf, int nbytes);
-	int (*recv)(struct endpoint *ep, char *buf, int max);
-	int (*send_to)(struct endpoint *ep, const char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len);
-	int (*recv_from)(struct endpoint *ep, char *buf, int max, struct sockaddr *sockaddr, socklen_t *len);
+	int (*send)(struct endpoint *ep, const unsigned char *buf, int nbytes);
+	int (*recv)(struct endpoint *ep, unsigned char *buf, int max);
+	int (*send_to)(struct endpoint *ep, const unsigned char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len);
+	int (*recv_from)(struct endpoint *ep, unsigned char *buf, int max, struct sockaddr *sockaddr, socklen_t *len);
 	int (*get_options)(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen);
 	int (*set_options)(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen);
 	int (*poll)(struct endpoint *ep, int events);

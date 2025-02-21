@@ -41,7 +41,7 @@ void init_interrupts(void)
 
 void set_interrupt(char iv_num, interrupt_handler_t handler)
 {
-	vector_table[iv_num] = handler;
+	vector_table[(short) iv_num] = handler;
 }
 
 
@@ -74,7 +74,7 @@ void print_stack(struct exception_stack_frame *frame)
 {
 	// Dump stack
 	printk_safe("Stack: %x\n", frame);
-	for (char i = 0; i < 48; i++) {
+	for (short i = 0; i < 48; i++) {
 		printk_safe("%04x ", ((uint16_t *) frame)[i]);
 		if ((i & 0x7) == 0x7)
 			printk_safe("\n");
@@ -82,7 +82,7 @@ void print_stack(struct exception_stack_frame *frame)
 
 	// Dump code where the error occurred
 	printk_safe("\nCode:\n");
-	for (char i = 0; i < 48; i++) {
+	for (short i = 0; i < 48; i++) {
 		printk_safe("%04x ", frame->pc[i]);
 		if ((i & 0x7) == 0x7)
 			printk_safe("\n");
@@ -139,10 +139,11 @@ __attribute__((interrupt)) void handle_exception(void)
 	GET_FRAME(frame);
 
 	extern int kernel_reentries;
-	if (kernel_reentries < 1)
+	if (kernel_reentries < 1) {
 		user_error(frame);
-	else
+	} else {
 		fatal_error(frame);
+	}
 }
 
 INTERRUPT_ENTRY(handle_fatal_error);

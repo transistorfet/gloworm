@@ -39,9 +39,9 @@ FILE *fopen(const char *filename, const char *mode)
 		return NULL;
 
 	fd = open(filename, modebits, 0644);
-	if (fd < 0)
+	if (fd < 0) {
 		return NULL;
-	else if (fd >= _STDIO_BASE_FD + _STDIO_MAX_OPEN_FILES) {
+	} else if (fd >= _STDIO_BASE_FD + _STDIO_MAX_OPEN_FILES) {
 		close(fd);
 		return NULL;
 	}
