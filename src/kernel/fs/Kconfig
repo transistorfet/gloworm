@@ -9,6 +9,7 @@ config MALLOC_FS
 
 config MINIX_FS
 	bool "Minix file system"
+	default y
 	help
 	  This enables the minix file system support.  Only v1 is supported
 

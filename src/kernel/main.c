@@ -26,7 +26,7 @@
 #endif
 
 #include "api.h"
-#include "interrupts.h"
+#include <asm/interrupts.h>
 
 
 extern void tty_68681_preinit();

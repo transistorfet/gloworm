@@ -1,6 +1,4 @@
 
-#include <asm/macros.h>
-
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -48,7 +46,7 @@ int serverloop()
 
 	memset(&addr, '\0', sizeof(struct sockaddr_in));
 	addr.sin_family = AF_INET;
-	addr.sin_port = to_be16(3904);
+	addr.sin_port = htons(3904);
 	addr.sin_addr.s_addr = INADDR_ANY;
 
 	error = bind(sockfd, (struct sockaddr *) &addr, sizeof(struct sockaddr_in));

@@ -6,11 +6,18 @@
 
 #include <kernel/vfs.h>
 #include <kernel/printk.h>
+#include <kernel/kconfig.h>
 
 #include <elf.h>
 
 #include "memory.h"
 #include "process.h"
+
+#if defined(CONFIG_M68K)
+#define ELF_MACHINE	EM_68K
+#else
+#error "Unable to load binaries for the target machine"
+#endif
 
 int load_flat_binary(struct vfile *file, struct process *proc, void **entry);
 int load_elf_binary(struct vfile *file, struct process *proc, void **entry);
@@ -78,8 +85,8 @@ int load_elf_binary(struct vfile *file, struct process *proc, void **entry)
 	if (memcmp(header.e_ident, "\x7F\x45\x4C\x46\x01\x02\x01", 7))
 		return ENOEXEC;
 
-	// Make sure it's an executable for the 68k
-	if (header.e_type != ET_EXEC || header.e_machine != EM_68K || header.e_phentsize != sizeof(Elf32_Phdr))
+	// Make sure it's an executable for the the current machine
+	if (header.e_type != ET_EXEC || header.e_machine != ELF_MACHINE || header.e_phentsize != sizeof(Elf32_Phdr))
 		return ENOEXEC;
 
 	// Load the program headers from the ELF file

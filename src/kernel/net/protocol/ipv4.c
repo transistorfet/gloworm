@@ -1,5 +1,5 @@
 
-#include <asm/macros.h>
+#include <endian.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -69,10 +69,10 @@ int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 	if (hdr->version != 4 || hdr->ihl < 5 || hdr->ihl > 9)
 		return -2;
 
-	hdr->length = from_be16(hdr->length);
-	hdr->checksum = from_be16(hdr->checksum);
-	hdr->src = from_be32(hdr->src);
-	hdr->dest = from_be32(hdr->dest);
+	hdr->length = be16toh(hdr->length);
+	hdr->checksum = be16toh(hdr->checksum);
+	hdr->src = be32toh(hdr->src);
+	hdr->dest = be32toh(hdr->dest);
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
@@ -123,15 +123,15 @@ int ipv4_encode_header(struct packet *pack, const struct ipv4_address *src, cons
 	hdr->ihl = 5;
 	hdr->dscp = 0;
 	hdr->ecn = 0;
-	hdr->length = to_be16(sizeof(struct ipv4_header) + length);
-	hdr->id = to_be16(0);
+	hdr->length = htobe16(sizeof(struct ipv4_header) + length);
+	hdr->id = htobe16(0);
 	hdr->flags = 2;
-	hdr->frag_offset = to_be16(0);
+	hdr->frag_offset = htobe16(0);
 	hdr->ttl = 0x40;
 	hdr->protocol = pack->proto->protocol;
-	hdr->checksum = to_be16(0);
-	hdr->src = to_be32(src->addr);
-	hdr->dest = to_be32(dest->addr);
+	hdr->checksum = htobe16(0);
+	hdr->src = htobe32(src->addr);
+	hdr->dest = htobe32(dest->addr);
 
 	hdr->checksum = ipv4_calculate_checksum(hdr, sizeof(struct ipv4_header), 0);
 

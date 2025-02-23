@@ -1,6 +1,6 @@
 
-#ifndef _SRC_KERNEL_INTERRUPTS_H
-#define _SRC_KERNEL_INTERRUPTS_H
+#ifndef _ASM_M68K_INTERRUPTS_H
+#define _ASM_M68K_INTERRUPTS_H
 
 // 68k Interrupt Vectors Numbers
 #define IV_BUS_ERROR		2

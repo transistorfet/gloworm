@@ -6,8 +6,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <asm/macros.h>
-
 int main(int argc, char **argv)
 {
 	char up;

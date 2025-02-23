@@ -1,5 +1,5 @@
 
-#include <asm/macros.h>
+#include <endian.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <kernel/printk.h>
@@ -60,7 +60,7 @@ static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, s
 	hdr->type = type;
 	hdr->code = code;
 	hdr->checksum = 0;
-	hdr->checksum = to_be16(ipv4_calculate_checksum(data, length, 0));
+	hdr->checksum = htobe16(ipv4_calculate_checksum(data, length, 0));
 
 	pack->data_offset = pack->length;
 	if (packet_append(pack, data, length))
@@ -94,8 +94,8 @@ int icmp_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 	pack->data_offset = offset + sizeof(struct icmp_header);
 
 	hdr = (struct icmp_header *) &pack->data[offset];
-	hdr->checksum = from_be16(hdr->checksum);
-	hdr->data = from_be32(hdr->data);
+	hdr->checksum = be16toh(hdr->checksum);
+	hdr->data = be32toh(hdr->data);
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;

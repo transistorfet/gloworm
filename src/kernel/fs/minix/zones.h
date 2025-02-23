@@ -5,7 +5,7 @@
 #include <string.h>
 #include <kernel/vfs.h>
 #include <sys/types.h>
-#include <asm/macros.h>
+#include <endian.h>
 
 #include "minix.h"
 #include "bitmaps.h"
@@ -86,7 +86,7 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 		} else {
 			if (buf)
 				release_block(buf, 0);
-			buf = get_block(super->dev, from_le16(*zone));
+			buf = get_block(super->dev, le16toh(*zone));
 			if (!buf)
 				return 0;
 
@@ -95,7 +95,7 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 
 		if (!*zone) {
 			if (create) {
-				*zone = to_le16(minix_alloc_zone(super));
+				*zone = htole16(minix_alloc_zone(super));
 				if (buf)
 					mark_block_dirty(buf);
 			} else {
@@ -106,7 +106,7 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 		}
 	}
 
-	ret = (zone_t) from_le16(*zone);
+	ret = (zone_t) le16toh(*zone);
 	if (buf)
 		release_block(buf, 0);
 	return ret;
@@ -128,12 +128,12 @@ static void zone_free_all(struct vnode *vnode)
 
 	// Go through the tier 2 zonenum tables and free each
 	if (MINIX_DATA(vnode).zones[8]) {
-		struct buf *buf = get_block(MINIX_SUPER(vnode->mp->super)->dev, from_le16(MINIX_DATA(vnode).zones[8]));
+		struct buf *buf = get_block(MINIX_SUPER(vnode->mp->super)->dev, le16toh(MINIX_DATA(vnode).zones[8]));
 		if (buf) {
 			minix_v1_zone_t *entries = buf->block;
 			for (zone_t i = 0; i < MINIX_V1_ZONENUMS_PER_ZONE; i++) {
 				if (entries[i])
-					minix_free_zone(MINIX_SUPER(vnode->mp->super), from_le16(entries[i]));
+					minix_free_zone(MINIX_SUPER(vnode->mp->super), le16toh(entries[i]));
 			}
 			release_block(buf, 0);
 		}
@@ -142,7 +142,7 @@ static void zone_free_all(struct vnode *vnode)
 	// Go through the tier 1 zonenum tables and free each
 	for (short i = MINIX_V1_TIER1_ZONENUMS; i < MINIX_V1_TOTAL_ZONENUMS; i++) {
 		if (MINIX_DATA(vnode).zones[i])
-			minix_free_zone(MINIX_SUPER(vnode->mp->super), from_le16(MINIX_DATA(vnode).zones[i]));
+			minix_free_zone(MINIX_SUPER(vnode->mp->super), le16toh(MINIX_DATA(vnode).zones[i]));
 	}
 
 	// Go through the tier 0 zonenum tables (the inode zones) and free each

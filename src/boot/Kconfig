@@ -1,0 +1,16 @@
+
+menu "Bootloader setup"
+
+config BOOT
+	bool "Build the Bootloader"
+	default y
+	help
+	  This bootloader will load the kernel from disk on /dev/ata0, expecting a
+	  minix filesystem in an msdos partition table.
+
+if BOOT
+
+endif
+
+endmenu
+

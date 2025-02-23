@@ -13,7 +13,7 @@
 #include <kernel/signal.h>
 #include <kernel/scheduler.h>
 
-#include "../interrupts.h"
+#include <asm/interrupts.h>
 
 
 #define TTY_DEVICE_NUM		2

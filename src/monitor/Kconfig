@@ -1,33 +1,14 @@
 
-menu "Monitor firmware"
+menu "Monitor setup"
 
-#config BOARD
-#	string
-#
-#choice
-#	prompt "Board version"
-#	default BOARD_K30P_VME
-#
-#config BOARD_68K_SBC
-#	bool "Computie 68k-SBC/68k-SMT"
-#	select DUAL_AM29F040
-#	help
-#	  Choosing this option will configure for the Computie 68k-SBC or
-#	  68k-SMT board
-#
-#config BOARD_K30_SBC
-#	bool "Computie k30-SBC"
-#	select AM29F040
-#	help
-#	  Choosing this option will configure for the Computie k30-SBC board
-#
-#config BOARD_K30P_VME
-#	bool "Computie k30p-VME"
-#	select AM29F040
-#	help
-#	  Choosing this option will configure for the Computie k30p-VME board
-#
-#endchoice
+config MONITOR
+	bool "Build the monitor"
+	default y
+	help
+	  Build the monitor firmware that can be flashed into onboard rom.  It
+	  currently only supports the computie family of 68k-based computers
+
+if MONITOR
 
 choice
 	prompt "Board ROM configuration"
@@ -49,5 +30,7 @@ config DUAL_AM29F040
 	  writing a new firmware image.
 
 endchoice
+
+endif
 
 endmenu

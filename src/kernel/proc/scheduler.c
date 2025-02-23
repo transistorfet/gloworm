@@ -1,14 +1,15 @@
 
 #include <errno.h>
-#include <asm/macros.h>
+#include <bits/macros.h>
 
 #include <kernel/printk.h>
 #include <kernel/scheduler.h>
 
+#include <asm/interrupts.h>
+
 #include "tasks.h"
 #include "process.h"
 #include "../api.h"
-#include "../interrupts.h"
 #include "../misc/queue.h"
 
 // Info for Current Running Process (accessed by syscall interface)

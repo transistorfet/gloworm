@@ -2,7 +2,6 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <asm/macros.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <kernel/kmalloc.h>
@@ -113,14 +112,14 @@ int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 		return -5;
 
 	hdr = (struct tcp_header *) &pack->data[offset];
-	hdr->src = from_be16(hdr->src);
-	hdr->dest = from_be16(hdr->dest);
-	hdr->seqnum = from_be32(hdr->seqnum);
-	hdr->acknum = from_be32(hdr->acknum);
-	hdr->flags = from_be16(hdr->flags);
-	hdr->window = from_be16(hdr->window);
-	hdr->checksum = from_be16(hdr->checksum);
-	hdr->urgent = from_be16(hdr->urgent);
+	hdr->src = be16toh(hdr->src);
+	hdr->dest = be16toh(hdr->dest);
+	hdr->seqnum = be32toh(hdr->seqnum);
+	hdr->acknum = be32toh(hdr->acknum);
+	hdr->flags = be16toh(hdr->flags);
+	hdr->window = be16toh(hdr->window);
+	hdr->checksum = be16toh(hdr->checksum);
+	hdr->urgent = be16toh(hdr->urgent);
 
 	pack->transport_offset = offset;
 	pack->data_offset = offset + (hdr->offset << 2);
@@ -512,16 +511,16 @@ static int tcp_finalize_and_send_packet(struct tcp_endpoint *tep, struct packet 
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
 	// Convert endianness of data in the header
-	hdr->src = to_be16(hdr->src);
-	hdr->dest = to_be16(hdr->dest);
-	hdr->seqnum = to_be32(hdr->seqnum);
-	hdr->acknum = to_be32(hdr->acknum);
-	hdr->window = to_be16(65535);
-	hdr->checksum = to_be16(0xFFFF);
-	hdr->urgent = to_be16(hdr->urgent);
+	hdr->src = htobe16(hdr->src);
+	hdr->dest = htobe16(hdr->dest);
+	hdr->seqnum = htobe32(hdr->seqnum);
+	hdr->acknum = htobe32(hdr->acknum);
+	hdr->window = htobe16(65535);
+	hdr->checksum = htobe16(0xFFFF);
+	hdr->urgent = htobe16(hdr->urgent);
 
 	// Update the checksum
-	hdr->checksum = to_be16(tcp_calculate_checksum(tep->ep.proto, pack));
+	hdr->checksum = htobe16(tcp_calculate_checksum(tep->ep.proto, pack));
 
 	return net_if_send_packet(tep->ep.ifdev, pack);
 }

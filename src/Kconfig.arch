@@ -1,28 +1,27 @@
 
-menu "Architecture"
-
 choice
-	prompt "CPU configuration"
-	default MC68030
+	prompt "Architecture"
 
-config MC68010
-	bool "MC68010"
+config ARCH_M68K
+	bool "m68k"
 	help
-	  This selects the 68010 CPU as the lowest common architecture for
-	  all software in this suite.  All files will be compiled with the
-	  -m68010 flag, and the system will be assumed to use a 16-bit
-	  bus, with separate even and odd bytes.  Furthermore, it will be
-	  assumed that the CPU supports the VBR register for relocating the
-	  interrupt vector table.
+	  Configure the kernel to run on the Motorola 680x0 family of
+	  architectures
 
-config MC68030
-	bool "MC68030+"
+config ARCH_TESTAPP
+	bool "testapp"
 	help
-	  This option selects the 68030 as the lowest common architecture for
-	  all software in this suite.  All files will be compiled with the
-	  -m68030 flag.  Furthermore, it will be assumed that the CPU has an
-	  MMU and cache.
+	  Configure the kernel to run as an application under linux for running
+	  tests and such.  This is more so a place to experiment with alternate
+	  configuration in opposition to the only other architecture, m68k.
 
 endchoice
 
-endmenu
+config ARCH
+	string
+	default "m68k" if ARCH_M68K
+
+config ARCH
+	string
+	default "testapp" if ARCH_TESTAPP
+

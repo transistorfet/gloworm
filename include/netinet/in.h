@@ -5,12 +5,12 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#include <asm/macros.h>
+#include <endian.h>
 
-#define ntohl(x)	from_be32((x))
-#define ntohs(x)	from_be16((x))
-#define htonl(x)	to_be32((x))
-#define htons(x)	to_be16((x))
+#define ntohl(x)	be32toh((x))
+#define ntohs(x)	be16toh((x))
+#define htonl(x)	htobe32((x))
+#define htons(x)	htobe16((x))
 
 
 #define IPPROTO_IP		0

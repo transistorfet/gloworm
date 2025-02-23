@@ -4,14 +4,13 @@
 #include <errno.h>
 
 #include <sys/stat.h>
-#include <asm/macros.h>
 #include <kernel/vfs.h>
 #include <kernel/printk.h>
 #include <kernel/driver.h>
 #include <kernel/kconfig.h>
 
 #include "partition.h"
-#include "../interrupts.h"
+#include <asm/interrupts.h>
 
 
 // Driver Definition

@@ -1,0 +1,13 @@
+if ARCH_TESTAPP
+
+config TESTAPP
+	bool
+	default y
+	select CPU_LITTLE_ENDIAN
+
+config GCC_PREFIX
+	string
+	default ""
+
+endif
+

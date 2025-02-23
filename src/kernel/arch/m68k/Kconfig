@@ -1,0 +1,37 @@
+
+if ARCH_M68K
+
+config M68K
+	bool
+	default y
+	select CPU_BIG_ENDIAN
+
+config GCC_PREFIX
+	string
+	default m68k-linux-gnu-
+
+choice
+	prompt "Minimum required CPU"
+	default MC68030
+
+config MC68010
+	bool "MC68010+"
+	help
+	  This selects the 68010 CPU as the lowest common architecture for
+	  all software in this suite.  All files will be compiled with the
+	  -m68010 flag, and the system will be assumed to use a 16-bit
+	  bus, with separate even and odd bytes.  Furthermore, it will be
+	  assumed that the CPU supports the VBR register for relocating the
+	  interrupt vector table.
+
+config MC68030
+	bool "MC68030+"
+	help
+	  This option selects the 68030 as the lowest common architecture for
+	  all software in this suite.  All files will be compiled with the
+	  -m68030 flag.  Furthermore, it will be assumed that the CPU has an
+	  MMU and cache.
+
+endchoice
+
+endif

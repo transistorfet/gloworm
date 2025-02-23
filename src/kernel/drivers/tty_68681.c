@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <sys/ioc_tty.h>
 
-#include <asm/macros.h>
+#include <bits/macros.h>
 #include <kernel/bh.h>
 #include <kernel/vfs.h>
 #include <kernel/time.h>
@@ -19,7 +19,8 @@
 #include <kernel/syscall.h>
 #include <kernel/scheduler.h>
 
-#include "../interrupts.h"
+#include <asm/interrupts.h>
+
 #include "../proc/timer.h"
 #include "../misc/circlebuf.h"
 
@@ -334,7 +335,6 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 
 		channels[minor].rx_ready = 1;
 		request_bh_run(BH_TTY68681);
-		//resume_blocked_procs(VFS_POLL_READ, NULL, DEVNUM(DEVMAJOR_TTY68681, channel == &channels[CH_A] ? 0 : 1));
 	}
 
 
@@ -346,6 +346,8 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 			// Disable the channel A transmitter if empty
 			if (*channels[minor].ports->status & SR_TX_EMPTY)
 				*channels[minor].ports->command = CMD_DISABLE_TX;
+			// Run the bottom half to wake up any processes blocked on writing
+			request_bh_run(BH_TTY68681);
 		}
 	}
 }

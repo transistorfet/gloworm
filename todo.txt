@@ -1,4 +1,5 @@
 
+* add config options for memory base/size for the heap, and also for the linker script
 * should the process wait until all output is flushed before exiting?  What happens on linux with a slow tty?
 * separate out the serial interrupt stuff to make it more generic
 * should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>

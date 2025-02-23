@@ -1,5 +1,5 @@
 
-#include <asm/macros.h>
+#include <endian.h>
 
 #include "partition.h"
 
@@ -20,8 +20,8 @@ int read_partition_table(char *buffer, struct partition *devices)
 	table = (struct partition_entry *) &buffer[0x1BE];
 
 	for (short i = 0; i < 4; i++) {
-		devices[i].base = from_le32(table[i].lba_start);
-		devices[i].size = from_le32(table[i].lba_sectors);
+		devices[i].base = le32toh(table[i].lba_start);
+		devices[i].size = le32toh(table[i].lba_sectors);
 		devices[i].fstype = table[i].fstype;
 		devices[i].flags = table[i].status;
 	}

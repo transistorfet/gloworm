@@ -2,3 +2,5 @@
 -target
 m68k-linux-gnu
 -isystem/media/work/gloworm/include
+-isystem/media/work/gloworm/src/libc/arch/m68k/include
+-isystem/media/work/gloworm/src/kernel/arch/m68k/include

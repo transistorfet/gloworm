@@ -2,7 +2,7 @@
 #ifndef _SRC_KERNEL_FS_MINIX_DIR_H
 #define _SRC_KERNEL_FS_MINIX_DIR_H
 
-#include <asm/macros.h>
+#include <asm/byteorder.h>
 
 #include "minix.h"
 #include "inodes.h"
@@ -22,15 +22,15 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 
 	entries = (struct minix_v1_dirent *) buf->block;
 
-	entries[0].inode = to_le16((minix_v1_inode_t) vnode->ino);
+	entries[0].inode = htole16((minix_v1_inode_t) vnode->ino);
 	strcpy(entries[0].filename, ".");
 
-	entries[1].inode = to_le16(parent ? (minix_v1_inode_t) parent->ino : 1);
+	entries[1].inode = htole16(parent ? (minix_v1_inode_t) parent->ino : 1);
 	strcpy(entries[1].filename, "..");
 
 	release_block(buf, BCF_DIRTY);
 
-	MINIX_DATA(vnode).zones[0] = to_le16(zone);
+	MINIX_DATA(vnode).zones[0] = htole16(zone);
 	// Set the initial directory size to include the two default entries
 	vnode->size = sizeof(struct minix_v1_dirent) << 1;
 	mark_vnode_dirty(vnode);
@@ -72,7 +72,7 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 			return NULL;
 		entries = (struct minix_v1_dirent *) buf->block;
 		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
-			if (from_le16(entries[i].inode) == ino) {
+			if (le16toh(entries[i].inode) == ino) {
 				offset_t position = ((znum << MINIX_V1_LOG_DIRENTS_PER_ZONE) + i + 1) << __builtin_ctz(sizeof(struct minix_v1_dirent));
 				if (dir->size < position) {
 					// TODO this is sort of a hack, isn't it?  Also what about shrinking in size

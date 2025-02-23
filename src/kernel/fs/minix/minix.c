@@ -8,7 +8,7 @@
 #include <kernel/vfs.h>
 #include <kernel/printk.h>
 #include <kernel/driver.h>
-#include <asm/macros.h>
+#include <asm/byteorder.h>
  
 #include "minix.h"
 #include "bitmaps.h"
@@ -123,7 +123,7 @@ int minix_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t u
 		return ENOMEM;
 	}
 
-	dir->inode = to_le16((minix_v1_inode_t) newnode->ino);
+	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
 	release_block(buf, BCF_DIRTY);
 
 	// TODO need to adjust the size of the directory size
@@ -153,7 +153,7 @@ int minix_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t
 		return EMFILE;
 	}
 
-	dir->inode = to_le16((minix_v1_inode_t) newnode->ino);
+	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
 	release_block(buf, BCF_DIRTY);
 
 	*result = newnode;
@@ -174,7 +174,7 @@ int minix_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 
 	if (*result)
 		vfs_release_vnode(*result);
-	*result = (struct vnode *) get_vnode(vnode->mp, from_le16(entry->inode));
+	*result = (struct vnode *) get_vnode(vnode->mp, le16toh(entry->inode));
 	release_block(buf, 0);
 	return 0;
 }
@@ -192,7 +192,7 @@ int minix_link(struct vnode *oldvnode, struct vnode *newparent, const char *file
 		return ENOSPC;
 
 	oldvnode->nlinks += 1;
-	dir->inode = to_le16((minix_v1_inode_t) oldvnode->ino);
+	dir->inode = htole16((minix_v1_inode_t) oldvnode->ino);
 	release_block(buf, BCF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
@@ -211,7 +211,7 @@ int minix_unlink(struct vnode *parent, struct vnode *vnode, const char *filename
 	if (!dir)
 		return ENOENT;
 
-	dir->inode = to_le16(0);
+	dir->inode = htole16(0);
 	release_block(buf, BCF_DIRTY);
 
 	vnode->nlinks -= 1;
@@ -246,8 +246,8 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 		return ENOENT;
 	}
 
-	newdir->inode = to_le16((minix_v1_inode_t) vnode->ino);
-	olddir->inode = to_le16(0);
+	newdir->inode = htole16((minix_v1_inode_t) vnode->ino);
+	olddir->inode = htole16(0);
 	release_block(newbuf, BCF_DIRTY);
 	release_block(oldbuf, BCF_DIRTY);
 	vfs_update_time(oldparent, MTIME);
@@ -458,7 +458,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 
 	max = MINIX_V1_MAX_FILENAME < VFS_FILENAME_MAX ? MINIX_V1_MAX_FILENAME : VFS_FILENAME_MAX;
 
-	dir->d_ino = from_le16(entries[zpos].inode);
+	dir->d_ino = le16toh(entries[zpos].inode);
 	strncpy(dir->d_name, entries[zpos].filename, max);
 	dir->d_name[max - 1] = '\0';
 	release_block(buf, BCF_DIRTY);

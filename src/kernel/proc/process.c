@@ -5,8 +5,9 @@
 #include <kernel/kmalloc.h>
 #include <kernel/scheduler.h>
 
+#include <asm/interrupts.h>
+
 #include "../api.h"
-#include "../interrupts.h"
 #include "../misc/queue.h"
 
 #include "timer.h"

@@ -1,13 +1,25 @@
 
-AS = m68k-linux-gnu-as
-AR = m68k-linux-gnu-ar
-CC = m68k-linux-gnu-gcc
-LD = m68k-linux-gnu-gcc
-STRIP = m68k-linux-gnu-strip
-OBJDUMP = m68k-linux-gnu-objdump
-OBJCOPY = m68k-linux-gnu-objcopy
-RANLIB = m68k-linux-gnu-ranlib
+kconfig-file			:= $(src-root)/.config
+config-h			:= $(src-root)/include/generated/config.h
+build-file			:= $(dir)/Makefile
+include-dir			:= $(src-root)/include
 
+AS				?= $(GCC_PREFIX)as
+AR				?= $(GCC_PREFIX)ar
+CC				?= $(GCC_PREFIX)gcc
+LD				?= $(GCC_PREFIX)gcc
+STRIP				?= $(GCC_PREFIX)strip
+OBJDUMP				?= $(GCC_PREFIX)objdump
+OBJCOPY				?= $(GCC_PREFIX)objcopy
+RANLIB				?= $(GCC_PREFIX)ranlib
+
+ccflags-y			+= -I$(include-dir) -g -Wall
+ccflags-y			+= -nostartfiles -nostdlib -fno-zero-initialized-in-bss
+ldflags-y 			+= -Wl,--build-id=none
+
+ccflags-$(CONFIG_CC_OPTIMIZE_FOR_SIZE)			+= -Os
+ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE)		+= -O2
+ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3)	+= -O3
 
 ccflags-$(CONFIG_MC68030)	+= -m68030 -msoft-float
 asflags-$(CONFIG_MC68030) 	+= -m68030 --defsym __mc68010__=1
@@ -15,17 +27,11 @@ asflags-$(CONFIG_MC68030) 	+= -m68030 --defsym __mc68010__=1
 ccflags-$(CONFIG_MC68010) 	+= -m68010
 asflags-$(CONFIG_MC68010) 	+= -m68010 --defsym __mc68010__=1
 
-INCLUDE = $(src-root)/include
-ASFLAGS = $(asflags-y)
-CFLAGS = -I$(INCLUDE) $(ccflags-y) -nostartfiles -nostdlib -fno-zero-initialized-in-bss -g -Os -Wall
-LDFLAGS = -Wl,--build-id=none
+userprog-ccflags-$(CONFIG_M68K)	+= -mpcrel
+firmware-ccflags-$(CONFIG_M68K)	+= -mpcrel
 
 # reduce the elf output size by reducing the alignment
-CFLAGS += -z max-page-size=0x10
+ccflags-y			+= -z max-page-size=0x10
 
-kconfig-file	:= $(src-root)/.config
-config-h	:= $(src-root)/include/generated/config.h
-build-file	:= $(dir)/Makefile
-
-export AS AR CC LD OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS
+export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 

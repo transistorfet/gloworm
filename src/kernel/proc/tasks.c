@@ -4,8 +4,9 @@
 #include <kernel/printk.h>
 #include <kernel/kconfig.h>
 
+#include <asm/interrupts.h>
+
 #include "../api.h"
-#include "../interrupts.h"
 
 #include "memory.h"
 #include "process.h"

@@ -3,12 +3,11 @@
 	.global	main
 	.global boot_args
 
-	.section .text
-
 /**
  * Image Start
  */
 
+.section    .text.start
 _start:
 	| Save boot args from the old stack before re-initializing
 	movea.l	(+4,%sp), %a0

@@ -6,8 +6,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <asm/macros.h>
-
 #define MAX_INPUT		20
 
 int main(int argc, char **argv)
@@ -34,7 +32,7 @@ int main(int argc, char **argv)
 
 	memset(&addr, '\0', sizeof(struct sockaddr_in));
 	addr.sin_family = AF_INET;
-	addr.sin_port = to_be16(port);
+	addr.sin_port = htons(port);
 	inet_aton(address, &addr.sin_addr);
 	//addr.sin_addr.s_addr = 0xC0A80166;
 

@@ -7,7 +7,8 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <asm/macros.h>
+#include <endian.h>
+#include <kernel/kconfig.h>
 
 #include "../kernel/fs/minix/minix-v1.h"
 
@@ -76,7 +77,7 @@ char *load_zones(struct boot_drive *drive, minix_v1_zone_t *zones, int max, char
 	for (short i = 0; i < max; i++) {
 		if (!zones[i])
 			return NULL;
-		copy_zone_data(drive, dest, from_le16(zones[i]));
+		copy_zone_data(drive, dest, le16toh(zones[i]));
 		dest += MINIX_V1_ZONE_SIZE;
 		putchar('.');
 	}
@@ -90,7 +91,7 @@ void load_partition(struct boot_drive *drive)
 
 	copy_zone_data(drive, buffer, 0);
 	entry = (struct partition_entry *) &buffer[PARTITION_OFFSET];
-	drive->ata_lba_start = from_le32(entry[(short) drive->partition].lba_start);
+	drive->ata_lba_start = le32toh(entry[(short) drive->partition].lba_start);
 }
 
 void load_kernel(struct boot_drive *drive, char *offset)
@@ -104,7 +105,7 @@ void load_kernel(struct boot_drive *drive, char *offset)
 	// Load our target inode and get the zone table in the inode
 	super = (struct minix_v1_superblock *) copy_zone_data(drive, buffer, MINIX_V1_SUPER_ZONE);
 	//MINIX_V1_INODE_TABLE_START(super);
-	minix_v1_zone_t inode_zone = MINIX_V1_BITMAP_ZONES + from_le16((super)->imap_blocks) + from_le16((super)->zmap_blocks);
+	minix_v1_zone_t inode_zone = MINIX_V1_BITMAP_ZONES + le16toh((super)->imap_blocks) + le16toh((super)->zmap_blocks);
 
 	// Load our target inode and get the zone table in the inode
 	inode_table = (struct minix_v1_inode *) copy_zone_data(drive, buffer, inode_zone);
@@ -115,7 +116,7 @@ void load_kernel(struct boot_drive *drive, char *offset)
 
 	// If there are more zones, load the indirect zone table and copy all the zones to RAM
 	if (offset && inode_zones[MINIX_V1_TIER1_ZONENUMS]) {
-		zone_table = (minix_v1_zone_t *) copy_zone_data(drive, buffer, from_le16(inode_table[inode_num - 1].zones[MINIX_V1_TIER1_ZONENUMS]));
+		zone_table = (minix_v1_zone_t *) copy_zone_data(drive, buffer, le16toh(inode_table[inode_num - 1].zones[MINIX_V1_TIER1_ZONENUMS]));
 		offset = load_zones(drive, zone_table, MINIX_V1_ZONENUMS_PER_ZONE, offset);
 	}
 
@@ -124,19 +125,18 @@ void load_kernel(struct boot_drive *drive, char *offset)
 	for (short i = 0; i < 1000; i++) { asm volatile(""); }
 }
 
-#define ATA_REG_DEV_CONTROL	((volatile uint8_t *) 0x60001D)
-#define ATA_REG_DEV_ADDRESS	((volatile uint8_t *) 0x60001F)
-#define ATA_REG_DATA		((volatile uint16_t *) 0x600020)
-#define ATA_REG_DATA_BYTE	((volatile uint8_t *) 0x600021)
-#define ATA_REG_FEATURE		((volatile uint8_t *) 0x600023)
-#define ATA_REG_ERROR		((volatile uint8_t *) 0x600023)
-#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) 0x600025)
-#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) 0x600027)
-#define ATA_REG_CYL_LOW		((volatile uint8_t *) 0x600029)
-#define ATA_REG_CYL_HIGH	((volatile uint8_t *) 0x60002B)
-#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) 0x60002D)
-#define ATA_REG_STATUS		((volatile uint8_t *) 0x60002F)
-#define ATA_REG_COMMAND		((volatile uint8_t *) 0x60002F)
+#define ATA_REG_BASE		CONFIG_ATA_BASE
+#define ATA_REG_DATA		((volatile uint16_t *) (ATA_REG_BASE + 0x0))
+#define ATA_REG_DATA_BYTE	((volatile uint8_t *) (ATA_REG_BASE + 0x0))
+#define ATA_REG_FEATURE		((volatile uint8_t *) (ATA_REG_BASE + 0x2))
+#define ATA_REG_ERROR		((volatile uint8_t *) (ATA_REG_BASE + 0x2))
+#define ATA_REG_SECTOR_COUNT	((volatile uint8_t *) (ATA_REG_BASE + 0x4))
+#define ATA_REG_SECTOR_NUM	((volatile uint8_t *) (ATA_REG_BASE + 0x6))
+#define ATA_REG_CYL_LOW		((volatile uint8_t *) (ATA_REG_BASE + 0x8))
+#define ATA_REG_CYL_HIGH	((volatile uint8_t *) (ATA_REG_BASE + 0xa))
+#define ATA_REG_DRIVE_HEAD	((volatile uint8_t *) (ATA_REG_BASE + 0xc))
+#define ATA_REG_STATUS		((volatile uint8_t *) (ATA_REG_BASE + 0xe))
+#define ATA_REG_COMMAND		((volatile uint8_t *) (ATA_REG_BASE + 0xe))
 
 
 #define ATA_CMD_READ_SECTORS	0x20

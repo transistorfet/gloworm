@@ -1,0 +1,43 @@
+
+menu "Commands"
+
+config COMMANDS
+	bool "Build commands"
+	default y
+	help
+	  Build the user commands
+
+if COMMANDS
+
+config CMD_SH
+	bool "sh"
+	default y
+	help
+	  The pseudo-shell, a very incomplete shell program that can launch
+	  other programs.  
+
+if CMD_SH
+
+config SHELL_WITH_UTILS
+	bool "Include the some basic /bin utilities in the shell"
+	help
+	  This will compile some utilities such as cat, cp, mv, ps, mount,
+	  kill, date, and so on, into a single elf.  The commands that are
+	  included will be run in a separate process using the same read-only
+	  memory area.  Any non-built-in commands will be run as normal, by
+	  attempting to load an elf executable from the file system.
+
+endif
+
+config TEST_CMDS
+	bool "build the various test commands"
+	default y
+	depends on NET
+	help
+	  There are some basic tests that can be built, such as `hello`,
+	  `daemontest`, `tcptest`, `tcpserv`, and so on
+
+endif
+
+endmenu
+

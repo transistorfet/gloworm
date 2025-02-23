@@ -9,8 +9,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <asm/macros.h>
-
 struct ntp_packet {
 	//char data[48];
 	uint8_t mode;
@@ -77,7 +75,7 @@ int main(int argc, char **argv)
 
 	memset(&addr, '\0', sizeof(struct sockaddr_in));
 	addr.sin_family = AF_INET;
-	addr.sin_port = to_be16(port);
+	addr.sin_port = htons(port);
 	inet_aton(address, &addr.sin_addr);
 
 	memset(&tx, '\0', sizeof(struct ntp_packet));

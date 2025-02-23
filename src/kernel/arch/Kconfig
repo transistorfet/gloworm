@@ -1,0 +1,15 @@
+
+menu "Architecture setup"
+
+source "src/kernel/arch/m68k/Kconfig"
+
+source "src/kernel/arch/testapp/Kconfig"
+
+endmenu
+
+config CPU_BIG_ENDIAN
+	bool
+
+config CPU_LITTLE_ENDIAN
+	bool
+

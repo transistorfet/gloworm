@@ -9,7 +9,7 @@
 #include <kernel/printk.h>
 #include <kernel/signal.h>
 
-#include "interrupts.h"
+#include <asm/interrupts.h>
 #include "proc/process.h"
 
 

@@ -15,6 +15,8 @@
 #include <kernel/kmalloc.h>
 #include <kernel/scheduler.h>
 
+#include <asm/interrupts.h>
+
 // TODO these should maybe be bundled into an interface in <kernel/processes.h>
 #include "proc/timer.h"
 #include "proc/memory.h"
@@ -26,7 +28,6 @@
 #include "net/socket.h"
 
 #include "api.h"
-#include "interrupts.h"
 
 
 #define SYSCALL_MAX	80

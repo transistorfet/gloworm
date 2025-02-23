@@ -1,7 +1,6 @@
 
 #include <errno.h>
 #include <string.h>
-#include <asm/macros.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <kernel/kmalloc.h>
@@ -103,10 +102,10 @@ int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 		return -5;
 
 	hdr = (struct udp_header *) &pack->data[offset];
-	hdr->src = from_be16(hdr->src);
-	hdr->dest = from_be16(hdr->dest);
-	hdr->length = from_be16(hdr->length);
-	hdr->checksum = from_be16(hdr->checksum);
+	hdr->src = be16toh(hdr->src);
+	hdr->dest = be16toh(hdr->dest);
+	hdr->length = be16toh(hdr->length);
+	hdr->checksum = be16toh(hdr->checksum);
 
 	if (hdr->length != pack->length - offset)
 		return -6;
@@ -166,10 +165,10 @@ static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src
 	pack->length += sizeof(struct udp_header);
 
 	hdr = (struct udp_header *) &pack->data[pack->transport_offset];
-	hdr->src = to_be16(src->port);
-	hdr->dest = to_be16(dest->port);
-	hdr->length = to_be16(sizeof(struct udp_header) + length);
-	hdr->checksum = to_be16(0);
+	hdr->src = htobe16(src->port);
+	hdr->dest = htobe16(dest->port);
+	hdr->length = htobe16(sizeof(struct udp_header) + length);
+	hdr->checksum = htobe16(0);
 
 	pack->data_offset = pack->length;
 	if (packet_append(pack, data, length)) {
@@ -178,7 +177,7 @@ static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src
 	}
 
 	// Update the checksum
-	hdr->checksum = to_be16(udp_calculate_checksum(pack->proto, pack));
+	hdr->checksum = htobe16(udp_calculate_checksum(pack->proto, pack));
 
 	return 0;
 }

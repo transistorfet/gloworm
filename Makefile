@@ -29,7 +29,7 @@ menuconfig:
 	kconfig-mconf $(src-root)/Kconfig
 
 PHONY += dockerconfig
-dockerconfig:
+dconfig:
 	cd tools/config && ./run.sh
 
 PHONY += generate-config
