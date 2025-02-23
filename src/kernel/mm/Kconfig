@@ -1,0 +1,21 @@
+
+menu "Memory management"
+
+config KMEM_START
+	hex "Kernel memory start address"
+	default 0x120000
+	help
+	  This is the start of the memory area that will be used for allocating
+	  kernel memory for disk blocks, and also user program space when
+	  paging is not used.  This does not include the kernel binary or
+	  data/bss area, so make sure it's higher than that.
+
+config KMEM_END
+	hex "Kernel memory end address"
+	default 0x200000
+	help
+	  This is the address at the top end of installed memory where the
+	  kernel memory will allocate from.  Currently only one contiguous
+	  chunk of memory is supported.
+
+endmenu

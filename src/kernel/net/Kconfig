@@ -1,10 +1,11 @@
 
-menuconfig NET
-	bool "Networking support"
+menu "Networking support"
+
+config NET
+	bool "Enable networking"
 	default y
 	help
 	  Include the networking subsystem
-
 if NET
 
 config INETV4
@@ -21,4 +22,6 @@ config SLIP
 	  a character device to send and receive INETV4 packets
 
 endif
+
+endmenu
 

@@ -97,7 +97,7 @@ create_context:
 	move.l	%d0, -(%a0)
 
 	| Push the 68010+ Format/Vector Word
-	#ifndef CONFIG_MC68000
+	#if !defined(CONFIG_MC68000)
 	move.w	#0, -(%a0)
 	#endif
 	| Push starting address
@@ -132,7 +132,7 @@ create_context:
 drop_context:
 	move.l	(4,%sp), %a0
 	add.l	#CONTEXT_SIZE, %a0
-	#ifndef CONFIG_MC68000
+	#if !defined(CONFIG_MC68000)
 	add.l	#2, %a0
 	#endif
 	add.l	#6, %a0

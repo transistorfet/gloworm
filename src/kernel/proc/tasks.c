@@ -39,6 +39,7 @@ struct process *create_init_task()
 	#else
 
 	// TODO this would load and execute an actual binary from the mounted disk
+	int error;
 	void *entry;
 	error = load_binary("/bin/init", proc, &entry);
 	if (error)

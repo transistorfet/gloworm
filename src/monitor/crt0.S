@@ -15,7 +15,7 @@
 _start:
 	/* Disable interrupts and reset VBR */
 	move.w	#0x2700, %sr
-	#ifndef CONFIG_MC68000
+	#if !defined(CONFIG_MC68000)
 	clr.l	%d0
 	movec	%d0, %vbr
 	#endif

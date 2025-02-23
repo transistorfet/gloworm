@@ -142,8 +142,7 @@ int main()
 	printk_safe("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	//init_kernel_heap((void *) 0x110000, 0xD0000);
-	init_kernel_heap((void *) 0x120000, 0xC0000);
+	init_kernel_heap(CONFIG_KMEM_START, CONFIG_KMEM_END);
 
 	init_time();
 	init_timer_list();

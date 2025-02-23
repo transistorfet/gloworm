@@ -1,48 +1,15 @@
 #
-# Automatically generated file; DO NOT EDIT.
-# Gloworm Configuration
+# Minimal config for 68k-SBC and 68k-SMT
+# (make sure to run menuconfig to add the defaults)
 #
 
-#
-# General setup
-#
-# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE is not set
-# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3 is not set
-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-
-#
-# Architecture
-#
 CONFIG_MC68010=y
-# CONFIG_MC68030 is not set
 
-#
-# Monitor firmware
-#
-# CONFIG_AM29F040 is not set
-CONFIG_DUAL_AM29F040=y
-
-#
-# Kernel configuration
-#
-
-#
-# Device drivers
-#
 CONFIG_ATA=y
 CONFIG_ATA_BASE=0x600021
-CONFIG_MEM=y
-CONFIG_MSDOS_PARTITION=y
-CONFIG_TTY=y
 CONFIG_TTY_68681=y
 
-#
-# File systems
-#
-# CONFIG_MALLOC_FS is not set
-CONFIG_MINIX_FS=y
-CONFIG_NET=y
-CONFIG_INETV4=y
-CONFIG_SLIP=y
-CONFIG_SHELL_IN_KERNEL=y
-CONFIG_SHELL_WITH_UTILS=y
+CONFIG_KMEM_START=0x120000
+CONFIG_KMEM_END=0x200000
+
+CONFIG_DUAL_AM29F040=y

@@ -1,11 +1,12 @@
 
 #include <stddef.h>
+#include <stdint.h>
 #include <kernel/printk.h>
 #include <kernel/kmalloc.h>
 
 
 struct block {
-	int size;
+	uintptr_t size;
 	struct block *next;
 };
 
@@ -17,11 +18,11 @@ struct heap {
 static struct heap main_heap = { 0 };
 
 
-void init_kernel_heap(void *addr, int size)
+void init_kernel_heap(uintptr_t start, uintptr_t end)
 {
-	struct block *space = (struct block *) addr;
+	struct block *space = (struct block *) start;
 
-	space->size = size;
+	space->size = end - start;
 	space->next = NULL;
 
 	main_heap.free_blocks = space;
