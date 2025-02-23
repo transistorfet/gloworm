@@ -1,4 +1,6 @@
 
+	#include <generated/config.h>
+
 	| Definitions in this file
 	.global enter_syscall
 	.global enter_irq
@@ -94,10 +96,10 @@ create_context:
 	| Push _exit return address for when main returns
 	move.l	%d0, -(%a0)
 
-	| Push the 68010 Format/Vector Word
-	.ifdef __mc68010__
+	| Push the 68010+ Format/Vector Word
+	#ifndef CONFIG_MC68000
 	move.w	#0, -(%a0)
-	.endif
+	#endif
 	| Push starting address
 	move.l	%a1, -(%a0)
 	| Push flags
@@ -130,9 +132,9 @@ create_context:
 drop_context:
 	move.l	(4,%sp), %a0
 	add.l	#CONTEXT_SIZE, %a0
-	.ifdef __mc68010__
+	#ifndef CONFIG_MC68000
 	add.l	#2, %a0
-	.endif
+	#endif
 	add.l	#6, %a0
 	move.l	%a0, %d0
 	rts

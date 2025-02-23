@@ -103,3 +103,21 @@
   the tty driver.  It is true that's it's not the most clean, but it's not that unusual since the tty68681 driver is really a
   subdriver of the tty subsystem.  Maybe there's a cleaner way, but at least it doesn't hang anymore
 
+2025-02-22:
+
+- I finally got a refactor done that I had thought would be quick, but ended up taking me 2 days or so.  Even though the standard
+  libc and unix are codependent, I kind of had hoped to separate the kernel arch includes from the libc ones, and went back and
+  forth a bit, but eventually settled on having src/libc/arch/<arch>/include, and src/kernel/arch/<arch>/include rather than putting
+  them together in include/.  I know the existing libc and kernel includes are mixed together, but it's only kernel stuff in
+  include/kernel/ and the rest is libc.  Then again I'm still having my doubts
+- I also changed the byteorder to_le16, etc functions into endian.h htole16, etc which is posix standard, so the things that use it
+  will be more portable to another libc, which might be wanted in some cases
+- also using the libc none with other baremetal code easily without needing the kernel
+
+- I also fixed some build issues.  The CFLAGS weren't applying to all downstream directories like I wanted, and I also needed to
+  refactor the arch-specific ones so I make a bunch of minor changes.  CFLAGS works now because it doesn't get overwritten in the
+  Makefile.defaults file on every decent, and ccflags-y works only for the current directory
+- I also added a userprog-ccflags-y, firmware-ccflags-y, and kernel-ccflags-y, which are activated by the respective directory's top
+  level Makefile by transfering it to CFLAGS.  The idea is that anything in those categories should get certain general flags that
+  are architecture-specific like `-mpcrel` which applies to monitor and boot (firmwares), but not userprogs or the kernel.
+

@@ -1,4 +1,6 @@
 
+	#include <generated/config.h>
+
 	.global _start
 	.global _error
 	.global	main
@@ -13,10 +15,10 @@
 _start:
 	/* Disable interrupts and reset VBR */
 	move.w	#0x2700, %sr
-	.ifdef __mc68010__
+	#ifndef CONFIG_MC68000
 	clr.l	%d0
 	movec	%d0, %vbr
-	.endif
+	#endif
 
 	move.w	#0x2000, %sr		/* enable all interrupts */
 
