@@ -10,7 +10,7 @@
 #include <kernel/kconfig.h>
 
 #include "partition.h"
-#include <asm/interrupts.h>
+#include <asm/irqs.h>
 
 
 // Driver Definition

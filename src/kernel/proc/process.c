@@ -1,11 +1,10 @@
 
 #include <stddef.h>
 
+#include <asm/irqs.h>
 #include <kernel/printk.h>
 #include <kernel/kmalloc.h>
 #include <kernel/scheduler.h>
-
-#include <asm/interrupts.h>
 
 #include "../api.h"
 #include "../misc/queue.h"
@@ -150,6 +149,18 @@ int set_proc_alarm(struct process *proc, uint32_t seconds)
 		add_timer(&proc->timer, seconds, 0);
 	}
 	return 0;
+}
+
+void print_proc_segments(struct process *proc)
+{ 
+	printk_safe("  Text: %x to %x, Data: %x to %x, Stack: %x to %x\n",
+		current_proc->map.segments[M_TEXT].base,
+		current_proc->map.segments[M_TEXT].base + current_proc->map.segments[M_TEXT].length,
+		current_proc->map.segments[M_DATA].base,
+		current_proc->map.segments[M_DATA].base + current_proc->map.segments[M_DATA].length,
+		current_proc->map.segments[M_STACK].base,
+		current_proc->map.segments[M_STACK].base + current_proc->map.segments[M_STACK].length
+	);
 }
 
 

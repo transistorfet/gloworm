@@ -99,6 +99,7 @@ void close_proc(struct process *proc);
 void cleanup_proc(struct process *proc);
 struct process *find_exited_child(pid_t parent, pid_t child);
 int set_proc_alarm(struct process *proc, uint32_t seconds);
+void print_proc_segments(struct process *proc);
 
 void proc_iter_start(struct process_iter *iter);
 struct process *proc_iter_next(struct process_iter *iter);

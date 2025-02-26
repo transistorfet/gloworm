@@ -78,11 +78,11 @@ $(libex-y): FORCE
 
 # Build Rules for User Programs
 $(user-csingle): ccflags-y += $(userprog-ccflags-y)
-$(user-csingle): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%.o $(libex-y) $(libex-obj-y)
+$(user-csingle): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%.o $(libex-obj-y)
 	$(cmd_ld_elf)
 
 $(user-cmulti): ccflags-y += $(userprog-ccflags-y)
-$(user-cmulti): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%/built-in.o $(libex-y) $(libex-obj-y)
+$(user-cmulti): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%/built-in.o $(libex-obj-y)
 	$(cmd_ld_elf)
 
 $(OUTPUT)%.strip: $(OUTPUT)%.elf

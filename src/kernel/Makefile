@@ -1,5 +1,6 @@
 
 obj-y				+= main.o
+obj-y				+= interrupts.o
 obj-y				+= syscall.o
 obj-y				+= bh.o
 obj-y				+= time.o

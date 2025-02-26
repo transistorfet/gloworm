@@ -8,8 +8,9 @@
 
 #include <sys/stat.h>
 #include <sys/ioc_tty.h>
-
 #include <bits/macros.h>
+
+#include <asm/irqs.h>
 #include <kernel/bh.h>
 #include <kernel/vfs.h>
 #include <kernel/time.h>
@@ -18,8 +19,7 @@
 #include <kernel/driver.h>
 #include <kernel/syscall.h>
 #include <kernel/scheduler.h>
-
-#include <asm/interrupts.h>
+#include <kernel/interrupts.h>
 
 #include "../proc/timer.h"
 #include "../misc/circlebuf.h"
@@ -133,7 +133,7 @@ void tty_68681_reset_leds(uint8_t bits);
 #define ISR_S_TX_READY			0x01
 
 
-#define TTY_INT_VECTOR			IV_USER_VECTORS
+#define TTY_INT_VECTOR			64
 
 #define CH_A				0
 #define CH_B				1
@@ -524,7 +524,7 @@ void tty_68681_normal_mode()
 	*CTLR_WR_ADDR = 0x00;
 
 	// Enable interrupts
-	set_interrupt(TTY_INT_VECTOR, enter_irq);
+	set_irq_handler(TTY_INT_VECTOR, enter_irq);
 	*IVR_WR_ADDR = TTY_INT_VECTOR;
 	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
 

@@ -1,12 +1,13 @@
 
 #include <string.h>
-
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/ioc_tty.h>
 #include <sys/socket.h>
+
+#include <asm/irqs.h>
 #include <kernel/vfs.h>
 #include <kernel/time.h>
 #include <kernel/signal.h>
@@ -14,8 +15,6 @@
 #include <kernel/driver.h>
 #include <kernel/kmalloc.h>
 #include <kernel/scheduler.h>
-
-#include <asm/interrupts.h>
 
 // TODO these should maybe be bundled into an interface in <kernel/processes.h>
 #include "proc/timer.h"
@@ -115,7 +114,7 @@ extern void enter_syscall();
 
 void init_syscall()
 {
-	set_interrupt(IV_TRAP1, enter_syscall);
+	set_irq_handler(IRQ_TRAP1, enter_syscall);
 }
 
 // TODO this is temporary until you have processes working correctly

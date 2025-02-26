@@ -5,15 +5,17 @@
 #include <stdio.h>
 #include <signal.h>
 
+#include <asm/irqs.h>
 #include <kernel/bh.h>
 #include <kernel/printk.h>
 #include <kernel/signal.h>
+#include <kernel/interrupts.h>
 
-#include <asm/interrupts.h>
-#include "proc/process.h"
-
+#include "../../proc/process.h"		// TODO this should be <kernel/process.h> or maybe convert to tasks/threads first?
 
 #define INTERRUPT_MAX		128
+
+typedef void (*m68k_irq_handler_t)();
 
 extern void exception_entry(void);
 
@@ -22,29 +24,31 @@ void fatal_error(struct exception_stack_frame *frame);
 void handle_trap_1(void);
 void handle_trace(void);
 
-static interrupt_handler_t vector_table[INTERRUPT_MAX];
+static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
 
-void init_interrupts(void)
+void init_irqs(void)
 {
-	init_bh();
-
 	extern void enter_handle_exception();
 	for (short i = 2; i < INTERRUPT_MAX; i++)
 		vector_table[i] = enter_handle_exception;
 
 	extern void enter_handle_trace();
-	set_interrupt(IV_TRACE, enter_handle_trace);
+	set_irq_handler(IRQ_TRACE, enter_handle_trace);
 
 	// Load the VBR register with the address of our vector table
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
 }
 
-void set_interrupt(char iv_num, interrupt_handler_t handler)
+void set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
 {
-	vector_table[(short) iv_num] = handler;
+	vector_table[(short) irq] = handler;
 }
 
-
+void do_irq(int irq) {
+	// TODO call the appropriate interrupt
+	extern m68k_irq_handler_t handle_serial_irq();
+	handle_serial_irq();
+}
 
 /**
  * Interrupt Handlers
@@ -53,7 +57,7 @@ void set_interrupt(char iv_num, interrupt_handler_t handler)
 struct exception_stack_frame {
 	uint16_t status;
 	uint16_t *pc;
-	uint16_t vector;
+	uint16_t irq;
 };
 
 #define INTERRUPT_ENTRY(name)				\
@@ -93,16 +97,8 @@ void user_error(struct exception_stack_frame *frame)
 {
 	extern struct process *current_proc;
 
-	printk_safe("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
-	printk_safe("  Text: %x to %x, Data: %x to %x, Stack: %x to %x\n",
-		current_proc->map.segments[M_TEXT].base,
-		current_proc->map.segments[M_TEXT].base + current_proc->map.segments[M_TEXT].length,
-		current_proc->map.segments[M_DATA].base,
-		current_proc->map.segments[M_DATA].base + current_proc->map.segments[M_DATA].length,
-		current_proc->map.segments[M_STACK].base,
-		current_proc->map.segments[M_STACK].base + current_proc->map.segments[M_STACK].length
-	);
-
+	printk_safe("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->irq & 0xFFF) >> 2);
+	print_proc_segments(current_proc);
 	print_stack(frame);
 
 	dispatch_signal(current_proc, SIGKILL);
@@ -112,7 +108,7 @@ void fatal_error(struct exception_stack_frame *frame)
 {
 	prepare_for_panic();
 
-	printk_safe("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
+	printk_safe("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->irq & 0xFFF) >> 2);
 
 	print_stack(frame);
 

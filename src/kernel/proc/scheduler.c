@@ -2,10 +2,9 @@
 #include <errno.h>
 #include <bits/macros.h>
 
+#include <asm/irqs.h>
 #include <kernel/printk.h>
 #include <kernel/scheduler.h>
-
-#include <asm/interrupts.h>
 
 #include "tasks.h"
 #include "process.h"

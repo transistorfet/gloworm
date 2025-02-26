@@ -18,6 +18,7 @@
 	.global current_proc
 	.global current_syscall
 	.global do_syscall
+	.global do_irq
 	.global need_reschedule
 	.global schedule
 	.global bh_requested
@@ -78,7 +79,12 @@ enter_irq:
 	or.w	#0x0700, %sr
 	bsr	save_context
 
-	bsr	handle_serial_irq
+	#if defined(CONFIG_MC68000)
+	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
+	#else
+	move.l	(66,%sp), %d0
+	#endif
+	bsr	do_irq
 
 	| Jump to the syscall interrupt return
 	bra	restore_context

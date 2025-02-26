@@ -1,6 +1,14 @@
 
 menu "Memory management"
 
+#config KERNEL_BASE
+#	hex "Kernel base address"
+#	default 0x100000
+#	help
+#	  This is the location in memory where the kernel will be loaded at.
+#	  This is also used when linking because the kernel is not relocatable,
+#	  so make sure it's set correctly.
+
 config KMEM_START
 	hex "Kernel memory start address"
 	default 0x120000

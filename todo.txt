@@ -1,46 +1,48 @@
 
-* add config options for memory base/size for the heap, and also for the linker script
-* should the process wait until all output is flushed before exiting?  What happens on linux with a slow tty?
-* separate out the serial interrupt stuff to make it more generic
-* should you separate out the serial port driver from any tty-specific portions of it?  Or is it even just a matter of renaming it?  Linux has CONFIG_TTY and CONFIG_SERIAL_<various>
+* should you change DISABLE_INTS to DISABLE_IRQS(), etc
+* make a kernel/process.h file, (or task.h, or thread.h) with either common interfaces to processes, or the whole struct, for use within the kernel
 
-* make the slip's tty device configurable
-* make it so the ata device will time out and fail instead of hanging when it doesn't work
+* separate out the serial interrupt stuff to make it more generic
+* there's an issue with extra-y, and whether to add the prefix or not
+* clean up how you do partitions and device files related to it
+* should you rename driver.c to drvmgr.c or something that makes it easier to autocomplete drivers/
+* create a tty subsystem with subdrivers for the individual controllers
+
+* the process should wait until all output is flushed before it can exit
 
 * there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
   building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
 * make it rebuild everything when the config file changes
 * make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
 
-* it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
-* should you replace the libc makefile with subdirs like the kernel?
-* make a better clean rule?
-* add select-config rule to copy existing config?
+* add configuration for base address in linker script
+* make the slip's tty device configurable
+* make it so the ata device will time out and fail instead of hanging when it doesn't work
 
 * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
-* go through and add so many more options
 
-* separate out architecture to port it to another platform
-* clean up how you do partitions and device files related to it
 * support minixfs 2 and 3?
 * add ext2 support
 * add virtual memory support
-* add dynamic linking so that you can have a shared libc
-* fix bugs
-
-* should I separate libc, kernel, and monitor into their own subproject directories with the include files separated?  Each could use the same build system and
-  config system, maybe with some modifications so that CCFLAGS can be defined for a whole subdirectory for the project-specific includes.  It would make it easier
-  to use only parts of it, like use libc in other projects, or take just the kernel (monitor doesn't have its own includes outside of itself, so it isn't so relevant)
-* should you rename driver.c to drvmgr.c or something that makes it easier to autocomplete drivers/
 
 
 Operating System:
+
+    * make use of 68k's supervisor and user mode. This requires major changes to the create_context since the entry point can't be put onto the user stack. RTE will pop the ret off the supervisor stack
+    * do you need to disable triggering of the device-indepedent tty bottom half when the serial device is opened directly?
+    * should there be a lighter weight task type, instead of processes, so that you can service interrupt processing without a bunch of wasted memory
 
     * something is causing the SLIP serial port to mess up somehow which requires restarting the PC side the setup, It's probably a null characters when turning the device on or off
     * make the tty68681 driver partially write data... right now it'll suspend if the full request can't be buffered, but it should return the partial number, and the read/write syscalls should do
       the actual blocking, and then for writing it can rewrite the syscall during the suspend, so that it'll restart in the proper position.  You then need to add resuming to tty
     * when there's a trailing / to rm or mkdir, it will create something weird
 
+    * add dynamic linking so that you can have a shared libc
+
+    * it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
+    * should you replace the libc makefile with subdirs like the kernel?
+    * make a better clean rule?
+    * add select-config rule to copy existing config?
 
     * add timers and retransmissions to tcp
     * try transfering files over tcp, to test the stability of TCP (it should be possible to `nc -l 3904 > tar -x` or something to transfer data)
@@ -49,12 +51,10 @@ Operating System:
     * should there be something that periodically syncs data to disk?
     * need a function to convert a device number into a device name or device file path. (Could add another driver function pointer for getting the name of a devnum) (add to /proc/mounts)
     * I don't really like the point-of-no-return code in execve().  Is there a way to ensure that wont happen, such as not overwriting the memory segments until the new process is loaded
-    * make use of 68k's supervisor and user mode. This requires major changes to the create_context since the entry point can't be put onto the user stack. RTE will pop the ret off the supervisor stack
     * add calculating of cpu runtime
 
 
     * add check to vfs_link() for loops
-    * do you need to disable triggering of the device-indepedent tty bottom half when the serial device is opened directly?
     * should there be a vnode op to fill in the statbuf struct, or should they be in the vnode?  The only 2 values not in the vnode are blksize, blocks
     * the directory size value in the inode isn't working the best.  There is no dir size shrinking yet either
     * split the boot loader up into multiple parts, so it can be stage loaded
@@ -64,10 +64,11 @@ Operating System:
     * do you need to implement some internal network routing?
 
     * should you rename vfs_clone_vnode/vfs_release_vnode to instead be vfs_clone_vnode_ref/vfs_drop_vnode_ref ??  The latter would make more sense, albeit be longer
-    * move interrupts.c/h to its own arch dir somewhere.  It contains the last m68k specific assembly, but requires a subdir in src/kernel for the code, along with the syscall_entry.s and start.s files
     * you could possibly make an abstracted packet construction thing using an ioctl-like function defined for each protocol, which can intercept parts of
       the requests to fill in data in the packet headers (set src address, set dest address, add id, etc)
-
+    * should you separate libc, kernel, and monitor into their own subproject directories with the include files separated?  Each could use the same build system and
+      config system, maybe with some modifications so that CCFLAGS can be defined for a whole subdirectory for the project-specific includes.  It would make it easier
+      to use only parts of it, like use libc in other projects, or take just the kernel (monitor doesn't have its own includes outside of itself, so it isn't so relevant)
 
     * implement dns
     * add pipe setup to command evaluation
@@ -88,14 +89,13 @@ Operating System:
 
     * implement fg/bg somehow... it would be builtin to the shell and would require job control stuff...
     * add commands: rmdir, dd, chown, grep
-    * implement shell scripting?
     * add up/down arrow processing to the shell (easy without cooked input, but how would it be done with...)
+    * implement shell scripting?
     * add some kind of debugging or tracing support
     * make a PIE format that can be loaded and executed (this will likely require a custom linker script)
 
 
 
-    * should there be a lighter weight task type, instead of processes, so that you can service interrupt processing without a bunch of wasted memory
     * should you add timestamps to packets? (not currently a use for it)
     * rewrite the math functions to use fewer registers, and cover the 32 bit divide by 32 bit number case
     * minixfs, implement versions 2 and 3

@@ -1,10 +1,10 @@
 
 #include <stddef.h>
+
+#include <asm/irqs.h>
 #include <kernel/kmalloc.h>
 #include <kernel/printk.h>
 #include <kernel/kconfig.h>
-
-#include <asm/interrupts.h>
 
 #include "../api.h"
 

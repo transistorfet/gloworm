@@ -15,6 +15,7 @@
 #include <kernel/driver.h>
 #include <kernel/printk.h>
 #include <kernel/scheduler.h>
+#include <kernel/interrupts.h>
 #include <kernel/kconfig.h>
 
 #include "proc/tasks.h"
@@ -26,7 +27,6 @@
 #endif
 
 #include "api.h"
-#include <asm/interrupts.h>
 
 
 extern void tty_68681_preinit();
@@ -135,8 +135,6 @@ void parse_boot_args()
 
 int main()
 {
-	DISABLE_INTS();
-
 	tty_68681_preinit();
 
 	printk_safe("\nBooting with \"%s\"...\n\n", boot_args);
