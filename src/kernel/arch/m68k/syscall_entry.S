@@ -1,7 +1,7 @@
 
 	#include <generated/config.h>
 
-	| Definitions in this file
+	// Definitions in this file
 	.global enter_syscall
 	.global enter_irq
 	.global create_context
@@ -11,7 +11,7 @@
 	.global _exit
 	.global _sigreturn
 
-	| Declarations defined outside of this file
+	// Declarations defined outside of this file
 	.global	syscall_table
 	.global kernel_reentries
 	.global kernel_stack
@@ -24,8 +24,8 @@
 	.global bh_requested
 	.global run_bh_handlers
 
-	.equ	CONTEXT_SIZE, 60		| The size of the saved registers on the stack (not including the interrupt return)
-	.equ	PROC_SP_OFFSET, 8		| The offset into struct process where the stack pointer is located
+	.equ	CONTEXT_SIZE, 60		// The size of the saved registers on the stack (not including the interrupt return)
+	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
 
 	.section .text
 
@@ -38,19 +38,19 @@ create_context:
 	move.l	(8,%sp), %a1
 	move.l	(12,%sp), %d0
 
-	| Push _exit return address for when main returns
+	// Push _exit return address for when main returns
 	move.l	%d0, -(%a0)
 
-	| Push the 68010+ Format/Vector Word
+	// Push the 68010+ Format/Vector Word
 	#if !defined(CONFIG_MC68000)
 	move.w	#0, -(%a0)
 	#endif
-	| Push starting address
+	// Push starting address
 	move.l	%a1, -(%a0)
-	| Push flags
+	// Push flags
 	move.w #0x2000, -(%a0)
 
-	| Push zeros for all registers
+	// Push zeros for all registers
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
@@ -85,7 +85,7 @@ drop_context:
 	rts
 
 
-.macro SAVE_SYSCALL
+.macro SAVE_SYSCALL_REGISTERS
 	// TODO change this to use a single movem, but that would be an ABI breaking change
 	// Save the arguments in the order expected of the syscall struct
 	move.l	%d3, -(%sp)
@@ -96,7 +96,7 @@ drop_context:
 	move.l	%d0, -(%sp)
 .endm
 
-.macro RESTORE_SYSCALL
+.macro RESTORE_SYSCALL_REGISTERS
 	// Restore the syscall registers
 	move.l	(%sp)+, %d0
 	move.l	(%sp)+, %d1
@@ -106,29 +106,57 @@ drop_context:
 	move.l	(%sp)+, %d3
 .endm
 
-.macro SAVE_EXTRA_REGISTERS
-	// Save registers
-	movem.l	%a6-%a2/%d7-%d4, -(%sp)
+.macro SAVE_EXTRA_REGISTERS reg=%sp
+        // Save registers
+	movem.l	%d4-%d7/%a2-%a6, -(\reg)
 .endm
-
-.macro RESTORE_EXTRA_REGISTERS
-	// Restore registers
-	movem.l	(%sp)+, %d4-%d7/%a2-%a6
+ 
+.macro RESTORE_EXTRA_REGISTERS reg=%sp
+        // Restore registers
+	movem.l	(\reg)+, %d4-%d7/%a2-%a6
 .endm
-
 
 /**
  * Save all registers to the current user stack and switch to the kernel stack
  */
 .macro	SAVE_CONTEXT
-	| Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
+	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
+	add.l	#1, kernel_reentries
+	cmp.l	#1, kernel_reentries
+	beq.w	101f
+
+	move.l	%d7, -(%sp)
+
+	// We're already on the kernel stack, so just save the scratch registers
+	move.l	%a1, -(%sp)
+	move.l	%a0, -(%sp)
+	move.l	%d1, -(%sp)
+	move.l	%d0, -(%sp)
+
+	bra.w	102f
+
+    101:
+
+	// Save registers
+	movem.l	%a6-%a0/%d7-%d0, -(%sp)
+
+	// Switch to the kernel stack
+	move.l	current_proc, %a5
+	adda.l	#PROC_SP_OFFSET, %a5
+	move.l	%sp, (%a5)
+	move.l	kernel_stack, %sp
+
+    102:
+
+/*
+	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
 	add.l	#1, kernel_reentries
 	cmp.l	#1, kernel_reentries
 	beq	5f
 
 	move.l	%d7, -(%sp)
 
-	| We're already on the kernel stack, so just save the scratch registers
+	// We're already on the kernel stack, so just save the scratch registers
 	move.l	%a1, -(%sp)
 	move.l	%a0, -(%sp)
 	move.l	%d1, -(%sp)
@@ -196,6 +224,7 @@ drop_context:
 	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
 	move.l	current_proc, previous_proc
 	// Continue processing interrupt
+*/
 
 .endm
 
@@ -204,42 +233,42 @@ drop_context:
  * Switch to the current user stack, restore the context, and return from the interrupt
  */
 restore_context:
-	| If we aren't exiting to a user process, then skip the next few checks
+	// If we aren't exiting to a user process, then skip the next few checks
 	cmp.l	#1, kernel_reentries
-	bne	L004
+	bne.w	204f
 
-    L002:
+    202:
 
-	| Check if there are any back half handlers to be run
+	// Check if there are any back half handlers to be run
 	cmp.l	#0, bh_requested
-	beq	L003
+	beq.w	203f
 
-	| Enable interrupts while running the back half handlers
+	// Enable interrupts while running the back half handlers
 	and.w	#0xF8FF, %sr
 	bsr	run_bh_handlers
 	or.w	#0x0700, %sr
 
-    L003:
+    203:
 
-	| Check if there was a request to schedule a different process
+	// Check if there was a request to schedule a different process
 	cmp.l	#0, need_reschedule
-	beq	L004
+	beq.w	204f
 
-	| Enable interrupts while running the scheduler, this might also re-run the syscall that the returning process was blocked on
+	// Enable interrupts while running the scheduler, this might also re-run the syscall that the returning process was blocked on
 	and.w	#0xF8FF, %sr
 	bsr	schedule
 	or.w	#0x0700, %sr
 
-	| After a process has been scheduled and a syscall restarted, it might need to be suspended right away again, so loop over the checks
-	bra	L002
+	// After a process has been scheduled and a syscall restarted, it might need to be suspended right away again, so loop over the checks
+	bra.w	202b
 
-    L004:
+    204:	// Now we'll actually return, and do a context switch if necessary
 
-	| Decrement the number of times we've entered the kernel, and if this is the last time, then switch to the user stack
+	// Decrement the number of times we've entered the kernel, and if this is the last time, then switch to the user stack
 	sub.l	#1, kernel_reentries
-	beq	L005
+	beq.w	205f
 
-	| We'll still be on the kernel stack after returning, so just pop off the saved scratch register values and return
+	// We'll still be on the kernel stack after returning, so just pop off the saved scratch register values and return
 	move.l	(%sp)+, %d0
 	move.l	(%sp)+, %d1
 	move.l	(%sp)+, %a0
@@ -248,27 +277,27 @@ restore_context:
 	move.l	(%sp)+, %d7
 	rte
 
-    L005:
+    205:	// Returning to a user process, check for context switch
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
 	move.l	current_proc, %a5
 	adda.l	#PROC_SP_OFFSET, %a5
 
-	| Restore registers
+	// Restore registers
 	movem.l	(%a5)+, %a6-%a0/%d7-%d0
 
 	move.l	%a5, %usp
 
 	#else
 
-	| Switch back to the current process's stack
+	// Switch back to the current process's stack
 	move.l	%sp, kernel_stack
 	move.l	current_proc, %a5
 	adda.l	#PROC_SP_OFFSET, %a5
 	move.l	(%a5), %sp
 
-	| Restore registers
+	// Restore registers
 	movem.l	(%sp)+, %a6-%a0/%d7-%d0
 
 	#endif
@@ -284,26 +313,26 @@ restore_context:
  * in order as d1, a0, and a1 (only 3 arguments max atm)
  */
 enter_syscall:
-	| Disable ints and save the context
+	// Disable ints and save the context
 	or.w	#0x0700, %sr
 	SAVE_CONTEXT
 
-	| Save the arguments in the order expected of the syscall struct
-	SAVE_SYSCALL
+	// Save the arguments in the order expected of the syscall struct
+	SAVE_SYSCALL_REGISTERS
 
 	move.l	%sp, current_syscall
 
-	| Enable interrupts during the syscall
+	// Enable interrupts during the syscall
 	move.l	%d7, -(%sp)
 	and.w	#0xF8FF, %sr
 	jsr	do_syscall
 	or.w	#0x0700, %sr
 	add.l	#4, %sp
 
-	| Restore the syscall registers
-	RESTORE_SYSCALL
+	// Restore the syscall registers
+	RESTORE_SYSCALL_REGISTERS
 
-	| Jump to the syscall interrupt return
+	// Jump to the syscall interrupt return
 	bra	restore_context
 
 
@@ -319,32 +348,36 @@ enter_irq:
 	bsr	do_irq
 	add.l	#4, %sp
 
-	| Jump to the syscall interrupt return
+	// Jump to the syscall interrupt return
 	bra	restore_context
 
 
 _exit:
-	| Execute the exit syscall to terminate the current process
+	// Execute the exit syscall to terminate the current process
 	moveq	#1, %d0
 	trap	#1
 
-	| This shouldn't run because the syscall should never return
+	// This shouldn't run because the syscall should never return
 	stop	#0x2000
 
 
 _sigreturn:
-	| Execute the sigreturn syscall to clean up the signal handling
+	// Execute the sigreturn syscall to clean up the signal handling
 	moveq	#30, %d0
 	trap	#1
 
-	| This shouldn't run because the syscall should never return
+	// This shouldn't run because the syscall should never return
 	stop	#0x2000
 
 
-//
+//////////////////////
 // Global Variables
+//////////////////////
 	.section .data
-
+ 
+// Stores the previous process on entering from a user process
+// Used to compare if returning to the same process, in which case an extended
+// context switch is performed
 previous_proc:
 	.long	0
 
