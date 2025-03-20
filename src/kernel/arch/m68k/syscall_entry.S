@@ -29,67 +29,6 @@
 
 	.section .text
 
-
-/**
- * System Call Entry Point
- *
- * This is the handler for the system call trap.
- * The system call number (index) is passed in d0, and arguments are passed
- * in order as d1, a0, and a1 (only 3 arguments max atm)
- */
-enter_syscall:
-	| Disable ints and save the context
-	or.w	#0x0700, %sr
-	bsr	save_context
-
-	| Save the arguments in the order expected of the syscall struct
-	move.l	%d0, -(%sp)
-	move.l	%d3, -(%sp)
-	move.l	%d2, -(%sp)
-	move.l	%a1, -(%sp)
-	move.l	%a0, -(%sp)
-	move.l	%d1, -(%sp)
-
-	move.l	%sp, current_syscall
-
-	| Enable interrupts during the syscall
-	and.w	#0xF8FF, %sr
-	jsr	do_syscall
-	or.w	#0x0700, %sr
-
-	| Restore the syscall registers
-	move.l	(%sp)+, %d1
-	move.l	(%sp)+, %a0
-	move.l	(%sp)+, %a1
-	move.l	(%sp)+, %d2
-	move.l	(%sp)+, %d3
-	move.l	(%sp)+, %d0
-
-	| Jump to the syscall interrupt return
-	bra	restore_context
-
-
-/**
- * Serial Controller IRQ
- *
- * This will save the context and stack frame before calling the C function to handle the rest
- */
-enter_irq:
-	| Disable ints and save the context
-	or.w	#0x0700, %sr
-	bsr	save_context
-
-	#if defined(CONFIG_MC68000)
-	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
-	#else
-	move.l	(66,%sp), %d0
-	#endif
-	bsr	do_irq
-
-	| Jump to the syscall interrupt return
-	bra	restore_context
-
-
 /**
  * Create a new context given a future stack address, return address
  * 	void *create_context(void *user_stack, void *entry, void *exit);
@@ -145,58 +84,120 @@ drop_context:
 	move.l	%a0, %d0
 	rts
 
+
+.macro SAVE_SYSCALL
+	// TODO change this to use a single movem, but that would be an ABI breaking change
+	// Save the arguments in the order expected of the syscall struct
+	move.l	%d3, -(%sp)
+	move.l	%d2, -(%sp)
+	move.l	%a1, -(%sp)
+	move.l	%a0, -(%sp)
+	move.l	%d1, -(%sp)
+	move.l	%d0, -(%sp)
+.endm
+
+.macro RESTORE_SYSCALL
+	// Restore the syscall registers
+	move.l	(%sp)+, %d0
+	move.l	(%sp)+, %d1
+	move.l	(%sp)+, %a0
+	move.l	(%sp)+, %a1
+	move.l	(%sp)+, %d2
+	move.l	(%sp)+, %d3
+.endm
+
+.macro SAVE_EXTRA_REGISTERS
+	// Save registers
+	movem.l	%a6-%a2/%d7-%d4, -(%sp)
+.endm
+
+.macro RESTORE_EXTRA_REGISTERS
+	// Restore registers
+	movem.l	(%sp)+, %d4-%d7/%a2-%a6
+.endm
+
+
 /**
  * Save all registers to the current user stack and switch to the kernel stack
  */
-save_context:
+.macro	SAVE_CONTEXT
 	| Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
 	add.l	#1, kernel_reentries
 	cmp.l	#1, kernel_reentries
-	beq	L001
+	beq	5f
 
-	| We're already on the kernel stack, so just save the scratch registers and return
-	move.l	(%sp), (-16,%sp)
-	add.l	#4, %sp
-	move.l	%a1, -(%sp)
-	move.l	%a0, -(%sp)
-	move.l	%d1, -(%sp)
-	move.l	%d0, -(%sp)
-	sub.l	#4, %sp
-	rts
-
-    L001:
-	| Move the return address ahead of where the context will be
-	move.l	(%sp), (-CONTEXT_SIZE,%sp)
-	add.l	#4, %sp
-
-	| Save registers
-	move.l	%a6, -(%sp)
-	move.l	%a5, -(%sp)
-	move.l	%a4, -(%sp)
-	move.l	%a3, -(%sp)
-	move.l	%a2, -(%sp)
-	move.l	%a1, -(%sp)
-	move.l	%a0, -(%sp)
 	move.l	%d7, -(%sp)
-	move.l	%d6, -(%sp)
-	move.l	%d5, -(%sp)
-	move.l	%d4, -(%sp)
-	move.l	%d3, -(%sp)
-	move.l	%d2, -(%sp)
+
+	| We're already on the kernel stack, so just save the scratch registers
+	move.l	%a1, -(%sp)
+	move.l	%a0, -(%sp)
 	move.l	%d1, -(%sp)
 	move.l	%d0, -(%sp)
 
-	| Save the return address before we switch the stacks
-	move.l	(-4,%sp), %a6
+	// Save the vector number to %d0 for do_irq
+	#if defined(CONFIG_MC68000)
+	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
+	#else
+	move.w	(26,%sp), %d7
+	//and.l	#0x00000FFF, %d7
+	//lsr.w	#2, %d7
+	#endif
 
-	| Switch to the kernel stack
+	bra	6f
+
+    5:
+	#if defined(CONFIG_M68K_USER_MODE)
+	// The interrupt switched to supervisor mode, so we're already on the kernel stack
+
+	// Save the original value of the register we'll use as a pointer to the context
+	// and copy the user stack pointer into it
+	move.l	%a6, -(%sp)
+	move.l	%usp, %a6
+	move.l	(%sp)+, -(%a6)
+
+	// Save registers
+	movem.l	%a5-%a0/%d7-%d0, -(%a6)
+
+	// Save the vector number to %d0 for do_irq
+	#if defined(CONFIG_MC68000)
+	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
+	#else
+	move.w	(66,%a6), %d7
+	//and.l	#0x00000FFF, %d7
+	//lsr.w	#2, %d7
+	#endif
+
+	#else
+	// Not using user-mode, so we have to manually switch stacks
+
+	// Save registers
+	movem.l	%a6-%a0/%d7-%d0, -(%sp)
+
+	// Save the vector number to %d0 for do_irq
+	#if defined(CONFIG_MC68000)
+	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
+	#else
+	move.w	(66,%sp), %d7
+	//and.l	#0x00000FFF, %d7
+	//lsr.w	#2, %d7
+	#endif
+
+	// Switch to the kernel stack
 	move.l	current_proc, %a5
 	adda.l	#PROC_SP_OFFSET, %a5
 	move.l	%sp, (%a5)
 	move.l	kernel_stack, %sp
 
-	| Jump to the return address of the caller
-	jmp	(%a6)
+	#endif
+
+
+
+    6:
+	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
+	move.l	current_proc, previous_proc
+	// Continue processing interrupt
+
+.endm
 
 
 /**
@@ -224,7 +225,7 @@ restore_context:
 	cmp.l	#0, need_reschedule
 	beq	L004
 
-	| Enable interrupts while running the scheduler
+	| Enable interrupts while running the scheduler, this might also re-run the syscall that the returning process was blocked on
 	and.w	#0xF8FF, %sr
 	bsr	schedule
 	or.w	#0x0700, %sr
@@ -243,9 +244,23 @@ restore_context:
 	move.l	(%sp)+, %d1
 	move.l	(%sp)+, %a0
 	move.l	(%sp)+, %a1
+
+	move.l	(%sp)+, %d7
 	rte
 
     L005:
+
+	#if defined(CONFIG_M68K_USER_MODE)
+
+	move.l	current_proc, %a5
+	adda.l	#PROC_SP_OFFSET, %a5
+
+	| Restore registers
+	movem.l	(%a5)+, %a6-%a0/%d7-%d0
+
+	move.l	%a5, %usp
+
+	#else
 
 	| Switch back to the current process's stack
 	move.l	%sp, kernel_stack
@@ -254,23 +269,58 @@ restore_context:
 	move.l	(%a5), %sp
 
 	| Restore registers
-	move.l	(%sp)+, %d0
-	move.l	(%sp)+, %d1
-	move.l	(%sp)+, %d2
-	move.l	(%sp)+, %d3
-	move.l	(%sp)+, %d4
-	move.l	(%sp)+, %d5
-	move.l	(%sp)+, %d6
-	move.l	(%sp)+, %d7
-	move.l	(%sp)+, %a0
-	move.l	(%sp)+, %a1
-	move.l	(%sp)+, %a2
-	move.l	(%sp)+, %a3
-	move.l	(%sp)+, %a4
-	move.l	(%sp)+, %a5
-	move.l	(%sp)+, %a6
+	movem.l	(%sp)+, %a6-%a0/%d7-%d0
+
+	#endif
 
 	rte
+
+
+/**
+ * System Call Entry Point
+ *
+ * This is the handler for the system call trap.
+ * The system call number (index) is passed in d0, and arguments are passed
+ * in order as d1, a0, and a1 (only 3 arguments max atm)
+ */
+enter_syscall:
+	| Disable ints and save the context
+	or.w	#0x0700, %sr
+	SAVE_CONTEXT
+
+	| Save the arguments in the order expected of the syscall struct
+	SAVE_SYSCALL
+
+	move.l	%sp, current_syscall
+
+	| Enable interrupts during the syscall
+	move.l	%d7, -(%sp)
+	and.w	#0xF8FF, %sr
+	jsr	do_syscall
+	or.w	#0x0700, %sr
+	add.l	#4, %sp
+
+	| Restore the syscall registers
+	RESTORE_SYSCALL
+
+	| Jump to the syscall interrupt return
+	bra	restore_context
+
+
+/**
+ * Serial Controller IRQ
+ *
+ * This will save the context and stack frame before calling the C function to handle the rest
+ */
+enter_irq:
+	SAVE_CONTEXT
+
+	move.l	%d7, -(%sp)
+	bsr	do_irq
+	add.l	#4, %sp
+
+	| Jump to the syscall interrupt return
+	bra	restore_context
 
 
 _exit:
@@ -281,6 +331,7 @@ _exit:
 	| This shouldn't run because the syscall should never return
 	stop	#0x2000
 
+
 _sigreturn:
 	| Execute the sigreturn syscall to clean up the signal handling
 	moveq	#30, %d0
@@ -288,4 +339,12 @@ _sigreturn:
 
 	| This shouldn't run because the syscall should never return
 	stop	#0x2000
+
+
+//
+// Global Variables
+	.section .data
+
+previous_proc:
+	.long	0
 
