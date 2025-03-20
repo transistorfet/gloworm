@@ -128,22 +128,22 @@ drop_context:
 	move.l	%d7, -(%sp)
 
 	// We're already on the kernel stack, so just save the scratch registers
-	move.l	%a1, -(%sp)
-	move.l	%a0, -(%sp)
-	move.l	%d1, -(%sp)
-	move.l	%d0, -(%sp)
+	movem.l	%d0-%d1/%a0-%a1, -(%sp)
 
 	bra.w	102f
 
     101:
 
 	// Save registers
-	movem.l	%a6-%a0/%d7-%d0, -(%sp)
+	SAVE_EXTRA_REGISTERS
+	SAVE_SYSCALL_REGISTERS
+
+	// Set the current syscall to the top of the stack
+	move.l	%sp, current_syscall
 
 	// Switch to the kernel stack
 	move.l	current_proc, %a5
-	adda.l	#PROC_SP_OFFSET, %a5
-	move.l	%sp, (%a5)
+	move.l	%sp, (%a5, PROC_SP_OFFSET)
 	move.l	kernel_stack, %sp
 
     102:
@@ -269,10 +269,7 @@ restore_context:
 	beq.w	205f
 
 	// We'll still be on the kernel stack after returning, so just pop off the saved scratch register values and return
-	move.l	(%sp)+, %d0
-	move.l	(%sp)+, %d1
-	move.l	(%sp)+, %a0
-	move.l	(%sp)+, %a1
+	movem.l (%sp)+, %d0-%d1/%a0-%a1
 
 	move.l	(%sp)+, %d7
 	rte
@@ -285,7 +282,8 @@ restore_context:
 	adda.l	#PROC_SP_OFFSET, %a5
 
 	// Restore registers
-	movem.l	(%a5)+, %a6-%a0/%d7-%d0
+	RESTORE_SYSCALL_REGISTERS
+	RESTORE_EXTRA_REGISTERS
 
 	move.l	%a5, %usp
 
@@ -294,11 +292,11 @@ restore_context:
 	// Switch back to the current process's stack
 	move.l	%sp, kernel_stack
 	move.l	current_proc, %a5
-	adda.l	#PROC_SP_OFFSET, %a5
-	move.l	(%a5), %sp
+	move.l	(%a5, PROC_SP_OFFSET), %sp
 
 	// Restore registers
-	movem.l	(%sp)+, %a6-%a0/%d7-%d0
+	RESTORE_SYSCALL_REGISTERS
+	RESTORE_EXTRA_REGISTERS
 
 	#endif
 
@@ -318,9 +316,7 @@ enter_syscall:
 	SAVE_CONTEXT
 
 	// Save the arguments in the order expected of the syscall struct
-	SAVE_SYSCALL_REGISTERS
-
-	move.l	%sp, current_syscall
+	//SAVE_SYSCALL_REGISTERS
 
 	// Enable interrupts during the syscall
 	move.l	%d7, -(%sp)
@@ -330,7 +326,7 @@ enter_syscall:
 	add.l	#4, %sp
 
 	// Restore the syscall registers
-	RESTORE_SYSCALL_REGISTERS
+	//RESTORE_SYSCALL_REGISTERS
 
 	// Jump to the syscall interrupt return
 	bra	restore_context
