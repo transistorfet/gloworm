@@ -8,6 +8,7 @@
 
 #include "tasks.h"
 #include "process.h"
+#include "context.h"
 #include "../api.h"
 #include "../misc/queue.h"
 
@@ -206,7 +207,7 @@ void restart_current_syscall()
 
 void set_proc_return_value(struct process *proc, int ret)
 {
-	*((uint32_t *) proc->sp) = ret;
+	set_context_return_value(proc, ret);
 }
 
 void return_to_current_proc(int ret)
@@ -215,7 +216,7 @@ void return_to_current_proc(int ret)
 		current_proc->bits &= ~PB_DONT_SET_RETURN_VAL;
 	} else if (current_proc->state == PS_RUNNING) {
 		// If the process is still in the ready state, then set the return value in the process's context
-		*((uint32_t *) current_proc->sp) = ret;
+		set_context_return_value(current_proc, ret);
 	}
 }
 

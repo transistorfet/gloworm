@@ -6,7 +6,7 @@
 	.global enter_irq
 	.global create_context
 	.global drop_context
-	.global save_context
+	.global set_context_return_value
 	.global restore_context
 	.global _exit
 	.global _sigreturn
@@ -84,6 +84,15 @@ drop_context:
 	move.l	%a0, %d0
 	rts
 
+/**
+ * Set the return value (%d0) of the context, given the stack pointer
+ * 	void set_context_return_value(void *user_stack, uint32_t value);
+ */
+set_context_return_value:
+	move.l	(4, %sp), %a0
+	move.l	(8, %sp), (36, %a0)
+	rts
+
 
 .macro SAVE_SYSCALL_REGISTERS
 	// TODO change this to use a single movem, but that would be an ABI breaking change
@@ -125,8 +134,6 @@ drop_context:
 	cmp.l	#1, kernel_reentries
 	beq.w	101f
 
-	move.l	%d7, -(%sp)
-
 	// We're already on the kernel stack, so just save the scratch registers
 	movem.l	%d0-%d1/%a0-%a1, -(%sp)
 
@@ -134,19 +141,26 @@ drop_context:
 
     101:
 
-	// Save registers
-	SAVE_EXTRA_REGISTERS
+	// If we're using user mode, then these will be on the kernel stack (%ssp/%isp) but if
+	// we're not, then these will be on the user stack before switching to the kernel stack
 	SAVE_SYSCALL_REGISTERS
 
 	// Set the current syscall to the top of the stack
 	move.l	%sp, current_syscall
 
+	SAVE_EXTRA_REGISTERS
+
+	#if !defined(CONFIG_M68K_USER_MODE)
 	// Switch to the kernel stack
-	move.l	current_proc, %a5
-	move.l	%sp, (%a5, PROC_SP_OFFSET)
+	move.l	current_proc, %a0
+	move.l	%sp, (%a0, PROC_SP_OFFSET)
 	move.l	kernel_stack, %sp
+	#endif
 
     102:
+
+	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
+	move.l	current_proc, previous_proc
 
 /*
 	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
@@ -233,7 +247,7 @@ drop_context:
  * Switch to the current user stack, restore the context, and return from the interrupt
  */
 restore_context:
-	// If we aren't exiting to a user process, then skip the next few checks
+	// If we returning into the kernel, instead of a user process, then skip the next few checks
 	cmp.l	#1, kernel_reentries
 	bne.w	204f
 
@@ -268,37 +282,91 @@ restore_context:
 	sub.l	#1, kernel_reentries
 	beq.w	205f
 
-	// We'll still be on the kernel stack after returning, so just pop off the saved scratch register values and return
-	movem.l (%sp)+, %d0-%d1/%a0-%a1
+	// We'll stay on the kernel stack after returning, so just pop off the saved scratch register values and return
+	movem.l	(%sp)+, %d0-%d1/%a0-%a1
 
-	move.l	(%sp)+, %d7
 	rte
 
     205:	// Returning to a user process, check for context switch
 
+	#if !defined(CONFIG_M68K_USER_MODE)
+	// Switch to the user stack
+	move.l  %sp, kernel_stack
+	move.l  current_proc, %a0
+	move.l  (%a0, PROC_SP_OFFSET), %sp
+	#endif
+
+/*
+	// Skip the extended context switch if the proc hasn't changed
+	move.l  (previous_proc), %a0
+	cmpa.l  (current_proc), %a0
+	beq.w   206f
+
+	#if defined(CONFIG_M68K_USER_MODE)
+	// The syscall regs are still on the kernel stack, which is in %sp
+	RESTORE_SYSCALL_REGISTERS
+	// TODO don't you actually need USP since it wasn't saved in the other switch?
+	move.l  previous_proc, %sp
+	move.l  (%sp, PROC_SP_OFFSET), %sp
+	// Reserve 2 long words for the exception frame
+	sub.l   #8, %sp
+	SAVE_SYSCALL_REGISTERS
+
+	move.l  kernel_stack, %sp
+	move.l  %a0, (%sp, 6)
+	move.l  %a1, (%sp, 8)
+
+	// Load the previous process's user stack pointer into a0
+	move.l  (%a0, PROC_SP_OFFSET), %a0
+	// TODO complete this
+	move.l (%a0)+, -(%sp)
+	#endif
+
+	// Switch to the previous process's stack
+	move.l  previous_proc, %a0
+	move.l  (%a0,PROC_SP_OFFSET), %a1
+
+	// Save the extended context of the previously running process, not including the system call registers
+	SAVE_EXTRA_REGISTERS %a1
+
+	// Update the new stack pointer of the previous proc
+	move.l  %a1, (%a0,PROC_SP_OFFSET)
+
+	// Restore the extended context of the next process, not including the system call registers
+	RESTORE_EXTRA_REGISTERS
+
+    206:	// Now it's the last step before returning to a user process
+
+*/
+	// Restore registers
+	RESTORE_EXTRA_REGISTERS
+	RESTORE_SYSCALL_REGISTERS
+
+	/*
 	#if defined(CONFIG_M68K_USER_MODE)
 
-	move.l	current_proc, %a5
-	adda.l	#PROC_SP_OFFSET, %a5
+	move.l  current_proc, %sp
+	adda.l  #PROC_SP_OFFSET, %sp
 
 	// Restore registers
 	RESTORE_SYSCALL_REGISTERS
 	RESTORE_EXTRA_REGISTERS
 
-	move.l	%a5, %usp
+	move.l	%sp, %usp
 
 	#else
 
 	// Switch back to the current process's stack
 	move.l	%sp, kernel_stack
-	move.l	current_proc, %a5
-	move.l	(%a5, PROC_SP_OFFSET), %sp
+	move.l	current_proc, %a0
+	move.l	(%a0, PROC_SP_OFFSET), %sp
 
 	// Restore registers
 	RESTORE_SYSCALL_REGISTERS
 	RESTORE_EXTRA_REGISTERS
 
 	#endif
+	*/
 
 	rte
 
