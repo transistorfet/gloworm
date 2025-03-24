@@ -2,6 +2,8 @@
 #ifndef _ASM_M68K_SYSCALL_H
 #define _ASM_M68K_SYSCALL_H
 
+extern int errno;
+
 static inline int SYSCALL1(int n, int a1)
 {
 	register int ret;

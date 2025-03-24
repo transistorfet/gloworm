@@ -13,8 +13,8 @@ struct irq_action {
 };
 
 void init_interrupts();
-void request_interrupt(irq_num_t irq, irq_handler_t handler, int flags);
-void free_interrupt(irq_num_t irq);
+void request_irq(irq_num_t irq, irq_handler_t handler, int flags);
+void free_irq(irq_num_t irq);
 void enable_irq(irq_num_t irq);
 void disable_irq(irq_num_t irq);
 

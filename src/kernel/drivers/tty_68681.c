@@ -524,7 +524,7 @@ void tty_68681_normal_mode()
 	*CTLR_WR_ADDR = 0x00;
 
 	// Enable interrupts
-	set_irq_handler(TTY_INT_VECTOR, enter_irq);
+	request_irq(TTY_INT_VECTOR, enter_irq, 0);
 	*IVR_WR_ADDR = TTY_INT_VECTOR;
 	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
 

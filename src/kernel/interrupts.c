@@ -11,8 +11,6 @@
 #include <kernel/signal.h>
 #include <kernel/interrupts.h>
 
-#include "proc/process.h"
-
 
 #define INTERRUPT_MAX		128
 
@@ -42,12 +40,26 @@ void init_interrupts(void)
 	init_irqs();
 }
 
-void request_interrupt(irq_num_t irq, irq_handler_t handler, int flags)
+void request_irq(irq_num_t irq, irq_handler_t handler, int flags)
 {
 	action_table[(short) irq].flags = flags;
 	action_table[(short) irq].handler = handler;
 }
 
+void free_irq(irq_num_t irq)
+{
+
+}
+
+void enable_irq(irq_num_t irq)
+{
+
+}
+
+void disable_irq(irq_num_t irq)
+{
+
+}
 
 /*
 struct exception_stack_frame {

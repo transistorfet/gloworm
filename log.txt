@@ -121,3 +121,136 @@
   level Makefile by transfering it to CFLAGS.  The idea is that anything in those categories should get certain general flags that
   are architecture-specific like `-mpcrel` which applies to monitor and boot (firmwares), but not userprogs or the kernel.
 
+2025-02-28:
+
+- I'm working on making it possible to generically register interrupt handlers so that other drivers can be made besides the serial
+  driver, and I've had it working for a few days now, in theory, but I'm also re-evaluating how I do contexts, and how I can improve
+  it.  I'd like to add the option of doing user mode switching, but there's a limited number of %usp instructions, so I'd have to
+  %a6 instead of %a7 to push all the data onto the stack.  There's also the option of not using the stack, although it looks like
+  linux is using the stack where on x86 I'm pretty sure it saves the registers in a struct in the process object.
+- I'm also not too happy about the double table (the first being the real vector table, and the second being the irq_action table).
+  Right now they're the same size, but the second one can at least cut out the exceptions since they're not overridable.  I haven't
+  looked closely enough at linux to know how it's storing them, but I want it to be fast, since they're interrupts, so I might still
+  stick to a limited table.
+- I tried removing the interrupt disable instruction at the entry of the two interrupt handlers I have, and it works when the irq
+  handler doesn't have it, but the trap handler does need it.  The 68k only masks the interrupts if an actual hardware interrupt
+  occurs, and not on a trap, and I guess without the disable on entry to the trap, it could have another interrupt while the trap
+  handler is saving the instructions.  There's only a limited set of trap instructions with specific irqs, so I could get away with
+  having the two different types of handlers.  It's maybe splitting hairs over one instruction, but I do still think they'll need to
+  be different anyways
+
+2025-03-01:
+
+- I almost have a modified context switcher that can either do what it currently did of always using Supervisor mode, or optionally
+  switch to/from User mode, and which in Supervisor-only mode switches to the kernel stack before pushing all the registers, but
+  it's not quite working
+- I thought I'd try running it on moa last night to "quickly" find the problem, and of course moa isn't working with computie, even
+  after changing the memory map to match the VME card.  I can't seem to find where the error is coming from.  It's Emulator(Misc,
+  "%d0"), but that error is only created with "Error::new" and all instantiations have a complete error message instead of just the
+  register name, so I'm stumped.  The code is such a mess from the time I tried adding emulator-hal.  I really need to pick it up
+  and fix it, but I want to work on gloworm first
+- ah! the trace function isn't even advancing the instruction, so no wonder it wasn't hitting the fault when tracing in moa
+
+2025-03-02:
+
+- I got thrown off by the fact that I had disabled ATA in the config, but also needed to change the boot stuff as a result.  I need
+  to fix how it gets the wrong boot arguments, and also make the boot arguments default use the config value, so it's consistent
+
+2025-03-15:
+
+- I've been trying to rewrite the context switching code for two weeks now, and ...
+- I just wandered off and did something else.  It's not that it's hard to do, but I keep just doing other things instead of working
+  on it, when I set down to work on it.  Not sure if it's an effect of the medication, or a lack of interesting, or what.  But that
+  said, I *do* want to only do it once, and I'm trying to incorporate everything, and read the linux m68k context switch code to
+  figure out how it does it
+- namely, in arch/m68k: entry.S and include/asm/entry.h
+- interestingly enough, it seems to only save the higher numbered registers when it actually switches processes, and otherwise it
+  doesn't touch them.  And it can do this because even though it enters the kernel's C code, as long as it doesn't actually change
+  states until it's returned all the way up the call stack, out of each re-entry of the kernel, and is finally ready to return from
+  the irq or syscall that entered the kernel, the stack will be exactly back to when it entered, and all the extra registers will
+  have been restored as part of the C calling convention to preserve their values on the stack.  It will be as if it had just
+  entered, and only pushed the scratch registers on the stack.  I'm pretty sure this is what was meant when I read that now all
+  interrupts were the "fast interrupt" in Linux, as in it only saves the full context state if it's switching and otherwise only
+  saves the minimum (ish) by default
+
+- So, what I want is:
+    - to be able to get the interrupt number that occurred (for the handler lookup table)
+    - to configurably do what it currently does of only using the supervisor stack, or optionally using user mode
+    - save the system call on the stack in a way that doesn't duplicate the values like it currently does
+    - don't save all the registers unless a task switch is actually going to happen
+
+- I think that's it.  The questions I still need to answer are: should I always save the systemcall registers, whether in a system
+  call or not, or only when in a syscall instead of irq, and how do I know which is which when looking at the stack?
+- also, should I keep my syscall register assignments or copy linux which uses %d1-%d5 primarily, still can't find a good reason why,
+  Minix on Mac might use the same as I am, but it looks like it uses a movem to save %d0-%d2/%a0-%a1 instead of the weird order I
+  have... this is kind of minor by comparison
+
+- for the first question, I'm pretty sure linux saves all of %d0-%d5/%a0-%a2, which are all the syscall registers plus some (still
+  don't know why %a2 specifically), but either way, every interrupt always saves those registers, so it doesn't try to be too fancy
+  and have two ways of entering?  It looks like it.  That would certainly be easier
+- ah, I have them in the slightly weird order they're in (%d0, %d1, %a0, %a1, %d2, %d3) based on the read and write syscalls, which
+  (SYSCALL3) which takes an integer (%d1), and then a pointer and size (which is pointer-like).  Interestingly enough, I don't have
+  any SYSCALL5's, even though I've defined it (and not 4).  Oh it's just not in unistd, but it's in socket.  And there it looks like
+  it doesn't make much sense... "a" registers have int flags and the ints in %d2 and %d3 are the actual pointers
+
+2025-03-16:
+
+- Ohhh!  Linux is using a different kernel stack *for each task*.  That's why the context switch seemed a bit weird.  It pushes the
+  basic registers to the kernel stack and I think it also keeps the exception frame on there as well.  That's why it doesn't seem to
+  copy anything from the kernel stack to the user stack when switching tasks.  It just stores all the data on the kernel stack.
+- I'm not sure why it's doing this yet (other than convenience, if you have lots of memory).  Unless there's a better reason, maybe
+  I should avoid this to keep the memory usage down?
+- what happens when a signal occurs?  I think that's the only weird case where you'd end up with 2 contexts on the user stack
+
+- I'm kind of thinking, at least for now, I'll use only one kernel stack (per cpu, but only one cpu atm), and that kernel stack will
+  always be in the ISP stack pointer, which is backwards compatible.  I won't make use of the MSP or the M bit for the time being.
+- is it worth it to always switch the stack to the user stack, push the context, and then switch back to the same kernel stack and
+  only push the rest of the context when switching, even though switching is probably going to be quite frequent.  Or should you
+  push it to the kernel stack along with the exception frame, and copy it to the user stack when switching fully?
+- or is it even best to push a0 to kernel stack, use it to push context to user stack, etc
+
+2025-03-18:
+
+- I think I will eventually move to a kernel stack per thread model, but for now I'll just do a single kernel thread and change
+  things over more slowly.  I don't even have threads yet
+
+2025-03-23:
+
+- Making progress, but still don't have a working context switch that delays the switch until it's returning, and only switches if
+  it's actually changing processes
+- so a little while ago I figured out that there was an issue with returning from a syscall, and that was because the code that set
+  that value is manipulating the context itself on the user stack.  This is a major point to note when changing the context layout.
+  Previously, the register %d0 was at the top of the stack, but that's not the case now, if the extra regs are only pushed as
+  needed.
+- I caught this by make it do the full switch but using the new macros.  I had it working when the extra regs were pushed before the
+  syscall regs, but not in the opposite direction.  Greping the code found places where proc->sp was being used, and that lead to
+  finding the issue.  I moved that code to a function in syscall_entry.S so that it would be more obvious that that was happening.
+  The code that actually set it was in schedule.c, so it's not supposed to know about the context format anyways
+- the symptoms were that it would appear to hang when starting multitasking, but it was still context switching according to the LED
+
+- I then tried to get the delayed switch working, and that's been a nightmare.  It usually gives a privillege violation, because the
+  flags register ends up being 0 due to an invalid stack.  Using the moa emulator, I was able to figure out that (at least in some
+  cases), it was doing the switch correctly the first few times, but not after that
+- there is an issue with starting multitaskings since the context needs to not try to save the previous process, which is NULL.  I
+  had some code to check if the previous_proc was null, but that was maybe causing more issues, so I disabled it, and that caused
+  different issues
+- one of the problems was that it was restoring the current_proc stack, and then saving the previous_proc stack, and not looking at
+  the current_proc value again before popping, but if the check to see if the proc is the same is disabled, then it won't use the
+  updated sp when popping current_proc, so for now I have it switch to current, switch to previous, and then switch back to current
+- It was still having a bad switch somewhere, and moa with a breakpoint just before it starts the stack manipulation found that
+  after 4 or so switches, it messes up, when trying to pop off a new stack.  The stack doesn't have the full context on it, so when
+  the switching code does the swap, it pops the extra regs off the stack which aren't there and thus later on pops the wrong data
+  during rte
+- more grepping of the code didn't find the issue, because I didn't look at the code around it.  I tried setting a breakpoint on the
+  signal code because that involved some stack manipulation, but that didn't get hit before the bad switch happened
+- I can't quite remember how I clued into the process clone.  I might have been looking at new_proc and stuff, but somewhere along
+  the line, I realized that the process cloning/fork was the problem.  It's cloning the current process which has an incomplete
+  context on its stack, and so when it goes to actually switch procs, the new proc doesn't have the extra regs, only the syscall
+  regs!
+- fixing this made the privillege violation stop, so it's successfully switching, but it now hangs before the shell starts.  I
+  *think* that might be because of the return value again.  I think the problem in general is that the context on the stack is not
+  consistent.  If you're doing something with the stack of the current proc, then it's only got the syscall, and if you're doing
+  something with any other process, it has the extended stack
+- nope, trying to conditionally set the return value in the context doesn't fix the problem.  It seemed to instead make context
+  switching halt.  When it's swapped from what it should be, it continues context switching and hangs before starting the shell
+

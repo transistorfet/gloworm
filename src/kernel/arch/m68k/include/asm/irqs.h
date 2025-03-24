@@ -19,6 +19,14 @@
 #define IRQ_FORMAT_ERROR	14
 #define IRQ_UNINITIALIZED_VEC	15
 
+#define IRQ_AUTOVEC1		25
+#define IRQ_AUTOVEC2		26
+#define IRQ_AUTOVEC3		27
+#define IRQ_AUTOVEC4		28
+#define IRQ_AUTOVEC5		29
+#define IRQ_AUTOVEC6		30
+#define IRQ_AUTOVEC7		31
+
 #define IRQ_TRAP0		32
 #define IRQ_TRAP1		33
 #define IRQ_TRAP2		34
@@ -36,7 +44,8 @@
 #define IRQ_TRAP14		46
 #define IRQ_TRAP15		47
 
-#define IRQ_USER_MAX		64
+#define IRQ_USER_START		64
+#define IRQ_USER_MAX		128
 
 
 /*** Macros ***/
@@ -68,7 +77,7 @@ typedef void (*irq_handler_t)();
 void init_irqs();
 void set_irq_handler(irq_num_t irq, irq_handler_t handler);
 
-void do_irq(int irq);
+void do_irq(irq_num_t irq);
 
 #endif
 

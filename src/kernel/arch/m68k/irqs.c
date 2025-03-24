@@ -11,6 +11,8 @@
 #include <kernel/signal.h>
 #include <kernel/interrupts.h>
 
+#include <asm/irqs.h>
+
 #include "../../proc/process.h"		// TODO this should be <kernel/process.h> or maybe convert to tasks/threads first?
 
 #define INTERRUPT_MAX		128
@@ -28,9 +30,29 @@ static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
 
 void init_irqs(void)
 {
-	extern void enter_handle_exception();
-	for (short i = 2; i < INTERRUPT_MAX; i++)
-		vector_table[i] = enter_handle_exception;
+	extern void enter_exception();
+	extern void enter_syscall();
+	extern void enter_irq();
+
+	// Processor exceptions
+	for (short i = IRQ_BUS_ERROR; i < IRQ_AUTOVEC1; i++)
+		vector_table[i] = enter_exception;
+
+	// Autovec interrupts
+	for (short i = IRQ_AUTOVEC1; i <= IRQ_AUTOVEC7; i++)
+		vector_table[i] = enter_irq;
+
+	// Trap instructions handlers
+	for (short i = IRQ_TRAP0; i <= IRQ_TRAP15; i++)
+		vector_table[i] = enter_syscall;
+
+	// Reserved interrupts vectors
+	for (short i = IRQ_TRAP15 + 1; i < IRQ_USER_START; i++)
+		vector_table[i] = enter_exception;
+
+	// User interrupts
+	for (short i = IRQ_USER_START; i < IRQ_USER_MAX; i++)
+		vector_table[i] = enter_irq;
 
 	extern void enter_handle_trace();
 	set_irq_handler(IRQ_TRACE, enter_handle_trace);
@@ -44,7 +66,8 @@ void set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
 	vector_table[(short) irq] = handler;
 }
 
-void do_irq(int irq) {
+void do_irq(irq_num_t irq) {
+	//printk_safe("%x\n", irq);
 	// TODO call the appropriate interrupt
 	extern m68k_irq_handler_t handle_serial_irq();
 	handle_serial_irq();
@@ -53,12 +76,6 @@ void do_irq(int irq) {
 /**
  * Interrupt Handlers
  */
-
-struct exception_stack_frame {
-	uint16_t status;
-	uint16_t *pc;
-	uint16_t irq;
-};
 
 #define INTERRUPT_ENTRY(name)				\
 __attribute__((noreturn)) void enter_##name()		\

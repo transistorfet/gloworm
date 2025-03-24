@@ -90,8 +90,14 @@ struct protocol_ops *protocols[] = {
 #endif
 
 
-char boot_args[32] = "ata0";
+// Storage for boot arguments, which are set in start.S
+const char boot_args[32] = "";
+
+#if defined(CONFIG_ATA)
+device_t root_dev = DEVNUM(DEVMAJOR_ATA, 0);
+#else
 device_t root_dev = DEVNUM(DEVMAJOR_MEM, 0);
+#endif
 
 
 void create_dir_or_panic(const char *path)
@@ -121,11 +127,6 @@ void create_special_or_panic(const char *path, device_t rdev)
 
 void parse_boot_args()
 {
-	// TODO this is overly simplistic because there aren't many options yet
-	if (!*boot_args) {
-		root_dev = DEVNUM(DEVMAJOR_MEM, 0);
-	}
-
 	if (!strncmp(boot_args, "mem", 3)) {
 		root_dev = DEVNUM(DEVMAJOR_MEM, boot_args[3] - '0');
 	} else if (!strncmp(boot_args, "ata", 3)) {
@@ -172,9 +173,6 @@ int main()
 	for (short i = 0; protocols[i]; i++)
 		protocols[i]->init();
 	#endif
-
-	// TODO hack because something isn't working
-	root_dev = DEVNUM(DEVMAJOR_ATA, 0);
 
 	printk_safe("minixfs: mounting (%x) at %s\n", root_dev, "/");
 	vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
