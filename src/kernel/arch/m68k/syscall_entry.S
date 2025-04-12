@@ -4,6 +4,7 @@
 	// Definitions in this file
 	.global enter_syscall
 	.global enter_irq
+	.global enter_exception
 	.global create_context
 	.global drop_context
 	.global set_context_return_value
@@ -414,6 +415,31 @@ enter_irq:
 
 	// Jump to the syscall interrupt return
 	bra	restore_context
+
+
+/**
+ * CPU Exception Entry Point
+ *
+ * This will always save the full context and then call the exception handler to decide what to do from there
+ */
+enter_exception:
+	// Disable irqs
+	or.w    #0x0700, %sr
+
+	// TODO this would be wrong for user mode
+	SAVE_SYSCALL_REGISTERS
+	SAVE_EXTRA_REGISTERS
+
+	movea.l  %sp, %a5
+
+	#if !defined(CONFIG_M68K_USER_MODE)
+	// Switch to the kernel stack
+	movea.l  current_proc, %a0
+	move.l  %sp, (%a0, PROC_SP_OFFSET)
+	movea.l  kernel_stack, %sp
+	#endif
+
+	bra.w   handle_exception
 
 
 _exit:

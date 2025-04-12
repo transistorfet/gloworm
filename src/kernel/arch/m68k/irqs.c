@@ -11,7 +11,8 @@
 #include <kernel/signal.h>
 #include <kernel/interrupts.h>
 
-#include <asm/irqs.h>
+#include <asm/context.h>
+#include <asm/exceptions.h>
 
 #include "../../proc/process.h"		// TODO this should be <kernel/process.h> or maybe convert to tasks/threads first?
 
@@ -19,11 +20,9 @@
 
 typedef void (*m68k_irq_handler_t)();
 
-extern void exception_entry(void);
+extern void enter_exception(void);
 
-struct exception_stack_frame;
-void fatal_error(struct exception_stack_frame *frame);
-void handle_trap_1(void);
+void fatal_error(struct context *frame);
 void handle_trace(void);
 
 static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
@@ -91,41 +90,48 @@ __attribute__((noreturn)) void enter_##name()		\
 	asm("move.l	%%a5, %0\n" : "=r" (frame_ptr))
 
 
-void print_stack(struct exception_stack_frame *frame)
+void print_stack(struct exception_frame *frame)
 {
+	uint16_t *code = (uint16_t *) frame->pc;
+	uint16_t *stack = (uint16_t *) frame;
+
 	// Dump stack
-	printk_safe("Stack: %x\n", frame);
+	printk_safe("Stack: %x\n", stack);
 	for (short i = 0; i < 48; i++) {
-		printk_safe("%04x ", ((uint16_t *) frame)[i]);
+		printk_safe("%04x ", stack[i]);
 		if ((i & 0x7) == 0x7)
 			printk_safe("\n");
 	}
 
 	// Dump code where the error occurred
-	printk_safe("\nCode:\n");
+	printk_safe("\nCode: %x\n", code);
 	for (short i = 0; i < 48; i++) {
-		printk_safe("%04x ", frame->pc[i]);
+		printk_safe("%04x ", code[i]);
 		if ((i & 0x7) == 0x7)
 			printk_safe("\n");
 	}
 }
 
-void user_error(struct exception_stack_frame *frame)
+void user_error(struct context *context)
 {
 	extern struct process *current_proc;
 
-	printk_safe("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->irq & 0xFFF) >> 2);
+	struct exception_frame *frame = &context->frame;
+
+	printk_safe("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	print_proc_segments(current_proc);
 	print_stack(frame);
 
 	dispatch_signal(current_proc, SIGKILL);
 }
 
-void fatal_error(struct exception_stack_frame *frame)
+void fatal_error(struct context *context)
 {
+	struct exception_frame *frame = &context->frame;
+
 	prepare_for_panic();
 
-	printk_safe("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->irq & 0xFFF) >> 2);
+	printk_safe("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 
 	print_stack(frame);
 
@@ -141,45 +147,30 @@ void fatal_error(struct exception_stack_frame *frame)
 	__builtin_unreachable();
 }
 
-INTERRUPT_ENTRY(handle_exception);
-
-__attribute__((interrupt)) void handle_exception(void)
+void handle_exception(void)
 {
-	DISABLE_INTS();
+	struct context *context;
 
-	struct exception_stack_frame *frame;
-
-	GET_FRAME(frame);
+	GET_FRAME(context);
 
 	extern int kernel_reentries;
 	if (kernel_reentries < 1) {
-		user_error(frame);
+		user_error(context);
+		// TODO this is temporary until you sort out how to return... basically need to call schedule and then restore_context, but the acutal restore_context could be in syscall_entry.S
+		asm volatile("stop #0x2700\n");
 	} else {
-		fatal_error(frame);
+		fatal_error(context);
+		asm volatile("stop #0x2700\n");
 	}
-}
-
-INTERRUPT_ENTRY(handle_fatal_error);
-
-__attribute__((interrupt)) void handle_fatal_error()
-{
-	DISABLE_INTS();
-
-	struct exception_stack_frame *frame;
-
-	GET_FRAME(frame);
-
-	fatal_error(frame);
-	asm volatile("stop #0x2700\n");
 }
 
 INTERRUPT_ENTRY(handle_trace);
 
 __attribute__((interrupt)) void handle_trace()
 {
-	struct exception_stack_frame *frame;
+	struct context *context;
 
-	GET_FRAME(frame);
+	GET_FRAME(context);
 
-	printk_safe("Trace %x (%x)\n", frame->pc, *frame->pc);
+	printk_safe("Trace %x (%x)\n", context->frame.pc, context->frame.pc);
 }
