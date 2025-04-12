@@ -36,10 +36,13 @@ void test() { printk("It's a test!\n"); }
 // TODO remove this after testing
 int do_execbuiltin(void *addr, char *const argv[], char *const envp[]);
 
+extern int __do_fork();
+
 void *syscall_table[SYSCALL_MAX] = {
 	test,
 	do_exit,
-	do_fork,
+	do_fork, // do_fork,
+	//__do_fork, // do_fork,
 	do_read,
 	do_write,
 	do_open,
@@ -125,6 +128,28 @@ extern struct syscall_record *current_syscall;
 void tty_68681_set_leds(uint8_t bits);
 void tty_68681_reset_leds(uint8_t bits);
 
+/// Called on entry to any system call
+///
+/// Any code that should run before a syscall is processed should go here, such
+/// as tracing or debugging info.  The `current_syscall` global will be set with
+/// the syscall info that is about to be executed
+void syscall_entry()
+{
+	// TODO temporary, for debugging
+	printk_safe("%d\n", current_syscall->syscall);
+	tty_68681_set_leds(0x04);
+}
+
+/// Called when exiting any system call
+///
+/// Any code that should be run after a syscall has run but before returning to
+/// user code should go here.  This is mostly a place to close any tracing or
+/// debugging info, as a counterpart to `syscall_entry()`
+void syscall_exit()
+{
+	tty_68681_reset_leds(0x04);
+}
+
 //
 // Perform a system call and pass the return value to the calling process
 //
@@ -132,12 +157,10 @@ void do_syscall()
 {
 	int ret;
 
-	tty_68681_set_leds(0x04);
-
+	syscall_entry();
 	ret = ((syscall_t) syscall_table[current_syscall->syscall])(current_syscall->arg1, current_syscall->arg2, current_syscall->arg3, current_syscall->arg4, current_syscall->arg5);
 	return_to_current_proc(ret);
-
-	tty_68681_reset_leds(0x04);
+	syscall_exit();
 }
 
 void do_exit(int exitcode)
@@ -151,8 +174,9 @@ pid_t do_fork()
 	struct process *proc;
 
 	proc = new_proc(0, current_proc->uid);
-	if (!proc)
+	if (!proc) {
 		panic("Ran out of procs\n");
+	}
 
 	clone_process_memory(current_proc, proc);
 

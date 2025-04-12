@@ -59,7 +59,9 @@ struct process;
 struct process {
 	struct queue_node node;
 	void *sp;
+	uintptr_t return_value;
 	uint16_t state;
+	uint16_t bits;
 
 	struct mem_map map;
 
@@ -68,7 +70,6 @@ struct process {
 	pid_t pgid;
 	pid_t session;
 
-	uint16_t bits;
 	int exitcode;
 	int wait_events;
 	wait_check_t wait_check;

@@ -60,6 +60,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 
 			table[i].state = PS_RUNNING;
 			table[i].sp = NULL;
+			table[i].return_value = 0;
 			// Clear memory records
 			for (short j = 0; j < NUM_SEGMENTS; j++) {
 				table[i].map.segments[j].base = NULL;

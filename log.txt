@@ -254,3 +254,122 @@
 - nope, trying to conditionally set the return value in the context doesn't fix the problem.  It seemed to instead make context
   switching halt.  When it's swapped from what it should be, it continues context switching and hangs before starting the shell
 
+- ok so after a bunch of debugging, I realized that since the clone function is just subtracting some size for the extra registers
+  (because it has no access to the extra registers that weren't saved before the syscall), they'll be all random values, and that's
+  probably what's causing the emulator to jump to an address which is actually some instructions.  It almost works but won't work
+  correctly unless those extra registers are actually cloned along with the rest of the process...
+- So looking at linux, it has specific entry points for fork, clone, sigreturn, and a few others, which save the switch stack every
+  time.  It feels a bit like cheating, because only "blessed" syscalls get the special treatment needed, but it's certainly more
+  optimized/performant.
+
+- This is the key point!  I'm pretty sure I knew this a few years ago too when I was looking at refactoring the context switch, but
+  gave up at the time because it wasn't important then.  When using a switch that delays the full switch until necessary, you can't
+  do it so casually.  You either need to have special entry points for the syscalls that could create a new task (or else the full
+  state can't be cloned), or you need a way to delay the full clone/stack clone until exiting to a user process, so you can get the
+  full state.  There's really no other way (besides always saving the full state or the non-recoverable state, MMU and FPU state
+  could be delayed still, but integer regs state can't because of C and what it will do (ie. save regs as needed instead of putting
+  them all in one place))
+
+2025-03-28:
+
+- looking at it more, I'm not sure how it actually uses those special entry points.  Oh I see, it's a table in assembly of entry
+  points, which is the same as gloworm is doing but it C.  I could shave off a few instructions by not saving arguments on the stack
+  but using the registers directly, and saving a jump instruction by putting the actual table call in assembly
+- the special entry point would go in the syscall table (so jumps to C, the jumps back to the same entry file, and then back to a
+  hard-coded syscall function in the same C syscall file as the jump.  Given that, it does kind of make more sense to move it to
+  assembly.  There are those LED control calls in the C version, but actually I could make a syscall entry/exit hook with compiled
+  in optional code like that, so it can be added or removed more easily with a kconfig setting
+
+2025-03-30:
+
+- I still haven't gotten back to this.  I had previously tried looking at linux's other archs to see the switching code, and I can't
+  see that same trick that the m68k code has with redirecting the fork and clone syscalls.  I wonder if that was an older solution
+  and the maintained archs have a newer better way of doing it, or if they're just really convoluted because they're more highly
+  optimized
+- I'm still thinking of doing the redirect solution.  The delayed clone might work too, and it would require less refactoring of the
+  syscall code, but might be too complicated?  I guess you'd have to store a pointer to the new process, and check that pointer when
+  returning to see if you need to complete the clone, and it would only work with a single clone/fork, even though that's likely
+  all you'll ever need
+- looking at the mips code, the fork/clone calls are wrapping in save_static_function, and there's a comment about that being
+  replaced with SAVE_STATIC.  Etiher way, it seems that the same trick is in place to save some of the extended regs conditionally,
+  but it's been made generic so any syscall  that needs it can access those values.  I don't really know how it works yet though
+
+2025-04-08:
+
+- I tried implementing the do_fork hook to save the regs before it actually clones the process.  I still have it using the
+  do_syscall entry, but that should be ok because it's not using anything but the scratch registers during that, so the extra regs
+  will still be preserved when it enters the new __do_fork.  That new entry saves the regs on the user stack of the current process,
+  calls the normal entry (which doesn't take arguments anyways), clones the process, and returns to pop the extra registers again.
+  I tried with both a sub instruction and a proper RESTORE, and both are causing a fatal exception, privillege violation, because
+  it's popped the wrong value into the flags register and jumped to address 40, which is a MOVE to SR instruction.
+- I have gotten this before, but I can't seem to find it in my notes.  I know it's because there's some kind of inconsistency in the
+  user stack, but I haven't changed that as far as I can tell.  It should be working
+- I inspected the stack of the process that failed (according to the stack trace) and couldn't find the expected flags value of
+  0x2000.  On a hunch, I tried commenting out the set_proc_return_value function in the fork, since it will calculate the wrong
+  address now, with the extra regs on the stack, and while it didn't work, it did at least avoid the fatal exception.  The LEDs are
+  flashing to show it's context switching, but it's hanging, as it does
+- I tried a hack where I change the value of current_proc, and it's still hanging, and only prints "forking 1" so it's not getting
+  past the `init` process.  I feel like I'm close though
+
+
+- I worked on this again tonight, and I've been going in circles of sorts, but still fixing issues in the process I think.  It
+  either has a fatal error, or it hangs after the first fork, depending on what I change.  I thought it was just an issue with the
+  return value, so I removed the explicit set function in the context, which needed to conditionally know where in the stack to
+  store the return, and replaced it with a value in the proc struct that is set just before returning, but that uncovered a
+  behaviour where it doesn't always set the return value, so I had check and reset the flag in the bits member of the proc struct
+  when it sets the return value, and in the process removed a run check before setting, and then changed the logic of the bit to
+  suit a bit better, and it's still fatal erroring
+- I'm pretty sure the current issue is that it doesn't pop the extra registers for the process that is just starting after being
+  cloned?  Well either way there's 9 extra long words on the stack (maybe 11 since the rte has already popped those off and caused
+  the fatal to begin with).  So it seems like some other condition where it gets the logic wrong on whether to skip parts of the
+  restore_context final work
+- Ah! right!!! the problem is with exec.  I keep forgetting about exec.  Pretty sure I previously came across this, but this has
+  been so drawn out over the last two months, I can't remember all the things I ran into.  I put a print statement on the syscall
+  entry to trace what's going on, and it ends in EXECBUILTIN, which is probably trying to launch the shell.  The exec's context is
+  probably wrong since it's actually the same current process, even though the executable is different.  create_context is wrong at
+  least in this case
+
+2025-04-09:
+
+- I commented out the extra reg values in the create_context function so that when exec was called, and the current process was
+  recreated, it would create a new short context so that it would restart properly, but that also fatal'd.  The syscalls were different
+  though
+- it was doing a bunch of syscall 4 (write), and then it does a syscall 3 (read) and fatals.  That's the first point where it would
+  block.  So something else happens that breaks, possible the idle task or some other task that runs that doesn't have the right
+  context.  I really need some way to know when creating the context if it's the current process or not
+- I wonder if Linux has a similar thing, or if there's a higher level interface to the arch-specific context code, or if it doesn't
+  need this difference for some other reason
+
+- oh, just looking at RESTORE_ALL in linux's m68k arch, it's got two values on the stack that it pops off last.  One is the orig d0,
+  and the other is a stack adjustment (according to the comment), but I don't yet know what value that is.  It's added to the
+  existing stack pointer, so that makes me think it's inherently the size of the context.  It could be 0 if it's a full context and
+  36 if it's a short context, and there's no conditional stuff.
+- The same thing could be done with the d0 value, since it's comment is orig d0.  Store the value of d0 (in the struct process) when
+  entering the context, and restore it when leaving.  That way you don't need flags.  You just restore whatever the value is, and
+  it'll be updated with the syscall return if there is one.  That's much more efficient
+- searching for the stack adjust value, and they're all clr instructions that set them, so it's not actually used in linux.  I
+  wonder if it was used for the reason I'm thinking of using it, but it's been removed for some reason and is kept for legacy
+  purposes, or it's expected of all architectures, and others use them but the m68k doesn't need it? *shrug*
+
+2025-04-11:
+
+- Ok I finally fixed the crashing, but it's still not getting to the shell.  I had to add a flag to create_context to selectively
+  create an extended context or not.  When using exec on a proc that's the current proc, it will use an extended context, otherwise
+  it won't.  That gets through both the initial process start (with the exceptional extended restore on first start), and also
+  the initial switch to the idle task, which needs an extended context because it's not the first process run.  I think the
+  remaining issue might be related to the return value still, which probably is still buggy
+- the current approach is messy and fragile, so hopefully I can make it better by initializing the return d0 value when entering the
+  kernel, and fixing the need for the extended context flag, or the exceptional case there.  Honestly, the easiest fix is of course
+  to have two stacks per process, but I still want to avoid adding that just yet
+- btw the issue I had with it not working last night was that the create context flag passed by C was a long word, so it was always
+  using 0 instead of the actual extended flag value when creating the context, and always created a short context
+
+2025-04-12:
+
+- Today I'm going to consolidate the changes I've made that aren't related to the context, so I've got my changes stashed and
+  re-applied so I have tho originals, and I've reverted the context changes and am adding back in the minimal changes needed to get
+  the enter_exception and other non-asm changes working
+- so far it's hanging with task switching working, so I'm pretty sure there's a problem with the return to user process and the
+  return value itself, which makes sense.  The other changes to delay the full switch are probably working but the return value
+  isn't which is causing the hanging behaviour I've been seeing in the full change
+

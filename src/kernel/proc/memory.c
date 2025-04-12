@@ -109,6 +109,9 @@ void free_process_memory(struct process *proc)
 
 int clone_process_memory(struct process *parent_proc, struct process *proc)
 {
+	// NOTE: the stack of the current process would normally not contain the non-system-call registers (unlike all suspended
+	// processes) but the system call entry is patched for the cloning system calls to save them in the context code, so we can
+	// just clone the stack despite usually cloning the current process
 	int stack_size = parent_proc->map.segments[M_STACK].length;
 	char *stack = kmalloc(stack_size);
 	char *stack_pointer = (stack + stack_size) - ((parent_proc->map.segments[M_STACK].base + parent_proc->map.segments[M_STACK].length) - parent_proc->sp);

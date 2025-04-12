@@ -1,7 +1,11 @@
 
+	#include <kernel/kconfig.h>
+
 	.global _start
 	.global	main
 	.global boot_args
+	.global __bss_start
+	.global __bss_end
 
 /**
  * Image Start
@@ -11,6 +15,15 @@
 _start:
 	/* Disable interrupts */
 	move.w  #0x2700, %sr
+
+	/* Zero out the BSS section of the kernel */
+	lea.l	__bss_start, %a0
+	move.l	__bss_end, %d0
+	sub.l	%a0, %d0
+	lsr.l	#2, %d0
+    5:
+	clr.l	(%a0)+
+	dbne	%d0, 5b
 
 	/* Save boot args from the old stack before re-initializing */
 	movea.l	(+4,%sp), %a0

@@ -11,6 +11,7 @@ struct syscall_record;
 typedef int (*wait_check_t)(struct process *proc, int events, struct vnode *vnode, device_t rdev);
 
 extern struct process *current_proc;
+extern struct process *previous_proc;
 extern struct syscall_record *current_syscall;
 
 void init_scheduler();
