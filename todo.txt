@@ -1,4 +1,6 @@
 
+* figure out why moving or adding new values before the memory map in the process struct causes weird behaviour
+
 * should you change DISABLE_INTS to DISABLE_IRQS(), etc
 * make a kernel/process.h file, (or task.h, or thread.h) with either common interfaces to processes, or the whole struct, for use within the kernel
 * separate out the serial interrupt stuff to make it more generic

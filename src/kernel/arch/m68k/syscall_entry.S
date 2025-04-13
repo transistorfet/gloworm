@@ -7,7 +7,6 @@
 	.global enter_exception
 	.global create_context
 	.global drop_context
-	.global set_context_return_value
 	.global restore_context
 	.global _exit
 	.global _sigreturn
@@ -28,6 +27,7 @@
 
 	.equ	CONTEXT_SIZE, 60		// The size of the saved registers on the stack (not including the interrupt return)
 	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
+	.equ	PROC_RETURN_OFFSET, 12		// The offset into struct process where the return_value is located
 
 	.section .text
 
@@ -84,15 +84,6 @@ drop_context:
 	#endif
 	add.l	#6, %a0
 	move.l	%a0, %d0
-	rts
-
-/**
- * Set the return value (%d0) of the context, given the stack pointer
- * 	void set_context_return_value(void *user_stack, uint32_t value);
- */
-set_context_return_value:
-	movea.l	(4, %sp), %a0
-	move.l	(8, %sp), (36, %a0)
 	rts
 
 
@@ -152,9 +143,13 @@ set_context_return_value:
 
 	SAVE_EXTRA_REGISTERS
 
+	movea.l	current_proc, %a0
+
+	// Save the original version of d0 to be returned on exit if not a syscall
+	move.l	%d0, (%a0, PROC_RETURN_OFFSET)
+
 	#if !defined(CONFIG_M68K_USER_MODE)
 	// Switch to the kernel stack
-	movea.l	current_proc, %a0
 	move.l	%sp, (%a0, PROC_SP_OFFSET)
 	movea.l	kernel_stack, %sp
 	#endif
@@ -162,7 +157,7 @@ set_context_return_value:
     102:
 
 	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
-	move.l	current_proc, previous_proc
+	move.l	%a0, previous_proc
 
 /*
 	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
@@ -350,6 +345,12 @@ restore_context:
 */
 	// Restore registers
 	RESTORE_EXTRA_REGISTERS
+
+	// This is the last time %a0 will be available as the current proc
+	// Stick the return value directly onto the stack where d0 will be
+	// popped from, so it won't get overwritten by the next macro
+	move.l	(%a0, PROC_RETURN_OFFSET), (%sp)
+
 	RESTORE_SYSCALL_REGISTERS
 
 	/*
@@ -392,6 +393,9 @@ enter_syscall:
 	// Disable ints and save the context
 	or.w	#0x0700, %sr
 	SAVE_CONTEXT
+
+	// Default to returning -1 on exit.  The syscall return will likely overwrite this before exiting
+	move.l	#-1, (%a0, PROC_RETURN_OFFSET)
 
 	// Save the arguments in the order expected of the syscall struct
 	//SAVE_SYSCALL_REGISTERS

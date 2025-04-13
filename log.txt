@@ -373,3 +373,33 @@
   return value itself, which makes sense.  The other changes to delay the full switch are probably working but the return value
   isn't which is causing the hanging behaviour I've been seeing in the full change
 
+- I've spent all day trying to chase down why it's not working.  I'm not doing the delayed switch.  I went back to the first commit
+  after main, 76c14006e0fd669b2b4aa3596a3ff12a8bbdde52, and that commit is broken for some reason, even though I thought it was
+  working before I committed.  The syscall gets 0 as the number, so it prints the test message (syscall #0)
+- the latest commit, f72add615976e9a5b021d3cc19b02ede7982ca76, fails for a different reason.  It seems to almost work but when it
+  returns to the shell process, pid 3, the stack seems to be corrupted somehow.  My emulator doesn't behave the same way, but I've
+  definitely got some bugs in the instructions, so not surprising.  It runs the init process alright, and I think it probably
+  switches to the idle process at some point.  The init process does a fork syscall, and then waitpid, and when it should switch to
+  the shell process, it either hangs or gives a format exception (stack format word is incorrect)
+
+- hmm... when I reverted the changes to the proc struct, it started working enough to be switching tasks, but the return value is
+  still likely wrong when the child fork returns because it's showing two waitpid calls (syscall#7), and then hangs, but the LED was
+  flashing
+- adding just the return value into the struct made it halt due to out of memory, so it's not happy with that
+- moving the bits member makes the stack use 0xFFFFFFF7 as the size for some reason, which then makes it hang
+
+- I don't know what's going on.  I fiddled with some things in the proc struct, and now it seems to be working with return_value up
+  high.  I moved mem map to below the pid numbers and made the bits a uint32_t.  Not sure if there's a corruption issues somewhere
+
+- alright, I have it working it seems.  It was of course the return value.  I finally got it to go in the proc struct, and I set it
+  in the enter_syscall and enter_irq, and then always (instead of conditionally) set it on exit to user space, and that sort of
+  worked but then it would go directly to the monitor as soon as a key was pressed...
+- after a second of thinking, I figured it was probably the enter_irq, since that is re-entrant but I was storing it in the single
+  process struct... so it was being overwritten.  The existing return code was complicated with the bit flag for a reason, because
+  it's a tricky problem...
+- moving the enter_irq d0 copy to the SAVE_CONTEXT macro, so it's only saved when entering from user mode, which only happens once.
+  Otherwise it will do the normal kernel scratch registers entry.  I still have the syscall entry setting it to -1, but I think
+  that's ok because it should always set that value anyways in the syscall handler code
+- hmm... I wonder if that's why it was broken when I substituted the C version of the syscall handler... because I forgot to call
+  the return_to_current_proc(ret) call
+

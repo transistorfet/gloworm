@@ -61,15 +61,15 @@ struct process {
 	void *sp;
 	uintptr_t return_value;
 	uint16_t state;
-	uint16_t bits;
-
-	struct mem_map map;
 
 	pid_t pid;
 	pid_t parent;
 	pid_t pgid;
 	pid_t session;
 
+	struct mem_map map;
+
+	uint32_t bits;
 	int exitcode;
 	int wait_events;
 	wait_check_t wait_check;

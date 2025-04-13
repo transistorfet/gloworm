@@ -6,6 +6,7 @@ obj-y				+= bh.o
 obj-y				+= time.o
 obj-y				+= driver.o
 
+obj-y				+= misc/
 obj-y				+= mm/
 obj-y				+= proc/
 

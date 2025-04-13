@@ -135,8 +135,6 @@ void tty_68681_reset_leds(uint8_t bits);
 /// the syscall info that is about to be executed
 void syscall_entry()
 {
-	// TODO temporary, for debugging
-	printk_safe("%d\n", current_syscall->syscall);
 	tty_68681_set_leds(0x04);
 }
 

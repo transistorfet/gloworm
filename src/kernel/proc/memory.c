@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
+#include <kernel/printk.h>
 #include <kernel/kmalloc.h>
 
 #include "memory.h"
