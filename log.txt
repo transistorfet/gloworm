@@ -403,3 +403,20 @@
 - hmm... I wonder if that's why it was broken when I substituted the C version of the syscall handler... because I forgot to call
   the return_to_current_proc(ret) call
 
+- well signal handling is definitely wrong.  I ran tcpserv and set up slattach and could send messages just fine, but when I did a
+  ctrl-c on tcpserv, it went directly to the rom again.  So the signal handling stuff is wrong somehow, maybe still the return
+  value... maybe it's actually the syscall set, if a signal happens
+- nope, that didn't fix it, but there's no harm in removing it anyways
+
+2025-02-13:
+
+- another whole morning of fighting with it but I finally got the delayed switch working.  The idea of putting the context size on
+  the stack, which can then be popped off, and checked before popping the rest.  It's much simpler than what I had before with
+  trying to "know" what context is on the stack
+- the main stumbling blocks that caused it to take so long were 1, the saving of the previous process was happening for kernel
+  re-entries via the irq entry, as well as coming from user mode, which would overwrite the intended value
+  2. the wrong stack was being used sometimes when resuming, which was caused by the code that compares the current and previous
+  procs and skips the switch, but in doing so would skip past the setting of a0 and a1
+  3. the wrong syscall was being done because the saving of the current_syscall pointer was happening after the context size was
+  pushed onto the stack, so the syscall number was always the context size and not the actual value of d0
+

@@ -1,4 +1,11 @@
 
+* add threads
+* should you have a kernel stack per task?
+* add a "page allocator" that allocates blocks (or contiguous blocks), to be used for all user allocations (kmalloc will only be kernel data, not user data)
+* add virtual memory
+* add new types of locks
+* continue the arch separation, make sure all process and signal stuff that's arch-specific/assumptuous is moved into arch
+
 * figure out why moving or adding new values before the memory map in the process struct causes weird behaviour
 
 * should you change DISABLE_INTS to DISABLE_IRQS(), etc
