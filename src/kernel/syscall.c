@@ -135,6 +135,8 @@ void tty_68681_reset_leds(uint8_t bits);
 /// the syscall info that is about to be executed
 void syscall_entry()
 {
+	// TODO for testing
+	//printk_safe("%d\n", current_syscall->syscall);
 	tty_68681_set_leds(0x04);
 }
 
@@ -441,7 +443,7 @@ int do_rename(const char *oldpath, const char *newpath)
 int do_mkdir(const char *path, mode_t mode)
 {
 	int error;
-	struct vfile *file;
+	struct vfile *file = NULL;
 
 	mode = mode & ~current_proc->umask & 0777;
 	error = vfs_open(current_proc->cwd, path, O_CREAT, S_IFDIR | mode, current_proc->uid, &file);
@@ -467,7 +469,7 @@ int do_open(const char *path, int oflags, mode_t mode)
 {
 	int fd;
 	int error;
-	struct vfile *file;
+	struct vfile *file = NULL;
 
 	fd = find_unused_fd(current_proc->fd_table);
 	if (fd < 0)
@@ -626,7 +628,7 @@ int do_fstat(int fd, struct stat *statbuf)
 int do_pipe(int pipefd[2])
 {
 	int error;
-	struct vfile *file[2];
+	struct vfile *file[2] = { NULL, NULL };
 
 	if (!pipefd)
 		return EINVAL;
@@ -711,7 +713,7 @@ int do_socket(int domain, int type, int protocol)
 {
 	int fd;
 	int error;
-	struct vfile *file;
+	struct vfile *file = NULL;
 
 	fd = find_unused_fd(current_proc->fd_table);
 	if (fd < 0)

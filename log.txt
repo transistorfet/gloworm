@@ -408,7 +408,7 @@
   value... maybe it's actually the syscall set, if a signal happens
 - nope, that didn't fix it, but there's no harm in removing it anyways
 
-2025-02-13:
+2025-04-13:
 
 - another whole morning of fighting with it but I finally got the delayed switch working.  The idea of putting the context size on
   the stack, which can then be popped off, and checked before popping the rest.  It's much simpler than what I had before with
@@ -419,4 +419,45 @@
   procs and skips the switch, but in doing so would skip past the setting of a0 and a1
   3. the wrong syscall was being done because the saving of the current_syscall pointer was happening after the context size was
   pushed onto the stack, so the syscall number was always the context size and not the actual value of d0
+
+- now I just have this signal issue, where when a signal is sent and a custom handler is registered for that signal, it will jump
+  straight to the rom instead of exiting the process.  It works fine for binaries that don't have a custom handler, but tcpserv
+  specifically does, to test signals and socket cleanup (I think)
+- there may be multiple issues, caused by the various changes, but the current one is caused by something that effects both the full
+  regs switch and delayed switch code
+- there could be an issue where the process that causes a signal to be sent to the same current process, the switch regs won't be
+  available.  This would be solved with a kernel stack per task because it would be saved on the stack from entry into the signal
+  dispatcher, so there's no need to save them at the start.  It's only because I'm trying to use the user stack, and practically
+  throw the kernel stack contents away each user entry/exit pair.  I can only throw away those C-saved extra regs on the stack if
+  they're already saved on the user stack, but the delay switch will never save them.  But that's not the straight to rom cause
+- well that's interesting.  I put a printk into the syscall again to print which number was called, and now tcpserv is exiting
+  properly now
+- tcpserv actually sets the signal handler to NULL for some reason.  I guess overriding the default action?  But it still fails
+
+2025-04-14:
+
+- I thought the signal problem might be related to `previous_proc` being set, so I explicitly set it to NULL in close_proc but that
+  didn't seem to change the jump to rom issue.  It's definitely happening after exit_proc though
+- If I comment out the body of `exit_proc`, it works without crashing, so it's something related to the deallocation/free code there
+- oddly enough, it seems to be related to release_fd_table, and not to the process memory itself.  Not sure why though
+- I thought I was chasing it, but I had forgotten to save a file, so I was, infact, not
+- ah interesting, it was not working still with the file->ops->close function commented out, but working with free_fileptr commented
+  out, and when it worked, it complained of "double free on file pointer 3".  The explicit ops close happens on the previously freed
+  file pointer, which might explain why it jumps straight to rom (calling a NULL address)
+- change the call to only call close if refcount == 1 instead of <= 1 has at least fixed it so it doesn't crash, but does print out
+  the double free error message
+
+- so it's not a problem with the refcount being calculated wrong. It's a problem of the file pointer/table being incorrect, with a
+  pointer to address 3 (totally invalid) and refcount in the -30720.  The table is all null when starting, and is corrupt when
+  exiting
+- ah I missed some functions, it's defintely a set_fd call that causes it
+- Ok, I found the cause.  It's setting it to 3 when exiting from the accept system call after blocking and suspending the current
+  system call, since nothing has connected.  This is literally the only place in the code that uses suspend_current_syscall() that
+  has anything other than a return after the suspend happens deeper in the code.  Every other suspend returns 0, and every parent
+  call just returns the result.  The accept() syscall is the only one that checks for an error code (< -1) and then sets the file
+  pointer and returns.  I don't know if the other calls like connect() should also return -1 if there's an error, or just generally
+  what's the best way to solve this in a way that's regularized for future calls
+- also, this is defintely not a new problem.  I probably even found it a while ago, but maybe didn't look into it at the time
+- I decided to go a bit defensive, since it is the kernel, and set NULL both before calling functions that take a double pointer,
+  and also set the result to NULL when exiting from net_socket_accept() due to a suspend
 

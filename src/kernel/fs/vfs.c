@@ -630,7 +630,9 @@ int vfs_close(struct vfile *file)
 {
 	int error = 0;
 
-	if (file->refcount <= 1)
+	// Only free the file if refcount == 1 or else it's a double free and
+	// you'll jump to a random location in memory
+	if (file->refcount == 1)
 		error = file->ops->close(file);
 	free_fileptr(file);
 	return error;

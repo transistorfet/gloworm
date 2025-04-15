@@ -105,11 +105,17 @@ struct process *get_proc(pid_t pid)
 
 void close_proc(struct process *proc)
 {
+	// Set the previous process to NULL so that we skip over attempting to
+	// save the context during restore_context
+	if (proc == previous_proc)
+		previous_proc = NULL;
+
 	remove_timer(&proc->timer);
 	release_fd_table(proc->fd_table);
 	free_process_memory(proc);
 
-	// Reassign any child procs' parent to be 1 (init), since we can't be sure this proc's parent is waiting, and the zombie proc wont get recycled
+	// Reassign any child procs' parent to be 1 (init), since we can't be sure this proc's
+	// parent is waiting, and the zombie proc wont get recycled
 	for (short i = 0; i < PROCESS_MAX; i++) {
 		if (table[i].pid && table[i].parent == proc->pid)
 			table[i].parent = 1;

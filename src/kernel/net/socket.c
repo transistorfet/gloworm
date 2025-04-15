@@ -167,6 +167,9 @@ int net_socket_accept(struct vfile *file, struct sockaddr *addr, socklen_t *addr
 
 	error = sock->ep->ops->accept(sock->ep, addr, addr_len, &ep);
 	if (error == EWOULDBLOCK) {
+		// Set the result so that the fd is set to NULL on exit,
+		// since we're returning 0 here
+		*result = NULL;
 		suspend_current_syscall(VFS_POLL_READ);
 		return 0;
 	} else if (error) {

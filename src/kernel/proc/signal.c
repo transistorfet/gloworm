@@ -129,8 +129,9 @@ void cleanup_signal_handler()
 	current_proc->sp = (((struct sigcontext *) current_proc->sp) + 1);
 
 	// TODO maybe we should restart the syscall anyways, which would then block again if it's not ready, instead of suspending here?
-	if (current_proc->bits & PB_SYSCALL)
+	if (current_proc->bits & PB_SYSCALL) {
 		suspend_proc(current_proc, 0);
+	}
 
 	check_pending_signals();
 }
