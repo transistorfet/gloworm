@@ -118,9 +118,9 @@ drop_context:
 	movem.l	(\reg)+, %d4-%d7/%a2-%a6
 .endm
 
-/**
- * Save all registers to the current user stack and switch to the kernel stack
- */
+/// Save all registers to the current user stack and switch to the kernel stack
+///
+/// After this macro, the %a1 register will have a pointer to the exception frame on the thread's stack
 .macro	SAVE_CONTEXT
 	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
 	add.l	#1, kernel_reentries
@@ -130,9 +130,12 @@ drop_context:
 	// We're already on the kernel stack, so just save the scratch registers
 	movem.l	%d0-%d1/%a0-%a1, -(%sp)
 
+	// Load a pointer to the exception frame into %a1
+	lea.l	(%sp, 16), %a1
+
 	bra.w	102f
 
-    101:
+    101:	// Entering from user-mode
 
 	// If we're using user mode, then these will be on the kernel stack (%ssp/%isp) but if
 	// we're not, then these will be on the user stack before switching to the kernel stack
@@ -141,12 +144,15 @@ drop_context:
 	// Set the current syscall to the top of the stack
 	move.l	%sp, current_syscall
 
-	SAVE_EXTRA_REGISTERS
+	// Load a pointer to the exception frame into %a1
+	lea.l	(%sp, 24), %a1
 
 	movea.l	current_proc, %a0
 
 	// Save the original version of d0 to be returned on exit if not a syscall
 	move.l	%d0, (%a0, PROC_RETURN_OFFSET)
+
+	SAVE_EXTRA_REGISTERS
 
 	#if !defined(CONFIG_M68K_USER_MODE)
 	// Switch to the kernel stack
@@ -154,88 +160,10 @@ drop_context:
 	movea.l	kernel_stack, %sp
 	#endif
 
-    102:
-
 	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
 	move.l	%a0, previous_proc
 
-/*
-	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
-	add.l	#1, kernel_reentries
-	cmp.l	#1, kernel_reentries
-	beq	5f
-
-	move.l	%d7, -(%sp)
-
-	// We're already on the kernel stack, so just save the scratch registers
-	move.l	%a1, -(%sp)
-	move.l	%a0, -(%sp)
-	move.l	%d1, -(%sp)
-	move.l	%d0, -(%sp)
-
-	// Save the vector number to %d0 for do_irq
-	#if defined(CONFIG_MC68000)
-	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
-	#else
-	move.w	(26,%sp), %d7
-	//and.l	#0x00000FFF, %d7
-	//lsr.w	#2, %d7
-	#endif
-
-	bra	6f
-
-    5:
-	#if defined(CONFIG_M68K_USER_MODE)
-	// The interrupt switched to supervisor mode, so we're already on the kernel stack
-
-	// Save the original value of the register we'll use as a pointer to the context
-	// and copy the user stack pointer into it
-	move.l	%a6, -(%sp)
-	move.l	%usp, %a6
-	move.l	(%sp)+, -(%a6)
-
-	// Save registers
-	movem.l	%a5-%a0/%d7-%d0, -(%a6)
-
-	// Save the vector number to %d0 for do_irq
-	#if defined(CONFIG_MC68000)
-	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
-	#else
-	move.w	(66,%a6), %d7
-	//and.l	#0x00000FFF, %d7
-	//lsr.w	#2, %d7
-	#endif
-
-	#else
-	// Not using user-mode, so we have to manually switch stacks
-
-	// Save registers
-	movem.l	%a6-%a0/%d7-%d0, -(%sp)
-
-	// Save the vector number to %d0 for do_irq
-	#if defined(CONFIG_MC68000)
-	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
-	#else
-	move.w	(66,%sp), %d7
-	//and.l	#0x00000FFF, %d7
-	//lsr.w	#2, %d7
-	#endif
-
-	// Switch to the kernel stack
-	movea.l	current_proc, %a5
-	adda.l	#PROC_SP_OFFSET, %a5
-	move.l	%sp, (%a5)
-	movea.l	kernel_stack, %sp
-
-	#endif
-
-
-
-    6:
-	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
-	move.l	current_proc, previous_proc
-	// Continue processing interrupt
-*/
+    102:	// Everything is saved in both user and kernel cases, so now do anything common to both before continuing
 
 .endm
 
@@ -297,52 +225,6 @@ restore_context:
 	movea.l  (%a0, PROC_SP_OFFSET), %sp
 	#endif
 
-/*
-	// Skip the extended context switch if the proc hasn't changed
-	movea.l  (previous_proc), %a0
-	cmpa.l  (current_proc), %a0
-	beq.w   207f
-
-	#if defined(CONFIG_M68K_USER_MODE)
-	// The syscall regs are still on the kernel stack, which is in %sp
-	RESTORE_SYSCALL_REGISTERS
-	// TODO don't you actually need USP since it wasn't saved in the other switch?
-	movea.l  previous_proc, %sp
-	movea.l  (%sp, PROC_SP_OFFSET), %sp
-	// Reserve 2 long words for the exception frame
-	sub.l   #8, %sp
-	SAVE_SYSCALL_REGISTERS
-
-	movea.l  kernel_stack, %sp
-	move.l  %a0, (%sp, 6)
-	move.l  %a1, (%sp, 8)
-
-	// Load the previous process's user stack pointer into a0
-	movea.l  (%a0, PROC_SP_OFFSET), %a0
-	// TODO complete this
-	move.l (%a0)+, -(%sp)
-	#endif
-
-	// Switch to the previous process's stack
-	movea.l  (%a1, PROC_SP_OFFSET), %sp
-
-	// Save the extended context of the previously running process, not including the system call registers
-	SAVE_EXTRA_REGISTERS
-
-	// Update the new stack pointer of the previous proc
-	move.l  %sp, (%a1, PROC_SP_OFFSET)
-
-	// Switch to the current process's user stack
-	movea.l  (%a0, PROC_SP_OFFSET), %sp
-
-    206:
-
-	// Restore the extended context of the next process, not including the system call registers
-	RESTORE_EXTRA_REGISTERS
-
-    207:	// Now it's the last step before returning to a user process
-
-*/
 	// Restore registers
 	RESTORE_EXTRA_REGISTERS
 
@@ -352,32 +234,6 @@ restore_context:
 	move.l	(%a0, PROC_RETURN_OFFSET), (%sp)
 
 	RESTORE_SYSCALL_REGISTERS
-
-	/*
-	#if defined(CONFIG_M68K_USER_MODE)
-
-	movea.l  current_proc, %sp
-	adda.l  #PROC_SP_OFFSET, %sp
-
-	// Restore registers
-	RESTORE_SYSCALL_REGISTERS
-	RESTORE_EXTRA_REGISTERS
-
-	move.l	%sp, %usp
-
-	#else
-
-	// Switch back to the current process's stack
-	move.l	%sp, kernel_stack
-	movea.l	current_proc, %a0
-	movea.l	(%a0, PROC_SP_OFFSET), %sp
-
-	// Restore registers
-	RESTORE_SYSCALL_REGISTERS
-	RESTORE_EXTRA_REGISTERS
-
-	#endif
-	*/
 
 	rte
 
@@ -397,21 +253,19 @@ enter_syscall:
 	// Default to returning -1 on exit.  The syscall return will likely overwrite this before exiting
 	move.l	#-1, (%a0, PROC_RETURN_OFFSET)
 
-	// Save the arguments in the order expected of the syscall struct
-	//SAVE_SYSCALL_REGISTERS
+	// Save the irq number on the stack
+	//move.l	%d0, -(%sp)
 
 	// Enable interrupts during the syscall
-	move.l	%d7, -(%sp)
 	and.w	#0xF8FF, %sr
 
 	jsr	do_syscall
 
 	// Disable interrupts after the syscall
 	or.w	#0x0700, %sr
-	adda.l	#4, %sp
 
-	// Restore the syscall registers
-	//RESTORE_SYSCALL_REGISTERS
+	// Pop the irq number off the stack
+	//adda.l	#4, %sp
 
 	// Jump to the syscall interrupt return
 	bra	restore_context
@@ -425,8 +279,21 @@ enter_syscall:
 enter_irq:
 	SAVE_CONTEXT
 
-	move.l	%d7, -(%sp)
+	#if defined(CONFIG_MC68000)
+	// TODO not sure how to do this without a custom handler for each which uses the PC value to identify the interrupt
+	#else
+	// Fetch the vector number from the exception frame
+	move.w	(%a1, 6), %d0
+	lsr.w	#2, %d0
+	and.l	#0x00000FFF, %d0
+	#endif
+
+	// Save the irq number on the stack
+	move.l	%d0, -(%sp)
+
 	bsr	do_irq
+
+	// Pop the irq number off the stack
 	adda.l	#4, %sp
 
 	// Jump to the syscall interrupt return

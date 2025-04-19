@@ -188,8 +188,6 @@ static char tick = 0;
 static char handle_timer = 0;
 static struct serial_channel channels[2];
 
-extern void enter_irq();
-
 static inline void config_serial_channel(struct serial_channel *channel)
 {
 	channel->opens = 0;
@@ -524,9 +522,11 @@ void tty_68681_normal_mode()
 	*CTLR_WR_ADDR = 0x00;
 
 	// Enable interrupts
-	request_irq(TTY_INT_VECTOR, enter_irq, 0);
 	*IVR_WR_ADDR = TTY_INT_VECTOR;
 	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
+
+	request_irq(TTY_INT_VECTOR, handle_serial_irq, 0);
+	enable_irq(TTY_INT_VECTOR);
 
 	// Flash LEDs briefly at boot
 	*OPCR_WR_ADDR = 0x00;
@@ -538,6 +538,7 @@ void tty_68681_normal_mode()
 
 	ASSERT_CTS(&channels[CH_A]);
 	ASSERT_CTS(&channels[CH_B]);
+
 }
 
 

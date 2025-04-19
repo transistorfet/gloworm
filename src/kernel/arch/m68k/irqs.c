@@ -60,16 +60,10 @@ void init_irqs(void)
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
 }
 
+// TODO actually this isn't needed...
 void set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
 {
 	vector_table[(short) irq] = handler;
-}
-
-void do_irq(irq_num_t irq) {
-	//printk_safe("%x\n", irq);
-	// TODO call the appropriate interrupt
-	extern m68k_irq_handler_t handle_serial_irq();
-	handle_serial_irq();
 }
 
 /**

@@ -14,6 +14,8 @@
 
 #define INTERRUPT_MAX		128
 
+#define INT_FLAG_ENABLED	0x01
+
 extern void exception_entry(void);
 
 struct exception_stack_frame;
@@ -28,7 +30,7 @@ void init_interrupts(void)
 	init_bh();
 
 	extern void enter_handle_exception();
-	for (short i = 2; i < INTERRUPT_MAX; i++) {
+	for (short i = 0; i < INTERRUPT_MAX; i++) {
 		action_table[i].irq = 0;
 		action_table[i].flags = 0;
 		action_table[i].handler = NULL;
@@ -42,48 +44,40 @@ void init_interrupts(void)
 
 void request_irq(irq_num_t irq, irq_handler_t handler, int flags)
 {
+	if (action_table[(short) irq].handler) {
+		printk_safe("already an irq handler for %d, overwriting\n", irq);
+	}
 	action_table[(short) irq].flags = flags;
 	action_table[(short) irq].handler = handler;
 }
 
 void free_irq(irq_num_t irq)
 {
-
+	action_table[(short) irq].flags = 0;
+	action_table[(short) irq].handler = 0;
 }
 
 void enable_irq(irq_num_t irq)
 {
-
+	action_table[(short) irq].flags |= INT_FLAG_ENABLED;
 }
 
 void disable_irq(irq_num_t irq)
 {
-
+	action_table[(short) irq].flags &= ~INT_FLAG_ENABLED;
 }
 
-/*
-struct exception_stack_frame {
-	uint16_t status;
-	uint16_t *pc;
-	uint16_t vector;
-};
-
-void print_stack(struct exception_stack_frame *frame)
+void do_irq(irq_num_t irq)
 {
-	// Dump stack
-	printk_safe("Stack: %x\n", frame);
-	for (short i = 0; i < 48; i++) {
-		printk_safe("%04x ", ((uint16_t *) frame)[i]);
-		if ((i & 0x7) == 0x7)
-			printk_safe("\n");
-	}
+	//printk_safe("irq %d\n", irq);
+	// TODO call the appropriate interrupt
+	//extern irq_handler_t handle_serial_irq();
+	//handle_serial_irq();
 
-	// Dump code where the error occurred
-	printk_safe("\nCode:\n");
-	for (short i = 0; i < 48; i++) {
-		printk_safe("%04x ", frame->pc[i]);
-		if ((i & 0x7) == 0x7)
-			printk_safe("\n");
+	struct irq_action *action = &action_table[(short) irq];
+	//printk_safe("%d %d %x\n", irq, action->flags, action->handler);
+	if (irq < INTERRUPT_MAX && action->handler && action->flags & INT_FLAG_ENABLED) {
+		action->handler();
 	}
 }
-*/
+

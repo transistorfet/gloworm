@@ -77,7 +77,5 @@ typedef void (*irq_handler_t)();
 void init_irqs();
 void set_irq_handler(irq_num_t irq, irq_handler_t handler);
 
-void do_irq(irq_num_t irq);
-
 #endif
 

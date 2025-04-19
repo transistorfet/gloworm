@@ -461,3 +461,22 @@
 - I decided to go a bit defensive, since it is the kernel, and set NULL both before calling functions that take a double pointer,
   and also set the result to NULL when exiting from net_socket_accept() due to a suspend
 
+2025-04-18:
+
+- I keep debating whether to go with two stacks per thread, and I feel like the path forward either way will be complicated so I
+  should decide now rather than deferring.  I'm also thinking, when using user mode which I'm not using at the moment, the exception
+  frame will be on the kernel stack.  The only reason that doesn't happen now is because the supervisor stack on an interrupt is
+  the user stack
+- if user mode is not configured, it would only use one stack, but if using user mode, then it uses two stacks.  That should be
+  easier to implement
+- since I'm targetting homebrew systems mostly, I should definitely stick with monolithic instead of microkernel.  Microkernels are
+  neat, but more complicated to get working and have more overhead as well, so a monolithic would be easier to port
+
+2025-04-19:
+
+- for a while now I've been chasing this last bug where when I activated the `request_irq` table call in `do_irq`, it would hang at
+  some point because it had the wrong irq number.  I kept thinking it was a problem with getting the right irq number from the
+  stack, but no... it turns out I just had the wrong function set by the tty driver *facepalm*.  It was going to enter_irq, which is
+  what it set the direct vector table to in order to make the hardcoded version work, but it needed to be changed to calling
+  `handle_serial_irq`.  Now it works and get the right irq number every time...
+
