@@ -4,8 +4,8 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+#include <kernel/utils/queue.h>
 
-#include "../misc/queue.h"
 
 #define BCF_ALLOCATED	0x01
 #define BCF_DIRTY	0x02

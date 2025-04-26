@@ -9,6 +9,7 @@ config KERNEL_BASE
 	  This is also used when linking because the kernel is not relocatable,
 	  so make sure it's set correctly.
 
+# TODO these could move to Kconfig.machine, such that the default is set conditionally, but otherwise appears in the machine menu
 config KMEM_START
 	hex "Kernel memory start address"
 	default 0x120000

@@ -1,40 +1,40 @@
 
-#ifndef _SRC_KERNEL_MISC_CIRCLEBUF_H
-#define _SRC_KERNEL_MISC_CIRCLEBUF_H
+#ifndef _KERNEL_UTILS_RINGBUFFER_H
+#define _KERNEL_UTILS_RINGBUFFER_H
 
-#define CIRCLE_BUFFER_SIZE	512
+#define RING_BUFFER_SIZE	512
 
-struct circular_buffer {
+struct ringbuffer {
 	short max;
 	volatile short in;
 	volatile short out;
-	volatile unsigned char buffer[CIRCLE_BUFFER_SIZE];
+	volatile unsigned char buffer[RING_BUFFER_SIZE];
 };
 
 
-static inline void _buf_init(struct circular_buffer *cb, short total_size)
+static inline void _buf_init(struct ringbuffer *cb, short total_size)
 {
-	cb->max = total_size ? total_size - sizeof(short) * 3 : CIRCLE_BUFFER_SIZE;
+	cb->max = total_size ? total_size - sizeof(short) * 3 : RING_BUFFER_SIZE;
 	cb->in = 0;
 	cb->out = 0;
 }
 
-static inline short _buf_next_in(struct circular_buffer *cb)
+static inline short _buf_next_in(struct ringbuffer *cb)
 {
 	return cb->in + 1 < cb->max ? cb->in + 1 : 0;
 }
 
-static inline int _buf_is_full(struct circular_buffer *cb)
+static inline int _buf_is_full(struct ringbuffer *cb)
 {
 	return _buf_next_in(cb) == cb->out;
 }
 
-static inline int _buf_is_empty(struct circular_buffer *cb)
+static inline int _buf_is_empty(struct ringbuffer *cb)
 {
 	return cb->in == cb->out;
 }
 
-static inline short _buf_used_space(struct circular_buffer *cb)
+static inline short _buf_used_space(struct ringbuffer *cb)
 {
 	if (cb->in >= cb->out) {
 		return cb->in - cb->out;
@@ -43,7 +43,7 @@ static inline short _buf_used_space(struct circular_buffer *cb)
 	}
 }
 
-static inline short _buf_free_space(struct circular_buffer *cb)
+static inline short _buf_free_space(struct ringbuffer *cb)
 {
 	if (cb->out > cb->in) {
 		return cb->out - cb->in - 1;
@@ -52,7 +52,7 @@ static inline short _buf_free_space(struct circular_buffer *cb)
 	}
 }
 
-static inline int _buf_get_char(struct circular_buffer *cb)
+static inline int _buf_get_char(struct ringbuffer *cb)
 {
 	register unsigned char ch;
 
@@ -64,7 +64,7 @@ static inline int _buf_get_char(struct circular_buffer *cb)
 	return ch;
 }
 
-static inline int _buf_put_char(struct circular_buffer *cb, unsigned char ch)
+static inline int _buf_put_char(struct ringbuffer *cb, unsigned char ch)
 {
 	register short next;
 
@@ -77,7 +77,7 @@ static inline int _buf_put_char(struct circular_buffer *cb, unsigned char ch)
 }
 
 
-static inline short _buf_get(struct circular_buffer *cb, unsigned char *data, short size)
+static inline short _buf_get(struct ringbuffer *cb, unsigned char *data, short size)
 {
 	short i;
 
@@ -91,7 +91,7 @@ static inline short _buf_get(struct circular_buffer *cb, unsigned char *data, sh
 	return i;
 }
 
-static inline short _buf_peek(struct circular_buffer *cb, unsigned char *data, short offset, short size)
+static inline short _buf_peek(struct ringbuffer *cb, unsigned char *data, short offset, short size)
 {
 	short i, j;
 	short avail;
@@ -113,7 +113,7 @@ static inline short _buf_peek(struct circular_buffer *cb, unsigned char *data, s
 	return i;
 }
 
-static inline short _buf_put(struct circular_buffer *cb, const unsigned char *data, short size)
+static inline short _buf_put(struct ringbuffer *cb, const unsigned char *data, short size)
 {
 	short i;
 	register short next;
@@ -128,7 +128,7 @@ static inline short _buf_put(struct circular_buffer *cb, const unsigned char *da
 	return i;
 }
 
-static inline short _buf_drop(struct circular_buffer *cb, short size)
+static inline short _buf_drop(struct ringbuffer *cb, short size)
 {
 	short avail = _buf_used_space(cb);
 

@@ -5,9 +5,9 @@
 #include <kernel/driver.h>
 #include <kernel/printk.h>
 #include <kernel/kmalloc.h>
+#include <kernel/utils/queue.h>
 
 #include "bufcache.h"
-#include "../misc/queue.h"
 
 
 #define BC_BLOCK_SIZE		1024

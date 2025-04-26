@@ -20,9 +20,9 @@
 #include <kernel/syscall.h>
 #include <kernel/scheduler.h>
 #include <kernel/interrupts.h>
+#include <kernel/utils/ringbuffer.h>
 
 #include "../proc/timer.h"
-#include "../misc/circlebuf.h"
 
 
 // Driver Definition
@@ -174,8 +174,8 @@ const struct channel_ports channel_b_ports = {
 
 
 struct serial_channel {
-	struct circular_buffer rx;
-	struct circular_buffer tx;
+	struct ringbuffer rx;
+	struct ringbuffer tx;
 	const struct channel_ports *ports;
 	int opens;
 	int open_mode;

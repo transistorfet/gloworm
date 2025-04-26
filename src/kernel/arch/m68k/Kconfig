@@ -10,6 +10,10 @@ config GCC_PREFIX
 	string
 	default m68k-linux-gnu-
 
+config NUM_CPUS
+	int
+	default 1
+
 choice
 	prompt "Minimum required CPU"
 	default MC68030
@@ -36,11 +40,77 @@ endchoice
 
 config M68K_USER_MODE
 	bool "run user programs in user mode"
-	default y
+	default n
 	help
 	  If this option is true, then all programs except the kernel itself
 	  will be run in the m68k processor's user mode, and the kernel will be
 	  run in supervisor mode.  If this option is false, then everything
 	  will run in supervisor mode.
+
+config MMU
+	bool "enable MMU (memory management unit)"
+	default n
+	depends on MC68030
+	depends on M68K_USER_MODE
+	help
+	  If this is option true, the kernel will enable the hardware-based MMU
+	  (Memory Management Unit) and run user processes in their own isolated
+	  virtual memory space.  If false, only physical memory addresses will
+	  be used.  It's recommended to select this option if the system it's
+	  running on has a supported MMU.
+
+choice
+	prompt "Page size"
+	default PAGE_SIZE_4K
+	help
+	  Select the size used by the MMU-based paged memory management system
+	  for the size in bytes of a single page of memory, which is the
+	  smallest unit of memory that can be allocated by the page allocator,
+	  mapped into a virtual memory address space, or swapped out of active
+	  RAM to secondary memory (eg. to a disk).  The page size is usually
+	  determined by the MMU, but in the case of the m68k family, the page
+	  size can be configured in powers of two from 256 bytes up to 32kB.
+
+config PAGE_SIZE_256
+	bool "256"
+	help
+	  This selects a virtual memory page size of 256 bytes
+
+config PAGE_SIZE_512
+	bool "512"
+	help
+	  This selects a virtual memory page size of 512 bytes
+
+config PAGE_SIZE_1K
+	bool "1K"
+	help
+	  This selects a virtual memory page size of 1024 bytes
+
+config PAGE_SIZE_2K
+	bool "2K"
+	help
+	  This selects a virtual memory page size of 2048 bytes
+
+config PAGE_SIZE_4K
+	bool "4K"
+	help
+	  This selects a virtual memory page size of 4096 bytes
+
+config PAGE_SIZE_8K
+	bool "8K"
+	help
+	  This selects a virtual memory page size of 8192 bytes
+
+config PAGE_SIZE_16K
+	bool "16K"
+	help
+	  This selects a virtual memory page size of 16384 bytes
+
+config PAGE_SIZE_32K
+	bool "32K"
+	help
+	  This selects a virtual memory page size of 32768 bytes
+
+endchoice
 
 endif

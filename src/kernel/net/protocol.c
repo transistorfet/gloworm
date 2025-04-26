@@ -4,10 +4,10 @@
 #include <string.h>
 #include <sys/socket.h>
 
+#include <kernel/utils/queue.h>
+
 #include "socket.h"
 #include "protocol.h"
-
-#include "../misc/queue.h"
 
 #define PROTOCOLS_MAX		4
 

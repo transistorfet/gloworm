@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-#include "../misc/queue.h"
+#include <kernel/utils/queue.h>
 
 #include "if.h"
 #include "packet.h"

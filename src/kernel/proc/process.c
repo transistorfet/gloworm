@@ -4,9 +4,9 @@
 #include <asm/irqs.h>
 #include <kernel/printk.h>
 #include <kernel/scheduler.h>
+#include <kernel/utils/queue.h>
 
 #include "../api.h"
-#include "../misc/queue.h"
 
 #include "timer.h"
 #include "memory.h"

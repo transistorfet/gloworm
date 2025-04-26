@@ -5,9 +5,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <kernel/vfs.h>
+#include <kernel/utils/queue.h>
 
 #include "minix-v1.h"
-#include "../../misc/queue.h"
 
 #define MINIX_SUPER(super)	((struct minix_super *) (super))
 #define MINIX_BLOCK(block)	((struct minix_block *) (block))

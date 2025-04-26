@@ -6,10 +6,10 @@
 #include <kernel/signal.h>
 #include <kernel/syscall.h>
 #include <kernel/scheduler.h>
+#include <kernel/utils/queue.h>
 
 #include "timer.h"
 #include "filedesc.h"
-#include "../misc/queue.h"
 
 #define INIT_PID		1
 

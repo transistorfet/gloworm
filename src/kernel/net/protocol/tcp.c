@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <kernel/kmalloc.h>
 
-#include "../../misc/queue.h"
+#include <kernel/kmalloc.h>
+#include <kernel/utils/queue.h>
 
 #include "../if.h"
 #include "../socket.h"

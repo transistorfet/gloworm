@@ -2,8 +2,8 @@
 #ifndef _SRC_KERNEL_NET_PACKET_H
 #define _SRC_KERNEL_NET_PACKET_H
 
-#include <stddef.h>
-#include "../misc/queue.h"
+#include <stdint.h>
+#include <kernel/utils/queue.h>
 
 #define PACKET_CUSTOM_DATA	32
 

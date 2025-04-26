@@ -1,8 +1,7 @@
 
 #include <kernel/time.h>
 #include <kernel/signal.h>
-
-#include "../misc/queue.h"
+#include <kernel/utils/queue.h>
 
 #include "timer.h"
 

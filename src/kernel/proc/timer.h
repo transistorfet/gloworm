@@ -3,8 +3,7 @@
 #define _SRC_KERNEL_PROC_TIMER_H
 
 #include <stdint.h>
-
-#include "../misc/queue.h"
+#include <kernel/utils/queue.h>
 
 struct timer;
 

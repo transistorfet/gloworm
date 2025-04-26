@@ -2,8 +2,10 @@
 #ifndef _SRC_KERNEL_NET_PROTOCOL_TCP_H
 #define _SRC_KERNEL_NET_PROTOCOL_TCP_H
 
-#include "../../misc/queue.h"
-#include "../../misc/circlebuf.h"
+#include <stdint.h>
+
+#include <kernel/utils/queue.h>
+#include <kernel/utils/ringbuffer.h>
 
 #define TCP_ADDRESS(x)		((struct tcp_address *) (x))
 #define TCP_ENDPOINT(x)		((struct tcp_endpoint *) (x))
@@ -66,8 +68,8 @@ struct tcp_endpoint {
 	uint32_t rx_last_seq;
 	short tx_acks_repeated;
 
-	struct circular_buffer *rx;
-	struct circular_buffer *tx;
+	struct ringbuffer *rx;
+	struct ringbuffer *tx;
 };
 
 extern struct protocol tcp_protocol;
