@@ -3,7 +3,6 @@
 
 #include <asm/irqs.h>
 #include <kernel/printk.h>
-#include <kernel/kmalloc.h>
 #include <kernel/scheduler.h>
 
 #include "../api.h"

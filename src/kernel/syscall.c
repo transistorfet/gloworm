@@ -13,7 +13,6 @@
 #include <kernel/signal.h>
 #include <kernel/printk.h>
 #include <kernel/driver.h>
-#include <kernel/kmalloc.h>
 #include <kernel/scheduler.h>
 
 // TODO these should maybe be bundled into an interface in <kernel/processes.h>
@@ -117,7 +116,7 @@ extern void enter_syscall();
 
 void init_syscall()
 {
-	set_irq_handler(IRQ_TRAP1, enter_syscall);
+	arch_set_irq_handler(IRQ_TRAP1, enter_syscall);
 }
 
 // TODO this is temporary until you have processes working correctly

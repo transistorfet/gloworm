@@ -39,7 +39,7 @@ void init_interrupts(void)
 	//extern void enter_handle_trace();
 	//set_interrupt(IV_TRACE, enter_handle_trace);
 
-	init_irqs();
+	arch_init_irqs();
 }
 
 void request_irq(irq_num_t irq, irq_handler_t handler, int flags)

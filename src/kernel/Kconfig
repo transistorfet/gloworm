@@ -1,5 +1,5 @@
 
-menu "Kernel configuration"
+menu "Kernel Configuration"
 
 config KERNEL
 	bool "Build the kernel"

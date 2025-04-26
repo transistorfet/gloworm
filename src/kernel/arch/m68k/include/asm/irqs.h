@@ -74,8 +74,8 @@ typedef short lock_state_t;
 
 typedef void (*irq_handler_t)();
 
-void init_irqs();
-void set_irq_handler(irq_num_t irq, irq_handler_t handler);
+void arch_init_irqs();
+void arch_set_irq_handler(irq_num_t irq, irq_handler_t handler);
 
 #endif
 

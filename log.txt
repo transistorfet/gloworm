@@ -480,3 +480,44 @@
   what it set the direct vector table to in order to make the hardcoded version work, but it needed to be changed to calling
   `handle_serial_irq`.  Now it works and get the right irq number every time...
 
+- I now have a fully working full context switch committed, and a working minimal patch for delayed context switching.  *phew*  Now
+  I don't know which one I want to use
+- I'm now strongly thinking of use two stacks per thread, when using user mode, and when not using user mode like it does now, it
+  can use only one stack since that's all it needs, and I think it should be relatively minimal to change the existing context
+  switch to suit both (ie. the user mode version basically just doesn't switch stacks in most places, where the non-user mode
+  version switches like the existing ifndefs use)
+- but I should probably add threads and a page allocator first?  I guess threads still aren't that important so I can leave them,
+  but I could at least start making room for them
+
+2025-04-20:
+
+- I've started implementing the page allocator and virtual memory/mmu although it's still very early.  I have a page allocator using
+  bitmaps but it needs testing (doesn't work yet), and I haven't done much about the mmu
+- I've put the Kconfig stuff in arch which is where linux puts it since it's platform dependent, but the global CONFIG_MMU flag is
+  defined in each architecture that implements it.  I keep thinking in a very type theory oriented way, where each flag must be
+  globally defined and then selected by different archs, but I need to get over that
+- I have the same reaction to the parts of the code that call into arch/ code.  I've taken to at least prepending the `arch_` mangle
+  but I haven't defined them in a common location in include/kernel/.  I feel like I should defined a common interface and not just
+  copy mistakes from other operating systems
+
+- also it turns out Kconfig has the option of conditional defaults, `default <value> if <condition>`
+
+
+2025-04-22:
+- Using page memory for the bitmap doesn't make much sense in some cases.  It's copied from ruxpin which allocated 256 MiB of RAM
+  which requires 2 pages of memory for the bitmaps, or 8192 bytes. For a system with 1 MiB, it's 32 bytes of bitmaps, 4064 bytes
+  unused, and only 8 *bytes* of memory for a 64KiB block, which too, keep in mind there, will be multiple blocks rather than one
+  big block that covers all of RAM
+
+
+2025-04-24:
+
+- I have the page allocator working, both contiguous and single, but I think I still have an off by one page error, because it
+  allocates 0x208000 when it should stop at 0x207000
+
+
+2025-04-26:
+
+- I think I have paging working, and I have the start of a testing framework for unit tests that run on the host.  I need to make it
+  able to compile for m68k as well, so I can run tests there instead of putting them in monitor.bin
+

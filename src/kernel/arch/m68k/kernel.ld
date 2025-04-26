@@ -26,4 +26,11 @@ SECTIONS
     *(.bss)
   } > ram
   __bss_end = .;
+
+  .stack (NOLOAD) : {
+    /* minimum 4k stack */
+    . = 4096;
+    . = ALIGN(4096);
+  } > ram
+  __end = .;
 }

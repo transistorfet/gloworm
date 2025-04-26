@@ -27,7 +27,7 @@ void handle_trace(void);
 
 static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
 
-void init_irqs(void)
+void arch_init_irqs(void)
 {
 	extern void enter_exception();
 	extern void enter_syscall();
@@ -54,14 +54,14 @@ void init_irqs(void)
 		vector_table[i] = enter_irq;
 
 	extern void enter_handle_trace();
-	set_irq_handler(IRQ_TRACE, enter_handle_trace);
+	vector_table[IRQ_TRACE] = enter_handle_trace;
 
 	// Load the VBR register with the address of our vector table
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
 }
 
 // TODO actually this isn't needed...
-void set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
+void arch_set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
 {
 	vector_table[(short) irq] = handler;
 }
