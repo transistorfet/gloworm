@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <kernel/printk.h>
-#include <kernel/kmalloc.h>
+#include <kernel/mm/kmalloc.h>
 
 
 struct block {

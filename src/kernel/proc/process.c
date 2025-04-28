@@ -2,16 +2,15 @@
 #include <stddef.h>
 
 #include <asm/irqs.h>
+#include <kernel/api.h>
 #include <kernel/printk.h>
-#include <kernel/scheduler.h>
+#include <kernel/proc/timer.h>
+#include <kernel/proc/memory.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/filedesc.h>
+#include <kernel/proc/scheduler.h>
 #include <kernel/utils/queue.h>
 
-#include "../api.h"
-
-#include "timer.h"
-#include "memory.h"
-#include "process.h"
-#include "filedesc.h"
 
 
 // Process Table and Queues

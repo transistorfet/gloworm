@@ -1,17 +1,16 @@
 
 #include <stddef.h>
 
+#include <kconfig.h>
 #include <asm/irqs.h>
-#include <kernel/kmalloc.h>
+#include <kernel/api.h>
 #include <kernel/printk.h>
-#include <kernel/kconfig.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/arch/context.h>
+#include <kernel/proc/memory.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/binaries.h>
 
-#include "../api.h"
-
-#include "memory.h"
-#include "process.h"
-#include "context.h"
-#include "binaries.h"
 
 struct process *create_init_task()
 {

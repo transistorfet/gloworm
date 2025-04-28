@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <kernel/kconfig.h>
+#include <kconfig.h>
 
 #if defined(CONFIG_AM29F040)
 #define BOARD	"k30"

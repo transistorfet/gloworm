@@ -1,6 +1,6 @@
 
 #include <signal.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {

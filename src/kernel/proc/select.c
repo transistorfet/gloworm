@@ -2,10 +2,10 @@
 #include <sys/types.h>
 #include <sys/select.h>
 
-#include <kernel/vfs.h>
-#include <kernel/scheduler.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/scheduler.h>
 
-#include "process.h"
 
 int select_check_open_fds(struct process *proc, int max, fd_set *readfds, fd_set *writefds, fd_set *exceptfds)
 {

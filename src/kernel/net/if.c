@@ -3,13 +3,12 @@
 #include <string.h>
 #include <sys/ioctl.h>
 
-#include <kernel/bh.h>
-#include <kernel/driver.h>
 #include <kernel/printk.h>
-
-#include "if.h"
-#include "packet.h"
-#include "protocol.h"
+#include <kernel/drivers.h>
+#include <kernel/irq/bh.h>
+#include <kernel/net/if.h>
+#include <kernel/net/packet.h>
+#include <kernel/net/protocol.h>
 
 #define IFDEV_MAX	2
 

@@ -1,6 +1,6 @@
 
-#ifndef _SRC_KERNEL_PRINTK_H
-#define _SRC_KERNEL_PRINTK_H
+#ifndef _KERNEL_PRINTK_H
+#define _KERNEL_PRINTK_H
 
 #include <stdarg.h>
 #include <stdint.h>

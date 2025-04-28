@@ -1,7 +1,6 @@
 
 #include <unistd.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 int dup2(int oldfd, int newfd)
 {

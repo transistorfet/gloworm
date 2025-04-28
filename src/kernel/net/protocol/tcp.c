@@ -5,12 +5,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <kernel/kmalloc.h>
+#include <kernel/net/if.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/net/socket.h>
+#include <kernel/net/protocol.h>
 #include <kernel/utils/queue.h>
-
-#include "../if.h"
-#include "../socket.h"
-#include "../protocol.h"
 
 #include "ipv4.h"
 #include "inet_af.h"

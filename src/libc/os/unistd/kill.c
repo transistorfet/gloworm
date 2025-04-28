@@ -1,6 +1,6 @@
 
 #include <sys/types.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int kill(pid_t pid, int sig)
 {

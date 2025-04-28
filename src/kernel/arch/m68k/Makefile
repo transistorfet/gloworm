@@ -5,5 +5,6 @@ extra-y				+= kernel.ld
 
 obj-y				+= start.o
 obj-y				+= syscall_entry.o
-obj-y				+= irqs.o
+
+obj-y				+= irq/
 

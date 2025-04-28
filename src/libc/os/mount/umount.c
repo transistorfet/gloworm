@@ -1,7 +1,6 @@
 
 #include <sys/types.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 int umount(const char *source)
 {

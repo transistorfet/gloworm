@@ -2,7 +2,7 @@
 #ifndef _SRC_KERNEL_FS_PROCFS_PROCFS_H
 #define _SRC_KERNEL_FS_PROCFS_PROCFS_H
 
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 #define PROCFS_DATA(vnode)	(((struct procfs_vnode *) (vnode))->data)
 

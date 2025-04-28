@@ -1,7 +1,6 @@
 
 #include <unistd.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 offset_t lseek(int fd, offset_t offset, int whence)
 {

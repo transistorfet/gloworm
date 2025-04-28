@@ -4,13 +4,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <kernel/vfs.h>
 #include <kernel/printk.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/fileptr.h>
+#include <kernel/fs/bufcache.h>
 
 #include "access.h"
 #include "device.h"
-#include "fileptr.h"
-#include "bufcache.h"
 
 
 #define VFS_MOUNT_MAX		4

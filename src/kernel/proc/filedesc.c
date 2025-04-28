@@ -2,9 +2,8 @@
 #include <stddef.h>
 
 #include <errno.h>
-#include <kernel/vfs.h>
-
-#include "filedesc.h"
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/filedesc.h>
 
 
 void init_fd_table(fd_table_t table)

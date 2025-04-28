@@ -8,7 +8,7 @@
 #include <string.h>
 
 #include <endian.h>
-#include <kernel/kconfig.h>
+#include <kconfig.h>
 
 #include "../kernel/fs/minix/minix-v1.h"
 

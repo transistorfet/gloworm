@@ -3,21 +3,16 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
-#include <kernel/vfs.h>
-#include <kernel/kmalloc.h>
 #include <kernel/syscall.h>
-#include <kernel/scheduler.h>
-
-// TODO this is IP-specific and probably shouldn't be here
-#include <netinet/in.h>
-
-#include "../fs/nop.h"
-#include "../fs/fileptr.h"
-
-#include "if.h"
-#include "packet.h"
-#include "socket.h"
-#include "protocol.h"
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/nop.h>
+#include <kernel/fs/fileptr.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/net/if.h>
+#include <kernel/net/packet.h>
+#include <kernel/net/socket.h>
+#include <kernel/net/protocol.h>
+#include <kernel/proc/scheduler.h>
 
 
 struct sock_vnode {

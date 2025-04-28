@@ -5,9 +5,9 @@
 #include <errno.h>
 
 #include <sys/stat.h>
-#include <kernel/vfs.h>
 #include <kernel/printk.h>
-#include <kernel/driver.h>
+#include <kernel/drivers.h>
+#include <kernel/fs/vfs.h>
 
 
 // Driver Definition

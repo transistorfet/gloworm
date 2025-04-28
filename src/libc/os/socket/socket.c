@@ -1,6 +1,6 @@
 
 #include <sys/socket.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int socket(int domain, int type, int protocol)
 {

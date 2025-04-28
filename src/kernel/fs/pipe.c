@@ -3,13 +3,12 @@
 #include <string.h>
 
 #include <errno.h>
-#include <kernel/kmalloc.h>
 #include <kernel/syscall.h>
-#include <kernel/scheduler.h>
-
-#include "nop.h"
-#include "fileptr.h"
-#include "../proc/process.h"
+#include <kernel/fs/nop.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/fileptr.h>
+#include <kernel/proc/scheduler.h>
 
 #define PIPE_BUFFER_MAX		512
 

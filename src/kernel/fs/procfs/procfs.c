@@ -6,14 +6,13 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <kernel/vfs.h>
-#include <kernel/driver.h>
-
-#include "../../proc/process.h"
+#include <kernel/drivers.h>
+#include <kernel/fs/nop.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/process.h>
 
 #include "data.h"
 #include "procfs.h"
-#include "../nop.h"
 
 #define PROCFS_POSITION(x)	((struct procfs_position *) &(x))
 

@@ -2,12 +2,11 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <kernel/driver.h>
 #include <kernel/printk.h>
-#include <kernel/kmalloc.h>
+#include <kernel/drivers.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/fs/bufcache.h>
 #include <kernel/utils/queue.h>
-
-#include "bufcache.h"
 
 
 #define BC_BLOCK_SIZE		1024

@@ -2,10 +2,9 @@
 #include <stddef.h>
 
 #include <errno.h>
-#include <kernel/vfs.h>
 #include <kernel/printk.h>
-
-#include "fileptr.h"
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/fileptr.h>
 
 #define FILE_TABLE_MAX		16
 

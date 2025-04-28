@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "../protocol.h"
+#include <kernel/net/protocol.h>
 
 #include "ipv4.h"
 

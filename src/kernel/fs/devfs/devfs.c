@@ -4,11 +4,11 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <kernel/vfs.h>
-#include <kernel/driver.h>
+#include <kernel/drivers.h>
+#include <kernel/fs/nop.h>
+#include <kernel/fs/vfs.h>
  
 #include "devfs.h"
-#include "../nop.h"
 
 struct vfile_ops devfs_vfile_ops = {
 	devfs_open,

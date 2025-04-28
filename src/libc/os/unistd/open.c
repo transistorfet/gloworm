@@ -1,7 +1,6 @@
 
 #include <unistd.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 int open(const char *path, int flags, mode_t mode)
 {

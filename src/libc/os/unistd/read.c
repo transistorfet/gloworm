@@ -1,7 +1,6 @@
 
 #include <unistd.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 ssize_t read(int fd, void *buf, size_t nbytes)
 {

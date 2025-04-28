@@ -1,5 +1,5 @@
 
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int pause()
 {

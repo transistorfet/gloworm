@@ -4,8 +4,7 @@
 
 #include <endian.h>
 #include <kernel/printk.h>
-
-#include "../bufcache.h"
+#include <kernel/fs/bufcache.h>
 
 #include "minix.h"
 #include "inodes.h"

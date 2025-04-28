@@ -5,9 +5,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <kernel/vfs.h>
 #include <kernel/printk.h>
 #include <kernel/driver.h>
+#include <kernel/fs/nop.h>
+#include <kernel/fs/vfs.h>
  
 #include "mallocfs.h"
 #include "alloc.h"

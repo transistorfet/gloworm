@@ -3,14 +3,13 @@
 #include <string.h>
 #include <errno.h>
 
-#include <sys/stat.h>
-#include <kernel/vfs.h>
-#include <kernel/printk.h>
-#include <kernel/driver.h>
-#include <kernel/kconfig.h>
-
-#include "partition.h"
+#include <kconfig.h>
 #include <asm/irqs.h>
+#include <sys/stat.h>
+#include <kernel/printk.h>
+#include <kernel/drivers.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/partition.h>
 
 
 // Driver Definition

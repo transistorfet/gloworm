@@ -1,9 +1,10 @@
 
 #include <errno.h>
 #include <sys/types.h>
-#include <kernel/driver.h>
+#include <kernel/drivers.h>
+#include <kernel/fs/nop.h>
+#include <kernel/fs/vfs.h>
 
-#include "nop.h"
 #include "device.h"
 
 struct vfile_ops device_vfile_ops = {

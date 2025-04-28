@@ -2,11 +2,10 @@
 #include <errno.h>
 
 #include <sys/types.h>
-#include <kernel/signal.h>
-#include <kernel/scheduler.h>
-
-#include "process.h"
-#include "context.h"
+#include <kernel/arch/context.h>
+#include <kernel/proc/signal.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/scheduler.h>
 
 
 #define SIG_MASK_DEFAULT_IGNORE		0x00010000

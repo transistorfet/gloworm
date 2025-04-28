@@ -2,7 +2,7 @@
 #ifndef _ASM_M68K_IRQS_H
 #define _ASM_M68K_IRQS_H
 
-#include <kernel/interrupts.h>
+#include <kernel/irq/action.h>
 
 // 68k Interrupt Vectors Numbers
 #define IRQ_BUS_ERROR		2

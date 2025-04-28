@@ -3,11 +3,11 @@
 #include <stddef.h>
 #include <string.h>
 #include <kernel/printk.h>
-#include <kernel/kmalloc.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/proc/memory.h>
+#include <kernel/arch/context.h>
+#include <kernel/proc/process.h>
 
-#include "memory.h"
-#include "process.h"
-#include "context.h"
 
 int copy_string_array(char **stack, int *count, char *const arr[])
 {

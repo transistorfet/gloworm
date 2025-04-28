@@ -27,4 +27,16 @@ config KMEM_END
 	  kernel memory will allocate from.  Currently only one contiguous
 	  chunk of memory is supported.
 
+config PAGE_SIZE
+	hex
+	default 256 if PAGE_SIZE_256
+	default 512 if PAGE_SIZE_512
+	default 1024 if PAGE_SIZE_1K
+	default 2048 if PAGE_SIZE_2K
+	default 4096 if PAGE_SIZE_4K
+	default 8192 if PAGE_SIZE_8K
+	default 16384 if PAGE_SIZE_16K
+	default 32768 if PAGE_SIZE_32K
+	default 65536 if PAGE_SIZE_64K
+
 endmenu

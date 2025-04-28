@@ -17,10 +17,10 @@
 #include <sys/mount.h>
 #include <sys/ioctl.h>
 #ifndef LINUXHOST
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 #endif
 
-#include <kernel/kconfig.h>
+#include <kconfig.h>
 
 #include "prototype.h"
 

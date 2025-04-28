@@ -3,14 +3,14 @@
 #include <bits/macros.h>
 
 #include <asm/irqs.h>
+#include <kernel/api.h>
 #include <kernel/printk.h>
-#include <kernel/scheduler.h>
 #include <kernel/utils/queue.h>
+#include <kernel/arch/context.h>
+#include <kernel/proc/init.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/scheduler.h>
 
-#include "tasks.h"
-#include "process.h"
-#include "context.h"
-#include "../api.h"
 
 // Info for Current Running Process (accessed by syscall interface)
 void *kernel_stack;

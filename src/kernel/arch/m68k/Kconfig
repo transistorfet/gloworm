@@ -39,13 +39,14 @@ config MC68030
 endchoice
 
 config M68K_USER_MODE
-	bool "run user programs in user mode"
+	bool "enable user mode"
 	default n
 	help
 	  If this option is true, then all programs except the kernel itself
 	  will be run in the m68k processor's user mode, and the kernel will be
 	  run in supervisor mode.  If this option is false, then everything
-	  will run in supervisor mode.
+	  will run in supervisor mode, and the CPU will never switch to user
+	  mode
 
 config MMU
 	bool "enable MMU (memory management unit)"

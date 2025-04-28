@@ -2,7 +2,8 @@
 #ifndef _SRC_KERNEL_FS_DEVICE_H
 #define _SRC_KERNEL_FS_DEVICE_H
 
-#include <kernel/driver.h>
+#include <kernel/drivers.h>
+#include <kernel/fs/vfs.h>
 
 extern struct vfile_ops device_vfile_ops;
 

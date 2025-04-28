@@ -1,6 +1,6 @@
 
 #include <sys/socket.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 ssize_t recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, socklen_t *addr_len)
 {

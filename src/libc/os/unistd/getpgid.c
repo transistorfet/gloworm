@@ -1,6 +1,6 @@
 
 #include <sys/types.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 pid_t getpgid(pid_t pid)
 {

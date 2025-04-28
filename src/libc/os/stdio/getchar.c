@@ -1,7 +1,7 @@
  
 #include <stdio.h>
 #include <unistd.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int getchar()
 {

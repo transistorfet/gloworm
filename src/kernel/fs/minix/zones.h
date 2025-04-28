@@ -3,14 +3,15 @@
 #define _SRC_KERNEL_FS_MINIX_ZONES_H
 
 #include <string.h>
-#include <kernel/vfs.h>
-#include <sys/types.h>
 #include <endian.h>
+#include <sys/types.h>
+
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/bufcache.h>
 
 #include "minix.h"
 #include "bitmaps.h"
 
-#include "../bufcache.h"
 
 #define MFS_LOOKUP_ZONE		0
 #define MFS_CREATE_ZONE		1

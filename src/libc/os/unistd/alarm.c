@@ -1,5 +1,5 @@
 
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 unsigned int alarm(unsigned int seconds)
 {

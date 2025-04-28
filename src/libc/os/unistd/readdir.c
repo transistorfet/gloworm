@@ -1,7 +1,7 @@
 
-#include <kernel/vfs.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
+struct dirent;
 
 int readdir(int fd, struct dirent *dir)
 {

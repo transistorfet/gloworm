@@ -17,7 +17,7 @@ LIBC_OS_OBJS = $(addprefix $(OUTPUT),$(patsubst %.c,%.o, $(patsubst %.s,%.o, $(L
 
 $(objprefix)libc-$(SRCARCH)-none.a: $(LIBC_NONE_OBJS)
 $(objprefix)libc-$(SRCARCH)-os.a: $(LIBC_OS_OBJS)
-# Only the OS portions of libc depend on the kernel arch includes, in particular syscall.h
+# Only the OS portions of libc depend on the kernel arch includes, in particular <asm/syscall.h>
 $(objprefix)libc-$(SRCARCH)-os.a: CFLAGS += -Isrc/kernel/arch/$(SRCARCH)/include
 
 # Create all the directories, since we're specifying the objects improperly

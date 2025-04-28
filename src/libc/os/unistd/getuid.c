@@ -1,6 +1,6 @@
 
 #include <sys/types.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 uid_t getuid()
 {

@@ -1,8 +1,8 @@
 
 #include <string.h>
 #include <sys/stat.h>
-#include <kernel/vfs.h>
 #include <kernel/time.h>
+#include <kernel/fs/vfs.h>
 
 #include "mallocfs.h"
 #include "alloc.h"

@@ -8,25 +8,23 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 
-#include <kernel/vfs.h>
+#include <kconfig.h>
+#include <kernel/api.h>
 #include <kernel/time.h>
-#include <kernel/kmalloc.h>
-#include <kernel/syscall.h>
-#include <kernel/driver.h>
 #include <kernel/printk.h>
-#include <kernel/scheduler.h>
-#include <kernel/interrupts.h>
-#include <kernel/kconfig.h>
-
-#include "proc/tasks.h"
-#include "proc/process.h"
+#include <kernel/syscall.h>
+#include <kernel/drivers.h>
+#include <kernel/irq/action.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/proc/init.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/scheduler.h>
 
 #if defined(CONFIG_NET)
-#include "net/if.h"
-#include "net/protocol.h"
+#include <kernel/net/if.h>
+#include <kernel/net/protocol.h>
 #endif
-
-#include "api.h"
 
 
 extern void tty_68681_preinit();

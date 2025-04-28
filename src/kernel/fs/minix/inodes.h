@@ -4,12 +4,14 @@
 
 #include <errno.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <kernel/vfs.h>
-#include <kernel/time.h>
 #include <endian.h>
+#include <sys/stat.h>
+
+#include <kernel/time.h>
+#include <kernel/fs/vfs.h>
 
 #include "minix.h"
+#include "bitmaps.h"
 
 static inode_t alloc_inode(struct minix_super *super, mode_t mode, uid_t uid, gid_t gid, device_t rdev)
 {

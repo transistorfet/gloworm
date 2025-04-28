@@ -1,6 +1,7 @@
 
 obj-y			+= devfs/
 obj-y			+= procfs/
+obj-y			+= partition/
 obj-$(CONFIG_MALLOC_FS)	+= mallocfs/
 obj-$(CONFIG_MINIX_FS)	+= minix/
 

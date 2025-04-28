@@ -1,6 +1,6 @@
 
 #include <sys/socket.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int bind(int fd, const struct sockaddr *addr, socklen_t len)
 {

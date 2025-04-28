@@ -1,8 +1,7 @@
 
 #include <errno.h>
-#include <kernel/vfs.h>
-
-#include "nop.h"
+#include <kernel/fs/nop.h>
+#include <kernel/fs/vfs.h>
 
 
 int nop_sync(struct mount *mp)

@@ -1,10 +1,9 @@
 
 #include <string.h>
-#include <kernel/kmalloc.h>
+#include <kernel/mm/kmalloc.h>
+#include <kernel/net/if.h>
+#include <kernel/net/packet.h>
 #include <kernel/utils/queue.h>
-
-#include "if.h"
-#include "packet.h"
 
 
 struct packet *packet_alloc(struct if_device *ifdev, struct protocol *proto, size_t capacity)

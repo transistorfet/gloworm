@@ -1,6 +1,6 @@
 
 #include <unistd.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 void *sbrk(intptr_t increment)
 {

@@ -1,6 +1,6 @@
 
 #include <sys/socket.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 {

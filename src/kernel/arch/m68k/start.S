@@ -1,5 +1,5 @@
 
-	#include <kernel/kconfig.h>
+	#include <kconfig.h>
 
 	.global _start
 	.global	main

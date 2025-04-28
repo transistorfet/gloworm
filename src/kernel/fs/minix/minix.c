@@ -5,10 +5,13 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <kernel/vfs.h>
-#include <kernel/printk.h>
-#include <kernel/driver.h>
+
 #include <asm/byteorder.h>
+#include <kernel/printk.h>
+#include <kernel/drivers.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/fs/nop.h>
+#include <kernel/fs/bufcache.h>
  
 #include "minix.h"
 #include "bitmaps.h"
@@ -17,9 +20,6 @@
 #include "zones.h"
 #include "super.h"
 #include "dir.h"
-
-#include "../nop.h"
-#include "../bufcache.h"
 
 
 struct vfile_ops minix_vfile_ops = {

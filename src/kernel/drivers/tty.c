@@ -6,12 +6,12 @@
 #include <sys/types.h>
 #include <sys/ioc_tty.h>
 
-#include <kernel/bh.h>
-#include <kernel/vfs.h>
-#include <kernel/driver.h>
+#include <kernel/drivers.h>
 #include <kernel/syscall.h>
-#include <kernel/signal.h>
-#include <kernel/scheduler.h>
+#include <kernel/irq/bh.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/signal.h>
+#include <kernel/proc/scheduler.h>
 
 #include <asm/irqs.h>
 

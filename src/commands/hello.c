@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #include <unistd.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 
 int main(int argc, char **argv)

@@ -11,18 +11,17 @@
 #include <bits/macros.h>
 
 #include <asm/irqs.h>
-#include <kernel/bh.h>
-#include <kernel/vfs.h>
 #include <kernel/time.h>
-#include <kernel/signal.h>
 #include <kernel/printk.h>
-#include <kernel/driver.h>
+#include <kernel/drivers.h>
 #include <kernel/syscall.h>
-#include <kernel/scheduler.h>
-#include <kernel/interrupts.h>
+#include <kernel/irq/bh.h>
+#include <kernel/irq/action.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/timer.h>
+#include <kernel/proc/signal.h>
+#include <kernel/proc/scheduler.h>
 #include <kernel/utils/ringbuffer.h>
-
-#include "../proc/timer.h"
 
 
 // Driver Definition

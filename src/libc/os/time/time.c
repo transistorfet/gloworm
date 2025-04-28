@@ -1,7 +1,6 @@
 
 #include <sys/types.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 time_t time(time_t *t)
 {

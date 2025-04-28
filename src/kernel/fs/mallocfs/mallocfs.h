@@ -2,7 +2,7 @@
 #ifndef _SRC_KERNEL_FS_MALLOCFS_MALLOCFS_H
 #define _SRC_KERNEL_FS_MALLOCFS_MALLOCFS_H
 
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 #define MALLOCFS_BLOCK_SIZE		1024
 #define MALLOCFS_LOG_BLOCK_SIZE		__builtin_ctz(MALLOCFS_BLOCK_SIZE)

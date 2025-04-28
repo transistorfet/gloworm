@@ -1,7 +1,6 @@
 
 #include <sys/mount.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 int mount(const char *source, const char *target, const char *fstype, int mountflags, void *data)
 {
@@ -12,5 +11,4 @@ int mount(const char *source, const char *target, const char *fstype, int mountf
 	opts.data = data;
 	return SYSCALL3(SYS_MOUNT, (int) source, (int) target, (int) &opts);
 }
-
 

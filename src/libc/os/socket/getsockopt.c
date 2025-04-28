@@ -1,6 +1,6 @@
 
 #include <sys/socket.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
 {

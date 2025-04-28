@@ -4,14 +4,14 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include <kernel/vfs.h>
+#include <kconfig.h>
 #include <kernel/printk.h>
-#include <kernel/kconfig.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/memory.h>
+#include <kernel/proc/process.h>
 
 #include <elf.h>
 
-#include "memory.h"
-#include "process.h"
 
 #if defined(CONFIG_M68K)
 #define ELF_MACHINE	EM_68K

@@ -1,22 +1,11 @@
 
-* the following includes use relative paths, but should be moved to include/kernel
-    src/kernel/arch/m68k/irqs.c:17:#include "../../proc/process.h"
-    src/kernel/fs/procfs/data.c:7:#include "../../proc/process.h"
-    src/kernel/fs/procfs/procfs.c:12:#include "../../proc/process.h"
-    src/kernel/drivers/tty_68681.c:24:#include "../proc/timer.h"
-    a whole bunch of references to api.h
-    and then all the net includes, socket.h, if.h, protocol.h, etc
- * should these go under their respective modules?  For net/ definitely, but for process.h and timer.h, since there's already scheduler.h and time.h in
-   kernel/, it makes sense to just put them there too instead of under proc/
- * should you move misc/ to include/kernel/utils ?
+* create a tty subsystem with subdrivers for the individual controllers
+* make tty.h for the common tty driver interface?
 
-
-
+* commit the pages.c, pages_test.c
 * convert proc/user memory, bufcache/disk blocks, fs vnodes, and net packets to use the new paging system.  Do you also need a slab allocator for vnodes/packets?
 
 * should you have a kernel stack per task? yes, but only when using usermode, and fix user mode work in the process
-
-* should you rename driver.c to drvmgr.c or something that makes it easier to autocomplete drivers/
 
 * add threads
 * add virtual memory
@@ -26,11 +15,8 @@
 * figure out why moving or adding new values before the memory map in the process struct causes weird behaviour
 
 * should you change DISABLE_INTS to DISABLE_IRQS(), etc
-* make a kernel/process.h file, (or task.h, or thread.h) with either common interfaces to processes, or the whole struct, for use within the kernel
 
 * there's an issue with extra-y, and whether to add the prefix or not
-* clean up how you do partitions and device files related to it
-* create a tty subsystem with subdrivers for the individual controllers
 
 * the process should wait until all output is flushed before it can exit
 

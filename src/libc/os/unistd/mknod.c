@@ -1,7 +1,6 @@
 
-
 #include <sys/types.h>
-#include <kernel/syscall.h>
+#include <sys/syscall.h>
 
 int mknod(const char *path, mode_t mode, device_t dev)
 {

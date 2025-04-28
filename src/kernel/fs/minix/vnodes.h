@@ -4,8 +4,8 @@
 
 #include <string.h>
 #include <sys/stat.h>
-#include <kernel/vfs.h>
-#include <kernel/kmalloc.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/mm/kmalloc.h>
 
 #include "minix.h"
 #include "inodes.h"

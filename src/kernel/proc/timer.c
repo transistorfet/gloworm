@@ -1,9 +1,8 @@
 
 #include <kernel/time.h>
-#include <kernel/signal.h>
+#include <kernel/proc/timer.h>
+#include <kernel/proc/signal.h>
 #include <kernel/utils/queue.h>
-
-#include "timer.h"
 
 
 static struct queue timer_list;

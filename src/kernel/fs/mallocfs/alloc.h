@@ -2,7 +2,7 @@
 #ifndef _SRC_KERNEL_FS_MALLOCFS_ALLOC_H
 #define _SRC_KERNEL_FS_MALLOCFS_ALLOC_H
 
-#include <kernel/kmalloc.h>
+#include <kernel/mm/kmalloc.h>
 
 #include "mallocfs.h"
 

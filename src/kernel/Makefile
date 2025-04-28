@@ -1,11 +1,10 @@
 
 obj-y				+= main.o
-obj-y				+= interrupts.o
 obj-y				+= syscall.o
-obj-y				+= bh.o
 obj-y				+= time.o
-obj-y				+= driver.o
+obj-y				+= drivers.o
 
+obj-y				+= irq/
 obj-y				+= mm/
 obj-y				+= proc/
 

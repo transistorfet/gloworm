@@ -1,7 +1,6 @@
 
 #include <unistd.h>
-#include <kernel/syscall.h>
-
+#include <sys/syscall.h>
 
 ssize_t write(int fd, const void *buf, size_t nbytes)
 {

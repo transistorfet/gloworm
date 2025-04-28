@@ -8,24 +8,19 @@
 #include <sys/socket.h>
 
 #include <asm/irqs.h>
-#include <kernel/vfs.h>
+#include <kernel/api.h>
 #include <kernel/time.h>
-#include <kernel/signal.h>
 #include <kernel/printk.h>
-#include <kernel/driver.h>
-#include <kernel/scheduler.h>
-
-// TODO these should maybe be bundled into an interface in <kernel/processes.h>
-#include "proc/timer.h"
-#include "proc/memory.h"
-#include "proc/process.h"
-#include "proc/binaries.h"
-#include "proc/filedesc.h"
-
-// TODO these should maybe be bundled into an interface in <kernel/net.h>
-#include "net/socket.h"
-
-#include "api.h"
+#include <kernel/drivers.h>
+#include <kernel/fs/vfs.h>
+#include <kernel/proc/timer.h>
+#include <kernel/proc/memory.h>
+#include <kernel/proc/signal.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/binaries.h>
+#include <kernel/proc/filedesc.h>
+#include <kernel/proc/scheduler.h>
+#include <kernel/net/socket.h>
 
 
 #define SYSCALL_MAX	80

@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <kernel/proc/process.h>
+
 #include "data.h"
 
-#include "../../proc/process.h"
 
 static inline char get_proc_state(struct process *proc);
 static inline size_t get_proc_size(struct process *proc);

@@ -2,7 +2,7 @@
 #ifndef _SRC_KERNEL_FS_DEVFS_DEVFS_H
 #define _SRC_KERNEL_FS_DEVFS_DEVFS_H
 
-#include <kernel/vfs.h>
+#include <kernel/fs/vfs.h>
 
 
 #define DEVFS_MAX_FILENAME	14
