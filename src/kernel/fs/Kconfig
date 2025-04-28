@@ -1,11 +1,18 @@
 
 menu "File systems"
 
-config MALLOC_FS
-	bool "malloc-backed file system"
+config MSDOS_PARTITION
+	bool "MSDOS Partition"
+	default y
 	help
-	  This enables the malloc-backed file system.  This allocates RAM from
-	  the user program space as files are created and written to
+	  This enables the ramdisk device, which requires a fixed size that
+	  will be reserved
+
+#config MALLOC_FS
+#	bool "malloc-backed file system"
+#	help
+#	  This enables the malloc-backed file system.  This allocates RAM from
+#	  the user program space as files are created and written to
 
 config MINIX_FS
 	bool "Minix file system"
