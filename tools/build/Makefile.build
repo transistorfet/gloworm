@@ -9,6 +9,7 @@ subdir-y		:=	# subdirectories to be built recursively
 #lib-y			:=
 libex-y			:=	# external libraries to include when linking
 extra-y			:=	# extra targets to build 
+tests-y			:=	# test targets to build (each file listed is its own binary)
 userprogs		:=	# user programs to compile
 ccflags-y		:=
 asflags-y		:=
@@ -37,9 +38,14 @@ all:
 
 include $(build-file)
 
+### Modify the inputs before path expansion
+
 #subdir-y		+= $(patsubst %/,%, $(filter %/, $(obj-y)))
 obj-y			:= $(patsubst %/,%/built-in.o, $(obj-y))
 #subdir-obj-y		:= $(filter %/built-in.o, $(obj-y))
+subdir-y		+= $(patsubst %/,%, $(filter %/,$(tests-y)))
+tests-subdir-y		:= $(addprefix $(dir)/, $(patsubst %/,%, $(filter %/,$(tests-y))))
+tests-obj-y		:= $(addprefix $(dir)/, $(patsubst %.o,%,$(filter %.o, $(tests-y))))
 
 # Executables compiled from a single .c file
 user-csingle		:= $(foreach m, $(userprogs), $(if $($(m)-objs),,$(m)))
@@ -48,7 +54,7 @@ user-csingle		:= $(foreach m, $(userprogs), $(if $($(m)-objs),,$(m)))
 user-cmulti		:= $(foreach m, $(userprogs), $(if $($(m)-objs),$(m)))
 
 
-# Add prefix to all applicable targets
+### Add prefix to all applicable targets
 obj-y			:= $(addprefix $(objprefix),$(obj-y))
 #subdir-obj-y		:= $(addprefix $(objprefix),$(subdir-obj-y))
 in-target		:= $(objprefix)built-in.o
@@ -65,15 +71,21 @@ targets			:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOA
 PHONY += all
 all: $(targets)
 
+# Include the testing rules if there are any tests to build & run
+ifneq ($(tests-y),)
+include $(src-root)/tools/build/Makefile.test
+endif
+
 $(in-target): $(libex-y) $(obj-y) $(extra-y) $(build-file)
 	$(LD) -r -o $@ $(obj-y) $(libex-obj-y)
 
 PHONY += $(subdir-y)
 $(subdir-y):
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$@
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$@ $(MAKECMDGOALS)
 
-$(libex-y): FORCE
+$(libex-y):
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@))
+
 
 
 # Build Rules for User Programs
@@ -107,8 +119,12 @@ $(OUTPUT)%/$(notdir $(dir)).elf: $(OUTPUT)%/built-in.o
 $(OUTPUT)%/built-in.o: FORCE
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$* $@
 
+# TODO there's a problem here, where this rule is needed to build a library but if no dependencies are supplied,
+# because it hasn't decended, then it makes an empty library that needs to be cleaned before it will even attempt
+# to recompile the lib.  This is a problem when compiling bare-tests from a clean repository, where libc won't be
+# compiled and it will fail during linking
 $(OUTPUT)%.a:
-	$(AR) rcs $@ $^
+	$(cmd_ar_a)
 
 $(OUTPUT)%.o: %.c
 	$(cmd_cc_o)
@@ -117,6 +133,7 @@ $(OUTPUT)%.o: %.S
 	$(cmd_as_o)
 
 # Commands
+cmd_ar_a = $(AR) rcs $@ $^
 cmd_ld_elf = $(LD) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -o $@ $^
 cmd_ld_bin = $(LD) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -Wl,--oformat=binary -o $@ $^
 cmd_cc_o = $(CC) $(CFLAGS) $(ccflags-y) -c -o $@ $<
@@ -127,7 +144,6 @@ obj-dirs := $(sort $(patsubst %/,%, $(dir $(targets))))
 ifneq ($(obj-dirs),)
 $(shell mkdir -p $(obj-dirs))
 endif
-
 
 
 PHONY += FORCE

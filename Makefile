@@ -59,6 +59,15 @@ kernel.load: src/kernel/kernel.load
 kernel.bin: src/kernel/kernel.bin
 kernel.elf: src/kernel/kernel.elf
 
+# Test building and running targets
+tests: generate-config
+	#$(MAKE) -f $(src-root)/tools/build/Makefile.test dir=tests tests
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests tests
+
+bare-tests: generate-config
+	#$(MAKE) -f $(src-root)/tools/build/Makefile.test dir=tests bare-tests
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests bare-tests
+
 
 # TODO 128 is just barely enough for 20 commands, kernel, devfiles
 #BLOCKS = 128
@@ -142,12 +151,17 @@ help:
 	@echo  '  output.txt    - Build the file included by 68kSupervisor to boot from'
 	@echo  '                  the arduino'
 	@echo  ''
+	@echo  'Test targets:'
+	@echo  '  tests         - Run all the tests that can run on the host machine'
+	@echo  '  bare-tests    - Build all the baremetal tests that run on the target machine'
+	@echo  ''
 	@echo  'Disk image targets:'
 	@echo  '  create-image  - Create a new disk image file initialized with minix1 fs'
 	@echo  '  mount-image   - Mount the disk image file to the default location'
 	@echo  '  umount-image  - Unmount the disk image file'
 	@echo  '  build-image   - Build `all` and copy the kernel, commands, /etc, and /dev'
 	@echo  '                  to the image mountpoint'
+
 
 PHONY += FORCE
 FORCE:

@@ -1,7 +1,7 @@
 
 // TODO need negative number examples
 
-int div_pairs[][4] = {
+unsigned int div_pairs[][4] = {
 	{ 0, 1, 0, 0 },
 	{ 1, 1, 1, 0 },
 	{ 98, 71, 1, 27 },
@@ -11,7 +11,7 @@ int div_pairs[][4] = {
 	{ 0, 0, 0, 0 }
 };
 
-int mul_pairs[][3] = {
+unsigned int mul_pairs[][3] = {
 	{ 0, 1, 0 },
 	{ 1, 1, 1 },
 	{ 35, 456, 15960 },

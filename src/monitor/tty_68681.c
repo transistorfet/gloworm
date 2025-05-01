@@ -74,7 +74,7 @@
 #define TTY_INT_VECTOR			7
 
 
-extern void delay(int count);
+extern void spin_loop(int count);
 
 int init_tty()
 {
@@ -116,13 +116,18 @@ int init_tty()
 	*OUT_SET_ADDR = 0xF0;
 	*OUT_RESET_ADDR = 0xF0;
 
-	// This slight delay prevents garbled output being sent during the welcome message
-	delay(100);
+	// This slight spin_loop prevents garbled output being sent during the welcome message
+	spin_loop(100);
 
 	// Assert CTS
 	*OUT_SET_ADDR = 0x01;
 
 	return 0;
+}
+
+void spin_loop(int count)
+{
+	while (--count > 0) { asm volatile (""); }
 }
 
 int getchar(void)

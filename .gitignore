@@ -1,7 +1,7 @@
 # Editor Files
 .*.sw?
 .local.vimrc
-session.vim
+session*.vim
 .ccls-cache/
 
 # Source Output Files

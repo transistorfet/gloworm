@@ -20,13 +20,8 @@
 
 
 extern void init_tty();
+extern void spin_loop(int count);
 char *led = (char *) 0x201c;
-
-
-void delay(int count)
-{
-	while (--count > 0) { asm volatile (""); }
-}
 
 int readline(char *buffer, short max)
 {
@@ -277,7 +272,7 @@ void command_eraserom(int argc, char **args)
 	}
 
 	erase_flash(sector);
-	delay(600000);
+	spin_loop(600000);
 	data = dest[0];
 
 	fputs("\nVerifying erase\n\n", stdout);
@@ -300,7 +295,7 @@ void program_flash_data(uint16_t *addr, uint16_t data)
 	*((volatile uint8_t *) 0x2AA) = 0x55;
 	*((volatile uint8_t *) 0x555) = 0xA0;
 	*((volatile uint8_t *) addr) = (uint8_t) (data >> 8);
-	delay(200);
+	spin_loop(200);
 	*((volatile uint8_t *) 0x555) = 0xAA;
 	*((volatile uint8_t *) 0x2AA) = 0x55;
 	*((volatile uint8_t *) 0x555) = 0xA0;
@@ -310,7 +305,7 @@ void program_flash_data(uint16_t *addr, uint16_t data)
 	*((volatile uint16_t *) (0x2AA << 1)) = 0x5555;
 	*((volatile uint16_t *) (0x555 << 1)) = 0xA0A0;
 	*((volatile uint16_t *) addr) = data;
-	delay(200);
+	spin_loop(200);
 	#endif
 }
 
@@ -336,7 +331,7 @@ void command_writerom(int argc, char **args)
 
 	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		program_flash_data(&dest[i], source[i]);
-		delay(200);
+		spin_loop(200);
 		printf("%x ", dest[i]);
 	}
 
@@ -690,7 +685,7 @@ int main()
 
 	//ARDUINO_TRACE_OFF();
 
-	//delay(10000);
+	//spin_loop(10000);
 
 	fputs("\n\nWelcome to the k30-VME Monitor!\n\n", stdout);
 

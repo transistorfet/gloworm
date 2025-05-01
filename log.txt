@@ -521,3 +521,13 @@
 - I think I have paging working, and I have the start of a testing framework for unit tests that run on the host.  I need to make it
   able to compile for m68k as well, so I can run tests there instead of putting them in monitor.bin
 
+
+2025-04-30:
+
+- there's a problem with the lib .a rule, which is needed to build a library but if no dependencies are supplied, it won't decend,
+  and instead make an empty library that needs to be cleaned before it will even attempt to recompile the lib.  This is a problem
+  when compiling bare-tests from a clean repository, where libc won't be compiled and it will fail during linking
+- I ended up making the test include really only contain the rules for tests, and put the variable resolution stuff into
+  Makefile.build, because the prefix-adding lines in the build file needed to come after the test variable filter/substitute lines,
+  but not that I think about it, I could just put the test rules above all the variables
+

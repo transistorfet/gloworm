@@ -1,0 +1,27 @@
+
+bare-tests-load		:= $(patsubst %,%.test.load, $(tests-obj-y))
+host-tests-run		:= $(patsubst %,%.test.run, $(tests-obj-y))
+
+bare-tests-common-deps	:= tests/entry.o src/monitor/tty_68681.o src/libc/libc-$(SRCARCH)-none.a
+bare-tests-common-deps	:= $(addprefix $(OUTPUT),$(bare-tests-common-deps))
+
+PHONY += tests
+tests: $(host-tests-run) $(tests-subdir-y)
+
+PHONY += bare-tests
+bare-tests: $(bare-tests-load) $(tests-subdir-y)
+
+%.test.run: %.test.host
+	./$<
+
+%.test.host: HOST_CFLAGS += -DHOST_TARGET
+%.test.host: %.c
+	$(HOST_GCC) $(HOST_CFLAGS) -o $@ $<
+
+%.test.load: ccflags-y += $(firmware-ccflags-y)
+%.test.load: %.bin
+	tools/make-load-file $< $@ $(LOAD_ARGS)
+
+%.test.bin: %.o $(bare-tests-common-deps)
+	$(cmd_ld_bin)
+
