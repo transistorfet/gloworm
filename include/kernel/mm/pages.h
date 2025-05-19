@@ -38,13 +38,13 @@ char *page_alloc(int pages);
 void page_free(char *ptr);
 
 
-#define ALL_PAGES_AT_INDEX	((uint8_t) 0xffffffff)
-#define PAGES_PER_INDEX		8
-#define LOG_OF_PAGES_PER_INDEX	3
+#define ALL_PAGES_AT_INDEX	((uint16_t) 0xffffffff)
+#define PAGES_PER_INDEX		16
+#define LOG_OF_PAGES_PER_INDEX	4
 #define BIT_INDEX(bit)		((bit) >> LOG_OF_PAGES_PER_INDEX)
 #define BIT_MASK(bit)		(1 << ((bit) & (PAGES_PER_INDEX - 1)))
 
-typedef uint8_t bitmap_t;
+typedef uint16_t bitmap_t;
 
 typedef uint8_t page_t[PAGE_SIZE];
 
@@ -61,10 +61,16 @@ struct page_block {
 };
 
 
+int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size);
+int init_page_block(struct page_block *block, void *addr, int size);
 page_t *page_block_alloc_single(struct page_block *block);
 void page_block_free_single(struct page_block *block, page_t *ptr);
 void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t size);
 page_t *page_block_alloc_contiguous(struct page_block *block, int contiguous_pages);
+
+int init_pages(uintptr_t start, uintptr_t end);
+page_t *page_alloc_single(void);
+void page_free_single(page_t *page);
 
 #endif
 

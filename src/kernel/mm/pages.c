@@ -4,6 +4,23 @@
 #include <kconfig.h>
 #include <kernel/mm/pages.h>
 
+static struct page_block pages = { 0 };
+
+int init_pages(uintptr_t start, uintptr_t end)
+{
+	return init_page_block(&pages, (void *) start, end);
+}
+
+page_t *page_alloc_single(void)
+{
+	return page_block_alloc_single(&pages);
+}
+
+void page_free_single(page_t *page)
+{
+	page_block_free_single(&pages, page);
+}
+
 
 int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size)
 {

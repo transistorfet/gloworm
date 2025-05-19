@@ -531,3 +531,62 @@
   Makefile.build, because the prefix-adding lines in the build file needed to come after the test variable filter/substitute lines,
   but not that I think about it, I could just put the test rules above all the variables
 
+
+2025-05-05:
+
+- looking at the options for page sizes, and how to set initial shift (IS), the TIA/TIB/TIC/TID fields, and page size.  The manual
+  says they must all add up to 32.  There is also a function code option not shown here, where you can have up to 3 extra bits that
+  make up the function code used like an address space expansion.  That's not really an option on some hardware, such as the k30p
+  because it uses the function codes to change the address modifier bits of the bus
+
+- that leaves these combinations, if you have one entire page used as each table.  It would be possible to make one or more levels
+  be multiple pages, or less than a page in order to make it work without the initial shift, but if each page table level was the
+  same size, filling exactly one page:
+
+fn main() {
+    for page_bits in 8..16 {
+        let remain = 32 - page_bits;
+        println!("with  long descriptors, initial shift: {}, levels: {}, table entries: {}, page: {}", remain % (page_bits - 3), remain / (page_bits - 3), 2_u32.pow(page_bits - 3), page_bits);  
+        println!("with short descriptors, initial shift: {}, levels: {}, table entries: {}, page: {}", remain % (page_bits - 2), remain / (page_bits - 2), 2_u32.pow(page_bits - 2), page_bits);
+    }
+}
+
+with  long descriptors, initial shift: 4, levels: 4, table entries: 32, page: 8
+with short descriptors, initial shift: 0, levels: 4, table entries: 64, page: 8
+with  long descriptors, initial shift: 5, levels: 3, table entries: 64, page: 9
+with short descriptors, initial shift: 2, levels: 3, table entries: 128, page: 9
+with  long descriptors, initial shift: 1, levels: 3, table entries: 128, page: 10
+with short descriptors, initial shift: 6, levels: 2, table entries: 256, page: 10
+with  long descriptors, initial shift: 5, levels: 2, table entries: 256, page: 11
+with short descriptors, initial shift: 3, levels: 2, table entries: 512, page: 11
+with  long descriptors, initial shift: 2, levels: 2, table entries: 512, page: 12
+with short descriptors, initial shift: 0, levels: 2, table entries: 1024, page: 12
+with  long descriptors, initial shift: 9, levels: 1, table entries: 1024, page: 13
+with short descriptors, initial shift: 8, levels: 1, table entries: 2048, page: 13
+with  long descriptors, initial shift: 7, levels: 1, table entries: 2048, page: 14
+with short descriptors, initial shift: 6, levels: 1, table entries: 4096, page: 14
+with  long descriptors, initial shift: 5, levels: 1, table entries: 4096, page: 15
+with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 15
+
+- there are only two that work evenly, and they're both only possible with the short descriptor, 256 byte pages and 4kb pages
+- the long descriptor 1 level 8k page size would use 512 entries of the 1024 top level page, so adding an extra level would not
+  waste too much memory
+- the top level page could even be split between the page table and other memory information that a process might need
+- I'm not sure if i should only support two page sizes for now, or make it possible to sacrifice address space optionally
+
+
+2025-05-19:
+
+- haven't had much time to work on this with the house hunting and closing the deal on the new place
+
+- I've got a mapping function working.  Starting it was the hardest part tbh.  I'm still not sure if I should put everything into
+  that one function, or have a separate unmapping function, at least for the total unmapping (freeing the page table pages
+  themselves)
+- the trickiest part of unmapping is knowing whether to free a page or not.  With ruxpin, since it's aarch64, and there are some
+  extra bits available to the user in the page descriptor, I used one of those bits as the copy-on-write indicator, and if it wasn't
+  set, that also means the page is not shared and should be freed, but if I'm using short descriptors on 68k (which are the only
+  ones that work out evenly for 4k and 256 byte pages), I don't have those extra bits to store in each descriptor.  It looks like
+  x86 is the same, not having user-defined bits
+- Given the above, I think it's better to find a way to do this without storing bits in the descriptors, so how do I know if a page
+  is shared or not?
+

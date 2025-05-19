@@ -1,11 +1,16 @@
 
-* fix the issue with Makefile.build where it needs to run make before running make bare-tests
-
-* fix up the testing build files
-* commit the pages.c, pages_test.c
+* I'm thinking of moving the network interface drivers to drivers/ under net/ similar to linux, which would keep all the drivers in one place
+  it works because each thing under drivers/ is moving towards being a subsystem with custom drivers
+* as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface
+* I don't know how the device driver interface in the file system would work with this
+* as part of this, it's possible that bufcache could move to the block driver subsystem code
 
 * implement mmu/tables
-* convert proc/user memory, bufcache/disk blocks, fs vnodes, and net packets to use the new paging system.  Do you also need a slab allocator for vnodes/packets?
+* convert proc/user memory to use pages
+* convert bufcache/disk blocks to use pages
+* convert fs vnodes to use pages
+* convert net packets to use pages
+* do you need a slab allocator for vnodes/packets?
 
 * should you change DISABLE_INTS to DISABLE_IRQS(), etc
 * there's an issue with extra-y, and whether to add the prefix or not
@@ -22,6 +27,7 @@
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable
 
+* fix the issue with Makefile.build where it needs to run make before running make bare-tests
 * the process should wait until all output is flushed before it can exit
 
 * figure out why moving or adding new values before the memory map in the process struct causes weird behaviour

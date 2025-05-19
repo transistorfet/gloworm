@@ -16,6 +16,7 @@
 #include <kernel/drivers.h>
 #include <kernel/irq/action.h>
 #include <kernel/fs/vfs.h>
+#include <kernel/mm/pages.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/proc/init.h>
 #include <kernel/proc/process.h>
@@ -26,6 +27,8 @@
 #include <kernel/net/protocol.h>
 #endif
 
+
+extern int arch_init_mm(void);
 
 extern void tty_68681_preinit();
 
@@ -140,6 +143,9 @@ int main()
 	parse_boot_args();
 
 	init_kernel_heap(CONFIG_KMEM_START, CONFIG_KMEM_END);
+	// TODO fix these addresses to be configurable
+	init_pages(0x200000, 0x100000);
+	arch_init_mm();
 
 	init_time();
 	init_timer_list();

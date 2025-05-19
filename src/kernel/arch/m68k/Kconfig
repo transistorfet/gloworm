@@ -52,7 +52,7 @@ config MMU
 	bool "enable MMU (memory management unit)"
 	default n
 	depends on MC68030
-	depends on M68K_USER_MODE
+	#depends on M68K_USER_MODE
 	help
 	  If this is option true, the kernel will enable the hardware-based MMU
 	  (Memory Management Unit) and run user processes in their own isolated
