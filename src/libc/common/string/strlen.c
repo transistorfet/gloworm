@@ -2,7 +2,7 @@
 #include <string.h>
 
 
-int strlen(const char *str)
+unsigned long strlen(const char *str)
 {
 	volatile register int i = 0;
 

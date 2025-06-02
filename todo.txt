@@ -1,4 +1,50 @@
 
+* actually allocate the maps, but where exactly?
+* separate out printk from tty driver and fix it so panic actually works
+
+* maybe use a memory_object abstractions
+* fix binary loading to use the right segments
+* use the 3 hardcoded pointers to make /proc/*/statm, and printing easier.  I can make a function to find and
+  grow/shrink/clone the segment(s), so that it can update the hardcoded pointers
+* fix the init code to create the first processes correctly
+* make forking the process allocate all the code/data/stack in one go, in binaries.c, and set up the memory segments
+* make it use page_alloc_contiguous() for the backing store, with page_free_single as the (*free) in memory_ops, and then go through
+  each page in the memory when freeing the segment.  That will make it easier to switch to MMU later
+
+* add mmu mapping to memory_map
+* make it possible to set up the virtual address space differently with MMU enabled, when loading a binary
+* finish implementing clone() syscall
+
+* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
+  memory without duplicating them
+
+* now that I think about it, if you just copy the stack, the pointers will all point to the old code segment.  I'm pretty sure I've
+  come across this before, just haven't looked for any existing notes yet.  It mostly works because exec will be called shortly
+  after on the child process.  The code itself will still use pcrel but any relocation table updates would have to be redone, and
+  any addresses on the stack or in registers would be invalid
+* i'm seeing a lot of problems with the memory allocation and binary loading code.  The text and data sections are not next to each
+  other for a start, which might explain why sometimes global variables don't have their init values.  I need to implement proper
+  chmem support, and allocate a single block for the program
+* bug: running cat on a directory in /proc makes it crash to the monitor
+
+* add flags to kmalloc?
+* add usp, mmu table to context and switch
+* allocate per-thread kernel stack if CONFIG_USER_MODE is defined
+* make memory_region use kzalloc instead of const
+
+* make a macro for alloc_contiguous vs alloc_single, such that if CONFIG_MMU then single otherwise contiguous
+* make kmalloc use the page-based memory for alloc
+* make kmalloc use multiple different allocators under the hood, including a bitmap-based allocator for small sized objects, like < 64 bytes
+  then it uses a slab-like allocator with bitmaps for at least common sizes of 16, 24, 32, 48, 64
+* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
+
+* see if using memset more, instead of manual initialization reduces code size
+* see if changing queues, ringbuffer, etc to non-inline functions reduces code size
+* make it possible to get a really small memory-usage kernel, at least with specific configurations
+
+* should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
+  much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
+
 * I'm thinking of moving the network interface drivers to drivers/ under net/ similar to linux, which would keep all the drivers in one place
   it works because each thing under drivers/ is moving towards being a subsystem with custom drivers
 * as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface

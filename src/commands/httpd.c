@@ -154,7 +154,7 @@ int handle_read(struct connection *conn)
 
 	i += snprintf(&response[i], MAX_HEADERS - i, "HTTP/1.1 200 OK\r\n");
 	i += snprintf(&response[i], MAX_HEADERS - i, "Content-Type: text/html; charset=UTF-8\r\n");
-	i += snprintf(&response[i], MAX_HEADERS - i, "Content-Length: %d\r\n", strlen(data));
+	i += snprintf(&response[i], MAX_HEADERS - i, "Content-Length: %ld\r\n", strlen(data));
 	i += snprintf(&response[i], MAX_HEADERS - i, "\r\n");
 	i += snprintf(&response[i], MAX_HEADERS - i, data);
 

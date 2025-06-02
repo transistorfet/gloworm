@@ -15,7 +15,7 @@ struct heap {
 static struct heap main_heap = { 0 };
 
 
-void init_heap(void *addr, int size)
+void init_heap(void *addr, unsigned long size)
 {
 	struct block *space = (struct block *) addr;
 
@@ -25,7 +25,7 @@ void init_heap(void *addr, int size)
 	main_heap.free_blocks = space;
 }
 
-void *malloc(int size)
+void *malloc(unsigned long size)
 {
 	struct block *prev = NULL;
 	struct block *nextfree = NULL;

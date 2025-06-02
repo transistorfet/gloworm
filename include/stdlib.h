@@ -8,9 +8,9 @@ int atoi(const char *str);
 char *itoa(int num, char *buffer, int radix);
 long int strtol(const char *str, char **endptr, int base);
 
-void init_heap(void *addr, int size);
+void init_heap(void *addr, unsigned long size);
 
-void *malloc(int size);
+void *malloc(unsigned long size);
 void free(void *ptr);
 
 void srand(unsigned int seed);

@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-int strncmp(const char *str1, const char *str2, int max)
+int strncmp(const char *str1, const char *str2, unsigned long max)
 {
 	while (max) {
 		if (*str1 > *str2)

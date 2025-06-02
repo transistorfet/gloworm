@@ -590,3 +590,100 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - Given the above, I think it's better to find a way to do this without storing bits in the descriptors, so how do I know if a page
   is shared or not?
 
+- thinking about adding the mmu table to the process, and it should be context because it's arch specific and loaded during a
+  context switch, but now that I dig into it, since context is used by signal handlers as well, which don't need to change the root
+  table, it seems to not fit to put the table there...
+- maybe there needs to be two halves to this
+
+
+2025-05-20:
+
+- was just laying in bed and thought, for the copy on write bit, you could set the WP (write protect) bit in each descriptor, and
+  have the segment it belongs to be marked as read/write, so when you get an exception when that segment is written to, it can check
+  both bits to know that copy on write is set, but that particular page has not yet been copied, and copy it before resuming
+
+- I have the `clone` syscall piped through, with a test program `threadtest`.  I just need to actually differential clone from fork.
+- I don't need to rename `process` yet
+- part of the clone/fork implementation is in clone_process_memory, but some is also in new_proc, namely the pid related stuff...
+- the stack init part of clone_process_memory is only needed in fork, and not clone
+- is there a bug where the heap isn't cloned properly, only the stack?  It probably wouldn't be noticed much since most things call
+  exec() right after forking
+
+
+2025-05-27:
+
+- I broke through the block I was having by deciding that I can use kmalloc, and I'll eventually fix kmalloc to use pages, if it
+  mostly allocates small things.  The pages don't have to be contiguous
+- so then I was able to alloc the memory_map and memory_area structs, and construct the address space like that.  I only need to
+  make the entire map shareable, and not the segments.  The file is already shareable, and accessing its blocks will always return
+  the same page memory holding the cached data, which can be directly added to an MMU map with copy on write set, or if no MMU, it
+  would be copied into the contiguous memory block of the process
+- I'm kind of bogged down again in fixing the mess of switching from an array of pointers to a queue of private structs, and
+  breaking all the code that sets up the process's memory.  That code is going to need to be partly architecture specific
+
+
+2025-05-28:
+
+- I should be able to abstract the actual adjustment functions in a way that's generic, so I'll have a library for manipulating
+  segments and such, but what part of the whole process should be arch-specific?
+- what should be arch-specific and what should be mmu vs no-mmu?
+
+- I'm getting close to something testable, but I still have a few areas to patch up, and it's still broken, but I'm trying to make
+  it work again before changing more about how the process's memory is initialized
+- once I'm done that, I'll still only have no-MMU support, and I'll have to add that and somehow change the code in
+  clone_process_memory, where it kmalloc's a new stack.  That will have to include the code, but also, when using an MMU it will not
+  kmalloc at all, and rely on the memory_ops and page faults to load or allocate everything
+
+- should I introduce something like FreeBSD, which has a vm_object for the thing that backs the memory area?  Linux just has some
+  hardcoded values instead of a separate abstraction.  Should it be allocated and refcounted?
+
+
+2025-05-29:
+
+- Oh I see why the data segment was initialized to 0, and the stack to everything, and that somehow wasn't glaringly broken.  It's
+  because all the data segments are loaded into the code segment.  That also means the data and bss segments would work without an
+  error since they're the correct offset from the code, and the heap doesn't need to be anywhere specific.  It's just really
+  confusing to me to do that
+- maybe I could make the heap its own segment, so that it's clear it's distinct from data
+
+- I have it almost working, but I forgot to add the code to create the map itself, which isn't done automatically in case the
+  process is cloning the memory map of another process
+
+
+2025-05-30:
+
+- now that I think about it, if you just copy the stack, the pointers will all point to the old code segment.  I'm pretty sure I've
+  come across this before, just haven't looked for any existing notes yet.  It mostly works because exec will be called shortly
+  after on the child process.  The code itself will still use pcrel but any relocation table updates would have to be redone, and
+  any addresses on the stack or in registers would be invalid
+
+
+2025-05-31:
+
+- just to remind myself, the reason I didn't put a refcount in for the memory address space in ruxpin (and why one doesn't exist in
+  linux I think), is because it can changing the address space, and just set copy on write on all the existing pages.  The address
+  space refcount is enough.  But without the MMU, you can't intercept a write operation so you need to copy at least the stack ahead
+  of time
+- on 8086, you can duplicate all memory and change the segment registers to point to the new area, and all the addresses on the
+  stack (assuming they aren't changing the segment registers) will still work correct while pointing at the duplicated memory
+- for m68k, this isn't the case, and your stack, even though duplicated, will have addresses on the stack that return to code in the
+  old process's space.  There could also be pointers that point to the old stack, if they were passed as arguments, which could
+  definitely cause problems
+- the short of it is that on m68k, it's just not really possible to fork a process unless that process almost immediately calls exec
+- but this is the case where I acutally need some kind of alternate means of refcounting the backing memory, since what I'm doing to
+  make the problem less problematic, is copy the heap/stack but make a ref to the existing code/data, and that's currently what's
+  causing the double free issue I'm running into
+
+- the code/data memory is freed twice because it just copies the addresses to a brand new memory_area
+- I can refcount the memory_object, but then I'd have to allocate it as well.  So there'd be memory_map, memory_area, and
+  memory_object, all wasting 8 bytes each to hold the alloc info
+- I can't insert the same memory_area into the linked list in two maps, but I can go back to the array of pointers style list.  I'd
+  have to realloc the area though, or else alloc the array separately, to allow the map to grow, so... I guess I still have 3 allocs
+
+- oh right, now I remember how it was with ruxpin.  The pages themselves are the cached open executable file, so at least for those
+  pages, they don't need to track the refs, as long as the file handle/vnode ref is held.  Unfortunately, that trick only works with
+  an MMU, so non-MMU mode will have to behave differently, and that difference needs to be easy to make configurable
+
+- now, unrelatedly, I'm thinking maybe the notation of `clone` is not good when it's always refcounted by meaning, and sometimes I
+  need some other kind of `duplicate` function... so how about `memory_object_ref` or `memory_object_make_ref` or get_ref, or...
+

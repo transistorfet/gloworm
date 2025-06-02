@@ -1,7 +1,7 @@
 
 #include <string.h>
 
-char *strncat(char *dest, const char *src, int max)
+char *strncat(char *dest, const char *src, unsigned long max)
 {
 	char *ret = dest;
 

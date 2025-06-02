@@ -16,7 +16,7 @@ struct heap {
 static int last_increase = 1024;
 static struct heap main_heap = { 0 };
 
-void *malloc(int size)
+void *malloc(unsigned long size)
 {
 	struct block *prev = NULL;
 	struct block *nextfree = NULL;
