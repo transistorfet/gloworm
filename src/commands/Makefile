@@ -40,7 +40,10 @@ userprogs-stripped		+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(n
 
 libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 extra-y				+= echo.c cat.c ls.c mkdir.c pwd.c mv.c cp.c ln.c rm.c chmod.c date.c ps.c kill.c mount.c umount.c sync.c
+extra-$(CONFIG_TEST_CMDS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest.c tcpserv.c
 
+
+userprog-ccflags-y		+= -Ttext=0x0000
 CFLAGS				+= -Isrc/kernel/arch/$(SRCARCH)/include
 
 # When other utilities are included into the shell, this flag will tell them not to include a main function
