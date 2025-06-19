@@ -687,3 +687,64 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - now, unrelatedly, I'm thinking maybe the notation of `clone` is not good when it's always refcounted by meaning, and sometimes I
   need some other kind of `duplicate` function... so how about `memory_object_ref` or `memory_object_make_ref` or get_ref, or...
 
+
+2025-06-03:
+
+- I'm pushed into using 3 allocations, and generally such a complicated memory map solution, by the no-MMU m68k architecture.  It
+  also requires a fairly unique memory map, as would the no-MMU 8086 arch.  I'm struggling with  how best to isolate the process
+  creation code for each arch
+
+
+2025-06-08:
+
+- I've made a new file, exec.c, in addition to binaries.c, fork.c, and init.c.  I've pushed the reset_stack stuff into exec.c and
+  the reset stack call into binaries.c for now.  My intention at least, is to put the common exec stuff into exec.c and try to keep
+  init.c as small as possible, so all the memory related creation is done in exec.c, and can be changed once without having to
+  consider both so often.  fork.c will have process forking/copying which is quite different from new executions.  And eventually
+  some of what's in binaries.c, the common non-file-related parts can also be pushed into exec.c so it has all the common new process
+  initialization code
+- also, I have a bunch of memory leak issues with memory map, and objects, where the refcounts are wrong and the process memory,
+  which is kmalloc'd at the moment, never gets freed
+
+
+2025-06-10:
+
+- I mentioned the issue of forking a process on 68k in the Usagi Electric - Homebrew Computing discord and PenguinOfEvil (the
+  creator of Fuzix) responded:
+      You copy it back when you task switch. That's how Fuzix works, it's how Minix works on 68K. There's only one generic old era
+      small Unix program commonly used that forks and doesn't then exec something which means no more copying needed - that's kermit
+- I was looking at Minix last night, and I found it has an extra shadow value in the proc struct with the memory map tables, and it
+  delays the copying until the kernel (and not the mm process) handles the fork, at which point it does a copy.  Last night I was
+  thinking it was just one copy, and it looks like just one copy, but Penguin is alluding to it copying the shadow region into the
+  same working region (primarily the data segment from the looks of it) on every task switch?  I can see why that would be slow, as
+  he mentioned much earlier
+- I feel like I've had this conversation with him before, but I remember it only vaguely.  Generally this solution is called the
+  shadow solution or shadowing, and there's a special shadow.c file just for it in the Macintosh Minix source code that I have
+- the Minix code mentions 500ms as the FLIPWAIT time.  It seems to be doing the copying itself in the clock code and not the context
+  switching code.  I'm not sure what's up with that.  It does seem like a weird implementation of the concept, or just difficult to
+  follow
+- The last time I heard of this, I had probably decided not to implement it, and I'm kind of thinking the same thing this time,
+  since almost all procs will call exec() after a fork(), but it would be nice if the new refactor would make it possible to
+  implement later
+- that said, now that I'm thinking about memory usage and constrained systems, I'm starting to second guess the approach I'm taking,
+  with so many allocations.  Maybe I should try to simplify it a bit?  It's a tradeoff between flexibility for larger systems and
+  memory usage for smaller systems, so in that sense, it's maybe better to focus on larger systems, but I still feel bad about it.
+  Maybe I could make some of it compile-time selectable?
+
+- from the todo file:  after looking at linux code, it initializes a new mm_struct when loading the binary, and then swaps it in
+  into the process when it executes, which is a much better way to do it, now that I have a separate alloc for the map itself
+
+- I've cleaned up the map and segment allocating code, with init.c using exec.c to launch new processes, and both kernel execution
+  and elf binary from fs works and runs correctly enough to not blatanly fail.  The increment and decrement messages are being
+  printed, so that's a big one to fix still.  I don't have that in my todo list yet
+
+
+2025-06-14:
+
+- I was making this pretty complicated, but realized that if I switch to the pages system instead of kmalloc for user memory, I
+  wouldn't need to free the block at once and could instead have it free the single block as multiple blocks (so that the heap and
+  stack segments could be free separately).  That means when cloning the process, it doesn't need to ensure it only copies one
+  memory_object as the heap/stack
+- now that I write that though, I realize that not only am I probably not adjusting the cloned heap correctly, but I'm also probably
+  not ensuring that when the heap grows, it only grows by PAGE_SIZE increments
+

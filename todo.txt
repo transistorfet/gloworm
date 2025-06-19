@@ -1,30 +1,35 @@
 
-* actually allocate the maps, but where exactly?
+
+* why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
+
+* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
+* when cloning the stack and heap, the heap segment is not adjusted properly
+* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
+  unfreed in the middle of the segment
+* you need to add a config option and convenience function for rounding up to the nearest size, like KMALLOC_MINALIGN on linux
+* threadtest is failing to execute, possibly because the transfer fails, but the output is really weird.  It calls load_binary many
+  many times, and then fails because there's too many open files, and this happens before the process even runs, so it's either a
+  bug in the loading/exec code that isn't triggered by a normal program, or there's a problem with the transfer and it's corrupted
+
+* try to optimize the memory map code?
+* fix proc data.c
+
+* should you move memory.c into mm/ instead of proc/
+
 * separate out printk from tty driver and fix it so panic actually works
 
-* maybe use a memory_object abstractions
-* fix binary loading to use the right segments
-* use the 3 hardcoded pointers to make /proc/*/statm, and printing easier.  I can make a function to find and
-  grow/shrink/clone the segment(s), so that it can update the hardcoded pointers
-* fix the init code to create the first processes correctly
-* make forking the process allocate all the code/data/stack in one go, in binaries.c, and set up the memory segments
 * make it use page_alloc_contiguous() for the backing store, with page_free_single as the (*free) in memory_ops, and then go through
   each page in the memory when freeing the segment.  That will make it easier to switch to MMU later
 
 * add mmu mapping to memory_map
 * make it possible to set up the virtual address space differently with MMU enabled, when loading a binary
-* finish implementing clone() syscall
+
+* use the 3 hardcoded pointers to make /proc/*/statm, and printing easier.  I can make a function to find and
+  grow/shrink/clone the segment(s), so that it can update the hardcoded pointers
 
 * there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
   memory without duplicating them
 
-* now that I think about it, if you just copy the stack, the pointers will all point to the old code segment.  I'm pretty sure I've
-  come across this before, just haven't looked for any existing notes yet.  It mostly works because exec will be called shortly
-  after on the child process.  The code itself will still use pcrel but any relocation table updates would have to be redone, and
-  any addresses on the stack or in registers would be invalid
-* i'm seeing a lot of problems with the memory allocation and binary loading code.  The text and data sections are not next to each
-  other for a start, which might explain why sometimes global variables don't have their init values.  I need to implement proper
-  chmem support, and allocate a single block for the program
 * bug: running cat on a directory in /proc makes it crash to the monitor
 
 * add flags to kmalloc?
@@ -50,6 +55,10 @@
 * as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface
 * I don't know how the device driver interface in the file system would work with this
 * as part of this, it's possible that bufcache could move to the block driver subsystem code
+
+* can you reduce memory usage in the memory map tables by reducing how many different pieces are allocated?
+* can you make some of the memory usage and advanced features compile-time selectable, to accomodate systems with lots of memory and
+  very little memory?
 
 * implement mmu/tables
 * convert proc/user memory to use pages
@@ -90,6 +99,12 @@
 
 
 Operating System:
+
+    * implement the shadow memory solution from Minix/Fuzix for the issue of forking processes without MMU, where the addresses are
+      not patched and point to the old processes memory space.  Both OSes copy a shadow data segment into the parent process's
+      memory segments so that the process will see its own data instead of sharing data with the parent.  Since most processes that
+      fork also exec shortly after, it's not a particularly pressing concern, but would make things like kermit usable, and maybe
+      generic /bin/sh implementations
 
     * make use of 68k's supervisor and user mode. This requires major changes to the create_context since the entry point can't be put onto the user stack. RTE will pop the ret off the supervisor stack
     * do you need to disable triggering of the device-indepedent tty bottom half when the serial device is opened directly?
