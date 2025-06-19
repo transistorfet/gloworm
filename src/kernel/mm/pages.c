@@ -1,25 +1,11 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include <kconfig.h>
 #include <kernel/mm/pages.h>
 
-static struct page_block pages = { 0 };
-
-int init_pages(uintptr_t start, uintptr_t end)
-{
-	return init_page_block(&pages, (void *) start, end);
-}
-
-page_t *page_alloc_single(void)
-{
-	return page_block_alloc_single(&pages);
-}
-
-void page_free_single(page_t *page)
-{
-	page_block_free_single(&pages, page);
-}
+struct page_block pages = { 0 };
 
 
 int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size)
@@ -35,9 +21,7 @@ int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int 
 		return -1;
 	}
 
-	for (int pos = 0; pos < block->bitmap_size; pos++) {
-		block->bitmap[pos] = 0;
-	}
+	memset(block->bitmap, '\0', block->bitmap_size);
 
 	return 0;
 }
@@ -70,8 +54,9 @@ int init_page_block(struct page_block *block, void *addr, int size)
 /// It doesn't record the length of the allocation, so when freeing pages, the
 /// allocating code must keep track of the size and deallocate each page
 /// separately
-page_t *page_block_alloc_contiguous(struct page_block *block, int contiguous_pages)
+page_t *page_block_alloc_contiguous(struct page_block *block, size_t size)
 {
+	int contiguous_pages = size >> PAGE_ADDR_BITS;
 	uint32_t bit, start_bit, end_bit;
 	bitmap_t *bitmap = block->bitmap;
 
@@ -107,9 +92,8 @@ page_t *page_block_alloc_contiguous(struct page_block *block, int contiguous_pag
 					bitmap[BIT_INDEX(bit)] |= BIT_MASK(bit);
 					bit += 1;
 				}
-			} 
+			}
 
-			//return block->base + ((start_index * PAGES_PER_INDEX + start_bit) << PAGE_ADDR_BITS);
 			return &block->base[start_bit];
 		}
 	}

@@ -1,6 +1,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <kernel/printk.h>
 #include <kernel/mm/kmalloc.h>
 
@@ -28,7 +29,19 @@ void init_kernel_heap(uintptr_t start, uintptr_t end)
 	main_heap.free_blocks = space;
 }
 
-void *kmalloc(int size)
+void *kzalloc(uintptr_t size)
+{
+	void *alloc;
+	alloc = kmalloc(size);
+	if (!alloc) {
+		return NULL;
+	}
+
+	memset(alloc, '\0', size);
+	return alloc;
+}
+
+void *kmalloc(uintptr_t size)
 {
 	struct block *prev = NULL;
 	struct block *nextfree = NULL;
@@ -36,7 +49,7 @@ void *kmalloc(int size)
 
 	// Align the size to 4 bytes
 	size += ((4 - (size & 0x3)) & 0x3);
-	int block_size = size + sizeof(struct block);
+	uintptr_t block_size = size + sizeof(struct block);
 
 	for (; cur; prev = cur, cur = cur->next) {
 		if (cur->size >= block_size) {
@@ -60,6 +73,8 @@ void *kmalloc(int size)
 			}
 
 			return (void *) (cur + 1);
+		} else {
+
 		}
 	}
 	// Out Of Memory
@@ -71,6 +86,13 @@ void kmfree(void *ptr)
 {
 	struct block *prev = NULL;
 	struct block *block = ((struct block *) ptr) - 1;
+
+	// Allocated blocks will not be in any list, and `next` is set to NULL during
+	// allocation, so if that pointer is not NULL, this block has already been freed
+	// or there was some kind of memory corruption that clobbered the block data
+	if (block->next) {
+		panic("Double free detected at %x! Halting...\n", block);
+	}
 
 	for (struct block *cur = main_heap.free_blocks; cur; prev = cur, cur = cur->next) {
 		if (cur->next == block) {
