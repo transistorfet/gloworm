@@ -4,6 +4,7 @@
 
 #include <endian.h>
 #include <kernel/printk.h>
+#include <kernel/mm/kmalloc.h>
 #include <kernel/fs/bufcache.h>
 
 #include "minix.h"
@@ -37,7 +38,7 @@ static struct minix_super *load_superblock(device_t dev)
 
 	// TODO this is a temporary hack for cold starting a ram disk
 	if (le16toh(super_v1->magic) != 0x137F) {
-		printk_safe("minixfs: initializing root disk\n");
+		log_notice("minixfs: initializing root disk\n");
 		if (minix_mkfs(dev))
 			return NULL;
 	}

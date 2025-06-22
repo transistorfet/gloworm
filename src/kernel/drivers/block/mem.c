@@ -48,7 +48,7 @@ int mem_init()
 	register_driver(DEVMAJOR_MEM, &mem_driver);
 
 	for (short i = 0; i < num_devices; i++)
-		printk_safe("mem%d: ram disk of %d bytes\n", i, devices[i].size);
+		log_notice("mem%d: ram disk of %d bytes\n", i, devices[i].size);
 	return 0;
 }
 

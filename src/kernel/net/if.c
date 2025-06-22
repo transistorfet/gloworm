@@ -65,12 +65,12 @@ int net_if_change_state(struct if_device *ifdev, int state)
 		extern struct protocol ipv4_protocol;
 		ifdev->incoming_proto = &ipv4_protocol;
 
-		printk_safe("%s: bringing interface up\n", ifdev->name);
+		log_notice("%s: bringing interface up\n", ifdev->name);
 		error = ifdev->ops->up(ifdev);
 		if (error)
 			return error;
 	} else {
-		printk_safe("%s: bringing interface down\n", ifdev->name);
+		log_notice("%s: bringing interface down\n", ifdev->name);
 		error = ifdev->ops->down(ifdev);
 		if (error)
 			return error;
@@ -143,10 +143,10 @@ static void net_if_process_bh(void *_unused)
 
 				error = net_incoming_packet(active_ifdevs[i]->incoming_proto, pack);
 				if (error == PACKET_DROPPED) {
-					printk_safe("packet dropped\n");
+					log_debug("packet dropped\n");
 					active_ifdevs[i]->rx_stats.dropped += 1;
 				} else if (error == PACKET_ERROR) {
-					printk_safe("packet error\n");
+					log_error("packet error\n");
 					active_ifdevs[i]->rx_stats.errors += 1;
 				}
 			}

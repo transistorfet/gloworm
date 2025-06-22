@@ -3,7 +3,6 @@
 
 #include <asm/irqs.h>
 #include <kernel/api.h>
-#include <kernel/printk.h>
 #include <kernel/proc/timer.h>
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>

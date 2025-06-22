@@ -336,9 +336,9 @@ void print_process_segments(struct process *proc)
 {
 	struct memory_area *cur;
 
-	printk_safe("pid %d memory map:\n", proc->pid);
+	printk("pid %d memory map:\n", proc->pid);
 	for (cur = _queue_head(&proc->map->segments); cur; cur = _queue_next(&cur->node)) {
-		printk_safe("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
+		printk("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
 	}
 }
 

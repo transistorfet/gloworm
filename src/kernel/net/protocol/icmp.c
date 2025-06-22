@@ -110,7 +110,7 @@ int icmp_forward_packet(struct protocol *proto, struct packet *pack)
 	struct ipv4_custom_data *custom = (struct ipv4_custom_data *) pack->custom_data;
 	struct icmp_header *hdr = (struct icmp_header *) &pack->data[pack->transport_offset];
 
-	printk_safe("ICMP recevied: %d %d\n", hdr->type, hdr->code);
+	log_debug("ICMP recevied: %d %d\n", hdr->type, hdr->code);
 
 	switch (hdr->type) {
 		case ICMP_TYPE_ECHO: {

@@ -136,7 +136,7 @@ struct process *create_kernel_thread(const char *name, int (*task_start)())
 fail:
 	if (proc)
 		close_proc(proc);
-	printk_safe("error when creating kernel task: %d\n", error);
+	log_error("error when creating kernel task: %d\n", error);
 	return NULL;
 }
 

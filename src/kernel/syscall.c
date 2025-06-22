@@ -217,7 +217,7 @@ int do_exec(const char *path, const char *const argv[], const char *const envp[]
 	error = load_binary(path, current_proc, argv, envp);
 	if (error == EKILL) {
 		// An error occurred past the point of no return.  The memory maps have been irrepairably damaged, so kill the process
-		printk_safe("Process terminated\n");
+		log_error("Process terminated\n");
 		exit_proc(current_proc, -1);
 		resume_waiting_parent(current_proc);
 		return error;

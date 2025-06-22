@@ -38,6 +38,40 @@ config SHELL_IN_KERNEL
 	  running the monitor from ROM, when no secondary storage is available
 	  or when it's not working correctly.
 
+choice
+	prompt "Log level"
+	default LOG_LEVEL_INFO
+
+config LOG_LEVEL_NOTICE
+	bool "notice"
+	help
+	  This option selects the NOTICE log level as the minimum level to print.
+	  Log messages that are equal to or more critical than this level will
+	  be printed to the console
+
+config LOG_LEVEL_INFO
+	bool "info"
+	help
+	  This option selects the INFO log level as the minimum level to print.
+	  Log messages that are equal to or more critical than this level will
+	  be printed to the console
+
+config LOG_LEVEL_DEBUG
+	bool "debug"
+	help
+	  This option selects the DEBUG log level as the minimum level to print.
+	  Log messages that are equal to or more critical than this level will
+	  be printed to the console
+
+config LOG_LEVEL_TRACE
+	bool "trace"
+	help
+	  This option selects the TRACE log level as the minimum level to print.
+	  Log messages that are equal to or more critical than this level will
+	  be printed to the console
+
+endchoice
+
 endif
 
 endmenu

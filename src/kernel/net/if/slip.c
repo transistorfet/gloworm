@@ -108,11 +108,11 @@ static void slip_encode_packet(struct slip_if_device *ifdev)
 
 
 	if (ifdev->ifdev.flags & IFF_DEBUG) {
-		printk_safe("DEBUG: send packet: ");
+		log_debug("DEBUG: send packet: ");
 		for (int i = 0; i < pack->length; i++) {
-			printk_safe("%x ", (int) pack->data[i]);
+			log_debug("%x ", (int) pack->data[i]);
 		}
-		printk_safe("\n");
+		log_debug("\n");
 	}
 
 
@@ -166,10 +166,10 @@ static void slip_decode_packet(struct slip_if_device *ifdev, short length)
 	pack->length = j;
 
 	if (ifdev->ifdev.flags & IFF_DEBUG) {
-		printk_safe("DEBUG: recv packet: ");
+		log_debug("DEBUG: recv packet: ");
 		for (int i = 0; i < pack->length; i++)
-			printk_safe("%x ", (int) pack->data[i]);
-		printk_safe("\n");
+			log_debug("%x ", (int) pack->data[i]);
+		log_debug("\n");
 	}
 
 	_queue_insert_after(&ifdev->ifdev.rx_queue, &pack->node, ifdev->ifdev.rx_queue.tail);
@@ -214,8 +214,8 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 	ifdev->rx_write += read;
 
 	//for (int i = 0; i < ifdev->rx_write; i++)
-	//	printk_safe("%x ", (int) ifdev->rx_buffer[i]);
-	//printk_safe("\n");
+	//	log_debug("%x ", (int) ifdev->rx_buffer[i]);
+	//log_debug("\n");
 
 	for (; read; read--) {
 		if (ifdev->rx_buffer[ifdev->rx_read] == SLIP_FRAME_END) {

@@ -74,7 +74,7 @@ int release_block(struct buf *buf, short dirty)
 		//_write_entry(buf);
 	} else if (buf->refcount < 0) {
 		buf->refcount = 0;
-		printk("Error: possible double free for block %d:%d\n", buf->dev, buf->num);
+		log_warning("error: possible double free for block %d:%d\n", buf->dev, buf->num);
 	}
 	return 0;
 }

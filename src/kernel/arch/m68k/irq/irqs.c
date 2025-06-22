@@ -89,20 +89,12 @@ void print_stack(struct exception_frame *frame)
 	uint16_t *stack = (uint16_t *) frame;
 
 	// Dump stack
-	printk_safe("Stack: %x\n", stack);
-	for (short i = 0; i < 48; i++) {
-		printk_safe("%04x ", stack[i]);
-		if ((i & 0x7) == 0x7)
-			printk_safe("\n");
-	}
+	printk("Stack: %x\n", stack);
+	printk_dump(stack, 48);
 
 	// Dump code where the error occurred
-	printk_safe("\nCode: %x\n", code);
-	for (short i = 0; i < 48; i++) {
-		printk_safe("%04x ", code[i]);
-		if ((i & 0x7) == 0x7)
-			printk_safe("\n");
-	}
+	printk("\nCode: %x\n", code);
+	printk_dump(code, 48);
 }
 
 void user_error(struct context *context)
@@ -111,7 +103,7 @@ void user_error(struct context *context)
 
 	struct exception_frame *frame = &context->frame;
 
-	printk_safe("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
+	log_error("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	print_process_segments(current_proc);
 	print_stack(frame);
 
@@ -121,10 +113,11 @@ void user_error(struct context *context)
 void fatal_error(struct context *context)
 {
 	struct exception_frame *frame = &context->frame;
+	void console_prepare_for_panic(void);
 
-	prepare_for_panic();
+	console_prepare_for_panic();
 
-	printk_safe("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
+	log_fatal("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 
 	print_stack(frame);
 
@@ -165,5 +158,5 @@ __attribute__((interrupt)) void handle_trace()
 
 	GET_FRAME(context);
 
-	printk_safe("Trace %x (%x)\n", context->frame.pc, context->frame.pc);
+	log_trace("Trace %x (%x)\n", context->frame.pc, context->frame.pc);
 }

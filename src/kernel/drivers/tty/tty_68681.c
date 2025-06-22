@@ -1,5 +1,4 @@
 
-#include <stdio.h>
 #include <stdint.h>
 
 #include <errno.h>
@@ -24,7 +23,7 @@
 #include <kernel/utils/ringbuffer.h>
 
 
-// Driver Definition
+// Kernel Driver Definition
 int tty_68681_init();
 int tty_68681_open(devminor_t minor, int access);
 int tty_68681_close(devminor_t minor);
@@ -210,20 +209,7 @@ static inline void config_serial_channel(struct serial_channel *channel)
 	*channel->ports->command = CMD_ENABLE_TX_RX;
 }
 
-
-static inline struct serial_channel *from_minor_dev(device_t minor)
-{
-	switch (minor) {
-		case 0:
-			return &channels[CH_A];
-		case 1:
-			return &channels[CH_B];
-		default:
-			return NULL;
-	}
-}
-
-static inline int getchar_buffered(struct serial_channel *channel)
+static inline int tty_68681_getchar_buffered(struct serial_channel *channel)
 {
 	short saved_status;
 	LOCK(saved_status);
@@ -231,7 +217,7 @@ static inline int getchar_buffered(struct serial_channel *channel)
 	// TODO maybe this should return some kind of error, like -1
 	while (_buf_is_empty(&channel->rx)) {
 		asm volatile("");
-		//putchar_buffered('^');
+		//tty_68681_putchar_buffered('^');
 	}
 	unsigned char ch = _buf_get_char(&channel->rx);
 
@@ -243,7 +229,7 @@ static inline int getchar_buffered(struct serial_channel *channel)
 }
 
 
-static inline int putchar_direct(struct serial_channel *channel, int ch)
+static inline int tty_68681_putchar_direct(struct serial_channel *channel, int ch)
 {
 	short saved_status;
 	LOCK(saved_status);
@@ -256,7 +242,7 @@ static inline int putchar_direct(struct serial_channel *channel, int ch)
 	return ch;
 }
 
-static inline int putchar_buffered(struct serial_channel *channel, int ch)
+static inline int tty_68681_putchar_buffered(struct serial_channel *channel, int ch)
 {
 	short saved_status;
 	LOCK(saved_status);
@@ -275,8 +261,6 @@ static inline int putchar_buffered(struct serial_channel *channel, int ch)
 	return ch;
 }
 
-//int putchar(int ch) { return putchar_buffered(&channels[CH_A], ch); }
-
 static void tty_68681_process_input(void *_unused)
 {
 	if (handle_timer) {
@@ -292,7 +276,7 @@ static void tty_68681_process_input(void *_unused)
 			//request_bh_run(BH_TTY);
 			request_bh_run(channels[i].bh_num);
 
-			// TODO this isn't needed now, since the assert in getchar handle this, but once we have the tty subsystem this might be needed
+			// TODO this isn't needed now, since the assert in getchar handles this, but once we have the tty subsystem this might be needed
 			//if (_buf_is_empty(&channels[i].rx))
 			//	ASSERT_CTS(&channels[i]);
 		}
@@ -349,7 +333,6 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 	}
 }
 
-// NOTE the entry to this is in syscall_entry.s
 void handle_serial_irq()
 {
 	// TODO this is for debugging to tell me when the handler exits
@@ -394,7 +377,7 @@ void handle_serial_irq()
 		);
 
 		//if (status & 0x03) {
-		//	putchar_buffered('!');
+		//	tty_68681_putchar_buffered('!');
 		//	TRACE_ON();
 		//}
 		//else if (!(status & 0x03)) {
@@ -421,70 +404,15 @@ void handle_serial_irq()
 	*OUT_RESET_ADDR = 0x08;
 }
 
-
-
-#define PRINTK_BUFFER	128
-
-int vprintk(int buffered, const char *fmt, va_list args)
+void tty_68681_set_leds(uint8_t bits)
 {
-	int i;
-	char buffer[PRINTK_BUFFER];
-	int (*put)(struct serial_channel *, int) = buffered ? putchar_buffered : putchar_direct;
-
-	vsnprintf(buffer, PRINTK_BUFFER, fmt, args);
-	for (i = 0; i < PRINTK_BUFFER && buffer[i]; i++)
-		//putchar_direct(&channels[CH_A], buffer[i]);
-		//putchar_buffered(&channels[CH_A], buffer[i]);
-		put(&channels[CH_A], buffer[i]);
-	return i;
+	*OUT_SET_ADDR = (bits << 4);
 }
 
-int printk(const char *fmt, ...)
+void tty_68681_reset_leds(uint8_t bits)
 {
-	int ret;
-	va_list args;
-
-	va_start(args, fmt);
-	ret = vprintk(1, fmt, args);
-	va_end(args);
-
-	return ret;
+	*OUT_RESET_ADDR = (bits << 4);
 }
-
-int printk_safe(const char *fmt, ...)
-{
-	int ret;
-	va_list args;
-
-	va_start(args, fmt);
-	ret = vprintk(0, fmt, args);
-	va_end(args);
-
-	return ret;
-}
-
-__attribute__((noreturn)) void panic(const char *fmt, ...)
-{
-	va_list args;
-
-	tty_68681_tx_safe_mode();
-
-	va_start(args, fmt);
-	vprintk(0, fmt, args);
-	va_end(args);
-
-	extern void print_stack(void *);
-	print_stack((void *) args);
-
-	HALT();
-	__builtin_unreachable();
-}
-
-void prepare_for_panic()
-{
-	tty_68681_tx_safe_mode();
-}
-
 
 void tty_68681_tx_safe_mode()
 {
@@ -527,6 +455,7 @@ void tty_68681_normal_mode()
 	*IVR_WR_ADDR = TTY_INT_VECTOR;
 	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
 
+	// Register the interrupt handler with the kernel for the irq number we configured the device for above
 	request_irq(TTY_INT_VECTOR, handle_serial_irq, 0);
 	enable_irq(TTY_INT_VECTOR);
 
@@ -540,7 +469,6 @@ void tty_68681_normal_mode()
 
 	ASSERT_CTS(&channels[CH_A]);
 	ASSERT_CTS(&channels[CH_B]);
-
 }
 
 
@@ -555,6 +483,21 @@ void tty_68681_preinit()
 	channels[CH_B].ports = &channel_b_ports;
 
 	tty_68681_tx_safe_mode();
+}
+
+
+////// Kernel Driver Interface //////
+
+static inline struct serial_channel *from_minor_dev(device_t minor)
+{
+	switch (minor) {
+		case 0:
+			return &channels[CH_A];
+		case 1:
+			return &channels[CH_B];
+		default:
+			return NULL;
+	}
 }
 
 int tty_68681_init()
@@ -611,7 +554,7 @@ int tty_68681_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 				suspend_current_syscall(VFS_POLL_READ);
 			return size - i;
 		}
-		*buffer = getchar_buffered(channel);
+		*buffer = tty_68681_getchar_buffered(channel);
 	}
 	return size;
 }
@@ -632,9 +575,9 @@ int tty_68681_write(devminor_t minor, const char *buffer, offset_t offset, size_
 		return 0;
 	}
 
-	for (; i > 0; i--, buffer++)
-		//putchar_indirect(channel, *buffer);
-		putchar_buffered(channel, *buffer);
+	for (; i > 0; i--, buffer++) {
+		tty_68681_putchar_buffered(channel, *buffer);
+	}
 	return size;
 }
 
@@ -677,14 +620,20 @@ offset_t tty_68681_seek(devminor_t minor, offset_t position, int whence, offset_
 }
 
 
-void tty_68681_set_leds(uint8_t bits)
+////// Printk Interface //////
+
+void console_prepare_for_panic()
 {
-	*OUT_SET_ADDR = (bits << 4);
+	tty_68681_tx_safe_mode();
 }
 
-void tty_68681_reset_leds(uint8_t bits)
+int console_putchar_direct(int ch)
 {
-	*OUT_RESET_ADDR = (bits << 4);
+	return tty_68681_putchar_direct(&channels[CH_A], ch);
 }
 
+int console_putchar_buffered(int ch)
+{
+	return tty_68681_putchar_buffered(&channels[CH_A], ch);
+}
 

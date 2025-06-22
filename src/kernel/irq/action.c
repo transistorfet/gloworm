@@ -45,7 +45,7 @@ void init_interrupts(void)
 void request_irq(irq_num_t irq, irq_handler_t handler, int flags)
 {
 	if (action_table[(short) irq].handler) {
-		printk_safe("already an irq handler for %d, overwriting\n", irq);
+		log_warning("already an irq handler for %d, overwriting\n", irq);
 	}
 	action_table[(short) irq].flags = flags;
 	action_table[(short) irq].handler = handler;
@@ -69,13 +69,13 @@ void disable_irq(irq_num_t irq)
 
 void do_irq(irq_num_t irq)
 {
-	//printk_safe("irq %d\n", irq);
+	//printk("irq %d\n", irq);
 	// TODO call the appropriate interrupt
 	//extern irq_handler_t handle_serial_irq();
 	//handle_serial_irq();
 
 	struct irq_action *action = &action_table[(short) irq];
-	//printk_safe("%d %d %x\n", irq, action->flags, action->handler);
+	//printk("%d %d %x\n", irq, action->flags, action->handler);
 	if (irq < INTERRUPT_MAX && action->handler && action->flags & INT_FLAG_ENABLED) {
 		action->handler();
 	}

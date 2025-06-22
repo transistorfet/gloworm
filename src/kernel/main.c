@@ -139,7 +139,7 @@ int main()
 {
 	tty_68681_preinit();
 
-	printk_safe("\nBooting with \"%s\"...\n\n", boot_args);
+	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
 	init_kernel_heap(CONFIG_KMEM_START, CONFIG_KMEM_END);
@@ -178,7 +178,7 @@ int main()
 		protocols[i]->init();
 	#endif
 
-	printk_safe("minixfs: mounting (%x) at %s\n", root_dev, "/");
+	printk("minixfs: mounting (%x) at %s\n", root_dev, "/");
 	vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
 
 
@@ -194,7 +194,7 @@ int main()
 	create_special_or_panic("/dev/ata0", DEVNUM(DEVMAJOR_ATA, 0));
 
 	// TODO device number here is an issue because 0 is used to indicated a mount slot is not used, which when mounting after this causes a /proc error
-	printk_safe("procfs: mounting at /proc\n");
+	printk("procfs: mounting at /proc\n");
 	vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
 
 	//vfs_mount(NULL, "/media", DEVNUM(DEVMAJOR_ATA, 0), &minix_mount_ops, SU_UID);

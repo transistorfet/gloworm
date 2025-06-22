@@ -7,7 +7,6 @@
 #include <sys/types.h>
 
 #include <asm/byteorder.h>
-#include <kernel/printk.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>

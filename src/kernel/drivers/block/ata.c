@@ -145,7 +145,7 @@ int ata_read_sector(int sector, char *buffer)
 
 	char status = (*ATA_REG_STATUS);
 	if (status & 0x01) {
-		printk_safe("Error while reading ata: %x\n", (*ATA_REG_ERROR));
+		log_error("Error while reading ata: %x\n", (*ATA_REG_ERROR));
 		UNLOCK(saved_status);
 		return 0;
 	}
@@ -163,11 +163,11 @@ int ata_read_sector(int sector, char *buffer)
 	}
 
 	/*
-	printk_safe("reading sector %x:\n", sector);
+	printk("reading sector %x:\n", sector);
 	for (int i = 0; i < 512; i++) {
-		printk_safe("%02x ", 0xff & buffer[i]);
+		printk("%02x ", 0xff & buffer[i]);
 		if ((i & 0x1F) == 0x1F)
-			printk_safe("\n");
+			printk("\n");
 	}
 	*/
 
@@ -197,9 +197,9 @@ int ata_write_sector(int sector, const char *buffer)
 	ATA_WAIT();
 
 	char status = (*ATA_REG_STATUS);
-	//printk_safe("IDE: %x\n", status);
+	//printk("IDE: %x\n", status);
 	if (status & 0x01) {
-		printk_safe("Error while writing ata: %x\n", (*ATA_REG_ERROR));
+		log_error("Error while writing ata: %x\n", (*ATA_REG_ERROR));
 		UNLOCK(saved_status);
 		return 0;
 	}
@@ -220,7 +220,7 @@ int ata_write_sector(int sector, const char *buffer)
 	ATA_WAIT();
 
 	if (*ATA_REG_STATUS & ATA_ST_ERROR) {
-		printk_safe("Error writing sector %d: %x\n", sector, *ATA_REG_ERROR);
+		log_error("Error writing sector %d: %x\n", sector, *ATA_REG_ERROR);
 	}
 
 	UNLOCK(saved_status);
@@ -259,7 +259,7 @@ int ata_init()
 
 	// TODO this doesn't work very well
 	if (!ata_detect()) {
-		printk_safe("ATA device not detected\n");
+		log_info("ATA device not detected\n");
 		return 0;
 	}
 
@@ -270,7 +270,7 @@ int ata_init()
 
 	for (short i = 0; i < PARTITION_MAX; i++) {
 		if (drives[0].parts[i].size)
-			printk_safe("ata%d: found partition with %d sectors\n", i, drives[0].parts[i].size);
+			log_notice("ata%d: found partition with %d sectors\n", i, drives[0].parts[i].size);
 	}
 
 	return 0;

@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/sched.h>
-#include <kernel/printk.h>
 #include <kernel/mm/pages.h>
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>

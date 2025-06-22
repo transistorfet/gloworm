@@ -34,8 +34,7 @@ void init_scheduler()
 
 	idle_proc = create_idle_task();
 	if (!idle_proc) {
-		printk_safe("eternal slumber\n");
-		while (1) {}
+		panic("eternal slumber\n");
 	}
 	_queue_remove(&run_queue, &idle_proc->node);
 }

@@ -13,6 +13,8 @@ obj-y				+= drivers/
 obj-y				+= fs/
 obj-$(CONFIG_NET)		+= net/
 
+obj-y				+= utils/
+
 obj-$(CONFIG_SHELL_IN_KERNEL)	+= cmd-init.o
 obj-$(CONFIG_SHELL_IN_KERNEL)	+= cmd-sh.o
 
