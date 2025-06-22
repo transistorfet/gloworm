@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 
 #include "data.h"
@@ -14,7 +15,7 @@ static inline size_t get_proc_size(struct process *proc);
 int get_data_cmdline(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
-	for (const char **arg = proc->cmdline; *arg; arg++) {
+	for (const char *const *arg = proc->map->argv; *arg; arg++) {
 		strncpy(&buffer[i], *arg, max - i);
 		i += strlen(*arg) + 1;
 		buffer[i - 1] = ' ';
@@ -31,7 +32,7 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 	return snprintf(buffer, max,
 		"%d %s %c %d %d %d %d %ld %ld\n",
 		proc->pid,
-		proc->cmdline[0],
+		proc->map->argv[0],
 		get_proc_state(proc),
 		proc->parent,
 		proc->pgid,
@@ -47,14 +48,15 @@ int get_data_statm(struct process *proc, char *buffer, int max)
 	return snprintf(buffer, max,
 		"%ld %lx %lx %lx %lx %lx %lx %lx\n",
 		get_proc_size(proc),
-		(uintptr_t) proc->map.segments[M_TEXT].base,
-		proc->map.segments[M_TEXT].length,
-		(uintptr_t) proc->map.segments[M_DATA].base,
-		proc->map.segments[M_DATA].length,
-		(uintptr_t) proc->map.segments[M_STACK].base,
-		proc->map.segments[M_STACK].length,
+		(uintptr_t) proc->map->code_start,
+		proc->map->data_start - proc->map->code_start,
+		(uintptr_t) proc->map->data_start,
+		proc->map->sbrk - proc->map->data_start,
+		(uintptr_t) proc->map->sbrk,
+		proc->map->stack_end,
 		(uintptr_t) proc->sp
 	);
+
 }
 
 
@@ -78,8 +80,10 @@ static inline char get_proc_state(struct process *proc)
 static inline size_t get_proc_size(struct process *proc)
 {
 	size_t size = 0;
-	for (short i = 0; i < NUM_SEGMENTS; i++)
-		size += proc->map.segments[i].length;
+
+	for (struct memory_area *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+		size += cur->end - cur->start;
+	}
 	return size;
 }
 

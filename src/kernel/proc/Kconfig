@@ -1,0 +1,11 @@
+
+menu "Process and thread options"
+
+config USER_STACK_SIZE
+	int
+	default 8192
+	help
+	  This is size of the stack that will be allocated for each user
+	  process that's executed.
+
+endmenu

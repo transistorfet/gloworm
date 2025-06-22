@@ -23,7 +23,7 @@ int select_check_open_fds(struct process *proc, int max, fd_set *readfds, fd_set
 		for (fd_mask_t bit = 0x01; bit; bit <<= 1, fd++) {
 			if (fd >= max)
 				return 0;
-			if ((mask & bit) && !proc->fd_table[fd])
+			if ((mask & bit) && !proc->fd_table->files[fd])
 				return -1;
 		}
 	}
@@ -42,7 +42,7 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 				break;
 
 			// TODO should it just poll for any of the 3, or trim it down to just the ones we're looking for
-			revents = vfs_poll(proc->fd_table[fd], VFS_POLL_READ | VFS_POLL_WRITE | VFS_POLL_ERROR);
+			revents = vfs_poll(proc->fd_table->files[fd], VFS_POLL_READ | VFS_POLL_WRITE | VFS_POLL_ERROR);
 
 			if (readfds && (readfds->fds_bits[word] & bit)) {
 				if (revents & VFS_POLL_READ) {

@@ -6,16 +6,27 @@
 
 #include <kernel/fs/vfs.h>
 
-typedef struct vfile *fd_table_t[OPEN_MAX];
+struct fd_table {
+	int refcount;
+	struct vfile *files[OPEN_MAX];
+};
 
-void init_fd_table(fd_table_t table);
-void release_fd_table(fd_table_t table);
-void dup_fd_table(fd_table_t dest, fd_table_t source);
+struct fd_table *alloc_fd_table();
+void free_fd_table(struct fd_table *table);
+void init_fd_table(struct fd_table *table);
+void release_fd_table(struct fd_table *table);
+void dup_fd_table(struct fd_table *dest, struct fd_table *source);
 
-int find_unused_fd(fd_table_t table);
-struct vfile *get_fd(fd_table_t table, int fd);
-void set_fd(fd_table_t table, int fd, struct vfile *file);
-void dup_fd(fd_table_t table, int fd, struct vfile *file);
-void unset_fd(fd_table_t table, int fd);
+int find_unused_fd(struct fd_table *table);
+struct vfile *get_fd(struct fd_table *table, int fd);
+void set_fd(struct fd_table *table, int fd, struct vfile *file);
+void dup_fd(struct fd_table *table, int fd, struct vfile *file);
+void unset_fd(struct fd_table *table, int fd);
+
+static inline struct fd_table *make_ref_fd_table(struct fd_table *table)
+{
+	table->refcount++;
+	return table;
+}
 
 #endif

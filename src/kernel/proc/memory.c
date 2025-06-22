@@ -2,180 +2,343 @@
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
+#include <kconfig.h>
+#include <asm/types.h>
 #include <kernel/printk.h>
 #include <kernel/mm/kmalloc.h>
+#include <kernel/mm/pages.h>
+#include <kernel/fs/fileptr.h>
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
 
 
-int copy_string_array(char **stack, int *count, char *const arr[])
+void pages_object_free(struct memory_object *object)
 {
-	int len = 0;
-	*count = 0;
+	page_free_contiguous(object->mem_start, object->mem_length);
+}
 
-	for (int i = 0; arr[i] != NULL; i++) {
-		// String, line terminator, and a pointer 
-		len += sizeof(char *) + strlen(arr[i]) + 1;
-		*count += 1;
+struct memory_ops pages_object_ops = {
+	.free		= pages_object_free,
+	.load_page_at	= NULL,
+};
+
+struct memory_object *memory_object_alloc(struct vfile *file)
+{
+	struct memory_object *object;
+	struct memory_ops *ops = NULL;
+
+	ops = &pages_object_ops;
+
+	object = kzalloc(sizeof(struct memory_object));
+	if (!object) {
+		return NULL;
 	}
-	len += sizeof(char *);
 
-	// Align to the nearest word
-	if (len & 0x01)
-		len += 1;
+	object->refcount = 1;
+	object->ops = ops;
+	object->file_backed.file = file;
 
-	char **dest_arr = (char **) (*stack - len);
-	char *buffer = ((char *) dest_arr) + (sizeof(char *) * (*count + 1));
-	*stack = (char *) dest_arr;
+	return object;
+}
 
-	int i = 0, j = 0;
-	for (; j < *count; j++) {
-		dest_arr[j] = &buffer[i];
-		strcpy(dest_arr[j], arr[j]);
-		i += strlen(arr[j]) + 1;
+void memory_object_free(struct memory_object *object)
+{
+	if (!object)
+		return;
+
+	if (--object->refcount == 0) {
+		if (object->ops && object->ops->free) {
+			object->ops->free(object);
+		}
+		kmfree(object);
 	}
-	dest_arr[j] = NULL;
-
-	return 0;
 }
 
-char *copy_exec_args(char *stack, char *const argv[], char *const envp[], const char **proc_args)
+struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile *file)
 {
-	int argc, envc;
-	char **stack_argv, **stack_envp;
+	char *memory = NULL;
+	struct memory_object *object;
 
-	copy_string_array(&stack, &envc, envp);
-	stack_envp = (char **) stack;
-	copy_string_array(&stack, &argc, argv);
-	stack_argv = (char **) stack;
+	// Round the size up to the nearest page
+	if ((size & (PAGE_SIZE - 1)) != 0) {
+		size = (size & ~(PAGE_SIZE - 1)) + PAGE_SIZE;
+	}
 
-	stack -= sizeof(char **);
-	*((char ***) stack) = stack_envp;
-	stack -= sizeof(char **);
-	*((char ***) stack) = stack_argv;
-	stack -= sizeof(int);
-	*((int *) stack) = argc;
+	object = memory_object_alloc(file);
+	if (!object)
+		goto fail;
 
-	for (short j = 0; j < PROC_CMDLINE_ARGS; j++)
-		proc_args[j] = j < argc ? stack_argv[j] : NULL;
+	#if !defined(CONFIG_MMU)
+	memory = (char *) page_alloc_contiguous(size);
+	if (!memory)
+		goto fail;
 
-	return stack;
+	object->ops = &pages_object_ops;
+	object->mem_start = memory;
+	object->mem_length = size;
+	object->anonymous.address = (physical_address_t) memory;
+	#endif
+
+	return object;
+
+fail:
+	if (memory)
+		kmfree(memory);
+	if (file)
+		free_fileptr(file);
+	return NULL;
 }
 
-int create_process_memory(struct process *proc, size_t text_size)
-{
-	char *text = kmalloc(text_size);
 
-	// TODO overwriting this could be a memory leak if it's not already NULL.  How do I refcount segments?
-	//if (proc->map.segments[M_TEXT].base)
-	//	kmfree(proc->map.segments[M_TEXT].base);
-	proc->map.segments[M_TEXT].base = text;
-	proc->map.segments[M_TEXT].length = text_size;
-	return 0;
+struct memory_area *memory_area_alloc(uintptr_t start, uintptr_t end, int flags, struct memory_object *object)
+{
+	struct memory_area *area;
+
+	area = kmalloc(sizeof(struct memory_area));
+	if (!area) {
+		memory_object_free(object);
+		return NULL;
+	}
+
+	_queue_node_init(&area->node);
+	area->flags = flags;
+	area->start = start;
+	area->end = end;
+	area->object = object;
+
+	return area;
 }
 
-void free_process_memory(struct process *proc)
+void memory_area_free(struct memory_area *area)
 {
-	struct process *cur;
-	struct process_iter iter;
+	memory_object_free(area->object);
+	kmfree(area);
+}
 
-	// If another process is sharing the same text segment, then set it to NULL so we don't free it
-	proc_iter_start(&iter);
-	while ((cur = proc_iter_next(&iter))) {
-		if (cur != proc && cur->map.segments[M_TEXT].base == proc->map.segments[M_TEXT].base) {
-			proc->map.segments[M_TEXT].base = NULL;
+struct memory_map *memory_map_alloc(void)
+{
+	struct memory_map *map;
+
+	map = kzalloc(sizeof(struct memory_map));
+	if (!map) {
+		return NULL;
+	}
+
+	map->refcount = 1;
+	_queue_init(&map->segments);
+
+	return map;
+}
+
+void memory_map_free(struct memory_map *map)
+{
+	struct memory_area *cur, *next;
+
+	if (!map) {
+		return;
+	}
+
+	if (--map->refcount == 0) {
+		for (cur = _queue_head(&map->segments); cur; cur = next) {
+			next = _queue_next(&cur->node);
+			memory_area_free(cur);
+		}
+		kmfree(map);
+		// TODO if CONFIG_MMU then also free table?
+	}
+}
+
+int memory_map_insert(struct memory_map *map, uintptr_t start, uintptr_t end, int flags, struct memory_object *object)
+{
+	struct memory_area *cur, *next, *area;
+
+	if (!object) {
+		return EFAULT;
+	}
+
+	area = memory_area_alloc(start, end, flags, object);
+	if (!area) {
+		memory_object_free(object);
+		return ENOMEM;
+	}
+
+	if (!map->code_start) {
+		if (flags & AREA_EXECUTABLE) {
+			map->code_start = start;
+		} else {
+			map->data_start = start;
+		}
+	}
+
+	if (end > map->stack_end) {
+		map->stack_end = end;
+	}
+
+	for (cur = _queue_head(&map->segments); cur; cur = next) {
+		next = _queue_next(&cur->node);
+		if (cur->end <= start && (!next || end <= next->start)) {
 			break;
 		}
 	}
 
-	if (proc->map.segments[M_TEXT].base)
-		kmfree(proc->map.segments[M_TEXT].base);
-	if (proc->map.segments[M_DATA].base)
-		kmfree(proc->map.segments[M_DATA].base);
+	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
+	_queue_insert_after(&map->segments, &area->node, cur ? &cur->node : NULL);
 
-	proc->map.segments[M_TEXT].base = NULL;
-	proc->map.segments[M_TEXT].length = 0;
-	proc->map.segments[M_DATA].base = NULL;
-	proc->map.segments[M_DATA].length = 0;
-	proc->map.segments[M_STACK].base = NULL;
-	proc->map.segments[M_STACK].length = 0;
-	/*
-	for (char j = 0; j < NUM_SEGMENTS; j++) {
-		if (proc->map.segments[j].base)
-			kmfree(proc->map.segments[j].base);
-	}
-	*/
+	return 0;
 }
 
-int clone_process_memory(struct process *parent_proc, struct process *proc)
+// TODO can you get rid of this function?
+struct memory_area *memory_map_find_by_type(struct memory_map *map, int flags)
 {
-	// NOTE: the stack of the current process would normally not contain the non-system-call registers (unlike all suspended
-	// processes) but the system call entry is patched for the cloning system calls to save them in the context code, so we can
-	// just clone the stack despite usually cloning the current process
-	int stack_size = parent_proc->map.segments[M_STACK].length;
-	char *stack = kmalloc(stack_size);
-	char *stack_pointer = (stack + stack_size) - ((parent_proc->map.segments[M_STACK].base + parent_proc->map.segments[M_STACK].length) - parent_proc->sp);
+	struct memory_area *cur;
 
-	memcpy(stack, parent_proc->map.segments[M_STACK].base, parent_proc->map.segments[M_STACK].length);
-
-	proc->map.segments[M_DATA].base = stack;
-	proc->map.segments[M_DATA].length = 0;
-	proc->map.segments[M_STACK].base = proc->map.segments[M_DATA].base;
-	proc->map.segments[M_STACK].length = stack_size;
-	proc->sp = stack_pointer;
-
-	proc->map.segments[M_TEXT].base = parent_proc->map.segments[M_TEXT].base;
-	proc->map.segments[M_TEXT].length = parent_proc->map.segments[M_TEXT].length;
-
-	// Copy the relevant process data from the parent to child
-	proc->cwd = parent_proc->cwd;
-	dup_fd_table(proc->fd_table, parent_proc->fd_table);
-
-	for (short j = 0; j < PROC_CMDLINE_ARGS; j++) {
-		if (parent_proc->cmdline[j]) {
-			proc->cmdline[j] = proc->map.segments[M_STACK].base + (parent_proc->cmdline[j] - (char *) parent_proc->map.segments[M_STACK].base);
-		} else {
-			proc->cmdline[j] = NULL;
+	for (cur = _queue_tail(&map->segments); cur; cur = _queue_prev(&cur->node)) {
+		if ((cur->flags & AREA_TYPE) == flags) {
+			return cur;
 		}
 	}
+	return NULL;
+}
 
+
+/// Resize the given area
+///
+/// The segment will be resized by `diff` bytes.  If the segment has the MAP_GROWSDOWN
+/// flag set, then it will grow the start of the segment downwards.  Otherwise the segment
+/// will grow the end of the segment upwards.  If there is an adjacent segment that would
+/// overlap after the change, then it is shrunk by the necessary amount
+int memory_map_resize(struct memory_area *area, ssize_t diff)
+{
+	uintptr_t new_addr;
+	struct memory_area *adjacent;
+
+	if (area->flags & AREA_GROWSDOWN) {
+		new_addr = area->start - diff;
+		adjacent = _queue_prev(&area->node);
+		if (adjacent && adjacent->end > new_addr) {
+			// TODO should this be an error or should it move it?
+			if (adjacent->start > new_addr) {
+				return EFAULT;
+			}
+			adjacent->end = new_addr;
+		}
+		area->start = new_addr;
+	} else {
+		new_addr = area->end + diff;
+		adjacent = _queue_next(&area->node);
+		if (adjacent && new_addr > adjacent->start) {
+			// TODO should this be an error or should it move it?
+			if (new_addr > adjacent->end) {
+				return EFAULT;
+			}
+			adjacent->start = new_addr;
+		}
+		area->end = new_addr;
+	}
 	return 0;
 }
 
-int reset_stack(struct process *proc, void *entry, char *const argv[], char *const envp[])
+
+
+int memory_map_move_sbrk(struct process *proc, int diff)
 {
-	// TODO this might be wrong if the data segment contains non-heap memory areas
-	// Reset the data segment to be 0
-	proc->map.segments[M_STACK].length += proc->map.segments[M_DATA].length;
-	proc->map.segments[M_STACK].base = proc->map.segments[M_DATA].base;
-	proc->map.segments[M_DATA].length = 0;
+	int error;
+	uintptr_t new_sbrk;
+	struct memory_area *heap, *stack;
 
-	// Reset the stack to start our new process
-	char *task_stack_pointer = proc->map.segments[M_STACK].base + proc->map.segments[M_STACK].length;
+	new_sbrk = proc->map->sbrk + diff;
 
-	// Setup new stack image
-	task_stack_pointer = copy_exec_args(task_stack_pointer, argv, envp, proc->cmdline);
-	task_stack_pointer = create_context(task_stack_pointer, entry, _exit);
-	proc->sp = task_stack_pointer;
+	stack = memory_area_find_prev(memory_map_iter_last(proc->map), proc->map->sbrk);
+	if (!stack) {
+		return EFAULT;
+	}
 
-	return 0;
-}
+	heap = memory_map_iter_prev(stack);
+	if (!heap) {
+		return EFAULT;
+	}
 
-int increase_data_segment(struct process *proc, int increase)
-{
-	if (proc->map.segments[M_DATA].base + increase >= proc->sp)
+	if (proc->map->sbrk != stack->start) {
+		return EFAULT;
+	}
+
+	if (stack->start + diff >= (uintptr_t) proc->sp) {
 		return ENOMEM;
-	if (((ssize_t) proc->map.segments[M_DATA].length) + increase < 0)
+	}
+
+	if (((ssize_t) (stack->end - stack->start)) + diff < 0) {
 		return ENOMEM;
+	}
+
 	// Require an alignment to 4 bytes
-	if ((increase > 0 ? increase : -increase) & 0x3)
+	if ((diff > 0 ? diff : -diff) & 0x3) {
 		return ENOMEM;
+	}
 
-	proc->map.segments[M_DATA].length += increase;
-	proc->map.segments[M_STACK].base += increase;
-	proc->map.segments[M_STACK].length -= increase;
+	if (diff >= 0) {
+		error = memory_map_resize(stack, -diff);
+	} else {
+		error = memory_map_resize(heap, diff);
+	}
+
+	if (error < 0) {
+		return error;
+	}
+
+	if (diff >= 0) {
+		error = memory_map_resize(heap, diff);
+	} else {
+		error = memory_map_resize(stack, -diff);
+	}
+
+	if (error < 0) {
+		return error;
+	}
+
+	proc->map->sbrk = new_sbrk;
 
 	return 0;
+}
+
+
+int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size)
+{
+	uintptr_t start;
+	int error = ENOMEM;
+	struct memory_object *object = NULL;
+
+	object = memory_object_alloc_user_memory(stack_size, NULL);
+	if (!object)
+		return ENOMEM;
+
+	start = object->anonymous.address;
+	error = memory_map_insert(map, start, start, AREA_TYPE_HEAP | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
+	if (error < 0)
+		goto fail;
+	error = memory_map_insert(map, start, start + stack_size, AREA_TYPE_STACK | AREA_GROWSDOWN | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
+	if (error < 0)
+		goto fail;
+	map->sbrk = start;
+
+	// Release the extra reference before exiting
+	memory_object_free(object);
+
+	return 0;
+
+fail:
+	if (object)
+		memory_object_free(object);
+	return error;
+}
+
+void print_process_segments(struct process *proc)
+{
+	struct memory_area *cur;
+
+	printk_safe("pid %d memory map:\n", proc->pid);
+	for (cur = _queue_head(&proc->map->segments); cur; cur = _queue_next(&cur->node)) {
+		printk_safe("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
+	}
 }
 

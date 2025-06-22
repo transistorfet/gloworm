@@ -19,6 +19,8 @@ source "src/kernel/mm/Kconfig"
 
 source "src/kernel/net/Kconfig"
 
+source "src/kernel/proc/Kconfig"
+
 comment "Miscellaneous options"
 
 config SHELL_IN_KERNEL

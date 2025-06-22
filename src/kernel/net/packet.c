@@ -10,10 +10,9 @@ struct packet *packet_alloc(struct if_device *ifdev, struct protocol *proto, siz
 {
 	struct packet *pack;
 
-	pack = kmalloc(sizeof(struct packet) + capacity);
+	pack = kzalloc(sizeof(struct packet) + capacity);
 	if (!pack)
 		return NULL;
-	memset(pack, '\0', sizeof(struct packet) + capacity);
 
 	_queue_node_init(&pack->node);
 	pack->proto = proto;

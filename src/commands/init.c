@@ -21,7 +21,6 @@ int MAIN(init_task)()
 	// Open stderr
 	dup2(fd, 2);
 
-
 	// TODO temporary, for testing
 	int test_files();
 	int test_dirs();

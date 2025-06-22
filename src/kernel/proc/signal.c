@@ -30,8 +30,9 @@ void init_signal_data(struct process *proc)
 	proc->signals.blocked = 0;
 	proc->signals.pending = 0;
 
-	for (short i = 0; i < SIG_HANDLERS_NUM; i++)
+	for (short i = 0; i < SIG_HANDLERS_NUM; i++) {
 		proc->signals.actions[i].sa_handler = NULL;
+	}
 }
 
 int get_signal_action(struct process *proc, int signum, struct sigaction *act)
@@ -53,8 +54,9 @@ int send_signal(pid_t pid, int signum)
 	struct process *proc;
 
 	proc = get_proc(pid);
-	if (!proc)
+	if (!proc) {
 		return ESRCH;
+	}
 	return dispatch_signal(proc, signum);
 }
 
@@ -65,8 +67,9 @@ int send_signal_process_group(pid_t pgid, int signum)
 
 	proc_iter_start(&iter);
 	while ((proc = proc_iter_next(&iter))) {
-		if (proc->pgid == pgid)
+		if (proc->pgid == pgid) {
 			dispatch_signal(proc, signum);
+		}
 	}
 	return 0;
 }
@@ -75,12 +78,14 @@ int dispatch_signal(struct process *proc, int signum)
 {
 	sigset_t sigmask;
 
-	if (signum <= 0 || signum >= 32)
+	if (signum <= 0 || signum >= 32) {
 		return EINVAL;
+	}
 	sigmask = signal_to_map(signum);
 
-	if (sigmask & proc->signals.ignored)
+	if (sigmask & proc->signals.ignored) {
 		return 0;
+	}
 
 	if (sigmask & proc->signals.blocked) {
 		proc->signals.pending |= sigmask;
@@ -101,8 +106,9 @@ static inline void run_signal_handler(struct process *proc, int signum)
 	struct sigcontext *context;
 
 	// If the syscall won't be restarted after the handler has run, then cancel it now
-	if ((proc->bits & PB_PAUSED) || !(proc->signals.actions[signum - 1].sa_flags & SA_RESTART))
+	if ((proc->bits & PB_PAUSED) || !(proc->signals.actions[signum - 1].sa_flags & SA_RESTART)) {
 		cancel_syscall(proc);
+	}
 
 	// Save signal data on the stack for use by sigreturn
 	context = (((struct sigcontext *) proc->sp) - 1);
@@ -141,8 +147,9 @@ void check_pending_signals()
 
 	if (current_proc->signals.pending & ~current_proc->signals.blocked) {
 		signum = get_next_signum(current_proc->signals.pending);
-		if (signum < 0)
+		if (signum < 0) {
 			return;
+		}
 		current_proc->signals.pending &= ~signal_to_map(signum);
 		dispatch_signal(current_proc, signum);
 	}
@@ -172,8 +179,9 @@ static inline sigset_t signal_to_map(int signum)
 static inline int get_next_signum(sigset_t mask)
 {
 	for (short i = 1; i < 31; i++) {
-		if (mask & 0x01)
+		if (mask & 0x01) {
 			return i;
+		}
 		mask >>= 1;
 	}
 	return -1;

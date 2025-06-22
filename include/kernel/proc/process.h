@@ -7,28 +7,11 @@
 #include <kernel/proc/timer.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/filedesc.h>
+#include <kernel/proc/memory.h>
 #include <kernel/proc/scheduler.h>
 #include <kernel/utils/queue.h>
 
-#define INIT_PID		1
-
-#define	NUM_SEGMENTS		3
-
-typedef enum {
-	M_TEXT,
-	M_DATA,
-	M_STACK
-} proc_seg_t;
-
-struct mem_seg {
-	void *base;
-	size_t length;
-};
-
-struct mem_map {
-	struct mem_seg segments[NUM_SEGMENTS];
-};
-
+#define INIT_PID			1
 
 #define PB_BLOCK_CONDITIONS		0x00FF
 #define PB_SYSCALL			0x0001
@@ -50,13 +33,14 @@ typedef enum {
 
 
 #define PROC_DEFAULT_UMASK	022
-#define PROC_CMDLINE_ARGS	4
 
 struct vnode;
 struct process;
 
 struct process {
 	struct queue_node node;
+	/// The kernel stack pointer for this process
+	/// If user mode is not used, this will also be the user stack pointer
 	void *sp;
 	uintptr_t return_value;
 	uint16_t state;
@@ -66,7 +50,19 @@ struct process {
 	pid_t pgid;
 	pid_t session;
 
-	struct mem_map map;
+	struct memory_map *map;
+
+	//#if defined(CONFIG_USER_MODE)
+	///// A pointer to the start of the kernel stack for this process
+	//page_t kernel_stack;
+	///// The size of the allocated kernel stack
+	//ssize_t kernel_stack_size;
+	//#endif
+
+	// TODO somewhere in here, or in the context, would be:
+	// page_t kernel_stack;
+	// mmu_table_t *root_table;
+	// uint32_t usp;
 
 	uint32_t bits;
 	int exitcode;
@@ -83,9 +79,8 @@ struct process {
 	uid_t uid;
 	mode_t umask;
 	device_t ctty;
-	const char *cmdline[PROC_CMDLINE_ARGS];
 	struct vnode *cwd;
-	fd_table_t fd_table;
+	struct fd_table *fd_table;
 };
 
 struct process_iter {
@@ -99,7 +94,6 @@ void close_proc(struct process *proc);
 void cleanup_proc(struct process *proc);
 struct process *find_exited_child(pid_t parent, pid_t child);
 int set_proc_alarm(struct process *proc, uint32_t seconds);
-void print_proc_segments(struct process *proc);
 
 void proc_iter_start(struct process_iter *iter);
 struct process *proc_iter_next(struct process_iter *iter);

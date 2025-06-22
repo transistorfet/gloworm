@@ -112,7 +112,7 @@ void user_error(struct context *context)
 	struct exception_frame *frame = &context->frame;
 
 	printk_safe("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
-	print_proc_segments(current_proc);
+	print_process_segments(current_proc);
 	print_stack(frame);
 
 	dispatch_signal(current_proc, SIGKILL);

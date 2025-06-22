@@ -41,6 +41,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 	for (short i = 0; i < PROCESS_MAX; i++) {
 		if (!table[i].pid) {
 			LOCK(saved_status);
+			memset(&table[i], 0, sizeof(struct process));
 
 			_queue_node_init(&table[i].node);
 			table[i].pid = pid;
@@ -57,31 +58,15 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			}
 
 			table[i].state = PS_RUNNING;
-			table[i].sp = NULL;
-			table[i].return_value = 0;
-			// Clear memory records
-			for (short j = 0; j < NUM_SEGMENTS; j++) {
-				table[i].map.segments[j].base = NULL;
-				table[i].map.segments[j].length = 0;
-			}
-
-			table[i].bits = 0;
-			table[i].exitcode = 0;
-			table[i].wait_events = 0;
-			table[i].wait_check = NULL;
+			table[i].map = NULL;
 			init_timer(&table[i].timer);
 			init_signal_data(&table[i]);
 
 			table[i].start_time = get_system_time();
-			table[i].user_time = 0;
-			table[i].sys_time = 0;
 
 			table[i].uid = uid;
-			for (short j = 0; j < PROC_CMDLINE_ARGS; j++)
-				table[i].cmdline[j] = NULL;
-			table[i].cwd = NULL;
 			table[i].umask = PROC_DEFAULT_UMASK;
-			init_fd_table(table[i].fd_table);
+			table[i].fd_table = NULL;
 
 			insert_proc(&table[i]);
 
@@ -109,8 +94,12 @@ void close_proc(struct process *proc)
 		previous_proc = NULL;
 
 	remove_timer(&proc->timer);
-	release_fd_table(proc->fd_table);
-	free_process_memory(proc);
+	if (proc->fd_table) {
+		release_fd_table(proc->fd_table);
+	}
+	if (proc->map) {
+		memory_map_free(proc->map);
+	}
 
 	// Reassign any child procs' parent to be 1 (init), since we can't be sure this proc's
 	// parent is waiting, and the zombie proc wont get recycled
@@ -154,18 +143,6 @@ int set_proc_alarm(struct process *proc, uint32_t seconds)
 		add_timer(&proc->timer, seconds, 0);
 	}
 	return 0;
-}
-
-void print_proc_segments(struct process *proc)
-{ 
-	printk_safe("  Text: %x to %x, Data: %x to %x, Stack: %x to %x\n",
-		current_proc->map.segments[M_TEXT].base,
-		current_proc->map.segments[M_TEXT].base + current_proc->map.segments[M_TEXT].length,
-		current_proc->map.segments[M_DATA].base,
-		current_proc->map.segments[M_DATA].base + current_proc->map.segments[M_DATA].length,
-		current_proc->map.segments[M_STACK].base,
-		current_proc->map.segments[M_STACK].base + current_proc->map.segments[M_STACK].length
-	);
 }
 
 

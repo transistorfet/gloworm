@@ -4,6 +4,6 @@
 
 struct process;
 
-int load_binary(const char *path, struct process *proc, void **entry);
+int load_binary(const char *path, struct process *proc, const char *const argv[], const char *const envp[]);
 
 #endif

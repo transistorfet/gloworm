@@ -3,7 +3,12 @@
 #define _ASM_M68K_CONTEXT_H
 
 #include <stdint.h>
+#include <kconfig.h>
 #include <asm/exceptions.h>
+
+#if defined(CONFIG_MMU)
+#include <asm/mmu.h>
+#endif
 
 struct registers {
 	uint32_t d0;
@@ -21,12 +26,13 @@ struct registers {
 	uint32_t a4;
 	uint32_t a5;
 	uint32_t a6;
+	uint32_t usp;
 };
 
 
 struct context {
-	struct registers regs;
 	struct exception_frame frame;
+	struct registers regs;
 };
 
 #endif

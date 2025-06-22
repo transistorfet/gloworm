@@ -748,3 +748,39 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - now that I write that though, I realize that not only am I probably not adjusting the cloned heap correctly, but I'm also probably
   not ensuring that when the heap grows, it only grows by PAGE_SIZE increments
 
+
+2025-06-19:
+
+- I was thinking that maybe I could eliminate the memory_object by forcing adjacent kmalloced data to be allocated separately, but
+  then I remembered that that would mean the node tracking data would be between segments, causing the addresses to be all wrong,
+  for an elf file, so that doesn't work
+- I don't think it's possible to make kmalloc'd non-paged memory work without significantly more complexity
+- if I go all in on pages for user memory in every situation, and I can always free arbitrary pages, can I simplify things more?  I
+  could allocate contiguously and then break it up, but if I want to ever ^^^^ reuse pages without an MMU ^^^^ I need to keep track
+  of how many things hold the pages still
+- I can do that on a page-by-page basis like I did in ruxpin, or I can do that with memory_object
+
+- I guess it's actually a waste of memory to use per-page refcounts without an MMU since the same page can't be mapped into a
+  processe's address space on a per-page basis.  It can be mapped on a per-region basis (so all pages in a range)
+
+
+2025-06-20:
+
+- I feel like I have more code now, and I do in terms of creating memory maps and segments, but it seems like some of that is
+  duplicate.  Not only that, but some can be reduced by removing it when using an MMU, or simplifying the memory map.
+
+- I could possible go back to an array of segments structs (not pointers to structs), but then it's cumbersome to move them around
+  if you want to insert a new one.  For non-MMU, that will rarely ever happen, but if you can use mmap, then it would happen more
+  often, whenever using mmap, which would certainly need to insert into the middle where the heap is
+
+
+2025-06-21:
+
+- not that I'm unhappy with the current massive commit that I'm about to make, but I feel pretty conflicted about the memory
+  segment/map changes.  I know it can do with a lot of massaging, but it's probably better to get it in and then change it after.  I
+  should probably start making branches and then merging those branches without squashing which means I can commit without waiting
+  so long, and still avoid main getting broken.  I certainly could have used diffs a couple times during this massive change
+
+- I should change the memory stuff to not deal with segments directly but deal with mapping and unmapping addresses, and let the
+  impl handle the rest
+

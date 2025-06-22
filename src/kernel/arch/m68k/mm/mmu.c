@@ -18,6 +18,13 @@
 
 mmu_descriptor_t *root = NULL;
 
+static inline int init_mmu_table(mmu_descriptor_t *root)
+{
+	memset(root, '\0', sizeof(mmu_table_t));
+	return 0;
+}
+
+
 int init_mmu(void)
 {
 	uint32_t tcr = 0;
@@ -60,10 +67,20 @@ int init_mmu(void)
 	return 0;
 }
 
-int init_mmu_table(mmu_descriptor_t *root)
+mmu_descriptor_t *mmu_table_alloc(void)
 {
-	memset(root, '\0', sizeof(mmu_table_t));
-	return 0;
+	mmu_descriptor_t *root;
+
+	root = (mmu_descriptor_t *) page_alloc_single();
+	init_mmu_table(root);
+
+	return root;
+}
+
+void mmu_table_free(mmu_descriptor_t *root)
+{
+	// TODO unmap all
+	page_free_single((page_t *) root);
 }
 
 int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, int flags)

@@ -162,7 +162,7 @@ int vfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
 int vfs_poll(struct vfile *file, int events);
 offset_t vfs_seek(struct vfile *file, offset_t position, int whence);
 int vfs_readdir(struct vfile *file, struct dirent *dir);
-struct vfile *vfs_duplicate_fileptr(struct vfile *file);
+struct vfile *vfs_clone_fileptr(struct vfile *file);
 
 int vfs_create_pipe(struct vfile **rfile, struct vfile **wfile);
 

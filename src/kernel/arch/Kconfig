@@ -13,3 +13,5 @@ config CPU_BIG_ENDIAN
 config CPU_LITTLE_ENDIAN
 	bool
 
+config USER_MODE
+	bool

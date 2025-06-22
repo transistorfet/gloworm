@@ -672,7 +672,7 @@ int vfs_readdir(struct vfile *file, struct dirent *dir)
 	return file->ops->readdir(file, dir);
 }
 
-struct vfile *vfs_duplicate_fileptr(struct vfile *file)
+struct vfile *vfs_clone_fileptr(struct vfile *file)
 {
 	return dup_fileptr(file);
 }

@@ -17,7 +17,8 @@ void do_syscall();
 // Processes
 extern void do_exit(int exitcode);
 extern pid_t do_fork();
-extern int do_exec(const char *path, char *const argv[], char *const envp[]);
+extern pid_t do_clone(int (*fn)(void *), void *stack, int flags, void *arg);
+extern int do_exec(const char *path, const char *const argv[], const char *const envp[]);
 extern pid_t do_waitpid(pid_t pid, int *status, int options);
 extern int do_kill(pid_t pid, int sig);
 extern int do_sigreturn();

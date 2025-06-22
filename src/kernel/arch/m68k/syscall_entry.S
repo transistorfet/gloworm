@@ -24,6 +24,7 @@
 	.global schedule
 	.global bh_requested
 	.global run_bh_handlers
+	.global mmu_table_create
 
 	.equ	CONTEXT_SIZE, 60		// The size of the saved registers on the stack (not including the interrupt return)
 	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
@@ -33,7 +34,7 @@
 
 /**
  * Create a new context given a future stack address, return address
- * 	void *create_context(void *user_stack, void *entry, void *exit);
+ * 	void *create_context(void *user_kernel_stack, void *entry, void *exit);
  */
 create_context:
 	movea.l	(4,%sp), %a0
@@ -74,7 +75,7 @@ create_context:
 
 /**
  * Remove the context from the stack and return the new stack pointer
- * 	void *drop_context(void *user_stack);
+ * 	void *drop_context(void *user_kernel_stack);
  */
 drop_context:
 	movea.l	(4,%sp), %a0
@@ -154,11 +155,9 @@ drop_context:
 
 	SAVE_EXTRA_REGISTERS
 
-	#if !defined(CONFIG_M68K_USER_MODE)
-	// Switch to the kernel stack
+	// Switch to the internal kernel stack
 	move.l	%sp, (%a0, PROC_SP_OFFSET)
 	movea.l	kernel_stack, %sp
-	#endif
 
 	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
 	move.l	%a0, previous_proc
@@ -219,11 +218,9 @@ restore_context:
 
 	///// A0 = CURRENT_PROC, A1 = PREVIOUS_PROC /////
 
-	#if !defined(CONFIG_M68K_USER_MODE)
-	// Switch to the user stack
+	// Switch to the user's kernel stack
 	move.l  %sp, kernel_stack
 	movea.l  (%a0, PROC_SP_OFFSET), %sp
-	#endif
 
 	// Restore registers
 	RESTORE_EXTRA_REGISTERS
@@ -315,12 +312,10 @@ enter_exception:
 
 	movea.l  %sp, %a5
 
-	#if !defined(CONFIG_M68K_USER_MODE)
-	// Switch to the kernel stack
+	// Switch to the internal kernel stack
 	movea.l  current_proc, %a0
 	move.l  %sp, (%a0, PROC_SP_OFFSET)
 	movea.l  kernel_stack, %sp
-	#endif
 
 	bra.w   handle_exception
 

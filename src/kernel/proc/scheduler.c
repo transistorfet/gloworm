@@ -32,7 +32,11 @@ void init_scheduler()
 	_queue_init(&run_queue);
 	_queue_init(&blocked_queue);
 
-	idle_proc = create_kernel_task("idle", idle_task);
+	idle_proc = create_idle_task();
+	if (!idle_proc) {
+		printk_safe("eternal slumber\n");
+		while (1) {}
+	}
 	_queue_remove(&run_queue, &idle_proc->node);
 }
 
@@ -183,7 +187,7 @@ static int syscall_wait_check(struct process *proc, int events, struct vnode *vn
 	int fd;
 
 	fd = proc->blocked_call.arg1;
-	return (vnode && proc->fd_table[fd]->vnode == vnode) || (rdev && proc->fd_table[fd]->vnode->rdev == rdev);
+	return (vnode && proc->fd_table->files[fd]->vnode == vnode) || (rdev && proc->fd_table->files[fd]->vnode->rdev == rdev);
 }
 
 void suspend_current_syscall(int events)

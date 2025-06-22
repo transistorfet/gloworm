@@ -30,6 +30,7 @@ struct stat;
 // Syscalls
 
 pid_t fork();
+pid_t clone(int (*fn)(void *), void *stack, int flags, void *arg);
 void exit(int status);
 int execve(const char *path, char *const argv[], char *const envp[]);
 pid_t wait(int *status);

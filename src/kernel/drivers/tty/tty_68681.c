@@ -473,6 +473,9 @@ __attribute__((noreturn)) void panic(const char *fmt, ...)
 	vprintk(0, fmt, args);
 	va_end(args);
 
+	extern void print_stack(void *);
+	print_stack((void *) args);
+
 	HALT();
 	__builtin_unreachable();
 }

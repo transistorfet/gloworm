@@ -26,6 +26,6 @@ typedef unsigned short gid_t;
 // Standard type names
 typedef device_t dev_t;
 typedef inode_t ino_t;
-typedef offset_t off_t;
+typedef signed long off_t;
 
 #endif

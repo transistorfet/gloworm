@@ -4,8 +4,8 @@
 
 struct process;
 
-struct process *create_init_task();
-struct process *create_kernel_task(const char *name, int (*task_start)());
-int idle_task();
+struct process *create_idle_task(void);
+struct process *create_init_task(void);
+struct process *create_kernel_thread(const char *name, int (*task_start)());
 
 #endif

@@ -32,6 +32,7 @@ commands-$(CONFIG_TEST_CMDS)	+= nettest
 commands-$(CONFIG_TEST_CMDS)	+= test
 commands-$(CONFIG_TEST_CMDS)	+= tcptest
 commands-$(CONFIG_TEST_CMDS)	+= tcpserv
+commands-$(CONFIG_TEST_CMDS)	+= threadtest
 
 #userprogs			:= $(commands-y)
 #userprogs			+= $(foreach name,$(commands-y),$(name).send)
@@ -40,7 +41,7 @@ userprogs-stripped		+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(n
 
 libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 extra-y				+= echo.c cat.c ls.c mkdir.c pwd.c mv.c cp.c ln.c rm.c chmod.c date.c ps.c kill.c mount.c umount.c sync.c
-extra-$(CONFIG_TEST_CMDS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest.c tcpserv.c
+extra-$(CONFIG_TEST_CMDS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest.c tcpserv.c threadtest.c
 
 
 userprog-ccflags-y		+= -Ttext=0x0000

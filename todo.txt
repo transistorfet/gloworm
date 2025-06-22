@@ -1,25 +1,36 @@
 
+* instead of interacting with segments directly, you can use map functions that take address ranges, or which allocate certain
+  chunks, and make all the cloning and duplicating use those, with special addresses stored in the root to make it easier
+
+* implement tid and tgid
+* allow stack to be NULL when calling clone (which makes it behave like fork)
+* fix the incorrect process size in the ps command
+* separate out printk from tty driver and fix it so panic actually works
+
+* readjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
+
+* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
+
+* [is this fixed?] when cloning the stack and heap, the heap segment is not adjusted properly
+* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
+  unfreed in the middle of the segment
+* you need to add a config option and convenience function for rounding up to the nearest size, like KMALLOC_MINALIGN on linux
+
 
 * why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
 
 * send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
-* when cloning the stack and heap, the heap segment is not adjusted properly
-* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
-  unfreed in the middle of the segment
-* you need to add a config option and convenience function for rounding up to the nearest size, like KMALLOC_MINALIGN on linux
+
 * threadtest is failing to execute, possibly because the transfer fails, but the output is really weird.  It calls load_binary many
   many times, and then fails because there's too many open files, and this happens before the process even runs, so it's either a
   bug in the loading/exec code that isn't triggered by a normal program, or there's a problem with the transfer and it's corrupted
 
-* try to optimize the memory map code?
-* fix proc data.c
+
+* try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
+
 
 * should you move memory.c into mm/ instead of proc/
 
-* separate out printk from tty driver and fix it so panic actually works
-
-* make it use page_alloc_contiguous() for the backing store, with page_free_single as the (*free) in memory_ops, and then go through
-  each page in the memory when freeing the segment.  That will make it easier to switch to MMU later
 
 * add mmu mapping to memory_map
 * make it possible to set up the virtual address space differently with MMU enabled, when loading a binary

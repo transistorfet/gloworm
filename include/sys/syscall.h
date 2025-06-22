@@ -78,4 +78,7 @@
 // TODO remove this after testing
 #define SYS_EXECBUILTIN	68
 
+// TODO reorganize these, and maybe follow linux's abi, if it's already pretty close, to make it easier to port applications?
+#define SYS_CLONE	69
+
 #endif

@@ -388,8 +388,7 @@ static struct tcp_endpoint *tcp_alloc_endpoint(struct protocol *proto, struct so
 {
 	struct tcp_endpoint *tep;
 
-	tep = kmalloc(sizeof(struct tcp_endpoint));
-	memset(tep, '\0', sizeof(struct tcp_endpoint));
+	tep = kzalloc(sizeof(struct tcp_endpoint));
 	_queue_node_init(&tep->ep.node);
 	tep->ep.ops = &tcp_endpoint_ops;
 	tep->ep.proto = proto;

@@ -41,6 +41,7 @@ endchoice
 config M68K_USER_MODE
 	bool "enable user mode"
 	default n
+	select USER_MODE
 	help
 	  If this option is true, then all programs except the kernel itself
 	  will be run in the m68k processor's user mode, and the kernel will be

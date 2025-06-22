@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <sys/sched.h>
 #include <sys/ioc_tty.h>
 #include <sys/socket.h>
 
@@ -13,6 +14,8 @@
 #include <kernel/printk.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
+#include <kernel/proc/exec.h>
+#include <kernel/proc/fork.h>
 #include <kernel/proc/timer.h>
 #include <kernel/proc/memory.h>
 #include <kernel/proc/signal.h>
@@ -28,7 +31,7 @@
 void test() { printk("It's a test!\n"); }
 
 // TODO remove this after testing
-int do_execbuiltin(void *addr, char *const argv[], char *const envp[]);
+int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[]);
 
 extern int __do_fork();
 
@@ -105,6 +108,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	do_setsockopt,
 
 	do_execbuiltin,
+	do_clone,
 };
 
 extern void enter_syscall();
@@ -165,6 +169,7 @@ void do_exit(int exitcode)
 
 pid_t do_fork()
 {
+	int error;
 	struct process *proc;
 
 	proc = new_proc(0, current_proc->uid);
@@ -172,19 +177,44 @@ pid_t do_fork()
 		panic("Ran out of procs\n");
 	}
 
-	clone_process_memory(current_proc, proc);
+	error = clone_process_memory(current_proc, proc, 0);
+	if (error < 0)
+		return error;
 
 	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
 	set_proc_return_value(proc, 0);
 	return proc->pid;
 }
 
-int do_exec(const char *path, char *const argv[], char *const envp[])
+pid_t do_clone(int (*fn)(void *), void *stack, int flags, void *arg)
 {
 	int error;
-	void *entry;
+	struct process *proc;
 
-	error = load_binary(path, current_proc, &entry);
+	proc = new_proc(0, current_proc->uid);
+	if (!proc) {
+		panic("Ran out of procs\n");
+	}
+
+	error = clone_process_memory(current_proc, proc, flags);
+	if (error < 0)
+		return error;
+
+	// Put the argument onto the stack before initializing the context
+	stack -= sizeof(void *);
+	*((void **) stack) = arg;
+	proc->sp = exec_initialize_stack_entry(proc->map, stack, fn);
+
+	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
+	set_proc_return_value(proc, 0);
+	return proc->pid;
+}
+
+int do_exec(const char *path, const char *const argv[], const char *const envp[])
+{
+	int error;
+
+	error = load_binary(path, current_proc, argv, envp);
 	if (error == EKILL) {
 		// An error occurred past the point of no return.  The memory maps have been irrepairably damaged, so kill the process
 		printk_safe("Process terminated\n");
@@ -195,15 +225,13 @@ int do_exec(const char *path, char *const argv[], char *const envp[])
 		return error;
 	}
 
-	reset_stack(current_proc, entry, argv, envp);
-
 	return 0;
 }
 
-int do_execbuiltin(void *addr, char *const argv[], char *const envp[])
+int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[])
 {
 	// NOTE no modification of the memory maps here, since the code should be in the same process
-	reset_stack(current_proc, addr, argv, envp);
+	exec_reset_and_initialize_stack(current_proc, current_proc->map, addr, argv, envp);
 	return 0;
 }
 
@@ -271,17 +299,18 @@ int do_pause()
 
 int do_brk(void *addr)
 {
-	int diff = addr - current_proc->map.segments[M_DATA].base;
-	return increase_data_segment(current_proc, diff);
+	int diff = (uintptr_t) addr - current_proc->map->sbrk;
+	return memory_map_move_sbrk(current_proc, diff);
 }
 
 void *do_sbrk(intptr_t increment)
 {
 	if (increment) {
-		if (increase_data_segment(current_proc, increment))
+		if (memory_map_move_sbrk(current_proc, increment))
 			return NULL;
 	}
-	return current_proc->map.segments[M_DATA].base + current_proc->map.segments[M_DATA].length;
+
+	return (void *) current_proc->map->sbrk;
 }
 
 pid_t do_getpid()

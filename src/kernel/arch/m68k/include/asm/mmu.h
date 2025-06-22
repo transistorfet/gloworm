@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <asm/addresses.h>
 #include <kernel/mm/pages.h>
 
 
@@ -37,9 +38,6 @@
 #define MMU_TC_TIB_SHIFT	8
 #define MMU_TC_TIC_SHIFT	4
 #define MMU_TC_TID_SHIFT	0
-
-typedef uint32_t virtual_address_t;
-typedef uint32_t physical_address_t;
 
 struct mmu_root_pointer {
 	uint16_t limit;
@@ -108,7 +106,8 @@ typedef mmu_table_short_t mmu_table_t;
 #define MMU_FLAG_SHARED		0x80
 
 int init_mmu(void);
-int init_mmu_table(mmu_descriptor_t *root);
+mmu_descriptor_t *mmu_table_alloc(void);
+void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, void *address, ssize_t length, int flags);
 int mmu_table_unmap(mmu_descriptor_t *root, void *address, ssize_t length);
 

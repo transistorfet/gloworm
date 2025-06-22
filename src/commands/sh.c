@@ -141,7 +141,7 @@ int command_send(int argc, char **argv, char **envp)
 	tcsetattr(STDIN_FILENO, TCSANOW, &tio);
 	tio.c_lflag = lflag;
 
-	printf("Loading file %s\n", argv[1]);
+	printf("Loading file %s from tty\n", argv[1]);
 
 	if ((fd = open(argv[1], O_CREAT | O_WRONLY, 0755)) < 0) {
 		printf("Error opening %s: %d\n", argv[1], fd);
