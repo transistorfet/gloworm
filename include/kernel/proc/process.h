@@ -45,6 +45,8 @@ struct process {
 	uintptr_t return_value;
 	uint16_t state;
 
+	pid_t tid;
+	pid_t tgid;
 	pid_t pid;
 	pid_t parent;
 	pid_t pgid;

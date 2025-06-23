@@ -40,6 +40,7 @@ unsigned int alarm(unsigned int seconds);
 int pause();
 int brk(void *addr);
 void *sbrk(intptr_t increment);
+pid_t gettid();
 pid_t getpid();
 pid_t getppid();
 pid_t getpgid(pid_t pid);

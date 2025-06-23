@@ -26,41 +26,6 @@ struct process *primordial_process = NULL;
 int idle_task(void);
 void alloc_kernel_stack(struct process *proc, int (*task_start)(), const char *const argv[], const char *const envp[]);
 
-/// Create the idle task
-///
-/// The idle task is the first task created, and also the primordial task that all other
-/// kernel threads and user processes are cloned from.`
-struct process *create_idle_task(void)
-{
-	int error = ENOMEM;
-	struct process *proc;
-	const char *argv[2] = { "idle", NULL }, *envp[1] = { NULL };
-
-	proc = new_proc(0, SU_UID);
-	if (!proc)
-		goto fail;
-
-	proc->map = memory_map_alloc();
-	if (!proc->map)
-		goto fail;
-
-	proc->fd_table = alloc_fd_table();
-	if (!proc->fd_table)
-		goto fail;
-
-	alloc_kernel_stack(proc, idle_task, argv, envp);
-
-	primordial_process = proc;
-
-	return proc;
-
-fail:
-	if (proc)
-		close_proc(proc);
-	panic("failed to create primordial process, %d; stopping", error);
-	while (1) {}
-}
-
 /// Create the init process
 ///
 /// This is the first user process which is created, and it executes the init binary
@@ -110,6 +75,41 @@ fail:
 	while (1) {}
 }
 
+/// Create the idle task
+///
+/// The idle task is the first task created, and also the primordial task that all other
+/// kernel threads and user processes are cloned from.`
+struct process *create_idle_task(void)
+{
+	int error = ENOMEM;
+	struct process *proc;
+	const char *argv[2] = { "idle", NULL }, *envp[1] = { NULL };
+
+	proc = new_proc(0, SU_UID);
+	if (!proc)
+		goto fail;
+
+	proc->map = memory_map_alloc();
+	if (!proc->map)
+		goto fail;
+
+	proc->fd_table = alloc_fd_table();
+	if (!proc->fd_table)
+		goto fail;
+
+	alloc_kernel_stack(proc, idle_task, argv, envp);
+
+	primordial_process = proc;
+
+	return proc;
+
+fail:
+	if (proc)
+		close_proc(proc);
+	panic("failed to create primordial process, %d; stopping", error);
+	while (1) {}
+}
+
 /// Create a kernel thread
 ///
 /// A kernel thread uses the same address space and file table as the kernel
@@ -119,13 +119,15 @@ struct process *create_kernel_thread(const char *name, int (*task_start)())
 {
 	int error = ENOMEM;
 	struct process *proc;
+	struct clone_args args;
 	const char *argv[2] = { name, NULL }, *envp[1] = { NULL };
 
-	proc = new_proc(0, SU_UID);
-	if (!proc)
-		goto fail;
+	args.flags = CLONE_THREAD | CLONE_VM | CLONE_FS | CLONE_FILES;
+	args.entry = NULL;
+	args.stack = NULL;
+	args.arg = NULL;
 
-	error = clone_process_memory(primordial_process, proc, CLONE_VM | CLONE_FS | CLONE_FILES);
+	error = clone_process(primordial_process, &args, &proc);
 	if (error < 0)
 		goto fail;
 

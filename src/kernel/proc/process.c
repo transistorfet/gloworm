@@ -43,18 +43,13 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			memset(&table[i], 0, sizeof(struct process));
 
 			_queue_node_init(&table[i].node);
+			table[i].tid = pid;
+			table[i].tgid = pid;
 			table[i].pid = pid;
-			if (current_proc) {
-				table[i].parent = current_proc->pid;
-				table[i].pgid = current_proc->pgid;
-				table[i].session = current_proc->session;
-				table[i].ctty = current_proc->ctty;
-			} else {
-				table[i].parent = INIT_PID;
-				table[i].pgid = table[i].pid;
-				table[i].session = table[i].pid;
-				table[i].ctty = 0;
-			}
+			table[i].parent = INIT_PID;
+			table[i].pgid = table[i].pid;
+			table[i].session = table[i].pid;
+			table[i].ctty = 0;
 
 			table[i].state = PS_RUNNING;
 			table[i].map = NULL;

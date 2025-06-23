@@ -3,7 +3,10 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/sched.h>
+#include <kernel/printk.h>
 #include <kernel/mm/pages.h>
+#include <kernel/proc/fork.h>
+#include <kernel/proc/exec.h>
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
@@ -12,9 +15,50 @@ char **adjust_string_array(char **source, char *parent_stack_start, char *new_st
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map, struct memory_object *parent_object);
 static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
 
+int clone_process(struct process *parent_proc, struct clone_args *args, struct process **result)
+{
+	int error;
+	struct process *proc;
+
+	proc = new_proc(0, parent_proc->uid);
+	if (!proc) {
+		panic("Ran out of procs\n");
+	}
+
+	proc->parent = parent_proc->pid;
+	proc->pgid = parent_proc->pgid;
+	proc->session = parent_proc->session;
+	proc->ctty = parent_proc->ctty;
+
+	error = clone_process_memory(parent_proc, proc, args->flags);
+	if (error < 0)
+		return error;
+
+	if (args->stack) {
+		// Put the argument onto the stack before initializing the context
+		args->stack -= sizeof(void *);
+		*((void **) args->stack) = args->arg;
+		proc->sp = exec_initialize_stack_entry(proc->map, args->stack, args->entry);
+	}
+
+	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
+	set_proc_return_value(proc, 0);
+
+	*result = proc;
+	return 0;
+}
+
 int clone_process_memory(struct process *parent_proc, struct process *proc, int flags)
 {
 	int error;
+
+	if (flags & CLONE_THREAD) {
+		// The new process has a new pid by default, but we want a new thread instead
+		// so set the thread group and pid to match the parent process, leaving the
+		// tid to be the only new id in the new process
+		proc->tgid = parent_proc->pid;
+		proc->pid = parent_proc->pid;
+	}
 
 	if (flags & CLONE_VM) {
 		proc->map = memory_map_make_ref(parent_proc->map);

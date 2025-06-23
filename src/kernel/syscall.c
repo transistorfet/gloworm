@@ -109,6 +109,7 @@ void *syscall_table[SYSCALL_MAX] = {
 
 	do_execbuiltin,
 	do_clone,
+	do_gettid,
 };
 
 extern void enter_syscall();
@@ -169,44 +170,24 @@ void do_exit(int exitcode)
 
 pid_t do_fork()
 {
-	int error;
-	struct process *proc;
-
-	proc = new_proc(0, current_proc->uid);
-	if (!proc) {
-		panic("Ran out of procs\n");
-	}
-
-	error = clone_process_memory(current_proc, proc, 0);
-	if (error < 0)
-		return error;
-
-	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
-	set_proc_return_value(proc, 0);
-	return proc->pid;
+	return do_clone(NULL, NULL, 0, NULL);
 }
 
 pid_t do_clone(int (*fn)(void *), void *stack, int flags, void *arg)
 {
 	int error;
 	struct process *proc;
+	struct clone_args args;
 
-	proc = new_proc(0, current_proc->uid);
-	if (!proc) {
-		panic("Ran out of procs\n");
-	}
+	args.flags = flags;
+	args.entry = fn;
+	args.stack = stack;
+	args.arg = arg;
 
-	error = clone_process_memory(current_proc, proc, flags);
+	error = clone_process(current_proc, &args, &proc);
 	if (error < 0)
 		return error;
 
-	// Put the argument onto the stack before initializing the context
-	stack -= sizeof(void *);
-	*((void **) stack) = arg;
-	proc->sp = exec_initialize_stack_entry(proc->map, stack, fn);
-
-	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
-	set_proc_return_value(proc, 0);
 	return proc->pid;
 }
 
@@ -311,6 +292,11 @@ void *do_sbrk(intptr_t increment)
 	}
 
 	return (void *) current_proc->map->sbrk;
+}
+
+pid_t do_gettid()
+{
+	return current_proc->tid;
 }
 
 pid_t do_getpid()

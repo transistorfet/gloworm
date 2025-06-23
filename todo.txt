@@ -5,7 +5,6 @@
 * implement tid and tgid
 * allow stack to be NULL when calling clone (which makes it behave like fork)
 * fix the incorrect process size in the ps command
-* separate out printk from tty driver and fix it so panic actually works
 
 * readjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 

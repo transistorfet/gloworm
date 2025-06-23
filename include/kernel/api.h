@@ -27,6 +27,7 @@ extern unsigned int do_alarm(unsigned int seconds);
 extern int do_pause();
 extern int do_brk(void *addr);
 extern void *do_sbrk(intptr_t increment);
+extern pid_t do_gettid();
 extern pid_t do_getpid();
 extern pid_t do_getppid();
 extern pid_t do_getpgid(pid_t pid);
