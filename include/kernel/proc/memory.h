@@ -47,6 +47,12 @@ struct anonymous_memory {
 	physical_address_t address;
 };
 
+/// Represents a contiguous piece of physical memory backing a program segment
+///
+/// By having a separately allocated object, it shared between processes and refcounted
+/// as a block instead of per-page.  When using an MMU, per-page refcounts will be kept
+/// but in no-MMU systems, per-page refcounts will not be stored and only the
+/// memory_object refcount will be used
 struct memory_object {
 	struct memory_ops *ops;
 
@@ -78,6 +84,7 @@ struct memory_map {
 	struct queue segments;
 	uintptr_t code_start;
 	uintptr_t data_start;
+	uintptr_t heap_start;
 	uintptr_t sbrk;
 	uintptr_t stack_end;
 
@@ -98,13 +105,14 @@ struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile 
 struct memory_map *memory_map_alloc(void);
 void memory_map_free(struct memory_map *map);
 static inline struct memory_map *memory_map_make_ref(struct memory_map *map);
-int memory_map_insert(struct memory_map *map, uintptr_t start, uintptr_t end, int flags, struct memory_object *object);
-struct memory_area *memory_map_find_by_type(struct memory_map *map, int flags);
+
+int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, struct memory_object *object);
+int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
 
 int memory_map_resize(struct memory_area *area, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size);
 
-int memory_map_move_sbrk(struct process *proc, int diff);
+int memory_map_move_sbrk(struct memory_map *map, int diff);
 
 void print_process_segments(struct process *proc);
 

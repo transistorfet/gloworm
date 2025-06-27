@@ -85,7 +85,7 @@ int load_flat_binary(struct vfile *file, struct process *proc, struct memory_map
 		goto fail;
 	}
 
-	error = memory_map_insert(map, object->anonymous.address, object->anonymous.address + mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
+	error = memory_map_mmap(map, object->anonymous.address, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
 	if (error < 0) {
 		goto fail;
 	}
@@ -197,7 +197,7 @@ int load_elf_binary(struct vfile *file, struct process *proc, struct memory_map 
 				flags |= AREA_TYPE_DATA;
 			}
 
-			if ((error = memory_map_insert(map, segment_start, segment_end, flags, memory_object_make_ref(object))) < 0) {
+			if ((error = memory_map_mmap(map, segment_start, prog_headers[i].p_memsz, flags, memory_object_make_ref(object))) < 0) {
 				goto fail;
 			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {

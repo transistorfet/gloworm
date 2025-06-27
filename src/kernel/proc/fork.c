@@ -111,7 +111,7 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 			// the heap or stack segments so we can insert new ones later
 			parent_object = cur->object;
 		} else {
-			error = memory_map_insert(new_map, cur->start, cur->end, cur->flags, memory_object_make_ref(cur->object));
+			error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, memory_object_make_ref(cur->object));
 			if (error < 0)
 				goto fail;
 		}
@@ -138,31 +138,27 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 {
 	int error = 0;
 	int stack_size;
-	char *new_stack;
 	char *stack_pointer = NULL;
-	struct memory_area *stack_area;
 
-	stack_size = parent_object->mem_length;
+	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
 
 	error = memory_map_insert_heap_stack(new_map, stack_size);
 	if (error < 0)
 		return error;
 
-	stack_area = memory_map_find_by_type(new_map, AREA_TYPE_STACK);
-	if (!stack_area)
-		return ENOMEM;
-
-	new_stack = stack_area->object->mem_start;
-
-	stack_pointer = (new_stack + stack_size) - ((parent_object->mem_start + parent_object->mem_length) - parent_proc->sp);
+	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) parent_proc->sp);
 	if (!stack_pointer)
 		return EFAULT;
 
-	memcpy(new_stack, parent_object->mem_start, stack_size);
+	error = memory_map_move_sbrk(new_map, parent_proc->map->sbrk - parent_proc->map->heap_start);
+	if (error < 0)
+		return error;
+
+	memcpy((char *) new_map->heap_start, (char *) parent_proc->map->heap_start, stack_size);
 
 	// Adjust the pointers to the command line arguments to point to the new stack
-	new_map->argv = (const char *const *) adjust_string_array((char **) parent_proc->map->argv, (char *) parent_object->mem_start, new_stack);
-	new_map->envp = (const char *const *) adjust_string_array((char **) parent_proc->map->envp, (char *) parent_object->mem_start, new_stack);
+	new_map->argv = (const char *const *) adjust_string_array((char **) parent_proc->map->argv, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
+	new_map->envp = (const char *const *) adjust_string_array((char **) parent_proc->map->envp, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
 
 	proc->map = new_map;
 	proc->sp = stack_pointer;

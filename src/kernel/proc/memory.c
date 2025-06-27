@@ -149,20 +149,41 @@ void memory_map_free(struct memory_map *map)
 	}
 }
 
-int memory_map_insert(struct memory_map *map, uintptr_t start, uintptr_t end, int flags, struct memory_object *object)
+/// Map the given address range to the given object
+///
+/// NOTE: this will not unmap any previously mapped regions nor will it check for
+/// existing mappings, so it should be paired with an unmap call when modifying
+/// an existing map
+int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, struct memory_object *object)
 {
+	int error = 0;
+	uintptr_t end;
 	struct memory_area *cur, *next, *area;
+
+	end = start + length;
 
 	if (!object) {
 		return EFAULT;
 	}
 
-	area = memory_area_alloc(start, end, flags, object);
-	if (!area) {
-		memory_object_free(object);
-		return ENOMEM;
+	// Find the location to insert the new segment before allocating it
+	for (cur = _queue_head(&map->segments); cur; cur = next) {
+		next = _queue_next(&cur->node);
+		if (cur->end <= start && (!next || end <= next->start)) {
+			break;
+		}
 	}
 
+	area = memory_area_alloc(start, end, flags, object);
+	if (!area) {
+		error = ENOMEM;
+		goto fail;
+	}
+
+	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
+	_queue_insert_after(&map->segments, &area->node, cur ? &cur->node : NULL);
+
+	// Adjust memory markers, if needed
 	if (!map->code_start) {
 		if (flags & AREA_EXECUTABLE) {
 			map->code_start = start;
@@ -175,30 +196,60 @@ int memory_map_insert(struct memory_map *map, uintptr_t start, uintptr_t end, in
 		map->stack_end = end;
 	}
 
-	for (cur = _queue_head(&map->segments); cur; cur = next) {
-		next = _queue_next(&cur->node);
-		if (cur->end <= start && (!next || end <= next->start)) {
-			break;
-		}
-	}
-
-	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
-	_queue_insert_after(&map->segments, &area->node, cur ? &cur->node : NULL);
-
 	return 0;
+
+fail:
+	if (object) {
+		memory_object_free(object);
+	}
+	return error;
 }
 
-// TODO can you get rid of this function?
-struct memory_area *memory_map_find_by_type(struct memory_map *map, int flags)
+/// Unmap the given address range
+///
+/// If a segment is larger than the given range, it will be split in two.  Otherwise
+/// it will be deleted or shrunk accordingly to make room.
+int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 {
-	struct memory_area *cur;
+	uintptr_t end;
+	struct memory_area *cur, *next, *new;
 
-	for (cur = _queue_tail(&map->segments); cur; cur = _queue_prev(&cur->node)) {
-		if ((cur->flags & AREA_TYPE) == flags) {
-			return cur;
+	end = start + length;
+	for (cur = memory_map_iter_first(map); cur; cur = next) {
+		next = memory_map_iter_next(cur);
+		if (cur->start >= start && cur->start <= end) {
+			if (cur->end >= start && cur->end <= end) {
+				// The segment is entirely within the unmap region so delete it entirely
+				_queue_remove(&map->segments, &cur->node);
+				memory_area_free(cur);
+			} else {
+				// The start will be unmapped but not the end, so move the segment start
+				cur->start = end;
+			}
+		} else if (cur->end >= start && cur->end <= end) {
+			// The end will be unmapped but not the start, so move the segment end
+			cur->end = start;
+		} else if (start >= cur->start && start <= cur->end) {
+			//  The unmapped region is entirely within this segment, so we need to split it in two
+			new = memory_area_alloc(end, cur->end, cur->flags, memory_object_make_ref(cur->object));
+			if (!new)
+				return ENOMEM;
+			_queue_insert_after(&map->segments, &new->node, &cur->node);
+			cur->end = start;
 		}
 	}
-	return NULL;
+
+	// TODO this is wrong, they should find the next lowest valid mapped address to assign
+	// it's also not clear what to do when the sbrk or stack_end are unmapped, so maybe
+	// making them NULL is the better option, even though that can cause its own issues
+	if (map->code_start >= start && map->code_start <= end)
+		map->code_start = start;
+	if (map->data_start >= start && map->data_start <= end)
+		map->data_start = start;
+	if (map->heap_start >= start && map->heap_start <= end)
+		map->heap_start = start;
+
+	return 0;
 }
 
 
@@ -239,17 +290,15 @@ int memory_map_resize(struct memory_area *area, ssize_t diff)
 	return 0;
 }
 
-
-
-int memory_map_move_sbrk(struct process *proc, int diff)
+int memory_map_move_sbrk(struct memory_map *map, int diff)
 {
 	int error;
 	uintptr_t new_sbrk;
 	struct memory_area *heap, *stack;
 
-	new_sbrk = proc->map->sbrk + diff;
+	new_sbrk = map->sbrk + diff;
 
-	stack = memory_area_find_prev(memory_map_iter_last(proc->map), proc->map->sbrk);
+	stack = memory_area_find_prev(memory_map_iter_last(map), map->sbrk);
 	if (!stack) {
 		return EFAULT;
 	}
@@ -259,20 +308,16 @@ int memory_map_move_sbrk(struct process *proc, int diff)
 		return EFAULT;
 	}
 
-	if (proc->map->sbrk != stack->start) {
+	if (map->sbrk != stack->start) {
 		return EFAULT;
-	}
-
-	if (stack->start + diff >= (uintptr_t) proc->sp) {
-		return ENOMEM;
 	}
 
 	if (((ssize_t) (stack->end - stack->start)) + diff < 0) {
 		return ENOMEM;
 	}
 
-	// Require an alignment to 4 bytes
-	if ((diff > 0 ? diff : -diff) & 0x3) {
+	// Require an alignment to page size bytes
+	if ((diff > 0 ? diff : -diff) & (PAGE_SIZE - 1)) {
 		return ENOMEM;
 	}
 
@@ -296,7 +341,7 @@ int memory_map_move_sbrk(struct process *proc, int diff)
 		return error;
 	}
 
-	proc->map->sbrk = new_sbrk;
+	map->sbrk = new_sbrk;
 
 	return 0;
 }
@@ -313,13 +358,15 @@ int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size)
 		return ENOMEM;
 
 	start = object->anonymous.address;
-	error = memory_map_insert(map, start, start, AREA_TYPE_HEAP | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
+	error = memory_map_mmap(map, start, 0, AREA_TYPE_HEAP | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
 	if (error < 0)
 		goto fail;
-	error = memory_map_insert(map, start, start + stack_size, AREA_TYPE_STACK | AREA_GROWSDOWN | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
+	error = memory_map_mmap(map, start, stack_size, AREA_TYPE_STACK | AREA_GROWSDOWN | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
 	if (error < 0)
 		goto fail;
+	map->heap_start = start;
 	map->sbrk = start;
+	map->stack_end = start + stack_size;
 
 	// Release the extra reference before exiting
 	memory_object_free(object);

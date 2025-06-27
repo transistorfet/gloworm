@@ -1,6 +1,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <sys/param.h>
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
@@ -19,9 +20,7 @@ int copy_string_array(char **stack, int *count, const char *const arr[])
 	len += sizeof(char *);
 
 	// Align to the nearest word
-	if (len & 0x01) {
-		len += 1;
-	}
+	len = roundup(len, 2);
 
 	char **dest_arr = (char **) (*stack - len);
 	char *buffer = ((char *) dest_arr) + (sizeof(char *) * (*count + 1));
@@ -81,23 +80,16 @@ void *exec_initialize_stack_with_args(struct memory_map *map, void *stack_pointe
 
 int exec_reset_and_initialize_stack(struct process *proc, struct memory_map *map, void *entry, const char *const argv[], const char *const envp[])
 {
-	struct memory_area *heap_seg, *stack_seg;
+	int error;
 
-	heap_seg = memory_map_find_by_type(map, AREA_TYPE_HEAP);
-	if (!heap_seg) {
-		return EFAULT;
+	// Reset sbrk to the start of the heap
+	error = memory_map_move_sbrk(proc->map, -1 * (map->sbrk - map->heap_start));
+	if (error < 0) {
+		return error;
 	}
 
-	stack_seg = memory_map_find_by_type(map, AREA_TYPE_STACK);
-	if (!stack_seg) {
-		return EFAULT;
-	}
-
-	// Reset the heap segment to be 0
-	stack_seg->start = heap_seg->start;
-	heap_seg->end = heap_seg->start;
-
-	proc->sp = exec_initialize_stack_with_args(map, (char *) stack_seg->end, entry, argv, envp);
+	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
+	proc->sp = exec_initialize_stack_with_args(map, (char *) map->stack_end, entry, argv, envp);
 
 	return 0;
 }

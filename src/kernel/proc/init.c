@@ -71,7 +71,7 @@ struct process *create_init_task(void)
 fail:
 	if (proc)
 		close_proc(proc);
-	panic("failed to create init task; stopping");
+	panic("failed to create init task; stopping\n");
 	while (1) {}
 }
 
@@ -106,7 +106,7 @@ struct process *create_idle_task(void)
 fail:
 	if (proc)
 		close_proc(proc);
-	panic("failed to create primordial process, %d; stopping", error);
+	panic("failed to create primordial process, %d; stopping\n", error);
 	while (1) {}
 }
 

@@ -280,14 +280,24 @@ int do_pause()
 
 int do_brk(void *addr)
 {
-	int diff = (uintptr_t) addr - current_proc->map->sbrk;
-	return memory_map_move_sbrk(current_proc, diff);
+	int diff;
+
+	diff = (uintptr_t) addr - current_proc->map->sbrk;
+	if (current_proc->map->heap_start + diff >= (uintptr_t) current_proc->sp) {
+		return ENOMEM;
+	}
+
+	return memory_map_move_sbrk(current_proc->map, diff);
 }
 
-void *do_sbrk(intptr_t increment)
+void *do_sbrk(intptr_t diff)
 {
-	if (increment) {
-		if (memory_map_move_sbrk(current_proc, increment))
+	if (diff) {
+		if (current_proc->map->heap_start + diff >= (uintptr_t) current_proc->sp) {
+			return NULL;
+		}
+
+		if (memory_map_move_sbrk(current_proc->map, diff))
 			return NULL;
 	}
 

@@ -1,19 +1,21 @@
 
-* instead of interacting with segments directly, you can use map functions that take address ranges, or which allocate certain
-  chunks, and make all the cloning and duplicating use those, with special addresses stored in the root to make it easier
+* if you split the memory_object when remapping instead of refcounting, and only use the refcounts for cloning a segment when no-MMU
+  forking then you can remove the mem_start and mem_length fields, since you'll be able to free the pages separately.  You can only
+  split a memory_object if it only has one refcount though, or else you'd have to find the others, so this might not actually work
 
-* implement tid and tgid
-* allow stack to be NULL when calling clone (which makes it behave like fork)
+* should you change the memory resize code to use mmap/unmap instead of resizing?  That would make it easier to add the MMU table
+  changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
+  the case of the heap and stack
+
 * fix the incorrect process size in the ps command
 
 * readjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 
-* [is this fixed?] when cloning the stack and heap, the heap segment is not adjusted properly
+* [this needs to be tested] allow stack to be NULL when calling clone (which makes it behave like fork)
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
   unfreed in the middle of the segment
-* you need to add a config option and convenience function for rounding up to the nearest size, like KMALLOC_MINALIGN on linux
 
 
 * why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
@@ -34,8 +36,6 @@
 * add mmu mapping to memory_map
 * make it possible to set up the virtual address space differently with MMU enabled, when loading a binary
 
-* use the 3 hardcoded pointers to make /proc/*/statm, and printing easier.  I can make a function to find and
-  grow/shrink/clone the segment(s), so that it can update the hardcoded pointers
 
 * there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
   memory without duplicating them
@@ -45,7 +45,6 @@
 * add flags to kmalloc?
 * add usp, mmu table to context and switch
 * allocate per-thread kernel stack if CONFIG_USER_MODE is defined
-* make memory_region use kzalloc instead of const
 
 * make a macro for alloc_contiguous vs alloc_single, such that if CONFIG_MMU then single otherwise contiguous
 * make kmalloc use the page-based memory for alloc

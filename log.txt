@@ -784,3 +784,26 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I should change the memory stuff to not deal with segments directly but deal with mapping and unmapping addresses, and let the
   impl handle the rest
 
+
+2025-06-24:
+
+- even in no-MMU I can still have mmap support.  There's just nothing in hardware stopping accessing the memory without mapping it
+  first.  As such, you can actually implement vnode bufcache paging things, so that it uses the same pages for all processes that
+  access the same read-only data, so long as the address it's mapping to is NULL or can otherwise be changed by the OS.  I fixed
+  mapping would still fail
+
+
+2025-06-27:
+
+- alright, I have mmap and unmap in the process memory code, minus the actual MMU stuff.
+- I'm still thinking of how I could get rid of memory_object (possibly by splitting them when dividing memory?  I only want to use
+  them as a per-region refcount instead of having to maintain per-page refcounts which would take like 4KB or more for 1MB of 256
+  byte pages)
+- I feel like I should get rid of the resize code as well, and use the mmap/unmap code instead, but maybe that's not so important
+- I still have more to do with the memory code, specifically adding and testing the MMU table mapping, and separating the no-MMU
+  cloning code and platform-specific cloning code from the MMU cloning, but maybe I should work on the context instead
+- for the context, I need to merge the previous change that delays the full switch until later, and also add in the user mode
+  support which is going to uncover a bunch of bugs.  I can't have a separate MMU table without adding that to the context switch,
+  and I can't add that until the CPU switching works, but I would also need to add two-stack support and so on, so it will be a big
+  change before I can get back to MMU support again
+
