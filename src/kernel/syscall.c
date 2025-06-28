@@ -8,6 +8,7 @@
 #include <sys/ioc_tty.h>
 #include <sys/socket.h>
 
+#include <kconfig.h>
 #include <asm/irqs.h>
 #include <kernel/api.h>
 #include <kernel/time.h>
@@ -26,92 +27,7 @@
 #include <kernel/net/socket.h>
 
 
-#define SYSCALL_MAX	80
-
-void test(void) { printk("It's a test!\n"); }
-
-// TODO remove this after testing
-int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[]);
-
-extern int __do_fork(void);
-extern int __do_clone(void);
-extern int __do_sigreturn(void);
-
-void *syscall_table[SYSCALL_MAX] = {
-	test,
-	do_exit,
-	__do_fork,
-	do_read,
-	do_write,
-	do_open,
-	do_close,
-	do_waitpid,
-	do_creat,
-	do_link,
-	do_unlink,
-	do_exec,
-	do_chdir,
-	do_time,
-	do_mknod,
-	do_chmod,
-	do_chown,
-	do_brk,
-	do_stat,
-	do_lseek,
-	do_getpid,
-	do_mount,
-	do_umount,
-	do_setuid,
-	do_getuid,
-	do_stime,
-	test,		// 26 = ptrace, not yet implemented
-	do_alarm,
-	do_fstat,
-	do_pause,
-	__do_sigreturn,
-	do_sigaction,
-	do_access,
-	do_sync,
-	do_kill,
-	do_rename,
-	do_mkdir,
-	test,		// 37 = rmdir, not yet implemented
-	do_getcwd,
-	do_dup2,
-	do_pipe,
-	do_ioctl,
-	do_fcntl,
-	do_readdir,
-	do_getppid,
-	test,		// 45 = symlink, not yet implemented
-	do_getpgid,
-	do_setpgid,
-	do_getsid,
-	do_setsid,
-	do_umask,
-	do_sbrk,
-	do_select,
-
-	do_socket,
-	do_socketpair,
-	do_connect,
-	do_bind,
-	do_listen,
-	do_accept,
-	do_shutdown,
-	do_send,
-	do_sendto,
-	do_sendmsg,
-	do_recv,
-	do_recvfrom,
-	do_recvmsg,
-	do_getsockopt,
-	do_setsockopt,
-
-	do_execbuiltin,
-	__do_clone,
-	do_gettid,
-};
+#include <asm/syscall_table.h>
 
 extern void enter_syscall(void);
 
@@ -120,13 +36,14 @@ void init_syscall(void)
 	arch_set_irq_handler(IRQ_TRAP1, enter_syscall);
 }
 
-// TODO this is temporary until you have processes working correctly
 extern struct process *current_proc;
 extern struct syscall_record *current_syscall;
 
 
+#if defined(CONFIG_TTY_68681)
 void tty_68681_set_leds(uint8_t bits);
 void tty_68681_reset_leds(uint8_t bits);
+#endif
 
 /// Called on entry to any system call
 ///
@@ -137,7 +54,10 @@ void syscall_entry(void)
 {
 	// TODO for testing
 	//printk_safe("%d\n", current_syscall->syscall);
+
+	#if defined(CONFIG_TTY_68681)
 	tty_68681_set_leds(0x04);
+	#endif
 }
 
 /// Called when exiting any system call
@@ -147,7 +67,9 @@ void syscall_entry(void)
 /// debugging info, as a counterpart to `syscall_entry()`
 void syscall_exit(void)
 {
+	#if defined(CONFIG_TTY_68681)
 	tty_68681_reset_leds(0x04);
+	#endif
 }
 
 //
