@@ -29,7 +29,8 @@
 	.global run_bh_handlers
 	.global mmu_table_create
 
-	.equ	CONTEXT_SIZE, 60		// The size of the saved registers on the stack (not including the interrupt return)
+	.equ	SHORT_CONTEXT_SIZE, 24		// The size of the syscall registers on the stack (not including the interrupt return)
+	.equ	FULL_CONTEXT_SIZE, 60		// The size of the saved registers on the stack (not including the interrupt return)
 	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
 	.equ	PROC_RETURN_OFFSET, 12		// The offset into struct process where the return_value is located
 
@@ -37,7 +38,7 @@
 
 /**
  * Create a new context given a future stack address, return address
- * 	void *create_context(void *user_kernel_stack, void *entry, void *exit);
+ * 	void *create_context(void *kernel_stack, void *entry, void *exit);
  */
 create_context:
 	movea.l	(4,%sp), %a0
@@ -73,7 +74,7 @@ create_context:
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
 	// Save context size as the last item
-	move.l  #60, -(%a0)
+	move.l  #FULL_CONTEXT_SIZE, -(%a0)
 
 	move.l	%a0, %d0
 	rts
@@ -152,10 +153,10 @@ drop_context:
 	move.l	%sp, current_syscall
 
 	// Load a pointer to the exception frame into %a1
-	lea.l	(%sp, 24), %a1
+	lea.l	(%sp, SHORT_CONTEXT_SIZE), %a1
 
 	// Save the context size now that the syscall is saved
-	move.l  #24, -(%sp)
+	move.l  #SHORT_CONTEXT_SIZE, -(%sp)
 
 	movea.l	current_proc, %a0
 
@@ -240,11 +241,11 @@ restore_context:
 
 	// Save the extended context of the previously running process, not including the system call registers
 	move.l  (%sp)+, %d1
-	cmp.l   #60, %d1
+	cmp.l   #FULL_CONTEXT_SIZE, %d1
 	beq.l   206f
 	SAVE_EXTRA_REGISTERS
     206:
-	move.l  #60, -(%sp)     // push a new context size
+	move.l  #FULL_CONTEXT_SIZE, -(%sp)     // push a new context size
 
 	// Update the new stack pointer of the previous proc
 	move.l  %sp, (%a1, PROC_SP_OFFSET)
@@ -256,7 +257,7 @@ restore_context:
 
 	// Check the context size
 	move.l  (%sp)+, %d1
-	cmp.l   #60, %d1
+	cmp.l   #FULL_CONTEXT_SIZE, %d1
 	bne.s   208f
 
 	// Restore the extended context of the next process, not including the system call registers
@@ -282,7 +283,7 @@ restore_context:
 	move.l  (%a0, PROC_SP_OFFSET), %a1
 	add.l   #4, %a1
 	SAVE_EXTRA_REGISTERS %a1
-	move.l  #60, -(%a1)
+	move.l  #FULL_CONTEXT_SIZE, -(%a1)
 	move.l  %a1, (%a0, PROC_SP_OFFSET)
 
 	// Do the actual system call
@@ -295,7 +296,7 @@ restore_context:
 	move.l  (%a0, PROC_SP_OFFSET), %a1
 	add.l   #4, %a1
 	RESTORE_EXTRA_REGISTERS %a1
-	move.l  #24, -(%a1)
+	move.l  #SHORT_CONTEXT_SIZE, -(%a1)
 	move.l  %a1, (%a0, PROC_SP_OFFSET)
 
 	rts
