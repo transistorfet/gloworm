@@ -106,6 +106,7 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 
 	parent_object = NULL;
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
+		// TODO get rid of this special case by using unmap later to remove the heap/stack area and replace it with a new one
 		if ((cur->flags & AREA_TYPE) == AREA_TYPE_STACK || (cur->flags & AREA_TYPE) == AREA_TYPE_HEAP) {
 			// Save the last object (which will be the stack) but don't copy
 			// the heap or stack segments so we can insert new ones later

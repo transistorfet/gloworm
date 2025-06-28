@@ -11,30 +11,30 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
-void init_syscall();
-void do_syscall();
+void init_syscall(void);
+void do_syscall(void);
 
 // Processes
 extern void do_exit(int exitcode);
-extern pid_t do_fork();
-extern pid_t do_clone(int (*fn)(void *), void *stack, int flags, void *arg);
+extern pid_t do_fork(void);
+extern pid_t do_clone(void);
 extern int do_exec(const char *path, const char *const argv[], const char *const envp[]);
 extern pid_t do_waitpid(pid_t pid, int *status, int options);
 extern int do_kill(pid_t pid, int sig);
-extern int do_sigreturn();
+extern int do_sigreturn(void);
 extern int do_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 extern unsigned int do_alarm(unsigned int seconds);
-extern int do_pause();
+extern int do_pause(void);
 extern int do_brk(void *addr);
 extern void *do_sbrk(intptr_t increment);
-extern pid_t do_gettid();
-extern pid_t do_getpid();
-extern pid_t do_getppid();
+extern pid_t do_gettid(void);
+extern pid_t do_getpid(void);
+extern pid_t do_getppid(void);
 extern pid_t do_getpgid(pid_t pid);
 extern int do_setpgid(pid_t pid, pid_t pgid);
 extern pid_t do_getsid(pid_t pid);
 extern pid_t do_setsid(void);
-extern uid_t do_getuid();
+extern uid_t do_getuid(void);
 extern int do_setuid(uid_t uid);
 
 // Files & Directories
@@ -64,7 +64,7 @@ extern int do_dup2(int oldfd, int newfd);
 extern mode_t do_umask(mode_t mask);
 extern int do_mount(const char *source, const char *target, struct mount_opts *opts);
 extern int do_umount(const char *source);
-extern int do_sync();
+extern int do_sync(void);
 extern int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 
 // Time

@@ -10,13 +10,16 @@
 	.global restore_context
 	.global _exit
 	.global _sigreturn
-	.global previous_proc
+	.global __do_fork
+	.global __do_clone
+	.global __do_sigreturn
 
 	// Declarations defined outside of this file
 	.global	syscall_table
 	.global kernel_reentries
 	.global kernel_stack
 	.global current_proc
+	.global previous_proc
 	.global current_syscall
 	.global do_syscall
 	.global do_irq
@@ -69,6 +72,8 @@ create_context:
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
+	// Save context size as the last item
+	move.l  #60, -(%a0)
 
 	move.l	%a0, %d0
 	rts
@@ -79,7 +84,8 @@ create_context:
  */
 drop_context:
 	movea.l	(4,%sp), %a0
-	add.l	#CONTEXT_SIZE, %a0
+	move.l  (%a0)+, %d0
+	add.l   %d0, %a0
 	#if !defined(CONFIG_MC68000)
 	add.l	#2, %a0
 	#endif
@@ -148,12 +154,13 @@ drop_context:
 	// Load a pointer to the exception frame into %a1
 	lea.l	(%sp, 24), %a1
 
+	// Save the context size now that the syscall is saved
+	move.l  #24, -(%sp)
+
 	movea.l	current_proc, %a0
 
 	// Save the original version of d0 to be returned on exit if not a syscall
 	move.l	%d0, (%a0, PROC_RETURN_OFFSET)
-
-	SAVE_EXTRA_REGISTERS
 
 	// Switch to the internal kernel stack
 	move.l	%sp, (%a0, PROC_SP_OFFSET)
@@ -218,12 +225,44 @@ restore_context:
 
 	///// A0 = CURRENT_PROC, A1 = PREVIOUS_PROC /////
 
-	// Switch to the user's kernel stack
+	// Save the kernel stack before the switch
 	move.l  %sp, kernel_stack
+
+	// Skip if no previous process
+	cmpa.l  #0, %a1
+	beq.w   207f
+	// Skip the extended context switch if the proc hasn't changed
+	cmpa.l  %a0, %a1
+	beq.w   207f
+
+	// Switch to the previous process's stack
+	movea.l  (%a1, PROC_SP_OFFSET), %sp
+
+	// Save the extended context of the previously running process, not including the system call registers
+	move.l  (%sp)+, %d1
+	cmp.l   #60, %d1
+	beq.l   206f
+	SAVE_EXTRA_REGISTERS
+    206:
+	move.l  #60, -(%sp)     // push a new context size
+
+	// Update the new stack pointer of the previous proc
+	move.l  %sp, (%a1, PROC_SP_OFFSET)
+
+    207:
+
+	// Switch to the current process's user stack
 	movea.l  (%a0, PROC_SP_OFFSET), %sp
 
-	// Restore registers
+	// Check the context size
+	move.l  (%sp)+, %d1
+	cmp.l   #60, %d1
+	bne.s   208f
+
+	// Restore the extended context of the next process, not including the system call registers
 	RESTORE_EXTRA_REGISTERS
+
+    208:       // Now it's the last step before returning to a user process
 
 	// This is the last time %a0 will be available as the current proc
 	// Stick the return value directly onto the stack where d0 will be
@@ -233,6 +272,38 @@ restore_context:
 	RESTORE_SYSCALL_REGISTERS
 
 	rte
+
+
+.macro SAVE_FULL_SYSCALL_ENTRY entry_name, handler_name
+\entry_name:
+	// Save the extra registers to the user stack before cloning the process
+	// It's ok to clobber the scratch registers because they're already saved
+	move.l  current_proc, %a0
+	move.l  (%a0, PROC_SP_OFFSET), %a1
+	add.l   #4, %a1
+	SAVE_EXTRA_REGISTERS %a1
+	move.l  #60, -(%a1)
+	move.l  %a1, (%a0, PROC_SP_OFFSET)
+
+	// Do the actual system call
+	jsr     \handler_name
+
+	// Remove the registers from the stack since `restore_context` will assume they aren't there
+	// The original values should still be in the registers, so there's no need to restore them
+	move.l  current_proc, %a0
+	//sub.l #36, (%a0, PROC_SP_OFFSET)
+	move.l  (%a0, PROC_SP_OFFSET), %a1
+	add.l   #4, %a1
+	RESTORE_EXTRA_REGISTERS %a1
+	move.l  #24, -(%a1)
+	move.l  %a1, (%a0, PROC_SP_OFFSET)
+
+	rts
+.endm
+
+SAVE_FULL_SYSCALL_ENTRY __do_fork, do_fork
+SAVE_FULL_SYSCALL_ENTRY __do_clone, do_clone
+SAVE_FULL_SYSCALL_ENTRY __do_sigreturn, do_sigreturn
 
 
 /**
@@ -336,16 +407,4 @@ _sigreturn:
 
 	// This shouldn't run because the syscall should never return
 	stop	#0x2000
-
-
-//////////////////////
-// Global Variables
-//////////////////////
-	.section .data
-
-// Stores the previous process on entering from a user process
-// Used to compare if returning to the same process, in which case an extended
-// context switch is performed
-previous_proc:
-	.long	0
 

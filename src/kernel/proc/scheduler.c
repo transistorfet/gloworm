@@ -18,6 +18,7 @@ int need_reschedule;
 int kernel_reentries;
 struct process *idle_proc;
 struct process *current_proc;
+struct process *previous_proc;
 struct syscall_record *current_syscall;
 
 static struct queue run_queue;
@@ -28,6 +29,7 @@ void init_scheduler()
 	need_reschedule = 0;
 	kernel_reentries = 1;
 	current_proc = NULL;
+	previous_proc = NULL;
 
 	_queue_init(&run_queue);
 	_queue_init(&blocked_queue);

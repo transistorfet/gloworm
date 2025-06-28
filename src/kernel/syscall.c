@@ -28,18 +28,19 @@
 
 #define SYSCALL_MAX	80
 
-void test() { printk("It's a test!\n"); }
+void test(void) { printk("It's a test!\n"); }
 
 // TODO remove this after testing
 int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[]);
 
-extern int __do_fork();
+extern int __do_fork(void);
+extern int __do_clone(void);
+extern int __do_sigreturn(void);
 
 void *syscall_table[SYSCALL_MAX] = {
 	test,
 	do_exit,
-	do_fork, // do_fork,
-	//__do_fork, // do_fork,
+	__do_fork,
 	do_read,
 	do_write,
 	do_open,
@@ -67,7 +68,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	do_alarm,
 	do_fstat,
 	do_pause,
-	do_sigreturn,
+	__do_sigreturn,
 	do_sigaction,
 	do_access,
 	do_sync,
@@ -108,13 +109,13 @@ void *syscall_table[SYSCALL_MAX] = {
 	do_setsockopt,
 
 	do_execbuiltin,
-	do_clone,
+	__do_clone,
 	do_gettid,
 };
 
-extern void enter_syscall();
+extern void enter_syscall(void);
 
-void init_syscall()
+void init_syscall(void)
 {
 	arch_set_irq_handler(IRQ_TRAP1, enter_syscall);
 }
@@ -132,7 +133,7 @@ void tty_68681_reset_leds(uint8_t bits);
 /// Any code that should run before a syscall is processed should go here, such
 /// as tracing or debugging info.  The `current_syscall` global will be set with
 /// the syscall info that is about to be executed
-void syscall_entry()
+void syscall_entry(void)
 {
 	// TODO for testing
 	//printk_safe("%d\n", current_syscall->syscall);
@@ -144,7 +145,7 @@ void syscall_entry()
 /// Any code that should be run after a syscall has run but before returning to
 /// user code should go here.  This is mostly a place to close any tracing or
 /// debugging info, as a counterpart to `syscall_entry()`
-void syscall_exit()
+void syscall_exit(void)
 {
 	tty_68681_reset_leds(0x04);
 }
@@ -152,7 +153,7 @@ void syscall_exit()
 //
 // Perform a system call and pass the return value to the calling process
 //
-void do_syscall()
+void do_syscall(void)
 {
 	int ret;
 
@@ -168,21 +169,40 @@ void do_exit(int exitcode)
 	resume_waiting_parent(current_proc);
 }
 
-pid_t do_fork()
-{
-	return do_clone(NULL, NULL, 0, NULL);
-}
-
-pid_t do_clone(int (*fn)(void *), void *stack, int flags, void *arg)
+pid_t do_fork(void)
 {
 	int error;
 	struct process *proc;
 	struct clone_args args;
 
-	args.flags = flags;
-	args.entry = fn;
-	args.stack = stack;
-	args.arg = arg;
+	args.entry = NULL;
+	args.stack = NULL;
+	args.flags = 0;
+	args.arg = NULL;
+
+	error = clone_process(current_proc, &args, &proc);
+	if (error < 0)
+		return error;
+
+	return proc->pid;
+}
+
+/// Clone a process (more precise than fork())
+///
+/// NOTE: this syscall may have an alternate entry to save the full context on
+/// the stack before cloning it.  Because of that, this function uses the
+/// `current_syscall` struct to access the arguments.
+//	Actual Args: int (*fn)(void *), void *stack, int flags, void *arg
+pid_t do_clone(void)
+{
+	int error;
+	struct process *proc;
+	struct clone_args args;
+
+	args.entry = (int (*)(void *)) current_syscall->arg1;
+	args.stack = (void *) current_syscall->arg2;
+	args.flags = current_syscall->arg3;
+	args.arg = (void *) current_syscall->arg4;
 
 	error = clone_process(current_proc, &args, &proc);
 	if (error < 0)
@@ -250,7 +270,7 @@ int do_kill(pid_t pid, int sig)
 	}
 }
 
-int do_sigreturn()
+int do_sigreturn(void)
 {
 	cleanup_signal_handler();
 	return 0;
@@ -271,7 +291,7 @@ unsigned int do_alarm(unsigned int seconds)
 	return set_proc_alarm(current_proc, seconds);
 }
 
-int do_pause()
+int do_pause(void)
 {
 	current_proc->bits |= PB_PAUSED;
 	suspend_current_syscall(0);
@@ -304,17 +324,17 @@ void *do_sbrk(intptr_t diff)
 	return (void *) current_proc->map->sbrk;
 }
 
-pid_t do_gettid()
+pid_t do_gettid(void)
 {
 	return current_proc->tid;
 }
 
-pid_t do_getpid()
+pid_t do_getpid(void)
 {
 	return current_proc->pid;
 }
 
-pid_t do_getppid()
+pid_t do_getppid(void)
 {
 	return current_proc->parent;
 }
@@ -375,7 +395,7 @@ pid_t do_setsid(void)
 	return current_proc->session;
 }
 
-uid_t do_getuid()
+uid_t do_getuid(void)
 {
 	return current_proc->uid;
 }
@@ -427,7 +447,7 @@ int do_umount(const char *source)
 	return vfs_unmount(vnode->rdev, current_proc->uid);
 }
 
-int do_sync()
+int do_sync(void)
 {
 	return vfs_sync(0);
 }

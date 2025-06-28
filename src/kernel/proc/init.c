@@ -34,7 +34,7 @@ void alloc_kernel_stack(struct process *proc, int (*task_start)(), const char *c
 /// orphaned processes will become the child of the init process.
 struct process *create_init_task(void)
 {
-	int error;
+	int error = 0;
 	struct process *proc;
 	const char *argv[2] = { "init", NULL }, *envp[1] = { NULL };
 
@@ -59,7 +59,6 @@ struct process *create_init_task(void)
 
 	#else
 
-	void *entry;
 	error = load_binary("/bin/init", proc, argv, envp);
 	if (error)
 		goto fail;
@@ -71,7 +70,7 @@ struct process *create_init_task(void)
 fail:
 	if (proc)
 		close_proc(proc);
-	panic("failed to create init task; stopping\n");
+	panic("failed to create init task, %d; stopping\n", error);
 	while (1) {}
 }
 

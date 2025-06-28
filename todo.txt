@@ -1,4 +1,8 @@
 
+* it looks like most of duplicate_memory and copy_stack are arch agnostic since it's copying what was made during program loading,
+  and program loading is generic because it's just doing what the binary format is
+* the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack
+
 * if you split the memory_object when remapping instead of refcounting, and only use the refcounts for cloning a segment when no-MMU
   forking then you can remove the mem_start and mem_length fields, since you'll be able to free the pages separately.  You can only
   split a memory_object if it only has one refcount though, or else you'd have to find the others, so this might not actually work

@@ -83,7 +83,7 @@ int exec_reset_and_initialize_stack(struct process *proc, struct memory_map *map
 	int error;
 
 	// Reset sbrk to the start of the heap
-	error = memory_map_move_sbrk(proc->map, -1 * (map->sbrk - map->heap_start));
+	error = memory_map_move_sbrk(map, -1 * (map->sbrk - map->heap_start));
 	if (error < 0) {
 		return error;
 	}
@@ -100,7 +100,7 @@ int exec_alloc_new_stack(struct process *proc, struct memory_map *map, int stack
 
 	error = memory_map_insert_heap_stack(map, stack_size);
 	if (error < 0)
-		return 0;
+		return error;
 
 	return exec_reset_and_initialize_stack(proc, map, entry, argv, envp);
 }

@@ -166,6 +166,7 @@ int load_elf_binary(struct vfile *file, struct process *proc, struct memory_map 
 
 	object = memory_object_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
 	if (!object) {
+		error = ENOMEM;
 		goto fail;
 	}
 
@@ -216,8 +217,9 @@ int load_elf_binary(struct vfile *file, struct process *proc, struct memory_map 
 	memory_object_free(object);
 
 	error = exec_alloc_new_stack(proc, map, CONFIG_USER_STACK_SIZE, entry, argv, envp);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	return 0;
 
