@@ -30,7 +30,7 @@
 	.global mmu_table_create
 
 	.equ	SHORT_CONTEXT_SIZE, 24		// The size of the syscall registers on the stack (not including the interrupt return)
-	.equ	FULL_CONTEXT_SIZE, 60		// The size of the saved registers on the stack (not including the interrupt return)
+	.equ	FULL_CONTEXT_SIZE, 64		// The size of the saved registers on the stack (not including the interrupt return)
 	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
 	.equ	PROC_RETURN_OFFSET, 12		// The offset into struct process where the return_value is located
 
@@ -38,24 +38,33 @@
 
 /**
  * Create a new context given a future stack address, return address
- * 	void *create_context(void *kernel_stack, void *entry, void *exit);
+ * 	void *create_context(void *kernel_stack, void *entry, void *exit, void *user_stack);
  */
 create_context:
-	movea.l	(4,%sp), %a0
-	movea.l	(8,%sp), %a1
-	move.l	(12,%sp), %d0
+	movea.l	(4,%sp), %a0	// void *kernel_stack
+	movea.l	(8,%sp), %a1	// void *entry
+	move.l	(12,%sp), %d0	// void *exit
+	move.l	(16,%sp), %d1	// void *user_stack
 
+/*
 	// Push _exit return address for when main returns
 	move.l	%d0, -(%a0)
+*/
 
-	// Push the 68010+ Format/Vector Word
 	#if !defined(CONFIG_MC68000)
+	// Push the 68010+ Format/Vector Word
 	move.w	#0, -(%a0)
 	#endif
+
 	// Push starting address
 	move.l	%a1, -(%a0)
+
 	// Push flags
+	#if defined(CONFIG_M68K_USER_MODE)
+	move.w #0x0000, -(%a0)
+	#else
 	move.w #0x2000, -(%a0)
+	#endif
 
 	// Push zeros for all registers
 	move.l	#0, -(%a0)
@@ -73,6 +82,7 @@ create_context:
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
 	move.l	#0, -(%a0)
+	move.l	%d1, -(%a0)
 	// Save context size as the last item
 	move.l  #FULL_CONTEXT_SIZE, -(%a0)
 
@@ -81,7 +91,7 @@ create_context:
 
 /**
  * Remove the context from the stack and return the new stack pointer
- * 	void *drop_context(void *user_kernel_stack);
+ * 	void *drop_context(void *kernel_stack);
  */
 drop_context:
 	movea.l	(4,%sp), %a0
@@ -119,11 +129,28 @@ drop_context:
 .macro SAVE_EXTRA_REGISTERS reg=%sp
 	// Save registers
 	movem.l	%d4-%d7/%a2-%a6, -(\reg)
+
+	// TODO should you just always load/restore it, which normally would have no effect and be a bit slower (two instructions)
+	//	but it would preserve the value, which could be used by something else?, but really... would it ever?
+	#if defined(CONFIG_M68K_USER_MODE)
+	movec.l	%usp, %d4
+	move.l	%d4, -(\reg)
+	#else
+	move.l	#0, -(\reg)
+	#endif
 .endm
 
 .macro RESTORE_EXTRA_REGISTERS reg=%sp
+	#if defined(CONFIG_M68K_USER_MODE)
+	move.l	(\reg)+, %d4
+	movec.l	%d4, %usp
+	#else
+	add.l	#4, \reg
+	#endif
+
 	// Restore registers
 	movem.l	(\reg)+, %d4-%d7/%a2-%a6
+
 .endm
 
 /// Save all registers to the current user stack and switch to the kernel stack
@@ -275,28 +302,34 @@ restore_context:
 	rte
 
 
+/// Generic entry point for some internal syscall
+///
+/// Some syscalls need the full set of registers saved to the stack, such as
+/// fork/clone so that the cloned child can restore the correct extra register
+/// values, which can contain important information, even if the child process
+/// is just calling exec() soon after.  The system is unbootable without this.
 .macro SAVE_FULL_SYSCALL_ENTRY entry_name, handler_name
 \entry_name:
 	// Save the extra registers to the user stack before cloning the process
 	// It's ok to clobber the scratch registers because they're already saved
 	move.l  current_proc, %a0
 	move.l  (%a0, PROC_SP_OFFSET), %a1
-	add.l   #4, %a1
+	add.l   #4, %a1				// remove the old context size from the stack
 	SAVE_EXTRA_REGISTERS %a1
-	move.l  #FULL_CONTEXT_SIZE, -(%a1)
+	move.l  #FULL_CONTEXT_SIZE, -(%a1)	// replace it with the new context size
 	move.l  %a1, (%a0, PROC_SP_OFFSET)
 
 	// Do the actual system call
 	jsr     \handler_name
 
 	// Remove the registers from the stack since `restore_context` will assume they aren't there
-	// The original values should still be in the registers, so there's no need to restore them
+	// The original values should still be in the registers, so there's no need to load them
 	move.l  current_proc, %a0
 	//sub.l #36, (%a0, PROC_SP_OFFSET)
 	move.l  (%a0, PROC_SP_OFFSET), %a1
-	add.l   #4, %a1
+	add.l   #4, %a1				// remove the old context size from the stack
 	RESTORE_EXTRA_REGISTERS %a1
-	move.l  #SHORT_CONTEXT_SIZE, -(%a1)
+	move.l  #SHORT_CONTEXT_SIZE, -(%a1)	// replace it with the new context size
 	move.l  %a1, (%a0, PROC_SP_OFFSET)
 
 	rts

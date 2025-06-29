@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/param.h>
+#include <kernel/proc/exec.h>
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
@@ -65,16 +66,25 @@ char *copy_exec_args(struct memory_map *map, char *stack, const char *const argv
 	return stack;
 }
 
-void *exec_initialize_stack_entry(struct memory_map *map, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
+void *exec_initialize_stack_entry(struct memory_map *map, void *stack_pointer, void *entry)
 {
-	stack_pointer = create_context(stack_pointer, entry, _exit);
+	//PUSH_STACK(stack_pointer, void *) = _exit;
+	stack_pointer = ((char *) stack_pointer) - sizeof(void *);
+	*((void **) stack_pointer) = _exit;
+	stack_pointer = create_context(stack_pointer, entry, NULL, NULL);
 	return stack_pointer;
 }
 
 void *exec_initialize_stack_with_args(struct memory_map *map, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
 {
+	// TODO this will be done to the user stack (which is the same as the kernel stack if no user mode)
 	stack_pointer = copy_exec_args(map, stack_pointer, argv, envp);
-	stack_pointer = create_context(stack_pointer, entry, _exit);
+	//PUSH_STACK(stack_pointer, void *) = _exit;
+	stack_pointer = ((char *) stack_pointer) - sizeof(void *);
+	*((void **) stack_pointer) = _exit;
+
+	// TODO this will be done to the kernel stack always
+	stack_pointer = create_context(stack_pointer, entry, NULL, NULL);
 	return stack_pointer;
 }
 

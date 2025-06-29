@@ -3,6 +3,7 @@
 #define _KERNEL_PROCESS_H
 
 #include <stddef.h>
+#include <asm/context.h>
 #include <kernel/syscall.h>
 #include <kernel/proc/timer.h>
 #include <kernel/proc/signal.h>
@@ -39,32 +40,28 @@ struct process;
 
 struct process {
 	struct queue_node node;
-	/// The kernel stack pointer for this process
-	/// If user mode is not used, this will also be the user stack pointer
+	/// Architecture-specific task state
+	//struct arch_task_info task_info;
 	void *sp;
+	/// The value that will be returned to the user process when the kernel returns
 	uintptr_t return_value;
-	uint16_t state;
 
+	struct memory_map *map;
+
+	#if defined(CONFIG_USER_MODE)
+	/// A pointer to the start of the kernel stack for this process
+	void* kernel_stack;
+	/// The size of the allocated kernel stack
+	ssize_t kernel_stack_size;
+	#endif
+
+	int state;
 	pid_t tid;
 	pid_t tgid;
 	pid_t pid;
 	pid_t parent;
 	pid_t pgid;
 	pid_t session;
-
-	struct memory_map *map;
-
-	//#if defined(CONFIG_USER_MODE)
-	///// A pointer to the start of the kernel stack for this process
-	//page_t kernel_stack;
-	///// The size of the allocated kernel stack
-	//ssize_t kernel_stack_size;
-	//#endif
-
-	// TODO somewhere in here, or in the context, would be:
-	// page_t kernel_stack;
-	// mmu_table_t *root_table;
-	// uint32_t usp;
 
 	uint32_t bits;
 	int exitcode;

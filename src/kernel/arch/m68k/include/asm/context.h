@@ -35,5 +35,15 @@ struct context {
 	struct registers regs;
 };
 
+struct arch_task_info {
+	/// The kernel stack pointer for this process
+	/// If user mode is not used, this will also be the user stack pointer
+	void *ksp;
+};
+
+#define PUSH_STACK(stack_pointer, ttype) \
+	(stack_pointer) = ((char *) (stack_pointer)) - sizeof((ttype));	\
+	*(((ttype) *) (stack_pointer))
+
 #endif
 

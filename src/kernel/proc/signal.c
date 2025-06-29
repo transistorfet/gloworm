@@ -118,7 +118,9 @@ static inline void run_signal_handler(struct process *proc, int signum)
 
 	// Push a fresh context onto the stack, which will run the handler and then call sigreturn()
 	proc->sp = (void *) context;
-	proc->sp = create_context(proc->sp, proc->signals.actions[signum - 1].sa_handler, _sigreturn);
+	proc->sp = ((char *) proc->sp) - sizeof(void *);
+	*((void **) proc->sp) = _sigreturn;
+	proc->sp = create_context(proc->sp, proc->signals.actions[signum - 1].sa_handler, NULL, NULL);
 
 	// Resume the process without restarting the last syscall
 	resume_proc_without_restart(proc);
