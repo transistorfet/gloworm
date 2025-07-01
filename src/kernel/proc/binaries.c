@@ -20,12 +20,13 @@
 #error "Unable to load binaries for the target machine"
 #endif
 
-int load_flat_binary(struct vfile *file, struct process *proc, struct memory_map *map, const char *const argv[], const char *const envp[]);
-int load_elf_binary(struct vfile *file, struct process *proc, struct memory_map *map, const char *const argv[], const char *const envp[]);
+int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry);
+int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry);
 
 int load_binary(const char *path, struct process *proc, const char *const argv[], const char *const envp[])
 {
 	int error;
+	void *entry;
 	struct vfile *file;
 	struct memory_map *map = NULL;
 
@@ -45,12 +46,12 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	if (!map)
 		return ENOMEM;
 
-	error = load_elf_binary(file, proc, map, argv, envp);
+	error = load_elf_binary(file, map, &entry);
 	// If the file was not a valid ELF binary, then execute it as a flat binary
 	if (error == ENOEXEC) {
 		error = vfs_seek(file, 0, SEEK_SET);
 		if (!error) {
-			error = load_flat_binary(file, proc, map, argv, envp);
+			error = load_flat_binary(file, map, &entry);
 		}
 	}
 
@@ -67,12 +68,14 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	memory_map_free(proc->map);
 	proc->map = map;
 
+	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
+	exec_initialize_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
+
 	return error;
 }
 
-int load_flat_binary(struct vfile *file, struct process *proc, struct memory_map *map, const char *const argv[], const char *const envp[])
+int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
-	void *entry;
 	int mem_size;
 	int error = ENOMEM;
 	struct memory_object *object = NULL;
@@ -98,9 +101,9 @@ int load_flat_binary(struct vfile *file, struct process *proc, struct memory_map
 		goto fail;
 	}
 
-	entry = (void *) object->anonymous.address;
+	*entry = (void *) object->anonymous.address;
 
-	error = exec_alloc_new_stack(proc, map, CONFIG_USER_STACK_SIZE, entry, argv, envp);
+	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		goto fail;
 
@@ -115,9 +118,8 @@ fail:
 
 #define PROG_HEADER_MAX	    6
 
-int load_elf_binary(struct vfile *file, struct process *proc, struct memory_map *map, const char *const argv[], const char *const envp[])
+int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
-	void *entry;
 	short num_ph;
 	size_t mem_size;
 	int error = ENOMEM;
@@ -211,15 +213,14 @@ int load_elf_binary(struct vfile *file, struct process *proc, struct memory_map 
 		}
 	}
 
-	entry = (void *) object->anonymous.address + header.e_entry;
+	*entry = (void *) object->anonymous.address + header.e_entry;
 
 	// Free the extra reference that was used to create the individual segments
 	memory_object_free(object);
 
-	error = exec_alloc_new_stack(proc, map, CONFIG_USER_STACK_SIZE, entry, argv, envp);
-	if (error < 0) {
+	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
+	if (error < 0)
 		goto fail;
-	}
 
 	return 0;
 

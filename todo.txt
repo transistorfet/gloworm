@@ -1,4 +1,11 @@
 
+* move some of the stack stuff to arch/m68k
+* where will the kernel stack be created?
+* set the user stack pointer when creating a new context
+* 
+
+* figure out why signals are broken
+
 * it looks like most of duplicate_memory and copy_stack are arch agnostic since it's copying what was made during program loading,
   and program loading is generic because it's just doing what the binary format is
 * the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack
@@ -13,7 +20,7 @@
 
 * fix the incorrect process size in the ps command
 
-* readjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
+* re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 

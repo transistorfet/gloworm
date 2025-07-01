@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/param.h>
+#include <asm/context.h>
 #include <kernel/proc/exec.h>
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
@@ -38,79 +39,39 @@ int copy_string_array(char **stack, int *count, const char *const arr[])
 	return 0;
 }
 
-char *copy_exec_args(struct memory_map *map, char *stack, const char *const argv[], const char *const envp[])
+char *copy_exec_args(struct memory_map *map, char *user_sp, const char *const argv[], const char *const envp[])
 {
 	int argc, envc;
 
 	if (envp) {
-		copy_string_array(&stack, &envc, envp);
-		map->envp = (const char *const *) stack;
+		copy_string_array(&user_sp, &envc, envp);
+		map->envp = (const char *const *) user_sp;
 	} else {
 		map->envp = NULL;
 	}
 
 	if (argv) {
-		copy_string_array(&stack, &argc, argv);
-		map->argv = (const char *const *) stack;
+		copy_string_array(&user_sp, &argc, argv);
+		map->argv = (const char *const *) user_sp;
 	} else {
 		map->argv = NULL;
 	}
 
-	stack -= sizeof(char **);
-	*((char ***) stack) = (char **) map->envp;
-	stack -= sizeof(char **);
-	*((char ***) stack) = (char **) map->argv;
-	stack -= sizeof(int);
-	*((int *) stack) = argc;
+	user_sp -= sizeof(char **);
+	*((char ***) user_sp) = (char **) map->envp;
+	user_sp -= sizeof(char **);
+	*((char ***) user_sp) = (char **) map->argv;
+	user_sp -= sizeof(int);
+	*((int *) user_sp) = argc;
 
-	return stack;
+	return user_sp;
 }
 
-void *exec_initialize_stack_entry(struct memory_map *map, void *stack_pointer, void *entry)
-{
-	//PUSH_STACK(stack_pointer, void *) = _exit;
-	stack_pointer = ((char *) stack_pointer) - sizeof(void *);
-	*((void **) stack_pointer) = _exit;
-	stack_pointer = create_context(stack_pointer, entry, NULL, NULL);
-	return stack_pointer;
-}
-
-void *exec_initialize_stack_with_args(struct memory_map *map, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
+void exec_initialize_stack_with_args(struct process *proc, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
 {
 	// TODO this will be done to the user stack (which is the same as the kernel stack if no user mode)
-	stack_pointer = copy_exec_args(map, stack_pointer, argv, envp);
-	//PUSH_STACK(stack_pointer, void *) = _exit;
-	stack_pointer = ((char *) stack_pointer) - sizeof(void *);
-	*((void **) stack_pointer) = _exit;
+	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
 
-	// TODO this will be done to the kernel stack always
-	stack_pointer = create_context(stack_pointer, entry, NULL, NULL);
-	return stack_pointer;
+	arch_reinit_task_info(proc, stack_pointer, entry);
 }
 
-int exec_reset_and_initialize_stack(struct process *proc, struct memory_map *map, void *entry, const char *const argv[], const char *const envp[])
-{
-	int error;
-
-	// Reset sbrk to the start of the heap
-	error = memory_map_move_sbrk(map, -1 * (map->sbrk - map->heap_start));
-	if (error < 0) {
-		return error;
-	}
-
-	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	proc->sp = exec_initialize_stack_with_args(map, (char *) map->stack_end, entry, argv, envp);
-
-	return 0;
-}
-
-int exec_alloc_new_stack(struct process *proc, struct memory_map *map, int stack_size, void *entry, const char *const argv[], const char *const envp[])
-{
-	int error = 0;
-
-	error = memory_map_insert_heap_stack(map, stack_size);
-	if (error < 0)
-		return error;
-
-	return exec_reset_and_initialize_stack(proc, map, entry, argv, envp);
-}

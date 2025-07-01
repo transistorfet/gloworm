@@ -54,7 +54,7 @@ int get_data_statm(struct process *proc, char *buffer, int max)
 		proc->map->sbrk - proc->map->data_start,
 		(uintptr_t) proc->map->sbrk,
 		proc->map->stack_end,
-		(uintptr_t) proc->sp
+		(uintptr_t) get_user_stackp(&proc->task_info)
 	);
 
 }

@@ -8,4 +8,5 @@ obj-y				+= syscall_entry.o
 
 obj-y				+= irq/
 obj-y				+= mm/
+obj-y				+= proc/
 

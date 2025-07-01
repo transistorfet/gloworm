@@ -3,6 +3,7 @@
 
 #include <asm/irqs.h>
 #include <kernel/api.h>
+#include <kernel/arch/context.h>
 #include <kernel/proc/timer.h>
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
@@ -101,6 +102,8 @@ void close_proc(struct process *proc)
 		if (table[i].pid && table[i].parent == proc->pid)
 			table[i].parent = 1;
 	}
+
+	arch_release_task_info(proc);
 }
 
 

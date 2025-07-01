@@ -325,7 +325,6 @@ restore_context:
 	// Remove the registers from the stack since `restore_context` will assume they aren't there
 	// The original values should still be in the registers, so there's no need to load them
 	move.l  current_proc, %a0
-	//sub.l #36, (%a0, PROC_SP_OFFSET)
 	move.l  (%a0, PROC_SP_OFFSET), %a1
 	add.l   #4, %a1				// remove the old context size from the stack
 	RESTORE_EXTRA_REGISTERS %a1

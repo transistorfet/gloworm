@@ -2,6 +2,7 @@
 #include <errno.h>
 
 #include <sys/types.h>
+#include <kernel/printk.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/process.h>
@@ -13,11 +14,6 @@
 #define SIG_MASK_DEFAULT_STOP		0x003C0000
 #define SIG_MASK_MASKABLE		0xFFFBFEFF
 
-
-struct sigcontext {
-	int signum;
-	sigset_t prev_mask;
-};
 
 static inline void run_signal_handler(struct process *proc, int signum);
 static inline void run_signal_default_action(struct process *proc, int signum, sigset_t sigmask);
@@ -103,24 +99,12 @@ int dispatch_signal(struct process *proc, int signum)
 
 static inline void run_signal_handler(struct process *proc, int signum)
 {
-	struct sigcontext *context;
-
 	// If the syscall won't be restarted after the handler has run, then cancel it now
 	if ((proc->bits & PB_PAUSED) || !(proc->signals.actions[signum - 1].sa_flags & SA_RESTART)) {
 		cancel_syscall(proc);
 	}
 
-	// Save signal data on the stack for use by sigreturn
-	context = (((struct sigcontext *) proc->sp) - 1);
-	context->signum = signum;
-	context->prev_mask = proc->signals.blocked;
-	proc->signals.blocked |= proc->signals.actions[signum - 1].sa_mask;
-
-	// Push a fresh context onto the stack, which will run the handler and then call sigreturn()
-	proc->sp = (void *) context;
-	proc->sp = ((char *) proc->sp) - sizeof(void *);
-	*((void **) proc->sp) = _sigreturn;
-	proc->sp = create_context(proc->sp, proc->signals.actions[signum - 1].sa_handler, NULL, NULL);
+	arch_add_signal_context(proc, signum);
 
 	// Resume the process without restarting the last syscall
 	resume_proc_without_restart(proc);
@@ -128,12 +112,7 @@ static inline void run_signal_handler(struct process *proc, int signum)
 
 void cleanup_signal_handler()
 {
-	struct sigcontext *context;
-
-	current_proc->sp = drop_context(current_proc->sp);
-	context = (struct sigcontext *) current_proc->sp;
-	current_proc->signals.blocked = context->prev_mask;
-	current_proc->sp = (((struct sigcontext *) current_proc->sp) + 1);
+	arch_remove_signal_context(current_proc);
 
 	// TODO maybe we should restart the syscall anyways, which would then block again if it's not ready, instead of suspending here?
 	if (current_proc->bits & PB_SYSCALL) {

@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/sched.h>
+
+#include <asm/context.h>
 #include <kernel/printk.h>
 #include <kernel/mm/pages.h>
 #include <kernel/proc/fork.h>
@@ -31,14 +33,17 @@ int clone_process(struct process *parent_proc, struct clone_args *args, struct p
 	proc->ctty = parent_proc->ctty;
 
 	error = clone_process_memory(parent_proc, proc, args->flags);
-	if (error < 0)
+	if (error < 0) {
+		close_proc(proc);
+		cleanup_proc(proc);
 		return error;
+	}
 
 	if (args->stack) {
 		// Put the argument onto the stack before initializing the context
 		args->stack -= sizeof(void *);
 		*((void **) args->stack) = args->arg;
-		proc->sp = exec_initialize_stack_entry(proc->map, args->stack, args->entry);
+		arch_reinit_task_info(proc, args->stack, args->entry);
 	}
 
 	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
@@ -147,7 +152,7 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	if (error < 0)
 		return error;
 
-	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) parent_proc->sp);
+	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) get_user_stackp(&parent_proc->task_info));
 	if (!stack_pointer)
 		return EFAULT;
 
@@ -162,7 +167,7 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	new_map->envp = (const char *const *) adjust_string_array((char **) parent_proc->map->envp, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
 
 	proc->map = new_map;
-	proc->sp = stack_pointer;
+	arch_clone_task_info(parent_proc, proc, stack_pointer);
 
 	return 0;
 }

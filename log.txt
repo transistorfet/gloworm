@@ -807,3 +807,22 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   and I can't add that until the CPU switching works, but I would also need to add two-stack support and so on, so it will be a big
   change before I can get back to MMU support again
 
+
+2025-06-29:
+
+- I was about to dive into adding the second kernel stack in user mode, but instead I've been investigating why signals don't work
+  properly anymore, since it's related to the context changes I've made
+- programs like the shell which register a custom signal handler for SIGINT will have that handler run, but then exit afterwards,
+  and it's acutally calling the exit syscall via `_exit` in the syscall_entry.S file, which makes me think the stack is somehow
+  getting corrupted.  It calls _sigreturn, and then _exit right after, so it's likely a problem in the cleanup code
+- the problem was introduced somewhere during the context refactoring, but I couldn't pinpoint exactly where because there are a
+  bunch of broken commits in there
+- disabling the special __do_sigreturn alternate entry point doesn't change anything, so I don't think this is related to that
+- it's not strictly related to the delayed context switch that I just enabled recently.  It's related to the earlier context
+  refactoring
+- the stack pointer seems to be the same before the custom handler is called, and after sigreturn cleans up afterwards, which is
+  throwing me off.  It should be right!  There must be something else, something subtle, going on
+- that said, between when the handler returns and when sigreturn is called the stack pointer is different, but also when sigreturn
+  is run, the process is the current process whereas when the signal is first run, it's not necessarily the current process that
+  handles the signal.  I wonder if even sending a signal to a background task would work where the current process doesn't
+

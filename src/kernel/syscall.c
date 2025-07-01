@@ -153,8 +153,17 @@ int do_exec(const char *path, const char *const argv[], const char *const envp[]
 
 int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[])
 {
+	int error;
+	char *stack_pointer;
+
+	// Reset sbrk to the start of the heap
+	error = memory_map_reset_sbrk(current_proc->map);
+	if (error < 0) {
+		return error;
+	}
+
 	// NOTE no modification of the memory maps here, since the code should be in the same process
-	exec_reset_and_initialize_stack(current_proc, current_proc->map, addr, argv, envp);
+	exec_initialize_stack_with_args(current_proc, (void *) current_proc->map->stack_end, addr, argv, envp);
 	return 0;
 }
 
@@ -225,7 +234,7 @@ int do_brk(void *addr)
 	int diff;
 
 	diff = (uintptr_t) addr - current_proc->map->sbrk;
-	if (current_proc->map->heap_start + diff >= (uintptr_t) current_proc->sp) {
+	if (current_proc->map->heap_start + diff >= (uintptr_t) get_user_stackp(&current_proc->task_info)) {
 		return ENOMEM;
 	}
 
@@ -235,7 +244,7 @@ int do_brk(void *addr)
 void *do_sbrk(intptr_t diff)
 {
 	if (diff) {
-		if (current_proc->map->heap_start + diff >= (uintptr_t) current_proc->sp) {
+		if (current_proc->map->heap_start + diff >= (uintptr_t) get_user_stackp(&current_proc->task_info)) {
 			return NULL;
 		}
 

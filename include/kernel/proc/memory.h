@@ -6,13 +6,17 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include <kconfig.h>
 #include <asm/addresses.h>
 #include <kernel/utils/queue.h>
+#include <kernel/mm/pages.h>
 #include <kernel/mm/kmalloc.h>
 
 #if defined(CONFIG_MMU)
 #include <asm/mmu.h>
 #endif
+
+#define KERNEL_STACK_SIZE	CONFIG_KERNEL_STACK_SIZE * PAGE_SIZE
 
 #define AREA_TYPE		0x000F		// Mask for type of mapping
 #define AREA_TYPE_INVALID	0x0000
@@ -115,6 +119,13 @@ int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size);
 int memory_map_move_sbrk(struct memory_map *map, int diff);
 
 void print_process_segments(struct process *proc);
+
+
+static inline int memory_map_reset_sbrk(struct memory_map *map)
+{
+	// Reset sbrk to the start of the heap
+	return memory_map_move_sbrk(map, -1 * (map->sbrk - map->heap_start));
+}
 
 static inline struct memory_map *memory_map_make_ref(struct memory_map *map)
 {

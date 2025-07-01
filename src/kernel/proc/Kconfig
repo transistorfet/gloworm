@@ -8,4 +8,11 @@ config USER_STACK_SIZE
 	  This is size of the stack that will be allocated for each user
 	  process that's executed.
 
+config KERNEL_STACK_SIZE
+	int "default per-user-process kernel stack size in pages"
+	default 1
+	help
+	  This is size of the stack that will be allocated for each user
+	  process that's executed, to be used exclusively by the kernel
+
 endmenu
