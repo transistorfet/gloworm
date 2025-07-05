@@ -69,10 +69,15 @@ __attribute__((noreturn)) void panic(const char *fmt, ...)
 
 void printk_dump(uint16_t *data, uint32_t length)
 {
-	for (short i = 0; i < length; i++) {
-		printk("%04x ", data[i]);
-		if ((i & 0x7) == 0x7)
-			printk("\n");
+	length >>= 1; // Adjust the dump size from bytes to words
+	while (length > 0) {
+		printk("%x: ", (unsigned int) data);
+		for (short i = 0; i < 8 && length > 0; i++, length--) {
+			printk("%04x ", data[i]);
+		}
+		printk("\n");
+		data += 8;
 	}
+	printk("\n");
 }
 

@@ -15,6 +15,7 @@
 #include <kernel/printk.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
+#include <kernel/arch/context.h>
 #include <kernel/proc/exec.h>
 #include <kernel/proc/fork.h>
 #include <kernel/proc/timer.h>
@@ -52,9 +53,6 @@ void tty_68681_reset_leds(uint8_t bits);
 /// the syscall info that is about to be executed
 void syscall_entry(void)
 {
-	// TODO for testing
-	//printk_safe("%d\n", current_syscall->syscall);
-
 	#if defined(CONFIG_TTY_68681)
 	tty_68681_set_leds(0x04);
 	#endif
@@ -154,7 +152,6 @@ int do_exec(const char *path, const char *const argv[], const char *const envp[]
 int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[])
 {
 	int error;
-	char *stack_pointer;
 
 	// Reset sbrk to the start of the heap
 	error = memory_map_reset_sbrk(current_proc->map);
@@ -234,7 +231,7 @@ int do_brk(void *addr)
 	int diff;
 
 	diff = (uintptr_t) addr - current_proc->map->sbrk;
-	if (current_proc->map->heap_start + diff >= (uintptr_t) get_user_stackp(&current_proc->task_info)) {
+	if (current_proc->map->heap_start + diff >= (uintptr_t) arch_get_user_stackp(current_proc)) {
 		return ENOMEM;
 	}
 
@@ -244,7 +241,7 @@ int do_brk(void *addr)
 void *do_sbrk(intptr_t diff)
 {
 	if (diff) {
-		if (current_proc->map->heap_start + diff >= (uintptr_t) get_user_stackp(&current_proc->task_info)) {
+		if (current_proc->map->heap_start + diff >= (uintptr_t) arch_get_user_stackp(current_proc)) {
 			return NULL;
 		}
 

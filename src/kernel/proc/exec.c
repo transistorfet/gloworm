@@ -72,6 +72,6 @@ void exec_initialize_stack_with_args(struct process *proc, void *stack_pointer, 
 	// TODO this will be done to the user stack (which is the same as the kernel stack if no user mode)
 	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
 
-	arch_reinit_task_info(proc, stack_pointer, entry);
+	arch_add_process_context(proc, stack_pointer, entry);
 }
 

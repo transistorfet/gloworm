@@ -211,6 +211,7 @@ int main()
 
 	create_init_task();
 
+	log_debug("begin multitasking...\n");
 	begin_multitasking();
 }
 

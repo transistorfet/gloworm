@@ -43,7 +43,7 @@ int clone_process(struct process *parent_proc, struct clone_args *args, struct p
 		// Put the argument onto the stack before initializing the context
 		args->stack -= sizeof(void *);
 		*((void **) args->stack) = args->arg;
-		arch_reinit_task_info(proc, args->stack, args->entry);
+		arch_add_process_context(proc, args->stack, args->entry);
 	}
 
 	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
@@ -152,7 +152,8 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	if (error < 0)
 		return error;
 
-	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) get_user_stackp(&parent_proc->task_info));
+	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
+	printk("fork sp - parent: %x, new %x\n", arch_get_user_stackp(parent_proc), stack_pointer);
 	if (!stack_pointer)
 		return EFAULT;
 

@@ -14,7 +14,85 @@ struct sigcontext {
 	sigset_t prev_mask;
 };
 
-int arch_reinit_task_info(struct process *proc, void *user_sp, void *entry)
+void *arch_get_user_stackp(struct process *proc)
+{
+	void *usp;
+
+	#if defined(CONFIG_M68K_USER_MODE)
+	if (proc == current_proc) {
+		asm volatile("movec.l	%%usp, %0\n" : "=r" (usp) : );
+		return usp;
+	} else if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
+		return (void *) access_reg(&proc->task_info, regs.usp);
+	} else {
+		printk("fuck, trying to read usp from different pid %d?\n", proc->pid);
+		return NULL;
+	}
+	#else
+	return proc->task_info->ksp;
+	#endif
+}
+
+void arch_set_user_stackp(struct process *proc, void *usp)
+{
+	#if defined(CONFIG_M68K_USER_MODE)
+	// TODO fix this, maybe make them normal functions?
+	if (proc == current_proc) {
+		asm volatile("movec.l	%0, %%usp\n" : : "r" (usp));
+	} else if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
+		access_reg(&proc->task_info, regs.usp) = (uint32_t) usp;
+	} else {
+		printk("fuck, trying to write usp to different pid %d?\n", proc->pid);
+	}
+	#else
+	proc->task_info.ksp = usp;
+	#endif
+}
+
+void *arch_get_kernel_stackp(struct process *proc)
+{
+	return proc->task_info.ksp;
+}
+
+void arch_set_kernel_stackp(struct process *proc, void *ksp)
+{
+	proc->task_info.ksp = ksp;
+}
+
+int arch_init_task_info(struct process *proc)
+{
+	#if defined(CONFIG_M68K_USER_MODE)
+
+	if (!proc->task_info.kernel_stack) {
+		proc->task_info.kernel_stack = (char *) page_alloc_contiguous(KERNEL_STACK_SIZE);
+		if (!proc->task_info.kernel_stack)
+			return ENOMEM;
+	}
+	proc->task_info.ksp = proc->task_info.kernel_stack + KERNEL_STACK_SIZE;
+
+	#else
+
+	proc->task_info.ksp = NULL;
+
+	#endif
+
+	return 0;
+}
+
+int arch_release_task_info(struct process *proc)
+{
+	#if defined(CONFIG_M68K_USER_MODE)
+
+	if (proc->task_info.kernel_stack) {
+		page_free_contiguous((page_t *) proc->task_info.kernel_stack, KERNEL_STACK_SIZE);
+	}
+
+	#endif
+
+	return 0;
+}
+
+int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 {
 	//PUSH_STACK(stack_pointer, void *) = _exit;
 	user_sp = ((char *) user_sp) - sizeof(void *);
@@ -22,12 +100,8 @@ int arch_reinit_task_info(struct process *proc, void *user_sp, void *entry)
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
-	if (!proc->task_info.kernel_stack) {
-		proc->task_info.kernel_stack = page_alloc_contiguous(KERNEL_STACK_SIZE);
-		if (!proc->task_info.kernel_stack)
-			return ENOMEM;
-	}
 	proc->task_info.ksp = proc->task_info.kernel_stack + KERNEL_STACK_SIZE;
+printk("kernel stack: %x, ksp: %x\n", proc->task_info.kernel_stack, proc->task_info.ksp);
 
 	#else
 
@@ -40,28 +114,17 @@ int arch_reinit_task_info(struct process *proc, void *user_sp, void *entry)
 	return 0;
 }
 
-int arch_release_task_info(struct process *proc)
-{
-	#if defined(CONFIG_M68K_USER_MODE)
-
-	if (proc->task_info.kernel_stack) {
-		page_free_contiguous(proc->task_info.kernel_stack, KERNEL_STACK_SIZE);
-	}
-
-	#endif
-
-	return 0;
-}
-
 int arch_clone_task_info(struct process *parent_proc, struct process *proc, char *user_sp)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
 	// TODO should the stack be allocated here too, so it's a decision made by the arch whether to have two stacks or one?
-	proc->task_info.ksp = proc->task_info.kernel_stack + (parent_proc->task_info.ksp - parent_proc->task_info.kernel_stack);
+	proc->task_info.ksp = proc->task_info.kernel_stack + (((char *) parent_proc->task_info.ksp) - parent_proc->task_info.kernel_stack);
 
 	memcpy((char *) proc->task_info.kernel_stack, (char *) parent_proc->task_info.kernel_stack, KERNEL_STACK_SIZE);
+printk("stack at %x, ksp %x, size %d\n", proc->task_info.kernel_stack, proc->task_info.ksp, KERNEL_STACK_SIZE);
 
-	((struct context *) proc->task_info.ksp)->regs.usp = (uint32_t) user_sp;
+	//((struct context *) proc->task_info.ksp)->regs.usp = (uint32_t) user_sp;
+	arch_set_user_stackp(proc, user_sp);
 
 	#else
 
@@ -74,35 +137,43 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 
 int arch_add_signal_context(struct process *proc, int signum)
 {
-	void *stack_pointer;
+	void *ksp, *usp;
 	struct sigcontext *context;
 
 	// Save signal data on the stack for use by sigreturn
-	context = (((struct sigcontext *) get_kernel_stackp(&proc->task_info)) - 1);
+	context = (((struct sigcontext *) arch_get_kernel_stackp(proc)) - 1);
 	context->signum = signum;
 	context->prev_mask = proc->signals.blocked;
 	proc->signals.blocked |= proc->signals.actions[signum - 1].sa_mask;
 
+	usp = arch_get_user_stackp(proc);
+	PUSH_STACK(usp, void *) = _sigreturn;
+	//usp = ((char *) usp) - sizeof(void *);
+	//*((void **) usp) = _sigreturn;
+	arch_set_user_stackp(proc, usp);
+printk("add, usp is %x\n", usp);
+
 	// Push a fresh context onto the stack, which will run the handler and then call sigreturn()
-	stack_pointer = (void *) context;
-	stack_pointer = ((char *) stack_pointer) - sizeof(void *);
-	*((void **) stack_pointer) = _sigreturn;
-	stack_pointer = create_context(stack_pointer, proc->signals.actions[signum - 1].sa_handler, NULL, NULL);
-	set_kernel_stackp(&proc->task_info, stack_pointer);
+	ksp = (void *) context;
+	ksp = create_context(ksp, proc->signals.actions[signum - 1].sa_handler, NULL, NULL);
+	arch_set_kernel_stackp(proc, ksp);
+printk("ksp is %x\n", ksp);
 
 	return 0;
 }
 
 int arch_remove_signal_context(struct process *proc)
 {
-	void *stack_pointer;
+	void *ksp;
 	struct sigcontext *context;
 
-	stack_pointer = drop_context(get_kernel_stackp(&proc->task_info));
-	context = (struct sigcontext *) stack_pointer;
+printk("remove, usp is %x\n", arch_get_user_stackp(proc));
+
+	ksp = drop_context(arch_get_kernel_stackp(proc));
+	context = (struct sigcontext *) ksp;
 	proc->signals.blocked = context->prev_mask;
-	stack_pointer = (((struct sigcontext *) stack_pointer) + 1);
-	set_kernel_stackp(&proc->task_info, stack_pointer);
+	ksp = (((struct sigcontext *) ksp) + 1);
+	arch_set_kernel_stackp(proc, ksp);
 
 	return 0;
 }

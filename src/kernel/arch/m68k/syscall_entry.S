@@ -31,8 +31,8 @@
 
 	.equ	SHORT_CONTEXT_SIZE, 24		// The size of the syscall registers on the stack (not including the interrupt return)
 	.equ	FULL_CONTEXT_SIZE, 64		// The size of the saved registers on the stack (not including the interrupt return)
-	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
-	.equ	PROC_RETURN_OFFSET, 12		// The offset into struct process where the return_value is located
+	.equ	PROC_RETURN_OFFSET, 8		// The offset into struct process where the return_value is located
+	.equ	PROC_SP_OFFSET, 12		// The offset into struct process where the stack pointer is located
 
 	.section .text
 
@@ -45,11 +45,6 @@ create_context:
 	movea.l	(8,%sp), %a1	// void *entry
 	move.l	(12,%sp), %d0	// void *exit
 	move.l	(16,%sp), %d1	// void *user_stack
-
-/*
-	// Push _exit return address for when main returns
-	move.l	%d0, -(%a0)
-*/
 
 	#if !defined(CONFIG_MC68000)
 	// Push the 68010+ Format/Vector Word
@@ -320,7 +315,7 @@ restore_context:
 	move.l  %a1, (%a0, PROC_SP_OFFSET)
 
 	// Do the actual system call
-	jsr     \handler_name
+	jsr.l	\handler_name
 
 	// Remove the registers from the stack since `restore_context` will assume they aren't there
 	// The original values should still be in the registers, so there's no need to load them
@@ -360,7 +355,7 @@ enter_syscall:
 	// Enable interrupts during the syscall
 	and.w	#0xF8FF, %sr
 
-	jsr	do_syscall
+	jsr.l	do_syscall
 
 	// Disable interrupts after the syscall
 	or.w	#0x0700, %sr
@@ -369,7 +364,7 @@ enter_syscall:
 	//adda.l	#4, %sp
 
 	// Jump to the syscall interrupt return
-	bra	restore_context
+	bra.w	restore_context
 
 
 /**
@@ -392,13 +387,13 @@ enter_irq:
 	// Save the irq number on the stack
 	move.l	%d0, -(%sp)
 
-	bsr	do_irq
+	bsr.w	do_irq
 
 	// Pop the irq number off the stack
 	adda.l	#4, %sp
 
 	// Jump to the syscall interrupt return
-	bra	restore_context
+	bra.w	restore_context
 
 
 /**
@@ -409,19 +404,18 @@ enter_irq:
 enter_exception:
 	// Disable irqs
 	or.w    #0x0700, %sr
+	SAVE_CONTEXT
 
-	// TODO this would be wrong for user mode
-	SAVE_SYSCALL_REGISTERS
-	SAVE_EXTRA_REGISTERS
+	// Save the exception frame on the stack
+	move.l	%a1, -(%sp)
 
-	movea.l  %sp, %a5
+	bsr.w	handle_exception
 
-	// Switch to the internal kernel stack
-	movea.l  current_proc, %a0
-	move.l  %sp, (%a0, PROC_SP_OFFSET)
-	movea.l  kernel_stack, %sp
+	// Pop the irq number off the stack
+	adda.l	#4, %sp
 
-	bra.w   handle_exception
+	// Jump to the syscall interrupt return
+	bra.w	restore_context
 
 
 _exit:

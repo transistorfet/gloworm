@@ -826,3 +826,47 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   is run, the process is the current process whereas when the signal is first run, it's not necessarily the current process that
   handles the signal.  I wonder if even sending a signal to a background task would work where the current process doesn't
 
+
+2025-07-03:
+
+- I had been banging my head on this problem for a while, where it wouldn't start, fork wouldn't work.  I had it working when
+  user mode was disabled, and the changes when it is enabled are small, but it wasn't working.  It would call syscall 5, then 4,
+  then 1 (which is exit) and then stop
+- I thought it was something to do with the stack or the _exit return address on the stack, but it was actually the address of the
+  `stop` instruction after the `trap` instruction in the `_exit` syscall, so it actually called the exit syscall for some reason
+- just this morning I looked at it again and thought to check the syscall_entry.S file because it's the only place other than the
+  stuff inside the CONFIG_USER_MODE blocks that might be affected by the few things changed by the ifdef blocks, and also at struct
+  process, and then saw that the return_value field is after the task_info struct which adds the kernel_start field when user mode
+  is enabled, so that explains why it wasn't working.  The return value was incorrect for the first syscall, which is fork, so it
+  thought it was the child process and ran the utility and exited like normal!
+- when I fixed the order, it wasn't working still.  It would run the shell but then crash on startup.  I started looking into it
+  (around 8pm, after work), and recompiled fresh with the shell compiled into the kernel, and now it just seems to be working fine
+  now, so maybe it needed a clean and make?
+- nope, it's broken when it doesn't have the shell compiled in.  It forks the shell, runs /etc/rc, and then has some kind of
+  exception.  Perhaps this is actually a privillege violation or something, and it's not displaying right (status: 7B72, vector: 19A)
+
+- I changed `ls` to use a `stop` instruction, which should cause an exception if it's actually in user mode.  That instruction is
+  privilleged.  When I tested it though, it gave a weird status and vector number.  Maybe it's using the wrong stack or something
+  because it seems to be displaying wrong with other exceptions too
+
+- yeah something's not quite right.  It's getting better, but it's not fully working
+- threadtest is unable to write usp and then gets out of memory and dies
+
+
+2025-07-04:
+
+- so the threadtest issues was caused by sbrk, which used arch_get_user_stackp(), which wasn't implemented when a short context was
+  on the stack and was returning 0, so I refactored to compare if it's the current proc that's changing its stack, and return the
+  value from usp itself, and that's working now.  Threads are working again
+- the signal problem was caused by not using the user stack, and putting the _sigreturn return address onto the kernel stack.  I've
+  split that now, like the process context, but haven't tested yet
+
+- using init on disk isn't working, but it's because of ntpdate from the looks of it.  It is returning from printing "timeout",
+  which is delivered via a signal, but there's an extra word on the stack, or the address is just wrong on the stack.  It should be
+  calling sigreturn there
+- I had just forgotten to change the get/set stackp calls for setting _sigreturn, so it was getting/setting the kernel stack, and
+  also not updating it because it used ksp to set instead of usp
+- but it's still not working...
+
+- in either case, the problem is handling custom signals.  Everything else appears to work, although I haven't tested extensively
+

@@ -40,10 +40,10 @@ struct process;
 
 struct process {
 	struct queue_node node;
-	/// Architecture-specific task state
-	struct arch_task_info task_info;
 	/// The value that will be returned to the user process when the kernel returns
 	uintptr_t return_value;
+	/// Architecture-specific task state
+	struct arch_task_info task_info;
 
 	struct memory_map *map;
 

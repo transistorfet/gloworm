@@ -21,8 +21,7 @@ typedef void (*m68k_irq_handler_t)();
 
 extern void enter_exception(void);
 
-void fatal_error(struct context *frame);
-void handle_trace(void);
+void handle_trace(struct context *context);
 
 static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
 
@@ -52,8 +51,7 @@ void arch_init_irqs(void)
 	for (short i = IRQ_USER_START; i < IRQ_USER_MAX; i++)
 		vector_table[i] = enter_irq;
 
-	extern void enter_handle_trace();
-	vector_table[IRQ_TRACE] = enter_handle_trace;
+	vector_table[IRQ_TRACE] = handle_trace;
 
 	// Load the VBR register with the address of our vector table
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
@@ -65,61 +63,43 @@ void arch_set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
 	vector_table[(short) irq] = handler;
 }
 
-/**
- * Interrupt Handlers
- */
-
-#define INTERRUPT_ENTRY(name)				\
-__attribute__((noreturn)) void enter_##name()		\
-{							\
-	asm(						\
-	"move.l	%sp, %a5\n"				\
-	"bra	" #name "\n"				\
-	);						\
-	__builtin_unreachable();			\
-}
-
-#define GET_FRAME(frame_ptr)				\
-	asm("move.l	%%a5, %0\n" : "=r" (frame_ptr))
-
-
-void print_stack(struct exception_frame *frame)
+void print_stack(void *stack, void *code)
 {
-	uint16_t *code = (uint16_t *) frame->pc;
-	uint16_t *stack = (uint16_t *) frame;
-
 	// Dump stack
 	printk("Stack: %x\n", stack);
-	printk_dump(stack, 48);
+	printk_dump(stack, 128);
 
 	// Dump code where the error occurred
 	printk("\nCode: %x\n", code);
-	printk_dump(code, 48);
+	if (code) {
+		printk_dump(code, 48);
+	}
 }
 
-void user_error(struct context *context)
+///////////////////////////
+// Exception Handlers
+///////////////////////////
+
+void user_error(struct exception_frame *frame)
 {
 	extern struct process *current_proc;
 
-	struct exception_frame *frame = &context->frame;
-
 	log_error("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	print_process_segments(current_proc);
-	print_stack(frame);
+	print_stack(frame, (void *) frame->pc);
 
 	dispatch_signal(current_proc, SIGKILL);
 }
 
-void fatal_error(struct context *context)
+void fatal_error(struct exception_frame *frame)
 {
-	struct exception_frame *frame = &context->frame;
 	void console_prepare_for_panic(void);
 
 	console_prepare_for_panic();
 
 	log_fatal("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 
-	print_stack(frame);
+	print_stack(frame, (void *) frame->pc);
 
 	// Jump to the monitor to allow debugging
 	asm volatile(
@@ -133,30 +113,20 @@ void fatal_error(struct context *context)
 	__builtin_unreachable();
 }
 
-void handle_exception(void)
+void handle_exception(struct exception_frame *frame)
 {
-	struct context *context;
-
-	GET_FRAME(context);
-
 	extern int kernel_reentries;
-	if (kernel_reentries < 1) {
-		user_error(context);
+	if (kernel_reentries <= 1) {
+		user_error(frame);
 		// TODO this is temporary until you sort out how to return... basically need to call schedule and then restore_context, but the acutal restore_context could be in syscall_entry.S
 		asm volatile("stop #0x2700\n");
 	} else {
-		fatal_error(context);
+		fatal_error(frame);
 		asm volatile("stop #0x2700\n");
 	}
 }
 
-INTERRUPT_ENTRY(handle_trace);
-
-__attribute__((interrupt)) void handle_trace()
+__attribute__((interrupt)) void handle_trace(struct context *context)
 {
-	struct context *context;
-
-	GET_FRAME(context);
-
 	log_trace("Trace %x (%x)\n", context->frame.pc, context->frame.pc);
 }

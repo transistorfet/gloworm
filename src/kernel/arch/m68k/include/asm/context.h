@@ -54,58 +54,22 @@ struct arch_task_info {
 
 	#if defined(CONFIG_M68K_USER_MODE)
 	/// A pointer to the start of the kernel stack for this process
-	void* kernel_stack;
+	char* kernel_stack;
 	#endif
 };
 
 #define PUSH_STACK(stack_pointer, ttype) \
-	(stack_pointer) = ((char *) (stack_pointer)) - sizeof((ttype));	\
-	*(((ttype) *) (stack_pointer))
+	(stack_pointer) = ((char *) (stack_pointer)) - sizeof(ttype);	\
+	*((ttype *) (stack_pointer))
 
 
-#define info_to_regs(info)	((struct context *) (info->ksp))
+#define info_to_regs(info)	((struct context *) ((info)->ksp))
 
 #define access_reg(info, name)	\
 	info_to_regs(info)->name
 
 // TODO this also defined in the assembly file =/
 #define FULL_CONTEXT_SIZE	64
-
-static inline void *get_user_stackp(struct arch_task_info *info)
-{
-	#if defined(CONFIG_M68K_USER_MODE)
-	if (info_to_regs(info)->size == FULL_CONTEXT_SIZE) {
-		return (void *) access_reg(info, regs.usp);
-	} else {
-		printk("fuck, trying to write usp to current?\n");
-	}
-	#else
-	return info->ksp;
-	#endif
-}
-
-static inline void set_user_stackp(struct arch_task_info *info, void *usp)
-{
-	#if defined(CONFIG_M68K_USER_MODE)
-	if (info_to_regs(info)->size == FULL_CONTEXT_SIZE) {
-		access_reg(info, regs.usp) = (uint32_t) usp;
-	} else {
-		printk("fuck, trying to write usp to current?\n");
-	}
-	#else
-	info->ksp = usp;
-	#endif
-}
-
-static inline void *get_kernel_stackp(struct arch_task_info *info)
-{
-	return info->ksp;
-}
-
-static inline void set_kernel_stackp(struct arch_task_info *info, void *ksp)
-{
-	info->ksp = ksp;
-}
 
 #endif
 

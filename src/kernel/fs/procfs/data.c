@@ -46,15 +46,14 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 int get_data_statm(struct process *proc, char *buffer, int max)
 {
 	return snprintf(buffer, max,
-		"%ld %lx %lx %lx %lx %lx %lx %lx\n",
+		"%ld %lx %lx %lx %lx %lx %lx\n",
 		get_proc_size(proc),
 		(uintptr_t) proc->map->code_start,
 		proc->map->data_start - proc->map->code_start,
 		(uintptr_t) proc->map->data_start,
 		proc->map->sbrk - proc->map->data_start,
 		(uintptr_t) proc->map->sbrk,
-		proc->map->stack_end,
-		(uintptr_t) get_user_stackp(&proc->task_info)
+		proc->map->stack_end
 	);
 
 }

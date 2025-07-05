@@ -4,6 +4,8 @@
 * set the user stack pointer when creating a new context
 * 
 
+* fix the printk_dump function
+
 * figure out why signals are broken
 
 * it looks like most of duplicate_memory and copy_stack are arch agnostic since it's copying what was made during program loading,
