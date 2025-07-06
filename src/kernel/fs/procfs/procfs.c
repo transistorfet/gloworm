@@ -171,7 +171,7 @@ int procfs_read(struct vfile *file, char *buf, size_t nbytes)
 	entry = _get_entry_by_num(proc_files, PROCFS_DATA(file->vnode).filenum);
 	if (!entry)
 		entry = _get_entry_by_num(root_files, PROCFS_DATA(file->vnode).filenum);
-	if (entry)
+	if (entry && entry->func)
 		limit = entry->func(proc, buffer, MAX_BUFFER);
 
 	if (file->position + nbytes >= limit)

@@ -1,43 +1,37 @@
 
+* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
+
 * figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
   it seems to only affect some things, namely when sh is compiled into the kernel
+* why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
+* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
+* when sending threadtest, it fails to run but then also says it's run out of files (too many open files) so there's likely multiple
+  bugs triggered by a corrupt elf file or something
+* the process should wait until all output is flushed before it can exit
 
+* there's an issue with extra-y, and whether to add the prefix or not
+* make it rebuild everything when the config file changes
+* make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
+* fix the issue with Makefile.build where it needs to run make before running make bare-tests
+
+* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
+  unfreed in the middle of the segment
 * the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
   arch/m68k?
-* Is there anything arch-specific left to move over?
-
 * if you split the memory_object when remapping instead of refcounting, and only use the refcounts for cloning a segment when no-MMU
   forking then you can remove the mem_start and mem_length fields, since you'll be able to free the pages separately.  You can only
   split a memory_object if it only has one refcount though, or else you'd have to find the others, so this might not actually work
-
 * should you change the memory resize code to use mmap/unmap instead of resizing?  That would make it easier to add the MMU table
   changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
   the case of the heap and stack
+* Is there anything arch-specific left to move over?
 
-* re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
-
-* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-
-* [this needs to be tested] allow stack to be NULL when calling clone (which makes it behave like fork)
-* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
-  unfreed in the middle of the segment
-
-
-* why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
-* bug: running cat on a directory in /proc makes it crash to the monitor
-
-* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
-
-* threadtest is failing to execute, possibly because the transfer fails, but the output is really weird.  It calls load_binary many
-  many times, and then fails because there's too many open files, and this happens before the process even runs, so it's either a
-  bug in the loading/exec code that isn't triggered by a normal program, or there's a problem with the transfer and it's corrupted
+* [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
 * there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
   memory without duplicating them
 
 * try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
-
-
 * should you move memory.c into mm/ instead of proc/
 
 -----
@@ -58,11 +52,11 @@
 
 * add flags to kmalloc?
 
-* make a macro for alloc_contiguous vs alloc_single, such that if CONFIG_MMU then single otherwise contiguous
 * make kmalloc use the page-based memory for alloc
+* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 * make kmalloc use multiple different allocators under the hood, including a bitmap-based allocator for small sized objects, like < 64 bytes
   then it uses a slab-like allocator with bitmaps for at least common sizes of 16, 24, 32, 48, 64
-* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
+* make a macro for alloc_contiguous vs alloc_single, such that if CONFIG_MMU then single otherwise contiguous
 
 * see if using memset more, instead of manual initialization reduces code size
 * see if changing queues, ringbuffer, etc to non-inline functions reduces code size
@@ -70,6 +64,9 @@
 
 * should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
   much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
+
+* make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
+* make the slip's tty device configurable
 
 * I'm thinking of moving the network interface drivers to drivers/ under net/ similar to linux, which would keep all the drivers in one place
   it works because each thing under drivers/ is moving towards being a subsystem with custom drivers
@@ -81,20 +78,7 @@
 * can you make some of the memory usage and advanced features compile-time selectable, to accomodate systems with lots of memory and
   very little memory?
 
-
 * should you change DISABLE_INTS to DISABLE_IRQS(), etc
-* there's an issue with extra-y, and whether to add the prefix or not
-* make it rebuild everything when the config file changes
-* make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
-
-* should you have a kernel stack per task? yes, but only when using usermode, and fix user mode work in the process
-
-
-* make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
-* make the slip's tty device configurable
-
-* fix the issue with Makefile.build where it needs to run make before running make bare-tests
-* the process should wait until all output is flushed before it can exit
 
 * there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
   building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
