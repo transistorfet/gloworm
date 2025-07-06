@@ -132,13 +132,17 @@ $(OUTPUT)%.o: %.c
 $(OUTPUT)%.o: %.S
 	$(cmd_as_o)
 
+DEPFLAGS = -Wp,-MT,$(patsubst %.c,%.o,$@) -Wp,-MMD,$(basename $<).d
+
 # Commands
 cmd_ar_a = $(AR) rcs $@ $^
 cmd_ld_elf = $(LD) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -o $@ $^
 cmd_ld_bin = $(LD) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -Wl,--oformat=binary -o $@ $^
-cmd_cc_o = $(CC) $(CFLAGS) $(ccflags-y) -c -o $@ $<
-cmd_as_o = $(AS) $(ASFLAGS) $(asflags-y) -c -o $@ $<
+cmd_cc_o = $(CC) $(DEPFLAGS) $(CFLAGS) $(ccflags-y) -c -o $@ $<
+cmd_as_o = $(AS) $(DEPFLAGS) $(ASFLAGS) $(asflags-y) -c -o $@ $<
 
+# Include the dependencies generated for each object file, if it exists
+-include $(obj-y:.o=.d)
 
 obj-dirs := $(sort $(patsubst %/,%, $(dir $(targets))))
 ifneq ($(obj-dirs),)

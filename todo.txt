@@ -10,8 +10,6 @@
 * the process should wait until all output is flushed before it can exit
 
 * there's an issue with extra-y, and whether to add the prefix or not
-* make it rebuild everything when the config file changes
-* make it rebuild things when a dependency has changed (the only way I think is to make it visit every directory, even though it looks noisey)
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
