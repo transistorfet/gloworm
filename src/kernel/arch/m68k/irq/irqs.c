@@ -9,6 +9,7 @@
 #include <kernel/printk.h>
 #include <kernel/irq/bh.h>
 #include <kernel/irq/action.h>
+#include <kernel/arch/context.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/process.h>
 
@@ -80,9 +81,11 @@ void print_stack(void *stack, void *code)
 // Exception Handlers
 ///////////////////////////
 
+extern struct process *current_proc;
+
 void user_error(struct exception_frame *frame)
 {
-	extern struct process *current_proc;
+	struct context *context;
 
 	log_error("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	print_process_segments(current_proc);

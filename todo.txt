@@ -1,12 +1,6 @@
 
-* move some of the stack stuff to arch/m68k
-* where will the kernel stack be created?
-* set the user stack pointer when creating a new context
-* 
 
-* fix the printk_dump function
-
-* figure out why signals are broken
+* figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
 
 * it looks like most of duplicate_memory and copy_stack are arch agnostic since it's copying what was made during program loading,
   and program loading is generic because it's just doing what the binary format is

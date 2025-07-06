@@ -19,11 +19,11 @@ void *arch_get_user_stackp(struct process *proc)
 	void *usp;
 
 	#if defined(CONFIG_M68K_USER_MODE)
-	if (proc == current_proc) {
+	if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
+		return (void *) access_reg(&proc->task_info, regs.usp);
+	} else if (proc == current_proc) {
 		asm volatile("movec.l	%%usp, %0\n" : "=r" (usp) : );
 		return usp;
-	} else if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
-		return (void *) access_reg(&proc->task_info, regs.usp);
 	} else {
 		printk("fuck, trying to read usp from different pid %d?\n", proc->pid);
 		return NULL;
@@ -37,10 +37,10 @@ void arch_set_user_stackp(struct process *proc, void *usp)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
 	// TODO fix this, maybe make them normal functions?
-	if (proc == current_proc) {
-		asm volatile("movec.l	%0, %%usp\n" : : "r" (usp));
-	} else if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
+	if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
 		access_reg(&proc->task_info, regs.usp) = (uint32_t) usp;
+	} else if (proc == current_proc) {
+		asm volatile("movec.l	%0, %%usp\n" : : "r" (usp));
 	} else {
 		printk("fuck, trying to write usp to different pid %d?\n", proc->pid);
 	}
@@ -101,7 +101,6 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 	#if defined(CONFIG_M68K_USER_MODE)
 
 	proc->task_info.ksp = proc->task_info.kernel_stack + KERNEL_STACK_SIZE;
-printk("kernel stack: %x, ksp: %x\n", proc->task_info.kernel_stack, proc->task_info.ksp);
 
 	#else
 
@@ -109,7 +108,7 @@ printk("kernel stack: %x, ksp: %x\n", proc->task_info.kernel_stack, proc->task_i
 
 	#endif
 
-	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, NULL, user_sp);
+	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp);
 
 	return 0;
 }
@@ -121,9 +120,7 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 	proc->task_info.ksp = proc->task_info.kernel_stack + (((char *) parent_proc->task_info.ksp) - parent_proc->task_info.kernel_stack);
 
 	memcpy((char *) proc->task_info.kernel_stack, (char *) parent_proc->task_info.kernel_stack, KERNEL_STACK_SIZE);
-printk("stack at %x, ksp %x, size %d\n", proc->task_info.kernel_stack, proc->task_info.ksp, KERNEL_STACK_SIZE);
 
-	//((struct context *) proc->task_info.ksp)->regs.usp = (uint32_t) user_sp;
 	arch_set_user_stackp(proc, user_sp);
 
 	#else
@@ -146,18 +143,13 @@ int arch_add_signal_context(struct process *proc, int signum)
 	context->prev_mask = proc->signals.blocked;
 	proc->signals.blocked |= proc->signals.actions[signum - 1].sa_mask;
 
+	// Push a return address that will call sigreturn() to the user stack
 	usp = arch_get_user_stackp(proc);
 	PUSH_STACK(usp, void *) = _sigreturn;
-	//usp = ((char *) usp) - sizeof(void *);
-	//*((void **) usp) = _sigreturn;
-	arch_set_user_stackp(proc, usp);
-printk("add, usp is %x\n", usp);
-
-	// Push a fresh context onto the stack, which will run the handler and then call sigreturn()
-	ksp = (void *) context;
-	ksp = create_context(ksp, proc->signals.actions[signum - 1].sa_handler, NULL, NULL);
+	// Push a fresh context onto the kernel stack
+	// NOTE the user stack is not updated directly, but is instead added to the new context
+	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp);
 	arch_set_kernel_stackp(proc, ksp);
-printk("ksp is %x\n", ksp);
 
 	return 0;
 }
@@ -166,8 +158,6 @@ int arch_remove_signal_context(struct process *proc)
 {
 	void *ksp;
 	struct sigcontext *context;
-
-printk("remove, usp is %x\n", arch_get_user_stackp(proc));
 
 	ksp = drop_context(arch_get_kernel_stackp(proc));
 	context = (struct sigcontext *) ksp;

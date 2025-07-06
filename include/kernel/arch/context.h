@@ -21,7 +21,7 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 int arch_add_signal_context(struct process *proc, int signum);
 int arch_remove_signal_context(struct process *proc);
 
-extern void *create_context(void *kernel_stack, void *entry, void *exit, void *user_stack);
+extern void *create_context(void *kernel_stack, void *entry, void *user_stack);
 extern void *drop_context(void *kernel_stack);
 extern void _exit();
 extern void _sigreturn();

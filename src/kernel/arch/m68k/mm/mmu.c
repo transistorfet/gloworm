@@ -40,10 +40,10 @@ int init_mmu(void)
 	//}
 
 	if (mmu_table_map(root, (void *) 0x00000000, 0x01000000, MMU_FLAG_DIRECT) < 0) {
-		printk_safe("error mapping lower memory\n");
+		log_error("error mapping lower memory\n");
 	}
 	if (mmu_table_map(root, (void *) 0xFF000000, 0x01000000, MMU_FLAG_DIRECT | MMU_FLAG_NOCACHE) < 0) {
-		printk_safe("error mapping upper memory\n");
+		log_error("error mapping upper memory\n");
 	}
 
 	root_pointer.limit = 0;
@@ -61,7 +61,7 @@ int init_mmu(void)
 		(PAGE_ADDR_BITS << MMU_TC_PAGE_SIZE_SHIFT) |
 		(MMU_TABLE_INITIAL_SHIFT << MMU_TC_INITIAL_SHIFT);
 
-	printk_safe("tcr: %x\n", tcr);
+	log_debug("tcr: %x\n", tcr);
 
 	MMU_MOVE_TO_TCR(tcr);
 	return 0;

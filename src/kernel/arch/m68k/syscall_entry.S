@@ -38,13 +38,12 @@
 
 /**
  * Create a new context given a future stack address, return address
- * 	void *create_context(void *kernel_stack, void *entry, void *exit, void *user_stack);
+ * 	void *create_context(void *kernel_stack, void *entry, void *user_stack);
  */
 create_context:
 	movea.l	(4,%sp), %a0	// void *kernel_stack
 	movea.l	(8,%sp), %a1	// void *entry
-	move.l	(12,%sp), %d0	// void *exit
-	move.l	(16,%sp), %d1	// void *user_stack
+	move.l	(12,%sp), %d1	// void *user_stack
 
 	#if !defined(CONFIG_MC68000)
 	// Push the 68010+ Format/Vector Word

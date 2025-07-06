@@ -353,7 +353,7 @@ int parseline(char *input, char **vargs)
 				input++;
 			vargs[j++] = input;
 		} else
- 			input++;
+			input++;
 	}
 
 	*input = '\0';
@@ -478,7 +478,7 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 		}
 	}
 
- 	pid = fork();
+	pid = fork();
 	if (pid) {
 		waitpid(pid, &status, 0);
 		pid_t fgpid = getpgid(0);

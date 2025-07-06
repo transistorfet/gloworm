@@ -153,7 +153,6 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 		return error;
 
 	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
-	printk("fork sp - parent: %x, new %x\n", arch_get_user_stackp(parent_proc), stack_pointer);
 	if (!stack_pointer)
 		return EFAULT;
 

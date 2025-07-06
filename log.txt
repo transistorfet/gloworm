@@ -870,3 +870,21 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 
 - in either case, the problem is handling custom signals.  Everything else appears to work, although I haven't tested extensively
 
+
+2025-07-05:
+
+- I finally found the cause of the signal handlers not working and crashing.  I was printing out the stack and the context looked
+  ok, but I had forgotten that there were two contexts in play with a signal, the one that saved the process state when entering the
+  kernel, and then the signal context added afterwards.
+- I was overwriting the usp of the process context before I added the new signal context onto the kernel stack, so when the process
+  returned after the signal context was removed, the restored usp would be pointing to _sigreturn still
+- it might still be broken when sending a signal to the current process, because the usp might get modified by the signal context
+  without being saved before hand!
+
+- [recalling later] either later last night or early in the morning, I realized I had forgotten to set the usp in the
+  create_context() call when adding the signal context, so USP was set to NULL when the process started.  This was causing it to run
+  the add_signal_context call, but not run the remove_signal_context calls, and once I set usp to the correct value, it ran the
+  remove_signal_context too, but then crashed again shortly after.  I then forgot all about this when looking for the problem I
+  described above, because it was directly related
+
+
