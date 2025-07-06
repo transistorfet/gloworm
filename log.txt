@@ -887,4 +887,8 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   remove_signal_context too, but then crashed again shortly after.  I then forgot all about this when looking for the problem I
   described above, because it was directly related
 
+- OH! the custom signals are working now as it turns out.  I didn't notice, but it now won't exit the shell when pressing Ctrl-C.
+  It's supposed to print ^C but it's not doing that for some reason.  But it's actually working from the looks of it.
+- No, it's only working when the init/sh are not compiled in.  When sh is compiled in, it doesn't work.  It exits Process 3 (sh)
+- So maybe it's something to do with changes to the commands compiled into sh?
 

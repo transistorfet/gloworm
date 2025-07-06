@@ -1,10 +1,10 @@
 
-
 * figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
+  it seems to only affect some things, namely when sh is compiled into the kernel
 
-* it looks like most of duplicate_memory and copy_stack are arch agnostic since it's copying what was made during program loading,
-  and program loading is generic because it's just doing what the binary format is
-* the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack
+* the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
+  arch/m68k?
+* Is there anything arch-specific left to move over?
 
 * if you split the memory_object when remapping instead of refcounting, and only use the refcounts for cloning a segment when no-MMU
   forking then you can remove the mem_start and mem_length fields, since you'll be able to free the pages separately.  You can only
@@ -26,6 +26,7 @@
 
 
 * why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
+* bug: running cat on a directory in /proc makes it crash to the monitor
 
 * send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
 
@@ -33,25 +34,31 @@
   many times, and then fails because there's too many open files, and this happens before the process even runs, so it's either a
   bug in the loading/exec code that isn't triggered by a normal program, or there's a problem with the transfer and it's corrupted
 
+* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
+  memory without duplicating them
 
 * try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
 
 
 * should you move memory.c into mm/ instead of proc/
 
+-----
 
 * add mmu mapping to memory_map
+* add mmu table to context and switch
 * make it possible to set up the virtual address space differently with MMU enabled, when loading a binary
 
+* implement mmu/tables
+* convert bufcache/disk blocks to use pages
 
-* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
-  memory without duplicating them
+* these can use a modified kmalloc that uses pages underneath, and/or bucket allocator?
+    * convert fs vnodes to use pages
+    * convert net packets to use pages
+    * do you need a slab allocator for vnodes/packets?
 
-* bug: running cat on a directory in /proc makes it crash to the monitor
+----
 
 * add flags to kmalloc?
-* add usp, mmu table to context and switch
-* allocate per-thread kernel stack if CONFIG_USER_MODE is defined
 
 * make a macro for alloc_contiguous vs alloc_single, such that if CONFIG_MMU then single otherwise contiguous
 * make kmalloc use the page-based memory for alloc
@@ -76,12 +83,6 @@
 * can you make some of the memory usage and advanced features compile-time selectable, to accomodate systems with lots of memory and
   very little memory?
 
-* implement mmu/tables
-* convert proc/user memory to use pages
-* convert bufcache/disk blocks to use pages
-* convert fs vnodes to use pages
-* convert net packets to use pages
-* do you need a slab allocator for vnodes/packets?
 
 * should you change DISABLE_INTS to DISABLE_IRQS(), etc
 * there's an issue with extra-y, and whether to add the prefix or not
@@ -90,10 +91,6 @@
 
 * should you have a kernel stack per task? yes, but only when using usermode, and fix user mode work in the process
 
-* add threads
-* add virtual memory
-* add new types of locks
-* continue the arch separation, make sure all process and signal stuff that's arch-specific/assumptuous is moved into arch
 
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable
@@ -101,17 +98,25 @@
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
 * the process should wait until all output is flushed before it can exit
 
-* figure out why moving or adding new values before the memory map in the process struct causes weird behaviour
 * there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
   building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
 
 * add configuration for base address in linker script
 * make it so the ata device will time out and fail instead of hanging when it doesn't work
 
-* omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
 
-* add ext2 support
-* support minixfs 2 and 3?
+
+Overview
+
+    * add virtual memory
+    * add new types of locks
+    * add ext2 support
+    * support minixfs 2 and 3?
+    * add multi-cpu support
+    * add dynamic linking
+    * add additional architectures?
+
+    * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
 
 
 Operating System:
@@ -122,9 +127,7 @@ Operating System:
       fork also exec shortly after, it's not a particularly pressing concern, but would make things like kermit usable, and maybe
       generic /bin/sh implementations
 
-    * make use of 68k's supervisor and user mode. This requires major changes to the create_context since the entry point can't be put onto the user stack. RTE will pop the ret off the supervisor stack
     * do you need to disable triggering of the device-indepedent tty bottom half when the serial device is opened directly?
-    * should there be a lighter weight task type, instead of processes, so that you can service interrupt processing without a bunch of wasted memory
 
     * something is causing the SLIP serial port to mess up somehow which requires restarting the PC side the setup, It's probably a null characters when turning the device on or off
     * make the tty68681 driver partially write data... right now it'll suspend if the full request can't be buffered, but it should return the partial number, and the read/write syscalls should do
@@ -144,7 +147,6 @@ Operating System:
     * add a read only mounting mode, such that you know you wont need to sync while also not messing up the CF card
     * should there be something that periodically syncs data to disk?
     * need a function to convert a device number into a device name or device file path. (Could add another driver function pointer for getting the name of a devnum) (add to /proc/mounts)
-    * I don't really like the point-of-no-return code in execve().  Is there a way to ensure that wont happen, such as not overwriting the memory segments until the new process is loaded
     * add calculating of cpu runtime
 
 
@@ -193,11 +195,13 @@ Operating System:
     * should you add timestamps to packets? (not currently a use for it)
     * rewrite the math functions to use fewer registers, and cover the 32 bit divide by 32 bit number case
     * minixfs, implement versions 2 and 3
-    * implement links for mallocfs
     * should you refactor the header files in minixfs implementation into actual c files, with a common header to declare the functions?
     * do you need to add variable sized buffers/blocks into bufcache? (yes)
     * can you change the fd allocator, such that calling it twice will return 2 different fds, even though they aren't reserved until set
       (ie. store the last allocated fd, but it has to be in the process struct)
+
+    * should you remove mallocfs entirely?
+    * implement links for mallocfs
 
 
     * remove the execbuiltin syscall, which is temporary until all commands can be executable files
@@ -208,12 +212,11 @@ Operating System:
     * the return from syscalls is sometimes generating a move %d0, %d1; move %d1, %d0
     * re-evaluate file permissions checks to make sure they're correct according to posix
     * you need some tests, but ideally it would use a simple emulator.  Maybe easy68k or something could be used
-    * It *might* be possible to defer the context save until you're certain a reschedule is needed just before exiting, but it would require being very careful during the stack swap
 
     * as a note about terminology for pseudoterminals, pts/ptm (slave/master);  it would make more sense for them to be named process-end and device-end, which implies
       the expected interface to each.   A user process will open the process-end terminal device and communicate with it like any tty.  The emulator or whatever would
       connect to the other end and act as if it were a terminal device, in place of what would be an actual I/O device like RS-232 or a hardwired keyboard.  I guess the
-      abbreviations might be /dev/ptpX and /dev/ptdX?
+      abbreviations might be /dev/ptpX and /dev/ptdX?  [In 2024, the officially adopted alternatives are manager and subsitiary, while still being ptm and pts]
 
 
 Monitor:
