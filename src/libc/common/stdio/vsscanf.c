@@ -13,6 +13,7 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 			char type;
 			char width = 0;
 			char ignore = 0;
+			char length = sizeof(unsigned int);
 
 			// Should it be ignored or saved
 			if (fmt[j + 1] == '*') {
@@ -27,6 +28,25 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				j += endptr - &fmt[j] - 1;
 			}
 
+			// Parse out length of data (for numbers mostly)
+			if (fmt[j + 1] == 'h') {
+				if (fmt[j + 2] == 'h') {
+					length = sizeof(char);
+					j += 2;
+				} else {
+					length = sizeof(short);
+					j += 1;
+				}
+			} else if (fmt[j + 1] == 'l') {
+				if (fmt[j + 2] == 'l') {
+					length = sizeof(long long);
+					j += 2;
+				} else {
+					length = sizeof(long);
+					j += 1;
+				}
+			}
+
 			// Parse the data type
 			type = fmt[++j];
 
@@ -38,10 +58,23 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				char *endptr;
 				register int number = strtol(&str[i], &endptr, type == 'd' || type == 'i' ? 10 : 16);
 				if (!ignore) {
-					int *ptr = va_arg(args, int *);
-					*ptr = number;
+					void *ptr = va_arg(args, void *);
+					switch (length) {
+					    case 2:
+						*((unsigned short *) ptr) = number;
+						break;
+					    case 4:
+						*((unsigned int *) ptr) = number;
+						break;
+					    case 8:
+						*((unsigned long long *) ptr) = number;
+						break;
+					    default:
+						// If there's an invalid character, return immediately
+						// with the count of valid reads up until this point
+						return count;
+					}
 				}
-				count++;
 				i += (endptr - &str[i]);
 				break;
 			    }
@@ -70,16 +103,20 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				break;
 			    }
 			    default: {
-				// TODO what to do if the format string is incorrect
-				break;
+				// If there's an invalid character, return immediately
+				// with the count of valid reads up until this point
+				return count;
 			    }
 			}
+			// Increment the number of arguments read successfully
+			count++;
 		} else if (isspace(fmt[j])) {
 			// Read any amount of whitespace from the input string
 			for (; isspace(str[i]); i++) { }
-		} else if (fmt[j] != str[i++])
+		} else if (fmt[j] != str[i++]) {
 			// For any other non-matching character, then fail and return
-			break;
+			return count;
+		}
 	}
 	return count;
 }

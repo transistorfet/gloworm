@@ -85,8 +85,6 @@ extern struct process *current_proc;
 
 void user_error(struct exception_frame *frame)
 {
-	struct context *context;
-
 	log_error("\nError in pid %d at %x (status: %x, vector: %x)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	print_process_segments(current_proc);
 	print_stack(frame, (void *) frame->pc);

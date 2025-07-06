@@ -18,7 +18,7 @@ int MAIN(command_ps)(int argc, char **argv, char **envp)
 	struct dirent dir;
 	char cmd[PS_BUFFER_SIZE];
 	char buffer[PS_BUFFER_SIZE];
-	int parent, pgid, session, ctty, size;
+	int parent, pgid, session, ctty, size = 0;
 
 	if ((dd = open("/proc", 0, 0)) < 0) {
 		printf("Error opening /proc\n");

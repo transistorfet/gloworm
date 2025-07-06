@@ -14,8 +14,6 @@
   changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
   the case of the heap and stack
 
-* fix the incorrect process size in the ps command
-
 * re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
