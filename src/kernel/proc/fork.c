@@ -14,7 +14,7 @@
 #include <kernel/proc/process.h>
 
 char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
-static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map, struct memory_object *parent_object);
+static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
 static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
 
 int clone_process(struct process *parent_proc, struct clone_args *args, struct process **result)
@@ -98,7 +98,6 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 	int error = 0;
 	struct memory_area *cur;
 	struct memory_map *new_map = NULL;
-	struct memory_object *parent_object;
 
 	// Check that the parent has a map and
 	// that new proc does *not* have a map
@@ -109,26 +108,14 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 	if (!new_map)
 		return ENOMEM;
 
-	parent_object = NULL;
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
-		// TODO get rid of this special case by using unmap later to remove the heap/stack area and replace it with a new one
-		if ((cur->flags & AREA_TYPE) == AREA_TYPE_STACK || (cur->flags & AREA_TYPE) == AREA_TYPE_HEAP) {
-			// Save the last object (which will be the stack) but don't copy
-			// the heap or stack segments so we can insert new ones later
-			parent_object = cur->object;
-		} else {
-			error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, memory_object_make_ref(cur->object));
-			if (error < 0)
-				goto fail;
-		}
+		// TODO enable copy on write for both the new map, and the parent map
+		error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, memory_object_make_ref(cur->object));
+		if (error < 0)
+			goto fail;
 	}
 
-	if (!parent_object) {
-		error = EFAULT;
-		goto fail;
-	}
-
-	error = copy_stack(parent_proc, proc, new_map, parent_object);
+	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
 
@@ -140,13 +127,17 @@ fail:
 	return error;
 }
 
-static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map, struct memory_object *parent_object)
+static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
 {
 	int error = 0;
 	int stack_size;
 	char *stack_pointer = NULL;
 
 	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
+
+	error = memory_map_unmap(new_map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
+	if (error < 0)
+		return error;
 
 	error = memory_map_insert_heap_stack(new_map, stack_size);
 	if (error < 0)

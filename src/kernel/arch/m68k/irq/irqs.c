@@ -119,8 +119,6 @@ void handle_exception(struct exception_frame *frame)
 	extern int kernel_reentries;
 	if (kernel_reentries <= 1) {
 		user_error(frame);
-		// TODO this is temporary until you sort out how to return... basically need to call schedule and then restore_context, but the acutal restore_context could be in syscall_entry.S
-		asm volatile("stop #0x2700\n");
 	} else {
 		fatal_error(frame);
 		asm volatile("stop #0x2700\n");

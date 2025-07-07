@@ -7,6 +7,7 @@ struct process;
 int get_data_cmdline(struct process *proc, char *buffer, int max);
 int get_data_stat(struct process *proc, char *buffer, int max);
 int get_data_statm(struct process *proc, char *buffer, int max);
+int get_data_maps(struct process *proc, char *buffer, int max);
 
 int get_data_mounts(struct process *proc, char *buffer, int max);
 

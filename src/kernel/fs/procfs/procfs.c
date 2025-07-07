@@ -61,6 +61,7 @@ struct procfs_dir_entry proc_files[] = {
 	{ PFN_CMDLINE,	"cmdline",	get_data_cmdline },
 	{ PFN_STAT,	"stat", 	get_data_stat },
 	{ PFN_STATM,	"statm",	get_data_statm },
+	{ PFN_MAPS,	"maps",		get_data_maps },
 	{ 0, NULL, NULL },
 };
 

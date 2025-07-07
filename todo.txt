@@ -1,4 +1,31 @@
 
+* add procfs map file
+
+* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
+  unfreed in the middle of the segment
+* maybe make memory_map_mmap grow/shrink/join memory regions or is that too complex, and splitting is good enough?
+* should you change the memory resize code to use mmap/unmap instead of resizing?  That would make it easier to add the MMU table
+  changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
+  the case of the heap and stack
+
+* make copy_stack only called if not MMU?
+* make it possible to recover from an exception somehow
+* the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
+  arch/m68k?
+
+* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
+  memory without duplicating them
+
+* add mmu mapping to memory_map
+* add mmu table to context and switch
+* make functions to translate between physical and virtual addresses
+* convert user facing code to translate from user space to kernel space (?)
+
+* implement mmu/tables
+* convert bufcache/disk blocks to use pages
+
+---
+
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 
 * figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
@@ -9,37 +36,12 @@
   bugs triggered by a corrupt elf file or something
 * the process should wait until all output is flushed before it can exit
 
-* there's an issue with extra-y, and whether to add the prefix or not
-* fix the issue with Makefile.build where it needs to run make before running make bare-tests
-
-* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
-  unfreed in the middle of the segment
-* the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
-  arch/m68k?
-* if you split the memory_object when remapping instead of refcounting, and only use the refcounts for cloning a segment when no-MMU
-  forking then you can remove the mem_start and mem_length fields, since you'll be able to free the pages separately.  You can only
-  split a memory_object if it only has one refcount though, or else you'd have to find the others, so this might not actually work
-* should you change the memory resize code to use mmap/unmap instead of resizing?  That would make it easier to add the MMU table
-  changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
-  the case of the heap and stack
-* Is there anything arch-specific left to move over?
-
-* [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
-
-* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
-  memory without duplicating them
-
 * try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
 * should you move memory.c into mm/ instead of proc/
 
+* [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
+
 -----
-
-* add mmu mapping to memory_map
-* add mmu table to context and switch
-* make it possible to set up the virtual address space differently with MMU enabled, when loading a binary
-
-* implement mmu/tables
-* convert bufcache/disk blocks to use pages
 
 * these can use a modified kmalloc that uses pages underneath, and/or bucket allocator?
     * convert fs vnodes to use pages
@@ -47,6 +49,11 @@
     * do you need a slab allocator for vnodes/packets?
 
 ----
+
+* Is there anything arch-specific left to move over?
+
+* there's an issue with extra-y, and whether to add the prefix or not
+* fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
 * add flags to kmalloc?
 

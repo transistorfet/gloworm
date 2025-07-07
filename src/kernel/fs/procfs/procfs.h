@@ -11,8 +11,9 @@
 #define PFN_CMDLINE	2
 #define PFN_STAT	3
 #define PFN_STATM	4
+#define PFN_MAPS	5
 
-#define PFN_MOUNTS	10
+#define PFN_MOUNTS	100
 
 
 typedef short procfs_filenum_t;
