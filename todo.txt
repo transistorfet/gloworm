@@ -188,10 +188,6 @@ Operating System:
     * can you change the fd allocator, such that calling it twice will return 2 different fds, even though they aren't reserved until set
       (ie. store the last allocated fd, but it has to be in the process struct)
 
-    * should you remove mallocfs entirely?
-    * implement links for mallocfs
-
-
     * remove the execbuiltin syscall, which is temporary until all commands can be executable files
 
 

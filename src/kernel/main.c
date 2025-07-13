@@ -53,7 +53,6 @@ struct driver *drivers[] = {
 	NULL	// Null Termination
 };
 
-extern struct mount_ops mallocfs_mount_ops;
 extern struct mount_ops minix_mount_ops;
 extern struct mount_ops procfs_mount_ops;
 
