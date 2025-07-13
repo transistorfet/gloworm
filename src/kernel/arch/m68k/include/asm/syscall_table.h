@@ -71,6 +71,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(51, do_sbrk),
 	__SYSCALL(52, do_select),
 
+	#if defined(CONFIG_NET)
 	__SYSCALL(53, do_socket),
 	__SYSCALL(54, do_socketpair),
 	__SYSCALL(55, do_connect),
@@ -86,6 +87,23 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(65, do_recvmsg),
 	__SYSCALL(66, do_getsockopt),
 	__SYSCALL(67, do_setsockopt),
+	#else
+	__SYSCALL(53, test),
+	__SYSCALL(54, test),
+	__SYSCALL(55, test),
+	__SYSCALL(56, test),
+	__SYSCALL(57, test),
+	__SYSCALL(58, test),
+	__SYSCALL(59, test),
+	__SYSCALL(60, test),
+	__SYSCALL(61, test),
+	__SYSCALL(62, test),
+	__SYSCALL(63, test),
+	__SYSCALL(64, test),
+	__SYSCALL(65, test),
+	__SYSCALL(66, test),
+	__SYSCALL(67, test),
+	#endif
 
 	__SYSCALL(68, do_execbuiltin),
 	__SYSCALL(69, __do_clone),

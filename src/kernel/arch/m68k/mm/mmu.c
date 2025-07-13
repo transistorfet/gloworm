@@ -1,4 +1,5 @@
 
+#include <errno.h>
 #include <string.h>
 
 #include <asm/mmu.h>
@@ -39,10 +40,10 @@ int init_mmu(void)
 	//	root[i] = (i << (PAGE_ADDR_BITS + MMU_TABLE_ADDR_BITS)) | MMU_DT_PAGE_DESCRIPTOR;
 	//}
 
-	if (mmu_table_map(root, (void *) 0x00000000, 0x01000000, MMU_FLAG_DIRECT) < 0) {
+	if (mmu_table_map(root, (uintptr_t) 0x00000000, 0x01000000, MMU_FLAG_DIRECT) < 0) {
 		log_error("error mapping lower memory\n");
 	}
-	if (mmu_table_map(root, (void *) 0xFF000000, 0x01000000, MMU_FLAG_DIRECT | MMU_FLAG_NOCACHE) < 0) {
+	if (mmu_table_map(root, (uintptr_t) 0xFF000000, 0x01000000, MMU_FLAG_DIRECT | MMU_FLAG_NOCACHE) < 0) {
 		log_error("error mapping upper memory\n");
 	}
 
@@ -83,7 +84,7 @@ void mmu_table_free(mmu_descriptor_t *root)
 	page_free_single((page_t *) root);
 }
 
-int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, int flags)
+int mmu_table_map(mmu_descriptor_t *root, uintptr_t virtual_addr, ssize_t length, int flags)
 {
 	int i;
 	int level = 0;
@@ -94,7 +95,12 @@ int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, in
 
 	// Check that the length is a multiple of the page size, or raise an error
 	if (length & (PAGE_SIZE - 1)) {
-		return -1;
+		return EINVAL;
+	}
+
+	// Check that the virtual address given is aligned to a page, and raise an error if it's not
+	if (((virtual_address_t) virtual_addr) & (PAGE_SIZE - 1)) {
+		return EINVAL;
 	}
 
 	// Check if the segment to be mapped will wrap around at the end of the address space, and
@@ -102,12 +108,7 @@ int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, in
 	if (((virtual_address_t) virtual_addr) + length > 0
 	    && ((virtual_address_t) virtual_addr) + length < ((virtual_address_t) virtual_addr))
 	{
-		return -1;
-	}
-
-	// Check that the virtual address given is aligned to a page, and raise an error if it's not
-	if (((virtual_address_t) virtual_addr) & (PAGE_SIZE - 1)) {
-		return -1;
+		return EINVAL;
 	}
 
 	table[0] = root;
@@ -125,7 +126,7 @@ int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, in
 				if ((flags & MMU_FLAG_TYPE) == MMU_FLAG_UNMAP) {
 					page_free_single((page_t *) MMU_TABLE_ADDRESS(table[level][i]));
 				} else {
-					return -1;
+					return EEXIST;
 				}
 			}
 
@@ -147,7 +148,7 @@ int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, in
 					break;
 				}
 				default: {
-					return -1;
+					return EINVAL;
 				}
 			}
 
@@ -157,7 +158,7 @@ int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, in
 
 			// Advance to the next address
 			length -= 1 << bits;
-			virtual_addr = (void *) (((virtual_address_t) virtual_addr) + (1 << bits));
+			virtual_addr = (((virtual_address_t) virtual_addr) + (1 << bits));
 
 			// If we've reached the end of the current table, then ascend one level
 			if (i + 1 >= MMU_TABLE_SIZE) {
@@ -185,7 +186,7 @@ int mmu_table_map(mmu_descriptor_t *root, void *virtual_addr, ssize_t length, in
 	return 0;
 }
 
-int mmu_table_unmap(mmu_descriptor_t *root, void *address, ssize_t length)
+int mmu_table_unmap(mmu_descriptor_t *root, uintptr_t address, ssize_t length)
 {
 
 	return 0;

@@ -318,7 +318,6 @@ int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
 		default:
 			return dev_ioctl(devices[minor].rdev, request, argp, uid);
 	}
-	return -1;
 }
 
 int tty_poll(devminor_t minor, int events)

@@ -58,11 +58,10 @@ extern struct mount_ops minix_mount_ops;
 extern struct mount_ops procfs_mount_ops;
 
 struct mount_ops *filesystems[] = {
-	//&mallocfs_mount_ops,
+	&procfs_mount_ops,
 	#if defined(CONFIG_MINIX_FS)
 	&minix_mount_ops,
 	#endif
-	&procfs_mount_ops,
 	NULL	// Null Termination
 };
 
@@ -178,8 +177,10 @@ int main()
 		protocols[i]->init();
 	#endif
 
+	#if defined(CONFIG_MINIX_FS)
 	printk("minixfs: mounting (%x) at %s\n", root_dev, "/");
 	vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
+	#endif
 
 
 	// TODO this would be moved elsewhere

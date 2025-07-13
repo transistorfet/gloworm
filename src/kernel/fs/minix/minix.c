@@ -393,7 +393,7 @@ int minix_write(struct vfile *file, const char *buffer, size_t nbytes)
 
 int minix_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
 {
-	return -1;
+	return EINVAL;
 }
 
 offset_t minix_seek(struct vfile *file, offset_t position, int whence)

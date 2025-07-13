@@ -892,3 +892,13 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - No, it's only working when the init/sh are not compiled in.  When sh is compiled in, it doesn't work.  It exits Process 3 (sh)
 - So maybe it's something to do with changes to the commands compiled into sh?
 
+
+2025-07-11:
+
+- just looking at some numbers:
+    + ext2 = 8 KiB
+    - net = 11 KiB
+    - shell = 11 KiB
+    - minix = 5 KiB?
+    - ata driver = 1.3 KiB
+

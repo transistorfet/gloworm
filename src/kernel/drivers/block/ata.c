@@ -297,7 +297,7 @@ int ata_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 		return ENXIO;
 
 	if (offset > (device->size << 9))
-		return -1;
+		return EINVAL;
 	if (offset + size > (device->size << 9))
 		size = (device->size << 9) - offset;
 
@@ -314,7 +314,7 @@ int ata_write(devminor_t minor, const char *buffer, offset_t offset, size_t size
 		return ENXIO;
 
 	if (offset > (device->size << 9))
-		return -1;
+		return EINVAL;
 	if (offset + size > (device->size << 9))
 		size = (device->size << 9) - offset;
 
@@ -329,7 +329,7 @@ int ata_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
 	struct partition *device = ata_get_device(minor);
 	if (!device)
 		return ENXIO;
-	return -1;
+	return EINVAL;
 }
 
 int ata_poll(devminor_t minor, int events)

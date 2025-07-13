@@ -1,5 +1,6 @@
 
-* add procfs map file
+* go through and assign proper error numbers to mmu_table_map
+* implement mmu_table_unmap, (it's implemented as a flag in map)
 
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
   unfreed in the middle of the segment

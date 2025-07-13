@@ -501,6 +501,8 @@ void command_vmetest(int argc, char **args)
 	*/
 }
 
+#if defined(CONFIG_ATA)
+
 #define ATA_REG_BASE		CONFIG_ATA_BASE
 #define ATA_REG_DATA		((volatile uint16_t *) (ATA_REG_BASE + 0x0))
 #define ATA_REG_DATA_BYTE	((volatile uint8_t *) (ATA_REG_BASE + 0x0))
@@ -593,6 +595,8 @@ void command_atatest(int argc, char **args)
 	return;
 }
 
+#endif
+
 /**************************
  * Command Line Execution *
  **************************/
@@ -626,7 +630,9 @@ int load_commands(struct command *command_list)
 
 	add_command("ramtest", command_ramtest);
 	add_command("v", command_vmetest);
+	#if defined(CONFIG_ATA)
 	add_command("a", command_atatest);
+	#endif
 
 	return num_commands;
 }

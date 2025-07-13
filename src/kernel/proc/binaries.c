@@ -78,6 +78,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
 	int mem_size;
 	int error = ENOMEM;
+	uintptr_t user_mem_start;
 	struct memory_object *object = NULL;
 
 	// The extra data is for the bss segment, which we don't know the proper size of
@@ -88,7 +89,9 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 		goto fail;
 	}
 
-	error = memory_map_mmap(map, object->anonymous.address, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
+	user_mem_start = object->anonymous.address;
+
+	error = memory_map_mmap(map, user_mem_start, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
 	if (error < 0) {
 		goto fail;
 	}
@@ -96,12 +99,12 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 	// so we set the pointer to NULL again to avoid a double-free
 	object = NULL;
 
-	error = vfs_read(file, (void *) object->anonymous.address, mem_size);
+	error = vfs_read(file, (void *) user_mem_start, mem_size);
 	if (error <= 0) {
 		goto fail;
 	}
 
-	*entry = (void *) object->anonymous.address;
+	*entry = (void *) user_mem_start;
 
 	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
@@ -123,6 +126,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	short num_ph;
 	size_t mem_size;
 	int error = ENOMEM;
+	uintptr_t user_mem_start;
 	uintptr_t segment_start, segment_end;
 	struct memory_object *object = NULL;
 	Elf32_Ehdr header;
@@ -172,11 +176,13 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 		goto fail;
 	}
 
+	user_mem_start = object->anonymous.address;
+
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {
 		if (prog_headers[i].p_type == PT_LOAD && prog_headers[i].p_filesz > 0) {
-			segment_start = object->anonymous.address + prog_headers[i].p_vaddr;
-			segment_end = object->anonymous.address + prog_headers[i].p_vaddr + prog_headers[i].p_memsz;
+			segment_start = user_mem_start + prog_headers[i].p_vaddr;
+			segment_end = user_mem_start + prog_headers[i].p_vaddr + prog_headers[i].p_memsz;
 
 			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
 				goto fail;
@@ -196,6 +202,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 			if (prog_headers[i].p_flags & PF_X) {
 				flags |= AREA_EXECUTABLE | AREA_TYPE_CODE;
 			}
+			// If it's not a code area, then mark it as data
 			if (!(flags & AREA_TYPE_CODE)) {
 				flags |= AREA_TYPE_DATA;
 			}
@@ -204,7 +211,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 				goto fail;
 			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
-			segment_start = object->anonymous.address + prog_headers[i].p_vaddr;
+			segment_start = user_mem_start + prog_headers[i].p_vaddr;
 
 			char **data = (char **) segment_start;
 			for (int entries = prog_headers[i].p_memsz >> 2; entries; entries--, data++) {
@@ -213,7 +220,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 		}
 	}
 
-	*entry = (void *) object->anonymous.address + header.e_entry;
+	*entry = (void *) user_mem_start + header.e_entry;
 
 	// Free the extra reference that was used to create the individual segments
 	memory_object_free(object);

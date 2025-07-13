@@ -62,8 +62,9 @@ static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, s
 	hdr->checksum = htobe16(ipv4_calculate_checksum(data, length, 0));
 
 	pack->data_offset = pack->length;
-	if (packet_append(pack, data, length))
-		return -1;
+	error = packet_append(pack, data, length);
+	if (error)
+		return error;
 	return 0;
 }
 

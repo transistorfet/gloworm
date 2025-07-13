@@ -73,7 +73,7 @@ int mem_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 	struct mem_geometry *geo = &devices[minor];
 
 	if (offset > geo->size)
-		return -1;
+		return EINVAL;
 	if (offset + size > geo->size)
 		size = geo->size - offset;
 	memcpy(buffer, &geo->base[offset], size);
@@ -87,7 +87,7 @@ int mem_write(devminor_t minor, const char *buffer, offset_t offset, size_t size
 	struct mem_geometry *geo = &devices[minor];
 
 	if (offset > geo->size)
-		return -1;
+		return EINVAL;
 	if (offset + size > geo->size)
 		size = geo->size - offset;
 	memcpy(&geo->base[offset], buffer, size);
@@ -98,7 +98,7 @@ int mem_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
 {
 	if (minor >= num_devices)
 		return ENXIO;
-	return -1;
+	return EINVAL;
 }
 
 int mem_poll(devminor_t minor, int events)

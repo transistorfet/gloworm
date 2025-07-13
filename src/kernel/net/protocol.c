@@ -29,7 +29,7 @@ int net_register_protocol(struct protocol *proto)
 			return 0;
 		}
 	}
-	return -1;
+	return ENOMEM;
 }
 
 struct protocol *net_get_protocol(int domain, int type, int protocol)

@@ -349,7 +349,7 @@ int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &TCP_ENDPOINT(ep)->remote);
 			return 0;
 		default:
-			return -1;
+			return EINVAL;
 	}
 }
 
@@ -357,7 +357,7 @@ int tcp_endpoint_set_options(struct endpoint *ep, int level, int optname, const 
 {
 	switch (optname) {
 		default:
-			return -1;
+			return EINVAL;
 	}
 }
 

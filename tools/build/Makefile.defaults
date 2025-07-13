@@ -32,7 +32,7 @@ userprog-ccflags-$(CONFIG_M68K)	+= -mpcrel
 firmware-ccflags-$(CONFIG_M68K)	+= -mpcrel
 
 # reduce the elf output size by reducing the alignment
-ccflags-y			+= -z max-page-size=0x10
+ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
 
 export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 

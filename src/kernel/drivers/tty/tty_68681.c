@@ -598,7 +598,7 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t ui
 		default:
 			break;
 	}
-	return -1;
+	return EINVAL;
 }
 
 int tty_68681_poll(devminor_t minor, int events)

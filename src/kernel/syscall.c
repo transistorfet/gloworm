@@ -357,8 +357,11 @@ int do_mount(const char *source, const char *target, struct mount_opts *opts)
 		if (!fsptr)
 			return EINVAL;
 	}
+	// TODO what's this doing?  Can you remove it entirely
+	#if defined(CONFIG_MINIX_FS)
 	if (!fsptr)
 		fsptr = &minix_mount_ops;
+	#endif
 
 	if (vfs_lookup(current_proc->cwd, source, VLOOKUP_NORMAL, current_proc->uid, &vnode))
 		return ENOENT;
@@ -675,7 +678,7 @@ int do_stime(const time_t *t)
 	return 0;
 }
 
-
+#if defined(CONFIG_NET)
 int do_socket(int domain, int type, int protocol)
 {
 	int fd;
@@ -820,4 +823,5 @@ int do_setsockopt(int fd, int level, int optname, const void *optval, socklen_t 
 		return EBADF;
 	return net_socket_set_options(file, level, optname, optval, optlen);
 }
+#endif
 
