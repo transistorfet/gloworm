@@ -7,12 +7,14 @@ ifneq ($(O),)
 endif
 export OUTPUT
 
-this-makefile := $(lastword $(MAKEFILE_LIST))
-src-root := $(realpath $(dir $(this-makefile)))
-
-include $(src-root)/tools/build/Makefile.defaults
+this-makefile	:= $(lastword $(MAKEFILE_LIST))
+src-root	:= $(realpath $(dir $(this-makefile)))
+kconfig-file	:= $(src-root)/.config
+config-h	:= $(src-root)/include/generated/config.h
 
 -include $(kconfig-file)
+
+include $(src-root)/tools/build/Makefile.defaults
 
 build-root	:= $(if $(OUTPUT),$(shell mkdir -p $(OUTPUT) && cd $(OUTPUT) && pwd))
 export src-root build-root kconfig-file config-h

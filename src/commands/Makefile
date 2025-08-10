@@ -17,7 +17,7 @@ commands-y			+= ns
 commands-y			+= ps
 commands-y			+= pwd
 commands-y			+= rm
-commands-$(CONFIG_SH)		+= sh
+commands-$(CONFIG_CMD_SH)	+= sh
 commands-y			+= sync
 commands-y			+= tar
 commands-y			+= umount
@@ -26,13 +26,13 @@ commands-$(CONFIG_NET)		+= ifconfig
 commands-$(CONFIG_NET)		+= httpd
 commands-$(CONFIG_NET)		+= ntpdate
 
-commands-$(CONFIG_TEST_CMDS)	+= daemontest
-commands-$(CONFIG_TEST_CMDS)	+= hello
-commands-$(CONFIG_TEST_CMDS)	+= nettest
-commands-$(CONFIG_TEST_CMDS)	+= test
-commands-$(CONFIG_TEST_CMDS)	+= tcptest
-commands-$(CONFIG_TEST_CMDS)	+= tcpserv
-commands-$(CONFIG_TEST_CMDS)	+= threadtest
+commands-$(CONFIG_CMD_TESTS)	+= daemontest
+commands-$(CONFIG_CMD_TESTS)	+= hello
+commands-$(CONFIG_CMD_TESTS)	+= nettest
+commands-$(CONFIG_CMD_TESTS)	+= test
+commands-$(CONFIG_CMD_TESTS)	+= tcptest
+commands-$(CONFIG_CMD_TESTS)	+= tcpserv
+commands-$(CONFIG_CMD_TESTS)	+= threadtest
 
 #userprogs			:= $(commands-y)
 #userprogs			+= $(foreach name,$(commands-y),$(name).send)
@@ -41,7 +41,7 @@ userprogs-stripped		+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(n
 
 libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 extra-y				+= echo.c cat.c ls.c mkdir.c pwd.c mv.c cp.c ln.c rm.c chmod.c date.c ps.c kill.c mount.c umount.c sync.c
-extra-$(CONFIG_TEST_CMDS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest.c tcpserv.c threadtest.c
+extra-$(CONFIG_CMD_TESTS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest.c tcpserv.c threadtest.c
 
 
 userprog-ccflags-y		+= -Ttext=0x0000

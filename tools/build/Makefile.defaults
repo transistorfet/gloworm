@@ -1,6 +1,7 @@
 
-kconfig-file			:= $(src-root)/.config
-config-h			:= $(src-root)/include/generated/config.h
+SRCARCH				:= $(patsubst "%",%,$(CONFIG_ARCH))
+GCC_PREFIX			:= $(patsubst "%",%,$(CONFIG_GCC_PREFIX))
+
 build-file			:= $(dir)/Makefile
 include-dir			:= $(src-root)/include
 

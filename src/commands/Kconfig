@@ -29,7 +29,7 @@ config SHELL_WITH_UTILS
 
 endif
 
-config TEST_CMDS
+config CMD_TESTS
 	bool "build the various test commands"
 	default y
 	depends on NET

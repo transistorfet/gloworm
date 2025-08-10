@@ -24,9 +24,6 @@ kernel-ccflags-y	:=	# CFLAGS for the kernel only
 
 include $(kconfig-file)
 
-SRCARCH			:= $(patsubst "%",%,$(CONFIG_ARCH))
-GCC_PREFIX		:= $(patsubst "%",%,$(CONFIG_GCC_PREFIX))
-
 include $(src-root)/tools/build/Makefile.defaults
 
 ifeq ($(shell test -e $(build-file) && echo yes),)
