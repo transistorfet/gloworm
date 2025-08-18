@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 
 #include <kconfig.h>
 #include <kernel/printk.h>
@@ -82,7 +83,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 	struct memory_object *object = NULL;
 
 	// The extra data is for the bss segment, which we don't know the proper size of
-	mem_size = file->vnode->size + 0x200;
+	mem_size = roundup(file->vnode->size + 0x200, PAGE_SIZE);
 
 	object = memory_object_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
 	if (!object) {
@@ -127,7 +128,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	size_t mem_size;
 	int error = ENOMEM;
 	uintptr_t user_mem_start;
-	uintptr_t segment_start, segment_end;
+	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
 	struct memory_object *object = NULL;
 	Elf32_Ehdr header;
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
@@ -164,7 +165,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 			if (prog_headers[i].p_vaddr > mem_size)
 				mem_size = prog_headers[i].p_vaddr;
-			mem_size += prog_headers[i].p_memsz;
+			mem_size += roundup(prog_headers[i].p_memsz, PAGE_SIZE);
 		}
 	}
 	if (mem_size == 0)
@@ -181,16 +182,18 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {
 		if (prog_headers[i].p_type == PT_LOAD && prog_headers[i].p_filesz > 0) {
-			segment_start = user_mem_start + prog_headers[i].p_vaddr;
-			segment_end = user_mem_start + prog_headers[i].p_vaddr + prog_headers[i].p_memsz;
+			file_segment_start = user_mem_start + prog_headers[i].p_vaddr;
+			file_segment_end = file_segment_start + prog_headers[i].p_filesz;
+			memory_segment_start = file_segment_start & ~(PAGE_SIZE - 1);
+			memory_segment_end = memory_segment_start + roundup(prog_headers[i].p_memsz, PAGE_SIZE);
 
 			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
 				goto fail;
 			}
-			if ((error = vfs_read(file, (char *) segment_start, prog_headers[i].p_filesz)) < 0) {
+			if ((error = vfs_read(file, (char *) file_segment_start, prog_headers[i].p_filesz)) < 0) {
 				goto fail;
 			}
-			memset((char *) segment_start + prog_headers[i].p_filesz, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
+			memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
 
 			int flags = 0;
 			if (prog_headers[i].p_flags & PF_R) {
@@ -207,15 +210,15 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 				flags |= AREA_TYPE_DATA;
 			}
 
-			if ((error = memory_map_mmap(map, segment_start, prog_headers[i].p_memsz, flags, memory_object_make_ref(object))) < 0) {
+			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, memory_object_make_ref(object))) < 0) {
 				goto fail;
 			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
-			segment_start = user_mem_start + prog_headers[i].p_vaddr;
+			memory_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 
-			char **data = (char **) segment_start;
+			char **data = (char **) memory_segment_start;
 			for (int entries = prog_headers[i].p_memsz >> 2; entries; entries--, data++) {
-				*data = (char *) segment_start + (size_t) *data;
+				*data = (char *) memory_segment_start + (size_t) *data;
 			}
 		}
 	}
