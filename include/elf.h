@@ -16,8 +16,8 @@
    License along with the GNU C Library; if not, see
    <https://www.gnu.org/licenses/>.  */
 
-/* NOTE: this file has been modified from the original to remove unused
-   definitions.  A complete copy is distributed with glibc */
+/* NOTE: (transistor) this file has been modified from the original to remove
+   unused definitions.  A complete copy is distributed with glibc */
 
 #ifndef _ELF_H
 #define	_ELF_H 1

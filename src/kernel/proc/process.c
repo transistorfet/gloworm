@@ -44,7 +44,6 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			memset(&table[i], 0, sizeof(struct process));
 
 			_queue_node_init(&table[i].node);
-			arch_init_task_info(&table[i]);
 
 			table[i].tid = pid;
 			table[i].tgid = pid;
@@ -65,6 +64,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			table[i].umask = PROC_DEFAULT_UMASK;
 			table[i].fd_table = NULL;
 
+			arch_init_task_info(&table[i]);
 			insert_proc(&table[i]);
 
 			UNLOCK(saved_status);

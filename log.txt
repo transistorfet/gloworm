@@ -902,3 +902,186 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
     - minix = 5 KiB?
     - ata driver = 1.3 KiB
 
+
+2025-07-13:
+
+- I'm back to the memory stuff, and while I still need to sort out the memory_object and what to do about it when using MMU, I'm
+  running into the mmu map failing because the numbers aren't rounded to the nearest page size.  It's because of the elf program
+  segments not being aligned as I expected
+- they're aligned to the nearest 0x100 (sort of, sometimes) but the lengths are not rounded.  You have to look at the next segment
+  to see where it starts to know if it's safe to round up
+- that said, I saw the threadtest has a data segment that starts at 0x908 and I have no idea why it's not rounded.  The rest seem to
+  be rounded
+
+- so I was looking into the program header issue, and I found a post on osdev talking about this very issue, with the answer being
+  the segment is still a page in size and it can be loaded still, but if you want the expected page aligned vaddr behaviour, you
+  need to use a linker script
+- I looked up in ruxpin and it turns out I ran into this problem there, and factored it in to the address, but I'm not entirely
+  clear on how it works, of it it uses two pages in memory or something
+
+
+2025-07-15:
+
+- I was running into a problem where it would return -17 EEXIST when running init on boot.  I had fixed the alignment issue, but it
+  was still failing.  I printed the output of the table mapping, and it has weird invalid addresses as if the page directories
+  weren't initialized, but I had already tested that
+- I looked at it a bit more and saw that it was using address 200000 as a page table, which should be where the bitmap for the page
+  allocator is located.  I just clued in that the top level table, table 0, is actually NULL!  It just so happens 200000 which looks
+  like an allocated page address almost just happens to be the starting stack address in rom at address 0.  So that would explain
+  why it's failing
+
+
+2025-07-17:
+
+- last day before the move, it wasn't working, even with MMU disabled
+- I went and commented out the three main parts that I had change, two in binaries.c where it used roundup to increase the area of
+  memory allocated and mapped, and one in memory.c where I added extra checks for both MMU and no-MMU.  That one, and the segment
+  start/end in binaries.c are causing it to not work, but I think I know why now, at least for one
+- for the binaries.c one, I'm using memcpy to load the data, but it must have a bug in it
+- even with just the memory.c checks though, it fails to load.  I'm not sure what's causing that one, but they might be co-related
+
+
+2025-07-24:
+
+- finally have my computer set up after the move to East Van and have my project set up again.  I probably won't do anything
+  tonight, but should be able to work on it tomorrow
+
+
+2025-07-27:
+
+- it seemed to be related to the memset in load_binary.  I commented that out and it's now booting, so I guess it was overwriting
+  something important
+
+
+2025-08-04:
+
+- ok, so I have it working with MMU disabled, but it's broken with MMU enabled and I can't remember what I was doing last, so I
+  don't even know where to start with it.  I'm still trying to pick this up again after moving but haven't had much time.
+- it tries to start up and initializes the kernel (with MMU enabled) but fails when running user programs.  The shell isn't compiled
+  into the kernel so it's trying to run them from disk.  It fails with a bunch of illegal instruction exceptions (vector 4)
+- compiling into the kernel, it seems to run the shell but then gets a privillege violation exception (vector 8).  I'm confused by
+  this because it's not actually using the MMU tables yet but maybe I need to set the CPU root table register or it will always
+  fail?  Am I not doing that yet?  It still managed to print the pseudo shell message, so it can't be the case that no table is set
+  or else it wouldn't get that far
+
+
+2025-08-06:
+
+- trying to figure out where I was, and tried not initializing the mmu to see if it was related to it being enabled vs disabled, and
+  at first it worked, but then I realized the config was disabled, and when I tried again, it had not effect, broken in both cases.
+  So it's related to the other code, and uncommenting the map and unmap calls, which were the only thing that wasn't unallocation
+  (well the unmap is unallocation too)
+- it worked without them, and it worked with the unmap call, so it was map, and changing the flag to something else instead of
+  MAP_FLAG_WINDOW worked, so it was just that flag
+
+- ah! an idea, what if it's because the table is not cloned during fork, and anything that tries to map will cause an exception
+  (it's trying to use a table that's NULL all over again).  That's gotta be it
+- no that can't be it because a new root table is allocated every time a map is created, and MMU_FLAG_WINDOW doesn't do anything
+  except use the virtual address as the physical address, so it's not a NULL table, but it is an unmapped table that's trying to
+  unallocate or map something that hasn't been mapped...
+- could it be not checking for NULL before recursing?
+
+- well when I compile the shell into the kernel, it works enough to get to the shell but then crashes in the kernel it looks like
+  when trying to run `ls`
+- so are the user programs different somehow?  I couldn't find a CONFIG_MMU in any context or process code, so it would seem not
+- address 10D0E0 is the fault address, and it halts so it was likely the kernel?  nope it's actually the exact same place as the
+  the fault when running the applications from disk!  It's the RTS instruction in the fork user function, just after the fork
+  syscall, so it's the same problem: a corrupt stack on return from fork, and it seems to be the parent that's affected and not the
+  child?
+
+- wait, is it not copying the extra stack?  When MMU is enabled, it uses two stacks? or maybe that's user mode.  If user mode is
+  working, it should be alright, but I tried removing the fork intercept thing where the extended regs are saved, knowing it
+  wouldn't work because important registers won't be cloned, but there might be some kind of problem with it, even though it
+  doesn't have any MMU-specific code.  But it then printed the "fuck, trying to write usp to different pid 3?" message, so that got
+  me thinking about the user stack.  I guess I can look at that code, but I don't think it's likely the problem
+- but what if the usp is overwritten when it shouldn't be?`
+
+- well, fuck me.  I just tried it the opposite way, commenting out the unmap and leaving the map, and it works, so it's not the map
+  that's causing the problem, it's the unmap...
+- I had previously just tried printing when usp was set, and it's set once, but that run also crashed silently before getting to the
+  first prompt, and an unmap happens before then (and then a map, and then the usp set), and that got me thinking that maybe if it
+  was freeing the old memory, it would reuse a page and thus overwrite its memory causing the stack corruption
+- and sure enough that was the problem... or at least I'm pretty confident of that now.  I don't understand it fully, but there must
+  be an early free somewhere
+
+
+2025-08-11:
+
+- I didn't work on it today, progress has been slow, but I think I have it able to track page refcounts.  I just need to add
+  refcounting to the existing page uses
+
+
+2025-08-17:
+
+- finally back to this again, and I went through a few things looking for that page free bug that was plaguing me before.  I had
+  thought that the page_free call in the mmu table code was causing an early free that would then allow the page to be reused and
+  then cause the stack problem when returning to the user process, but that turns out to not have been the cause
+- I had tried putting print statements around the alloc/frees, there weren't that many, and honestly it didn't seem like there was a
+  chance for an early free to be happening.  That ran fine, and re-enabling the free didn't cause the problem again
+- I found some code that I had changed at some point in the last few weeks since this problem happened, involving the MMU status
+  flags for page descriptors.  I remember at some point when looking through things noticing that the S (supervisor) flag was being
+  set, and had tried disabling that to no avail, but somewhere along the line I also noticed that I was using the LONG descriptor type
+  instead of using the header-selected descriptor type (I was using MMU_DT_TABLE_LONG instead of MMU_DT_TABLE).
+- acutally I just thought I had recreated the problem by putting it back to _LONG but that was just the timeout for fetching the
+  date, so acutally I don't think that recreated the problem
+- I can't seem to make it fail again like it was doing before...
+- either way, I think it's safe to re-enable this page_free code again
+
+- motherfucker... I had the init_mmu() call commented out, so it wasn't initializing the root table.  That would explain why I
+  couldn't reproduce the problem
+- still can't reproduce the problem
+- Ok there! Finally was able to reproduce it by removing the refcount page free code that I had recently added as well.  So there's
+  a problem there where it's not freeing the pages.  I don't think I have a make_ref call anywhere so it should be acting exactly
+  the same with or without the refcount check, but since it's not behaving the same, there must be an incorrect count
+
+- alright, so the previous problem with reproducing the problem was caused by the fact that the mmu table was not initialized, MMU
+  was disabled, and the page refcounting code wasn't working properly so no pages were actually freed
+- now the MMU is enabled, the proper page descriptor types are being used, supervisor bit is not set, and the refcounts are working
+  correctly, and the problem is occurring where page_free in MMU unmapping is causing 3 successive exceptions
+
+- Ok, so put a bunch of print statements back in, and I'm looking at the problem.  The first exception is the keep problem, and it's
+  always the same addresses.  It's an address exception with the fault address being 0x2038D4, which corresponds to the RTS
+  instruction on returning from the fork syscall, as executed from the user process code segment.  The instruction data in the
+  exception stack trace shows it being the RTS instruction that causes the problem
+- the objdump of the user process in questions shows 0x1D4 being the RTS instruction in the user side of the fork() call, which
+  corresponds to a code segment address of 0x203700 which matches that process's code segment, so that all lines up
+- the actual fault is caused by the return address on the stack, I believe, which corresponds to 0x206690, where the stack itself is
+  shown as 0x2034A4, but that's wrong.  The process address space says the stack should be between 0x204700 and 0x206700, so the
+  stack pointer is pointing to the wrong stack
+- while it's true the stack seems to be wrong, the fault address doesn't seem to be a problem.  The CRP register is pointing to the
+  root table, which should allow it to access all addresses, and the fault address itself isn't an odd byte or anything, so I don't
+  see why this would cause an exception besides just being wrong/pointing to the wrong place.  It should misbehave without causing
+  an exception, so why the exception
+- wait, I'm getting myself confused between the stacks.  There's two stacks here, and the exception always ends up on the kernel
+  stack for the process, so 0x2034A4 is the kernel stack address, not the user stack address, but even then, there seems to be
+  something not quite right.  I don't see an alloc for 0x203400 or a new ksp print statement for pid 1, so that's odd
+- the exceptions only occur when the shell on disk is used, and when compiled into the kernel, it hangs instead of causing an
+  exception.
+
+- I don't know what's going on.  I was trying to get more log messages with more info in, and I added the pid to the kernel stack
+  alloc print statement, but it was set to 0, so I moved the arch_init_task_info call from near the top to near the bottom of the
+  process init function, and now it seems to boot fine.  Not sure if this is coincidence or related.  Either way, it does match that
+  the kernel stack for pid 1 is 0x202D00 to 0x203500, so that ksp of the exception from before is correct, it's on the right kernel
+  stack
+- actually it doesn't boot fine.  It's causing an exception still, but it manages to get into the shell.  It doesn't have the
+  address exception, but it has an illegal instruction during boot and a privillege violation when running ls
+- moving that code back, it's still booting to the shell with a random exception (sometimes exception 4, sometimes 11, and then
+  exception 8 privillege violation whenever I run a command)
+- when it gets the vector 11 exception, that's 1111 emulator and the instruction pointed to is FFFF FFFF, and the code address is
+  0x2066BE, but that corresponds to the process's stack and not its code space... it feels like stack corruption, and given it's
+  magically fixed by not freeing some pages, I still think a page is being incorrectly reused somewhere that causes the corruption
+- this is really hard to trace and to fix
+- the address where the stack appears does indeed get freed that problematic page_free, but I don't know what it was originally used
+  by.  I think it's another process
+
+- Ah!  I think I see the double free.  The map/unmap code is separate from the memory_object code, and the refcount there, and it's
+  still not incrementing refcounts when it maps existing memory, so it's always freeing the stack area when a process terminates or
+  exec()s, even when the clone of that process still has a reference to that memory
+- while I don't like the fact that the memory object has its own reference(s) to the data, the proper thing to do is to increment
+  the refcounts when it maps a range of memory that's in the page space.  I don't know how I'll distinguish that though from
+  hardware memory mapped addresses
+
+- uuugh progress is so slow here.  I don't have as much motivation to work on it, plus so many other distractions, so while I sort
+  of know the cause now, I'm not sure about the solution, or how I should fix it properly, and I kinda don't want to work on it
+  right now because I also need to get some groceries and other things to do related to settling into the new place
+

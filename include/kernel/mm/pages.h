@@ -45,8 +45,11 @@ void page_free(char *ptr);
 #define BIT_MASK(bit)		(1 << ((bit) & (PAGES_PER_INDEX - 1)))
 
 typedef uint16_t bitmap_t;
-
 typedef uint8_t page_t[PAGE_SIZE];
+
+struct page_descriptor {
+	uint16_t refcount;
+};
 
 struct page_domain {
 	uint16_t cost[CONFIG_NUM_CPUS];
@@ -58,15 +61,22 @@ struct page_block {
 	int bitmap_size;
 	page_t *base;
 	int pages;
+	#if defined(CONFIG_MMU)
+	struct page_descriptor *page_descriptors;
+	#endif
 };
 
 
-int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size);
+int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size, struct page_descriptor *descriptors);
 int init_page_block(struct page_block *block, void *addr, int size);
 page_t *page_block_alloc_contiguous(struct page_block *block, size_t size);
 page_t *page_block_alloc_single(struct page_block *block);
 void page_block_free_single(struct page_block *block, page_t *ptr);
 void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t size);
+#if defined(CONFIG_MMU)
+page_t *page_block_make_ref_single(struct page_block *block, page_t *ptr);
+page_t *page_block_make_ref_contiguous(struct page_block *block, page_t *ptr, size_t size);
+#endif
 
 extern struct page_block pages;
 #define init_pages(start, end)					init_page_block(&pages, (void *) start, end)
@@ -74,6 +84,10 @@ extern struct page_block pages;
 #define page_alloc_single()					page_block_alloc_single(&pages)
 #define page_free_single(page)					page_block_free_single(&pages, page)
 #define page_free_contiguous(page, size)			page_block_free_contiguous(&pages, page, size)
+#if defined(CONFIG_MMU)
+#define page_make_ref_single(page)				page_block_make_ref_single(&pages, page)
+#define page_make_ref_contiguous(page, size)			page_block_make_ref_contiguous(&pages, page, size)
+#endif
 
 #endif
 
