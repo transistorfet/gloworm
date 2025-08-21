@@ -66,10 +66,10 @@ struct memory_object {
 		struct anonymous_memory anonymous;
 	};
 
-	#if !defined(CONFIG_MMU)
+	//#if !defined(CONFIG_MMU)
 	void *mem_start;
 	size_t mem_length;
-	#endif
+	//#endif
 };
 
 struct memory_area {

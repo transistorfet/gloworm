@@ -115,9 +115,11 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 			goto fail;
 	}
 
+	//#if !defined(CONFIG_MMU)
 	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
+	//#endif
 
 	return 0;
 

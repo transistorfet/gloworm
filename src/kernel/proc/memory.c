@@ -15,7 +15,11 @@
 
 void pages_object_free(struct memory_object *object)
 {
+	#if defined(CONFIG_MMU)
+	// TODO nothing to do, since unmap should do this for us?
+	#else
 	page_free_contiguous(object->mem_start, object->mem_length);
+	#endif
 }
 
 struct memory_ops pages_object_ops = {
@@ -69,7 +73,7 @@ struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile 
 	if (!object)
 		goto fail;
 
-	#if !defined(CONFIG_MMU)
+	//#if !defined(CONFIG_MMU)
 	memory = (char *) page_alloc_contiguous(size);
 	if (!memory)
 		goto fail;
@@ -78,7 +82,7 @@ struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile 
 	object->mem_start = memory;
 	object->mem_length = size;
 	object->anonymous.address = (physical_address_t) memory;
-	#endif
+	//#endif
 
 	return object;
 
@@ -128,6 +132,14 @@ struct memory_map *memory_map_alloc(void)
 	map->refcount = 1;
 	_queue_init(&map->segments);
 
+	#if defined(CONFIG_MMU)
+	map->root_table = mmu_table_alloc();
+	if (!map->root_table) {
+		memory_map_free(map);
+		return NULL;
+	}
+	#endif
+
 	return map;
 }
 
@@ -139,13 +151,18 @@ void memory_map_free(struct memory_map *map)
 		return;
 	}
 
+	#if defined(CONFIG_MMU)
+	if (map->root_table) {
+		mmu_table_free(map->root_table);
+	}
+	#endif
+
 	if (--map->refcount == 0) {
 		for (cur = _queue_head(&map->segments); cur; cur = next) {
 			next = _queue_next(&cur->node);
 			memory_area_free(cur);
 		}
 		kmfree(map);
-		// TODO if CONFIG_MMU then also free table?
 	}
 }
 
@@ -161,6 +178,22 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	struct memory_area *cur, *next, *area;
 
 	end = start + length;
+
+	// Check that the length is a multiple of the page size, or raise an error
+	if (length & (PAGE_SIZE - 1)) {
+		return EINVAL;
+	}
+
+	// Check that the virtual address given is aligned to a page, and raise an error if it's not
+	if (start & (PAGE_SIZE - 1)) {
+		return EINVAL;
+	}
+
+	// Check if the segment to be mapped will wrap around at the end of the address space, and
+	// raise an error if it will
+	if (start + length > 0 && start + length < start) {
+		return EINVAL;
+	}
 
 	if (!object) {
 		return EFAULT;
@@ -182,6 +215,13 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
 	_queue_insert_after(&map->segments, &area->node, cur ? &cur->node : NULL);
+
+	#if defined(CONFIG_MMU)
+	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
+	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW);
+	if (error < 0)
+		goto fail;
+	#endif
 
 	// Adjust memory markers, if needed
 	if (!map->code_start) {
@@ -211,8 +251,16 @@ fail:
 /// it will be deleted or shrunk accordingly to make room.
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 {
+	int error;
 	uintptr_t end;
 	struct memory_area *cur, *next, *new;
+
+	#if defined(CONFIG_MMU)
+	// TODO the MMU_FLAG_PAGE_BACKED flag is a bit of a hack atm to make it not free the underlying data when using MMU_FLAG_WINDOW
+	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | MMU_FLAG_PAGE_BACKED);
+	if (error < 0)
+		return error;
+	#endif
 
 	end = start + length;
 	for (cur = memory_map_iter_first(map); cur; cur = next) {
@@ -383,9 +431,13 @@ void print_process_segments(struct process *proc)
 {
 	struct memory_area *cur;
 
-	printk("pid %d memory map:\n", proc->pid);
-	for (cur = _queue_head(&proc->map->segments); cur; cur = _queue_next(&cur->node)) {
-		printk("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
+	if (proc->map) {
+		printk("pid %d memory map:\n", proc->pid);
+		for (cur = _queue_head(&proc->map->segments); cur; cur = _queue_next(&cur->node)) {
+			printk("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
+		}
+	} else {
+		printk("pid %d memory map: NULL\n", proc->pid);
 	}
 }
 

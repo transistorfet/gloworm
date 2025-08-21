@@ -97,19 +97,18 @@ typedef mmu_table_short_t mmu_table_t;
 #define MMU_FLAG_UNMAP		0x00	/// Unmap and free all entries visited
 #define MMU_FLAG_UNALLOCATED	0x01	/// Map all table entries, but leave the descriptors invalid, so a page fault can be caught
 #define MMU_FLAG_PREALLOCATED	0x02	/// Allocate pages for the entire range
-#define MMU_FLAG_DIRECT		0x03	/// Map the entire range to the same physical address as the corresponding virtual address
-#define MMU_FLAG_EXISTING	0x04	/// Map the entire range to the given physical address
+#define MMU_FLAG_WINDOW		0x03	/// Map the entire range to the same physical address as the corresponding virtual address
 
-#define MMU_FLAG_NOCACHE	0x40
+#define MMU_FLAG_PAGE_BACKED	0x20	/// Allocate pages from the global pool for the mapped range
+#define MMU_FLAG_NOCACHE	0x40	/// Disable hardware caching for the mapped range (eg. for memory-mapped device access)
 
-#define MMU_FLAG_PRIVATE	0x00
-#define MMU_FLAG_SHARED		0x80
+//#define MMU_FLAG_PRIVATE	0x00
+//#define MMU_FLAG_SHARED	0x80
 
 int init_mmu(void);
 mmu_descriptor_t *mmu_table_alloc(void);
 void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, ssize_t length, int flags);
-int mmu_table_unmap(mmu_descriptor_t *root, uintptr_t address, ssize_t length);
 
 #endif
 

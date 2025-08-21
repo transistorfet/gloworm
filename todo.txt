@@ -1,6 +1,10 @@
 
+* should you rename memory_area to memory_segment?
+* move memory_ops to memory_area instead of memory_object
+* try to isolate memory_object out and make it used only if !MMU
+* separate memory_object out, so that it can be compiled optionally based on !MMU
+
 * go through and assign proper error numbers to mmu_table_map
-* implement mmu_table_unmap, (it's implemented as a flag in map)
 
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
   unfreed in the middle of the segment
