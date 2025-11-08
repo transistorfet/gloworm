@@ -54,7 +54,7 @@ struct arch_task_info {
 
 	#if defined(CONFIG_M68K_USER_MODE)
 	/// A pointer to the start of the kernel stack for this process
-	char* kernel_stack;
+	char* kernel_stack_start;
 	#endif
 };
 
@@ -70,6 +70,11 @@ struct arch_task_info {
 
 // TODO this also defined in the assembly file =/
 #define FULL_CONTEXT_SIZE	64
+
+extern void *create_context(void *kernel_stack, void *entry, void *user_stack, int is_kernel);
+extern void *drop_context(void *kernel_stack);
+extern void _exit();
+extern void _sigreturn();
 
 #endif
 

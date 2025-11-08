@@ -8,6 +8,8 @@ MEMORY
 
 SECTIONS
 {
+  __kernel_start = .;
+
   .text : {
     *(.text.start)
     *(.text)
@@ -32,5 +34,6 @@ SECTIONS
     . = 4096;
     . = ALIGN(4096);
   } > ram
-  __end = .;
+
+  __kernel_end = .;
 }

@@ -52,13 +52,20 @@ struct process *create_init_task(void)
 
 	#if defined(CONFIG_SHELL_IN_KERNEL)
 
+	// Add a code segment for this process, which is the entire kernel
+	extern void *__kernel_start, *__kernel_end;
+	error = memory_map_mmap(proc->map, __kernel_start, __kernel_end - __kernel_start, AREA_TYPE_CODE | AREA_READ | AREA_EXECUTABLE, NULL);
+	if (error < 0)
+		goto fail;
+
+	// Add the heap and stack segments
 	error = memory_map_insert_heap_stack(proc->map, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		goto fail;
 
 	extern void init_task();
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_stack_with_args(proc, (char *) proc->map->stack_end, init_task, argv, envp);
+	exec_initialize_user_stack_with_args(proc, (char *) proc->map->stack_end, init_task, argv, envp);
 
 	#else
 
@@ -150,7 +157,7 @@ void alloc_kernel_stack(struct process *proc, int (*task_start)(), const char *c
 
 	stack = kzalloc(PAGE_SIZE);
 	proc->map->sbrk = (uintptr_t) stack;
-	exec_initialize_stack_with_args(proc, stack + PAGE_SIZE, task_start, argv, envp);
+	exec_initialize_kernel_stack_with_args(proc, stack + PAGE_SIZE, task_start, argv, envp);
 }
 
 int idle_task(void)

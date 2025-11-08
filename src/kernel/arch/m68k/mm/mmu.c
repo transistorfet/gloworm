@@ -7,16 +7,6 @@
 #include <kernel/printk.h>
 
 
-#define MMU_MOVE_TO_TCR(value)		\
-	asm volatile("pmove	%0, %%tc\n" : : "m" (value))
-
-#define MMU_MOVE_TO_CRP(value)		\
-	asm volatile("pmove	%0, %%crp\n" : : "m" (value))
-
-#define MMU_MOVE_TO_SRP(value)		\
-	asm volatile("pmove	%0, %%srp\n" : : "m" (value))
-
-
 mmu_descriptor_t *root = NULL;
 
 static inline int init_mmu_table(mmu_descriptor_t *root)
@@ -28,22 +18,25 @@ static inline int init_mmu_table(mmu_descriptor_t *root)
 
 int init_mmu(void)
 {
+	uint32_t tt = 0;
 	uint32_t tcr = 0;
 	struct mmu_root_pointer root_pointer;
 
 	root = mmu_table_alloc();
 
 	// Initialize the top-level kernel page table to map directly to real memory
-	if (mmu_table_map(root, (uintptr_t) 0x00000000, 0x01000000, MMU_FLAG_WINDOW) < 0) {
+	if (mmu_table_map(root, (uintptr_t) 0x00000000, 0x01000000, MMU_FLAG_WINDOW | MMU_FLAG_SUPERVISOR) < 0) {
 		log_error("error mapping lower memory\n");
 	}
-	if (mmu_table_map(root, (uintptr_t) 0xFF000000, 0x01000000, MMU_FLAG_WINDOW | MMU_FLAG_NOCACHE) < 0) {
+	if (mmu_table_map(root, (uintptr_t) 0xFF000000, 0x01000000, MMU_FLAG_WINDOW | MMU_FLAG_NOCACHE | MMU_FLAG_SUPERVISOR) < 0) {
 		log_error("error mapping upper memory\n");
 	}
 
-	root_pointer.limit = 0;
-	// TODO disabled supervisor flag for the time being, until user processes use their own address space
-	root_pointer.status = MMU_STATUS_DEFAULT | /* MMU_STATUS_DESC_S | */ MMU_DT_TABLE;
+	MMU_MOVE_TO_TT0(tt);
+	MMU_MOVE_TO_TT1(tt);
+
+	root_pointer.limit = 0x7fff;
+	root_pointer.status = MMU_DT_TABLE;
 	root_pointer.table = (uint32_t) root;
 	MMU_MOVE_TO_SRP(root_pointer);
 	MMU_MOVE_TO_CRP(root_pointer);
@@ -61,6 +54,10 @@ int init_mmu(void)
 	log_debug("mmu: setting TCR to %x\n", tcr);
 
 	MMU_MOVE_TO_TCR(tcr);
+
+	tcr = 0;
+	MMU_MOVE_FROM_TCR(tcr);
+	log_debug("mmu: read back TCR of %x\n", tcr);
 	return 0;
 }
 
@@ -110,6 +107,9 @@ int mmu_table_map(mmu_descriptor_t *root, uintptr_t virtual_addr, ssize_t length
 			if (flags & MMU_FLAG_NOCACHE) {
 				status |= MMU_STATUS_DESC_CI;
 			}
+			//if (flags & MMU_FLAG_SUPERVISOR) {
+			//	status |= MMU_STATUS_DESC_S;
+			//}
 
 			// If there's an existing page allocated, and we're not unmapping, then raise an error
 			if (MMU_TABLE_ADDRESS(table[level][i]) != 0) {

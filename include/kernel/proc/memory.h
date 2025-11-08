@@ -33,12 +33,12 @@
 
 struct vfile;
 struct process;
-struct memory_area;
+struct memory_segment;
 struct memory_object;
 
 struct memory_ops {
 	void (*free)(struct memory_object *object);
-	physical_address_t (*load_page_at)(struct memory_area *area, struct memory_object *object, virtual_address_t vaddr);
+	physical_address_t (*load_page_at)(struct memory_segment *area, struct memory_object *object, virtual_address_t vaddr);
 };
 
 struct file_backed_memory {
@@ -66,13 +66,13 @@ struct memory_object {
 		struct anonymous_memory anonymous;
 	};
 
-	//#if !defined(CONFIG_MMU)
+	#if !defined(CONFIG_MMU)
 	void *mem_start;
 	size_t mem_length;
-	//#endif
+	#endif
 };
 
-struct memory_area {
+struct memory_segment {
 	struct queue_node node;
 
 	int flags;
@@ -85,6 +85,10 @@ struct memory_area {
 struct memory_map {
 	int refcount;
 
+	#if defined(CONFIG_MMU)
+	mmu_descriptor_t *root_table;
+	#endif
+
 	struct queue segments;
 	uintptr_t code_start;
 	uintptr_t data_start;
@@ -94,10 +98,6 @@ struct memory_map {
 
 	const char *const *argv;
 	const char *const *envp;
-
-	#if defined(CONFIG_MMU)
-	mmu_descriptor_t *root_table;
-	#endif
 };
 
 
@@ -112,14 +112,19 @@ static inline struct memory_map *memory_map_make_ref(struct memory_map *map);
 
 int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, struct memory_object *object);
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
+int memory_map_remap_copy_on_write(struct memory_map *map, uintptr_t start, size_t length);
 
-int memory_map_resize(struct memory_area *area, ssize_t diff);
+int memory_map_resize(struct memory_segment *area, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size);
 
 int memory_map_move_sbrk(struct memory_map *map, int diff);
 
 void print_process_segments(struct process *proc);
 
+
+/************************
+ * Memory Object Inlines
+ ************************/
 
 static inline int memory_map_reset_sbrk(struct memory_map *map)
 {
@@ -139,28 +144,38 @@ static inline struct memory_object *memory_object_make_ref(struct memory_object 
 	return object;
 }
 
-static inline struct memory_area *memory_map_iter_first(struct memory_map *map)
+static inline uintptr_t memory_object_get_start_address(struct memory_object *object)
+{
+	return object->anonymous.address;
+}
+
+
+/*********************
+ * Memory Map Inlines
+ *********************/
+
+static inline struct memory_segment *memory_map_iter_first(struct memory_map *map)
 {
 	return _queue_head(&map->segments);
 }
 
-static inline struct memory_area *memory_map_iter_next(struct memory_area *cur)
+static inline struct memory_segment *memory_map_iter_next(struct memory_segment *cur)
 {
 	return _queue_next(&cur->node);
 }
 
 
-static inline struct memory_area *memory_map_iter_last(struct memory_map *map)
+static inline struct memory_segment *memory_map_iter_last(struct memory_map *map)
 {
 	return _queue_tail(&map->segments);
 }
 
-static inline struct memory_area *memory_map_iter_prev(struct memory_area *cur)
+static inline struct memory_segment *memory_map_iter_prev(struct memory_segment *cur)
 {
 	return _queue_prev(&cur->node);
 }
 
-static inline struct memory_area *memory_area_find_prev(struct memory_area *cur, uintptr_t address)
+static inline struct memory_segment *memory_segment_find_prev(struct memory_segment *cur, uintptr_t address)
 {
 	while (cur) {
 		if (address >= cur->start && address <= cur->end) {

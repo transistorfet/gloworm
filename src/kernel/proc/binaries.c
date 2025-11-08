@@ -70,7 +70,7 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	proc->map = map;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
+	exec_initialize_user_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
 
 	return error;
 }
@@ -90,7 +90,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 		goto fail;
 	}
 
-	user_mem_start = object->anonymous.address;
+	user_mem_start = memory_object_get_start_address(object);
 
 	error = memory_map_mmap(map, user_mem_start, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
 	if (error < 0) {
@@ -177,7 +177,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 		goto fail;
 	}
 
-	user_mem_start = object->anonymous.address;
+	user_mem_start = memory_object_get_start_address(object);
 
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {

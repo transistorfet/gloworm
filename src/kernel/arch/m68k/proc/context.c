@@ -63,12 +63,12 @@ int arch_init_task_info(struct process *proc)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
 
-	if (!proc->task_info.kernel_stack) {
-		proc->task_info.kernel_stack = (char *) page_alloc_contiguous(KERNEL_STACK_SIZE);
-		if (!proc->task_info.kernel_stack)
+	if (!proc->task_info.kernel_stack_start) {
+		proc->task_info.kernel_stack_start = (char *) page_alloc_contiguous(KERNEL_STACK_SIZE);
+		if (!proc->task_info.kernel_stack_start)
 			return ENOMEM;
 	}
-	proc->task_info.ksp = proc->task_info.kernel_stack + KERNEL_STACK_SIZE;
+	proc->task_info.ksp = proc->task_info.kernel_stack_start + KERNEL_STACK_SIZE;
 
 	#else
 
@@ -83,11 +83,32 @@ int arch_release_task_info(struct process *proc)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
 
-	if (proc->task_info.kernel_stack) {
-		page_free_contiguous((page_t *) proc->task_info.kernel_stack, KERNEL_STACK_SIZE);
+	if (proc->task_info.kernel_stack_start) {
+		page_free_contiguous((page_t *) proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 	}
 
 	#endif
+
+	return 0;
+}
+
+int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
+{
+	//PUSH_STACK(stack_pointer, void *) = _exit;
+	user_sp = ((char *) user_sp) - sizeof(void *);
+	*((void **) user_sp) = _exit;
+
+	#if defined(CONFIG_M68K_USER_MODE)
+
+	proc->task_info.ksp = proc->task_info.kernel_stack_start + KERNEL_STACK_SIZE;
+
+	#else
+
+	proc->task_info.ksp = user_sp;
+
+	#endif
+
+	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 1);
 
 	return 0;
 }
@@ -100,7 +121,7 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
-	proc->task_info.ksp = proc->task_info.kernel_stack + KERNEL_STACK_SIZE;
+	proc->task_info.ksp = proc->task_info.kernel_stack_start + KERNEL_STACK_SIZE;
 
 	#else
 
@@ -108,7 +129,7 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 
 	#endif
 
-	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp);
+	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0);
 
 	return 0;
 }
@@ -117,9 +138,9 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 {
 	#if defined(CONFIG_M68K_USER_MODE)
 	// TODO should the stack be allocated here too, so it's a decision made by the arch whether to have two stacks or one?
-	proc->task_info.ksp = proc->task_info.kernel_stack + (((char *) parent_proc->task_info.ksp) - parent_proc->task_info.kernel_stack);
+	proc->task_info.ksp = proc->task_info.kernel_stack_start + (((char *) parent_proc->task_info.ksp) - parent_proc->task_info.kernel_stack_start);
 
-	memcpy((char *) proc->task_info.kernel_stack, (char *) parent_proc->task_info.kernel_stack, KERNEL_STACK_SIZE);
+	memcpy((char *) proc->task_info.kernel_stack_start, (char *) parent_proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 
 	arch_set_user_stackp(proc, user_sp);
 
@@ -148,7 +169,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 	PUSH_STACK(usp, void *) = _sigreturn;
 	// Push a fresh context onto the kernel stack
 	// NOTE the user stack is not updated directly, but is instead added to the new context
-	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp);
+	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp, 0);
 	arch_set_kernel_stackp(proc, ksp);
 
 	return 0;
@@ -166,5 +187,12 @@ int arch_remove_signal_context(struct process *proc)
 	arch_set_kernel_stackp(proc, ksp);
 
 	return 0;
+}
+
+void arch_extended_switch_context(struct process *previous_proc, struct process *next_proc)
+{
+	#if defined(CONFIG_MMU)
+	mmu_table_switch(next_proc->map->root_table);
+	#endif
 }
 

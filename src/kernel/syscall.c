@@ -160,7 +160,7 @@ int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[
 	}
 
 	// NOTE no modification of the memory maps here, since the code should be in the same process
-	exec_initialize_stack_with_args(current_proc, (void *) current_proc->map->stack_end, addr, argv, envp);
+	exec_initialize_user_stack_with_args(current_proc, (void *) current_proc->map->stack_end, addr, argv, envp);
 	return 0;
 }
 

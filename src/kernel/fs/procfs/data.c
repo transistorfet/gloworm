@@ -62,7 +62,7 @@ int get_data_maps(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
 
-	for (struct memory_area *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+	for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
 		i += snprintf(&buffer[i], max - i, "%lx-%lx %x\n", cur->start, cur->end, cur->flags);
 	}
 	return i;
@@ -90,7 +90,7 @@ static inline size_t get_proc_size(struct process *proc)
 {
 	size_t size = 0;
 
-	for (struct memory_area *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+	for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
 		size += cur->end - cur->start;
 	}
 	return size;

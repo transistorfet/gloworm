@@ -9,6 +9,34 @@
 #include <kernel/mm/pages.h>
 
 
+#define MMU_MOVE_TO_TCR(value)		\
+	asm volatile("pmove	%0, %%tc\n" : : "m" (value))
+
+#define MMU_MOVE_FROM_TCR(value)	\
+	asm volatile("pmove	%%tc, %0\n" : "=m" (value))
+
+#define MMU_MOVE_TO_SRP(value)		\
+	asm volatile("pmove	%0, %%srp\n" : : "m" (value))
+
+#define MMU_MOVE_TO_CRP(value)		\
+	asm volatile("pmove	%0, %%crp\n" : : "m" (value))
+
+#define MMU_MOVE_FROM_CRP(value)	\
+	asm volatile("pmove	%%crp, %0\n" : "=m" (value))
+
+#define MMU_MOVE_TO_TT0(value)		\
+	asm volatile("pmove	%0, %%tt0\n" : : "m" (value))
+
+#define MMU_MOVE_TO_TT1(value)		\
+	asm volatile("pmove	%0, %%tt1\n" : : "m" (value))
+
+#define MMU_FLUSH_ALL()		\
+	asm volatile("pflusha\n")
+
+#define MMU_FLUSH_USER_TLB()		\
+	asm volatile("pflush	#4, #1\n")
+
+
 #define MMU_DT_INVALID		0
 #define MMU_DT_PAGE_DESCRIPTOR	1
 #define MMU_DT_TABLE_SHORT	2
@@ -19,10 +47,10 @@
 #define MMU_STATUS_DESC_U	0x0008
 #define MMU_STATUS_DESC_M	0x0010
 #define MMU_STATUS_DESC_CI	0x0040
-#define MMU_STATUS_DESC_S	0x0100
-#define MMU_STATUS_DEFAULT	0xFC00
+#define MMU_STATUS_DESC_S_LONG	0x0100
+#define MMU_STATUS_DEFAULT_LONG	0xFC00
 
-#define MMU_TC_ENABLE		0x10000000
+#define MMU_TC_ENABLE		0x80000000
 #define MMU_TC_SRE		0x02000000
 #define MMU_TC_FCL		0x01000000
 #define MMU_TC_PAGE_SIZE	0x00F00000	/// Page size - the number of least significant bits that index a single page
@@ -99,6 +127,7 @@ typedef mmu_table_short_t mmu_table_t;
 #define MMU_FLAG_PREALLOCATED	0x02	/// Allocate pages for the entire range
 #define MMU_FLAG_WINDOW		0x03	/// Map the entire range to the same physical address as the corresponding virtual address
 
+#define MMU_FLAG_SUPERVISOR	0x10	/// Set the supervisor flag on mapped pages
 #define MMU_FLAG_PAGE_BACKED	0x20	/// Allocate pages from the global pool for the mapped range
 #define MMU_FLAG_NOCACHE	0x40	/// Disable hardware caching for the mapped range (eg. for memory-mapped device access)
 
@@ -109,6 +138,18 @@ int init_mmu(void);
 mmu_descriptor_t *mmu_table_alloc(void);
 void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, ssize_t length, int flags);
+
+static inline void mmu_table_switch(mmu_descriptor_t *root)
+{
+	struct mmu_root_pointer root_pointer;
+
+	root_pointer.limit = 0x7fff;
+	root_pointer.status = MMU_DT_TABLE;
+	root_pointer.table = (uint32_t) root;
+	MMU_MOVE_TO_CRP(root_pointer);
+
+	MMU_FLUSH_USER_TLB();
+}
 
 #endif
 

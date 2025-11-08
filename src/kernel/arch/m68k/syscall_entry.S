@@ -44,6 +44,7 @@ create_context:
 	movea.l	(4,%sp), %a0	// void *kernel_stack
 	movea.l	(8,%sp), %a1	// void *entry
 	move.l	(12,%sp), %d1	// void *user_stack
+	move.l	(16,%sp), %d0	// int is_kernel
 
 	#if !defined(CONFIG_MC68000)
 	// Push the 68010+ Format/Vector Word
@@ -55,9 +56,15 @@ create_context:
 
 	// Push flags
 	#if defined(CONFIG_M68K_USER_MODE)
-	move.w #0x0000, -(%a0)
+	cmp.l	#0, %d0
+	beq.w	10f
+	move.w	#0x2000, -(%a0)
+	bra.w	11f
+    10:
+	move.w	#0x0000, -(%a0)
+    11:
 	#else
-	move.w #0x2000, -(%a0)
+	move.w	#0x2000, -(%a0)
 	#endif
 
 	// Push zeros for all registers
@@ -274,7 +281,7 @@ restore_context:
     207:
 
 	// Switch to the current process's user stack
-	movea.l  (%a0, PROC_SP_OFFSET), %sp
+	movea.l (%a0, PROC_SP_OFFSET), %sp
 
 	// Check the context size
 	move.l  (%sp)+, %d1

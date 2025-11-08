@@ -1085,3 +1085,62 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   of know the cause now, I'm not sure about the solution, or how I should fix it properly, and I kinda don't want to work on it
   right now because I also need to get some groceries and other things to do related to settling into the new place
 
+
+2025-08-21:
+
+- only now did I realize that the page free that was causing all the problems is slightly incorrect because I mapped the data using
+  the WINDOW flag, so it shouldn't be freeing the page unconditonally anyways.  There's no way for the mapper to know how it was
+  mapped, and the flags uses a type field when mapping, so the WINDOW flag can't be added while the UNMAP type is also provided
+- I hackishly added a flag that I can pass in to control freeing the pages in the table, and I'm always passing it in because I'm
+  always passing in WINDOW as well.  I'll have to fix it properly somehow later
+
+- I started trying to add the context switch stuff for the MMU table, and caused an MMU exception (56 decimal), which is because the
+  CPR register is not just the address.  I forgot it's a 64-bit word, so it's just plain wrong the way I have it
+- that then gets me thinking about whether I should all a function to do the extended switch instead, so I can do it in C and not
+  have to hard code the struct offsets, but there's also the MMU TLB invalidation that's needed, which then has me rethinking the
+  whole context switch, and the idea of doing it in C when the rescheduling happens rather than when returning
+- I think I have two approaches I can take here, both are the lesser refactoring options
+    1. keep things like they are, and add a call to a C function during the final context restoration which does the extra switch
+       (MMU switch, eventually FPU registers, anything else in hardware that needs to be done)
+    2. keep things mostly like they are, but put the actual switch call in the process reschedule() function or somewhere like that
+       and continue to do the extended register swap just before returning
+- option 2 would sort of split things up a bit, but it has the advantage of being done while interrupts are enabled
+- option 1 would be the simplest but would mean the context switching code would be kind of special with interrupts disabled, and
+  it would have to save the 4 scratch registers, or otherwise just be really careful about the code that gets generated
+
+
+2025-08-22:
+
+- I'm trying to get it to fail by having a user program access an invalid memory address, but no matter what I do, I can't get it to
+  generate an exception
+- I had some of the status bits set incorrectly, and the root pointer, but it didn't fail despite that.  I'm getting confused
+  between what the short descriptors and long descriptors support, but I can only get the full address space working if I use the
+  short descriptors, which don't support the supervisor bit! wtf
+- is it the TT0 and TT1 registers not being explicitly set that's causing it to work when it shouldn't?
+
+- omg! I had the wrong E bit value to enable the MMU, so the MMU hasn't been enabled this whole time!  I had hex 0x1000_0000 as the
+  enable bit, but it's actually 0x8000_0000  *headsmack*
+- now that I have the right bit, I'm getting an infinite number of exceptions, all exception 2, bus error.  I have no idea what's
+  wrong but it's definitely doing something different, so there's that
+
+
+2025-08-23:
+
+- the decision to not add the code segments to the memory map is coming back to bite me.  That's what's causing the exceptions, and
+  the processes are killed, but since it's pid 1 (init) and pid 2 (idle), it still ends up switching to them when scheduling, hence
+  the infinite exceptions
+- or at least I think/thought that.  I tried switching to not compiling the shell into the kernel, and it seems to run pid 1 (init)
+  but then has an exception on pid 3 (sh) and then pid 2 (idle) which it doesn't detect so it exception loops
+- the fault address seems to be 0x2066C2, which isn't in the memory map.  It's between the code/data area and the stack
+- oh, it's the process cloning that's the problem, and the fact that it still points to and uses the parent process, because pid 1
+  runs without an exception, which launches pid 3, and pid 3 is what has the first exception.  The address 0x2066C2 is in the stack
+  area of pid 1 but not pid 3
+
+2025-08-30:
+
+- once again haven't had much time in the past week, and I'm trying to pick up where I left off.  I think I had fairly reliably
+  tracked it down to being the missing code segments causing trouble, but I wasn't sure how I'd go about fixing it in light of the
+  stack cloning and all that
+- should I go straight for cloning the process's address space exactly instead of copying the stack elsewhere, or should I continue
+  trying to gradually switch over, but then have to map two processes's memory into the same space when cloning?
+

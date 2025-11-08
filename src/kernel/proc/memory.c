@@ -73,7 +73,7 @@ struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile 
 	if (!object)
 		goto fail;
 
-	//#if !defined(CONFIG_MMU)
+	#if !defined(CONFIG_MMU)
 	memory = (char *) page_alloc_contiguous(size);
 	if (!memory)
 		goto fail;
@@ -82,7 +82,7 @@ struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile 
 	object->mem_start = memory;
 	object->mem_length = size;
 	object->anonymous.address = (physical_address_t) memory;
-	//#endif
+	#endif
 
 	return object;
 
@@ -95,11 +95,11 @@ fail:
 }
 
 
-struct memory_area *memory_area_alloc(uintptr_t start, uintptr_t end, int flags, struct memory_object *object)
+struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int flags, struct memory_object *object)
 {
-	struct memory_area *area;
+	struct memory_segment *area;
 
-	area = kmalloc(sizeof(struct memory_area));
+	area = kmalloc(sizeof(struct memory_segment));
 	if (!area) {
 		memory_object_free(object);
 		return NULL;
@@ -114,7 +114,7 @@ struct memory_area *memory_area_alloc(uintptr_t start, uintptr_t end, int flags,
 	return area;
 }
 
-void memory_area_free(struct memory_area *area)
+void memory_segment_free(struct memory_segment *area)
 {
 	memory_object_free(area->object);
 	kmfree(area);
@@ -145,7 +145,7 @@ struct memory_map *memory_map_alloc(void)
 
 void memory_map_free(struct memory_map *map)
 {
-	struct memory_area *cur, *next;
+	struct memory_segment *cur, *next;
 
 	if (!map) {
 		return;
@@ -160,7 +160,7 @@ void memory_map_free(struct memory_map *map)
 	if (--map->refcount == 0) {
 		for (cur = _queue_head(&map->segments); cur; cur = next) {
 			next = _queue_next(&cur->node);
-			memory_area_free(cur);
+			memory_segment_free(cur);
 		}
 		kmfree(map);
 	}
@@ -175,7 +175,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 {
 	int error = 0;
 	uintptr_t end;
-	struct memory_area *cur, *next, *area;
+	struct memory_segment *cur, *next, *area;
 
 	end = start + length;
 
@@ -207,7 +207,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 		}
 	}
 
-	area = memory_area_alloc(start, end, flags, object);
+	area = memory_segment_alloc(start, end, flags, object);
 	if (!area) {
 		error = ENOMEM;
 		goto fail;
@@ -253,7 +253,7 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 {
 	int error;
 	uintptr_t end;
-	struct memory_area *cur, *next, *new;
+	struct memory_segment *cur, *next, *new;
 
 	#if defined(CONFIG_MMU)
 	// TODO the MMU_FLAG_PAGE_BACKED flag is a bit of a hack atm to make it not free the underlying data when using MMU_FLAG_WINDOW
@@ -269,7 +269,7 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 			if (cur->end >= start && cur->end <= end) {
 				// The segment is entirely within the unmap region so delete it entirely
 				_queue_remove(&map->segments, &cur->node);
-				memory_area_free(cur);
+				memory_segment_free(cur);
 			} else {
 				// The start will be unmapped but not the end, so move the segment start
 				cur->start = end;
@@ -279,7 +279,7 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 			cur->end = start;
 		} else if (start >= cur->start && start <= cur->end) {
 			//  The unmapped region is entirely within this segment, so we need to split it in two
-			new = memory_area_alloc(end, cur->end, cur->flags, memory_object_make_ref(cur->object));
+			new = memory_segment_alloc(end, cur->end, cur->flags, memory_object_make_ref(cur->object));
 			if (!new)
 				return ENOMEM;
 			_queue_insert_after(&map->segments, &new->node, &cur->node);
@@ -300,6 +300,20 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 	return 0;
 }
 
+int memory_map_remap_copy_on_write(struct memory_map *map, uintptr_t start, size_t length)
+{
+
+	// TODO would this have to be one exact segment entry to work?
+	// TODO well I guess the page loading strategy function could be the same and check
+	//	the page descriptor for a read only bit, while the segment would be read write
+	//	I guess this could skip any segments that are read only, since write isn't needed?
+	// TODO so this would primarily be a pages.c impl for remapping, and it's mostly touching
+	//	the page descriptors, but would also increment all refcounts?
+	// TODO actually, should it be the caller (fork.c) to increment the page references?
+
+	return 0;
+}
+
 
 /// Resize the given area
 ///
@@ -307,10 +321,10 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 /// flag set, then it will grow the start of the segment downwards.  Otherwise the segment
 /// will grow the end of the segment upwards.  If there is an adjacent segment that would
 /// overlap after the change, then it is shrunk by the necessary amount
-int memory_map_resize(struct memory_area *area, ssize_t diff)
+int memory_map_resize(struct memory_segment *area, ssize_t diff)
 {
 	uintptr_t new_addr;
-	struct memory_area *adjacent;
+	struct memory_segment *adjacent;
 
 	if (area->flags & AREA_GROWSDOWN) {
 		new_addr = area->start - diff;
@@ -342,11 +356,11 @@ int memory_map_move_sbrk(struct memory_map *map, int diff)
 {
 	int error;
 	uintptr_t new_sbrk;
-	struct memory_area *heap, *stack;
+	struct memory_segment *heap, *stack;
 
 	new_sbrk = map->sbrk + diff;
 
-	stack = memory_area_find_prev(memory_map_iter_last(map), map->sbrk);
+	stack = memory_segment_find_prev(memory_map_iter_last(map), map->sbrk);
 	if (!stack) {
 		return EFAULT;
 	}
@@ -429,7 +443,7 @@ fail:
 
 void print_process_segments(struct process *proc)
 {
-	struct memory_area *cur;
+	struct memory_segment *cur;
 
 	if (proc->map) {
 		printk("pid %d memory map:\n", proc->pid);

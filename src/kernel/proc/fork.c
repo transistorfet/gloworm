@@ -14,6 +14,7 @@
 #include <kernel/proc/process.h>
 
 char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
+static inline int remap_all_copy_on_write(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
 static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
 
@@ -96,7 +97,7 @@ int clone_process_memory(struct process *parent_proc, struct process *proc, int 
 static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc)
 {
 	int error = 0;
-	struct memory_area *cur;
+	struct memory_segment *cur;
 	struct memory_map *new_map = NULL;
 
 	// Check that the parent has a map and
@@ -115,11 +116,15 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 			goto fail;
 	}
 
-	//#if !defined(CONFIG_MMU)
+	#if defined(CONFIG_MMU)
+	error = remap_all_copy_on_write(parent_proc, proc, new_map);
+	if (error < 0)
+		goto fail;
+	#else
 	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
-	//#endif
+	#endif
 
 	return 0;
 
@@ -127,6 +132,28 @@ fail:
 	if (new_map)
 		memory_map_free(new_map);
 	return error;
+}
+
+static inline int remap_all_copy_on_write(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
+{
+	int error = 0;
+	struct memory_segment *cur;
+
+	// Remap all in parent process
+	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
+		error = memory_map_remap_copy_on_write(new_map, cur->start, cur->end - cur->start);
+		if (error < 0)
+			return error;
+	}
+
+	// Remap all in child process
+	for (cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+		error = memory_map_remap_copy_on_write(new_map, cur->start, cur->end - cur->start);
+		if (error < 0)
+			return error;
+	}
+
+	return 0;
 }
 
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map)

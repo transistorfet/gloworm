@@ -67,7 +67,14 @@ char *copy_exec_args(struct memory_map *map, char *user_sp, const char *const ar
 	return user_sp;
 }
 
-void exec_initialize_stack_with_args(struct process *proc, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
+void exec_initialize_kernel_stack_with_args(struct process *proc, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
+{
+	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
+
+	arch_add_process_context(proc, stack_pointer, entry);
+}
+
+void exec_initialize_user_stack_with_args(struct process *proc, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
 {
 	// TODO this will be done to the user stack (which is the same as the kernel stack if no user mode)
 	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
