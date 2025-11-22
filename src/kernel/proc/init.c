@@ -53,13 +53,13 @@ struct process *create_init_task(void)
 	#if defined(CONFIG_SHELL_IN_KERNEL)
 
 	// Add a code segment for this process, which is the entire kernel
-	extern void *__kernel_start, *__kernel_end;
-	error = memory_map_mmap(proc->map, __kernel_start, __kernel_end - __kernel_start, AREA_TYPE_CODE | AREA_READ | AREA_EXECUTABLE, NULL);
+	extern int __kernel_start, __kernel_end;
+	error = memory_map_mmap(proc->map, &__kernel_start, &__kernel_end - &__kernel_start, AREA_TYPE_CODE | AREA_READ | AREA_EXECUTABLE, NULL);
 	if (error < 0)
 		goto fail;
 
 	// Add the heap and stack segments
-	error = memory_map_insert_heap_stack(proc->map, CONFIG_USER_STACK_SIZE);
+	error = memory_map_insert_heap_stack(proc->map, &__kernel_end, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		goto fail;
 

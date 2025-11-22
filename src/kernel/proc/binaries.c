@@ -77,26 +77,36 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 
 int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
-	int mem_size;
+	size_t mem_size;
 	int error = ENOMEM;
 	uintptr_t user_mem_start;
-	struct memory_object *object = NULL;
 
 	// The extra data is for the bss segment, which we don't know the proper size of
 	mem_size = roundup(file->vnode->size + 0x200, PAGE_SIZE);
 
-	object = memory_object_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
+	#if defined(CONFIG_MMU)
+
+	struct vfile *object = file;
+	// TODO this is wrong, it should be some known address?
+	user_mem_start = 0x40000;
+
+	#else
+
+	struct memory_region *object = NULL;
+	object = memory_region_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
 	if (!object) {
 		goto fail;
 	}
 
-	user_mem_start = memory_object_get_start_address(object);
+	user_mem_start = memory_region_get_start_address(object);
 
-	error = memory_map_mmap(map, user_mem_start, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
+	#endif
+
+	error = memory_map_mmap(map, user_mem_start, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object, 0);
 	if (error < 0) {
 		goto fail;
 	}
-	// Since the object has now been added to the map, it will be freed when the map is freed
+	// Since the region or file has now been added to the map, it will be freed when the map is freed
 	// so we set the pointer to NULL again to avoid a double-free
 	object = NULL;
 
@@ -107,15 +117,17 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	*entry = (void *) user_mem_start;
 
-	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
-	if (error < 0)
+	error = memory_map_insert_heap_stack(map, user_mem_start + mem_size, CONFIG_USER_STACK_SIZE);
+	if (error < 0) {
 		goto fail;
+	}
 
 	return 0;
 
 fail:
-	if (object)
-		memory_object_free(object);
+	if (object) {
+		MEMORY_OBJECT_FREE(object);
+	}
 	memory_map_free(map);
 	return error;
 }
@@ -129,7 +141,6 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	int error = ENOMEM;
 	uintptr_t user_mem_start;
 	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
-	struct memory_object *object = NULL;
 	Elf32_Ehdr header;
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
 
@@ -171,13 +182,33 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	if (mem_size == 0)
 		return ENOEXEC;
 
-	object = memory_object_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
+	#if defined(CONFIG_MMU)
+
+	struct vfile *object = file;
+
+	// TODO this is temporary until you get page faults working
+	user_mem_start = (uintptr_t) page_alloc_contiguous(mem_size);
+	if (!user_mem_start) {
+		error = ENOMEM;
+		goto fail;
+	}
+
+	// TODO this is wrong of course, but it's a placeholder for the time being
+	// it should come from the elf?
+	//user_mem_start = 0x40000;
+
+	#else
+
+	struct memory_region *object = NULL;
+	object = memory_region_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
 	if (!object) {
 		error = ENOMEM;
 		goto fail;
 	}
 
-	user_mem_start = memory_object_get_start_address(object);
+	user_mem_start = memory_region_get_start_address(object);
+
+	#endif
 
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {
@@ -210,7 +241,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 				flags |= AREA_TYPE_DATA;
 			}
 
-			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, memory_object_make_ref(object))) < 0) {
+			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, MEMORY_OBJECT_MAKE_REF(object), file_segment_start)) < 0) {
 				goto fail;
 			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
@@ -225,17 +256,25 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	*entry = (void *) user_mem_start + header.e_entry;
 
+	#if !defined(CONFIG_MMU)
 	// Free the extra reference that was used to create the individual segments
-	memory_object_free(object);
+	memory_region_free(object);
+	#endif
 
-	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
-	if (error < 0)
+	error = memory_map_insert_heap_stack(map, roundup(user_mem_start + mem_size, PAGE_SIZE), CONFIG_USER_STACK_SIZE);
+	if (error < 0) {
 		goto fail;
+	}
 
 	return 0;
 
 fail:
-	if (object)
-		memory_object_free(object);
+	#if !defined(CONFIG_MMU)
+	if (object) {
+		// Free the extra reference to the user memory area
+		// NOTE: the caller will close the file and free the memory map
+		memory_region_free(object);
+	}
+	#endif
 	return error;
 }

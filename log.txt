@@ -546,7 +546,7 @@
 fn main() {
     for page_bits in 8..16 {
         let remain = 32 - page_bits;
-        println!("with  long descriptors, initial shift: {}, levels: {}, table entries: {}, page: {}", remain % (page_bits - 3), remain / (page_bits - 3), 2_u32.pow(page_bits - 3), page_bits);  
+        println!("with  long descriptors, initial shift: {}, levels: {}, table entries: {}, page: {}", remain % (page_bits - 3), remain / (page_bits - 3), 2_u32.pow(page_bits - 3), page_bits);
         println!("with short descriptors, initial shift: {}, levels: {}, table entries: {}, page: {}", remain % (page_bits - 2), remain / (page_bits - 2), 2_u32.pow(page_bits - 2), page_bits);
     }
 }
@@ -1136,6 +1136,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   runs without an exception, which launches pid 3, and pid 3 is what has the first exception.  The address 0x2066C2 is in the stack
   area of pid 1 but not pid 3
 
+
 2025-08-30:
 
 - once again haven't had much time in the past week, and I'm trying to pick up where I left off.  I think I had fairly reliably
@@ -1143,4 +1144,154 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   stack cloning and all that
 - should I go straight for cloning the process's address space exactly instead of copying the stack elsewhere, or should I continue
   trying to gradually switch over, but then have to map two processes's memory into the same space when cloning?
+
+
+2025-11-08:
+
+- linux only uses one offset instead of 3 like I used on ruxpin.  I'm sure I can make it work somehow
+- I'm going to make memory_object only be used for the non-MMU mode, and move the memory ops, file, and file offset to the segment
+  instead.  The offset will likely be different for each segment, so it's only using one more long word than it would otherwise use,
+  but saves having an extra allocation for the memory_object struct, and the refcount and all of that
+
+
+2025-11-11:
+
+- I've renamed memory_area to memory_segment, and memory_object to memory_region to be more descriptive.  A memory segment is a
+  single mapped entry in the memory_map.  A memory_region is a pre-allocated chunk of memory that is divied up between different
+  segments in a memory map.  It's only used when virtual memory is not used, since otherwise it will use and allocate pages on a
+  per-page basis, with a per-page refcount and per-page sharing between segments.  The memory_region struct is itself allocated, and
+  holds a refcount that is used to share regions (which also means an entire region is kept around until no processes use any part
+  of that region).  Since I'm still using the separate stack/heap allocation and code/data allocation instead of the shadow ram
+  method, and since most processes fork and then exec right after anyways, it shouldn't actually keep much in memory
+
+
+2025-11-19:
+
+- last night I was briefly looking at the code again, and thinking about the issue.  It's crashing on boot but now it's getting
+  exception 11, which is F line emulator, so it's executing an 0xFxxx instruction which confused me at first, but then I realized I
+  had changed the user memory start address when executing a new binary to 0x40000 which is a nonsensical address.  That got me to
+  thinking about hacks to make to the MMU option code that will run, and then thought well I can add pre-allocated memory for the
+  code and stack that I delete later once I get everything working, and I won't need to comment out anything because it'll be only
+  in the CONFIG_MMU code
+- I can use the page allocator to allocate a chunk (instead of using memory_region), and then I can probably getting it sharing code
+  based on page refcounts
+- I modified binaries.c to do the allocation where the non-MMU code does it, and then it crashed on 0x10224c with an address error
+  during a fork, possibly because of an issue with memory_map duplication?  It's in the clone_process_memory function, although
+  actually in the duplicate_memory_map/remap_all_copy_on_write functions which are inlined into the former, and it's just before
+  calling the memory_map_remap_copy_on_write() function
+- wait, did I just find the bug?  It was calling that remap (which does nothing atm) and iterating over the parent's map and then
+  the child's map, but it was actually calling it on the childs map in both cases?  Well that shouldn't matter since the function
+  does nothing yet, but either way, there's some kind of bug there.  This might be the first time that codes' actually been run
+
+- turns out it was a bug where `proc->map = new_map;` was only in the copy_stack function and wasn't run when calling
+  remap_all_copy_on_write.  Now it's back to crashing in a loop
+
+- the fault causing the infinite loop is different now.  It's an address error caused by 103AB8, which is an rte instruction in
+  restore_context, so it's trying to return, and the stack it's using is corrupted?
+- here is the output of the first two stack traces after booting:
+
+      ```
+      Booting with "..."
+
+      mmu: setting TCR to 82806666
+      mmu: read back TCR of 82806666
+      mem0: ram disk of 131072 bytes
+      ata0: found partition with 524288 sectors
+      ata1: found partition with 1048576 sectors
+      minixfs: mounting (400) at /
+      procfs: mounting at /proc
+      slip0: bringing interface up
+      begin multitasking...
+
+      Error in pid 3 at 103AB8 (status: 0, vector: 2)
+      pid 3 memory map:
+      203700 to 204000: flags=51
+      204000 to 204200: flags=32
+      204300 to 204300: flags=33
+      204300 to 206300: flags=134
+      Stack: 204DC8
+      204DC8: 0000 0010 3AB8 B008 1EEA B64D 0000 0000
+      204DD8: 0000 0000 0020 4E24 0000 0000 4E73 4E73
+      204DE8: 0000 0004 0000 0002 0010 3ABA 0000 0000
+      204DF8: 0000 0000 0000 F07C 0000 0000 0000 0000
+      204E08: 0000 0040 0000 0000 2034 0000 0020 4E24
+      204E18: 0000 0000 0011 FF34 0000 0000 0000 0000
+      204E28: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E38: 0000 0000 0000 0000 0000 0000 0000 0000
+
+      Code: 103AB8
+      103AB8: 4E73 2079 0010 DC48 2268 000C 5889 48E1
+      103AC8: 0F3E 4E7A 4800 2304 233C 0000 0040 2149
+      103AD8: 000C 4EB9 0010 1242 2079 0010 DC48 2268
+
+      error: double free of file pointer, 0
+      error: double free of file pointer, 0
+      Proces
+      Error in pid 2 at 103AB8 (status: 0, vector: 2)
+      pid 2 memory map:
+      Stack: 202BA4
+      202BA4: 0000 0010 3AB8 B008 1EEA B64D 0000 0000
+      202BB4: 0010 3600 0020 2C00 0000 0000 4E73 4E73
+      202BC4: 0010 3604 0010 3602 0010 3ABA 0010 3600
+      202BD4: 0000 0000 000F F07C 0000 0000 0000 0000
+      202BE4: 0000 7CF0 0000 0000 2008 0000 0020 2C00
+      202BF4: 0000 0000 0000 0000 0010 3600 0000 0000
+      202C04: 0000 0000 0000 0000 0000 0000 0000 0000
+      202C14: 0000 0000 0000 0000 0000 0000 0000 0000
+
+
+      Code: 103AB8
+      103AB8: 4E73 2079 0010 DC48 2268 000C 5889 48E1
+      103AC8: 0F3E 4E7A 4800 2304 233C 0000 0040 2149
+      103AD8: 000C 4EB9 0010 1242 2079 0010 DC48 2268
+      ```
+
+- I thought I saw something in it, but it's not what I thought.  It's only the second trace that has an address to the idle task's
+  instructions, and that's pid 2 which is the idle thread, so it makes sense, and the address at the top of the stack is 0x103ab8,
+  which is the rte instruction that's causing the problem
+- I'm not sure where the offending stack is that the rte instruction pops and causes the address error
+- an address error pushes 46 words, or 92 bytes, 0x5C, onto the stack
+
+      ```
+      > dump 204dc8 100
+      204DC8: 0000 0010 3AB8 B008 1EEA B64D 0000 0000
+      204DD8: 0000 0000 0020 4E24 0000 0000 4E73 4E73
+      204DE8: 0000 0004 0000 0002 0010 3ABA 0000 0000
+      204DF8: 0000 0000 0000 F07C 0000 0000 0000 0000
+      204E08: 0000 0040 0000 0000 2034 0000 0020 4E24
+      204E18: 0000 0000 0011 FF34 0000 0000 0000 0000
+      204E28: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E38: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E48: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E58: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E68: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E78: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E88: 0000 0000 0000 0000 0000 0000 0000 0000
+      204E98: 0000 0000 0000 0000 0000 0000 0000 0000
+      204EA8: 0000 0000 0000 0000 0000 0000 0000 0000
+      204EB8: 0000 0000 0000 0000 0000 0000 0000 0000
+      204EC8: 0000 0000 0000 0000 0000 0000 0000 0000
+      204ED8: 0000 0000 0000 0000 0000 0000 0000 0000
+      204EE8: 0000 0000 0000 0000 0000 0000 0000 0000
+      204EF8: 0000 0000 0000 0000 0020 5002 0020 5102
+      204F08: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F18: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F28: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F38: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F48: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F58: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F68: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F78: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F88: 0000 0000 0000 0000 0000 0000 0000 0000
+      204F98: 0000 0000 0000 0000 0000 0000 0000 0000
+      204FA8: 0000 0000 0000 0000 0000 0000 0000 0000
+      204FB8: 0000 0000 0000 0000 0000 0000 0000 0000
+      ```
+
+- it seems to be 0, which shouldn't cause an address error (I don't think).  Unless it's a special case in the hardware?
+- I wonder if it got clobbered by the RTE instruction, and it didn't push the data back onto the stack, so the only way I can know
+  is by catching it before the error
+
+- I mean it's probably because a stack is being shared or something, and there's no copy protection yet, since copy on write is not
+  implemented
 

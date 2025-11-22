@@ -111,21 +111,26 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
 		// TODO enable copy on write for both the new map, and the parent map
-		error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, memory_object_make_ref(cur->object));
+		error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, MEMORY_OBJECT_MAKE_REF(MEMORY_OBJECT_ACCESS(cur)), cur->offset);
 		if (error < 0)
 			goto fail;
 	}
 
 	#if defined(CONFIG_MMU)
+
 	error = remap_all_copy_on_write(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
+
 	#else
+
 	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
+
 	#endif
 
+	proc->map = new_map;
 	return 0;
 
 fail:
@@ -141,13 +146,13 @@ static inline int remap_all_copy_on_write(struct process *parent_proc, struct pr
 
 	// Remap all in parent process
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
-		error = memory_map_remap_copy_on_write(new_map, cur->start, cur->end - cur->start);
+		error = memory_map_remap_copy_on_write(parent_proc->map, cur->start, cur->end - cur->start);
 		if (error < 0)
 			return error;
 	}
 
 	// Remap all in child process
-	for (cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+	for (cur = memory_map_iter_first(new_map); cur; cur = memory_map_iter_next(cur)) {
 		error = memory_map_remap_copy_on_write(new_map, cur->start, cur->end - cur->start);
 		if (error < 0)
 			return error;
@@ -159,16 +164,18 @@ static inline int remap_all_copy_on_write(struct process *parent_proc, struct pr
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
 {
 	int error = 0;
-	int stack_size;
+	uintptr_t heap_start;
+	uintptr_t stack_size;
 	char *stack_pointer = NULL;
 
+	heap_start = parent_proc->map->heap_start;
 	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
 
 	error = memory_map_unmap(new_map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
 	if (error < 0)
 		return error;
 
-	error = memory_map_insert_heap_stack(new_map, stack_size);
+	error = memory_map_insert_heap_stack(new_map, heap_start, stack_size);
 	if (error < 0)
 		return error;
 

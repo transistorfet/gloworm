@@ -4,6 +4,8 @@
 #include <string.h>
 #include <kconfig.h>
 #include <asm/types.h>
+#include <sys/param.h>
+
 #include <kernel/printk.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/mm/pages.h>
@@ -13,111 +15,88 @@
 #include <kernel/proc/process.h>
 
 
-void pages_object_free(struct memory_object *object)
-{
-	#if defined(CONFIG_MMU)
-	// TODO nothing to do, since unmap should do this for us?
-	#else
-	page_free_contiguous(object->mem_start, object->mem_length);
-	#endif
-}
-
-struct memory_ops pages_object_ops = {
-	.free		= pages_object_free,
-	.load_page_at	= NULL,
-};
-
-struct memory_object *memory_object_alloc(struct vfile *file)
-{
-	struct memory_object *object;
-	struct memory_ops *ops = NULL;
-
-	ops = &pages_object_ops;
-
-	object = kzalloc(sizeof(struct memory_object));
-	if (!object) {
-		return NULL;
-	}
-
-	object->refcount = 1;
-	object->ops = ops;
-	object->file_backed.file = file;
-
-	return object;
-}
-
-void memory_object_free(struct memory_object *object)
-{
-	if (!object)
-		return;
-
-	if (--object->refcount == 0) {
-		if (object->ops && object->ops->free) {
-			object->ops->free(object);
-		}
-		kmfree(object);
-	}
-}
-
-struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile *file)
+#if !defined(CONFIG_MMU)
+struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile *file)
 {
 	char *memory = NULL;
-	struct memory_object *object;
+	struct memory_region *region;
 
 	// Round the size up to the nearest page
-	if ((size & (PAGE_SIZE - 1)) != 0) {
-		size = (size & ~(PAGE_SIZE - 1)) + PAGE_SIZE;
-	}
+	size = roundup(size, PAGE_SIZE);
 
-	object = memory_object_alloc(file);
-	if (!object)
+	region = kzalloc(sizeof(struct memory_region));
+	if (!region)
 		goto fail;
 
-	#if !defined(CONFIG_MMU)
 	memory = (char *) page_alloc_contiguous(size);
 	if (!memory)
 		goto fail;
 
-	object->ops = &pages_object_ops;
-	object->mem_start = memory;
-	object->mem_length = size;
-	object->anonymous.address = (physical_address_t) memory;
-	#endif
+	region->refcount = 1;
+	region->file = file;
+	region->mem_start = memory;
+	region->mem_length = size;
 
-	return object;
+	return region;
 
 fail:
+	if (file)
+		vfs_close(file);
 	if (memory)
 		kmfree(memory);
-	if (file)
-		free_fileptr(file);
 	return NULL;
 }
 
-
-struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int flags, struct memory_object *object)
+void memory_region_free(struct memory_region *region)
 {
-	struct memory_segment *area;
+	if (!region)
+		return;
 
-	area = kmalloc(sizeof(struct memory_segment));
-	if (!area) {
-		memory_object_free(object);
+	if (--region->refcount == 0) {
+		page_free_contiguous(region->mem_start, region->mem_length);
+		kmfree(region);
+	}
+}
+#endif
+
+struct memory_ops file_memory_ops = {
+	.load_page_at	= NULL,
+};
+
+struct memory_ops anonymous_memory_ops = {
+	.load_page_at	= NULL,
+};
+
+struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int flags)
+{
+	struct memory_segment *segment;
+
+	segment = kmalloc(sizeof(struct memory_segment));
+	if (!segment) {
 		return NULL;
 	}
 
-	_queue_node_init(&area->node);
-	area->flags = flags;
-	area->start = start;
-	area->end = end;
-	area->object = object;
+	_queue_node_init(&segment->node);
+	segment->flags = flags;
+	segment->start = start;
+	segment->end = end;
+	#if defined(CONFIG_MMU)
+	segment->ops = NULL;
+	#else
+	segment->region = NULL;
+	#endif
 
-	return area;
+	return segment;
 }
 
-void memory_segment_free(struct memory_segment *area)
+void memory_segment_free(struct memory_segment *segment)
 {
-	memory_object_free(area->object);
-	kmfree(area);
+	#if defined(CONFIG_MMU)
+	vfs_close(segment->file);
+	#else
+	memory_region_free(segment->region);
+	#endif
+	kmfree(segment);
 }
 
 struct memory_map *memory_map_alloc(void)
@@ -166,16 +145,16 @@ void memory_map_free(struct memory_map *map)
 	}
 }
 
-/// Map the given address range to the given object
+/// Map the given address range to the given region
 ///
 /// NOTE: this will not unmap any previously mapped regions nor will it check for
 /// existing mappings, so it should be paired with an unmap call when modifying
 /// an existing map
-int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, struct memory_object *object)
+int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset)
 {
 	int error = 0;
 	uintptr_t end;
-	struct memory_segment *cur, *next, *area;
+	struct memory_segment *cur, *next, *segment;
 
 	end = start + length;
 
@@ -195,10 +174,6 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 		return EINVAL;
 	}
 
-	if (!object) {
-		return EFAULT;
-	}
-
 	// Find the location to insert the new segment before allocating it
 	for (cur = _queue_head(&map->segments); cur; cur = next) {
 		next = _queue_next(&cur->node);
@@ -207,27 +182,43 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 		}
 	}
 
-	area = memory_segment_alloc(start, end, flags, object);
-	if (!area) {
+	segment = memory_segment_alloc(start, end, flags);
+	if (!segment) {
 		error = ENOMEM;
 		goto fail;
 	}
 
 	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
-	_queue_insert_after(&map->segments, &area->node, cur ? &cur->node : NULL);
+	_queue_insert_after(&map->segments, &segment->node, cur ? &cur->node : NULL);
 
 	#if defined(CONFIG_MMU)
+
+	if (object) {
+		segment->ops = &file_memory_ops;
+	} else {
+		segment->ops = &anonymous_memory_ops;
+	}
+	segment->file = object;
+	segment->offset = offset;
+
 	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
 	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW);
 	if (error < 0)
 		goto fail;
+
+	#else
+
+	segment->region = object;
+
 	#endif
 
 	// Adjust memory markers, if needed
-	if (!map->code_start) {
-		if (flags & AREA_EXECUTABLE) {
+	if (flags & AREA_EXECUTABLE) {
+		if (!map->code_start) {
 			map->code_start = start;
-		} else {
+		}
+	} else {
+		if (!map->data_start) {
 			map->data_start = start;
 		}
 	}
@@ -240,7 +231,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 fail:
 	if (object) {
-		memory_object_free(object);
+		MEMORY_OBJECT_FREE(object);
 	}
 	return error;
 }
@@ -251,11 +242,11 @@ fail:
 /// it will be deleted or shrunk accordingly to make room.
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 {
-	int error;
 	uintptr_t end;
 	struct memory_segment *cur, *next, *new;
 
 	#if defined(CONFIG_MMU)
+	int error;
 	// TODO the MMU_FLAG_PAGE_BACKED flag is a bit of a hack atm to make it not free the underlying data when using MMU_FLAG_WINDOW
 	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | MMU_FLAG_PAGE_BACKED);
 	if (error < 0)
@@ -279,10 +270,20 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 			cur->end = start;
 		} else if (start >= cur->start && start <= cur->end) {
 			//  The unmapped region is entirely within this segment, so we need to split it in two
-			new = memory_segment_alloc(end, cur->end, cur->flags, memory_object_make_ref(cur->object));
-			if (!new)
+			new = memory_segment_alloc(end, cur->end, cur->flags);
+			if (!new) {
 				return ENOMEM;
+			}
+			#if defined(CONFIG_MMU)
+			new->ops = cur->ops;
+			new->file = MEMORY_OBJECT_MAKE_REF(cur->file);
+			#else
+			new->region = MEMORY_OBJECT_MAKE_REF(cur->region);
+			#endif
+			new->offset = cur->offset + (end - cur->start);
 			_queue_insert_after(&map->segments, &new->node, &cur->node);
+
+			// Adjust the current segment to end at the start of the region to be unmapped
 			cur->end = start;
 		}
 	}
@@ -315,20 +316,20 @@ int memory_map_remap_copy_on_write(struct memory_map *map, uintptr_t start, size
 }
 
 
-/// Resize the given area
+/// Resize the given segment
 ///
 /// The segment will be resized by `diff` bytes.  If the segment has the MAP_GROWSDOWN
 /// flag set, then it will grow the start of the segment downwards.  Otherwise the segment
 /// will grow the end of the segment upwards.  If there is an adjacent segment that would
 /// overlap after the change, then it is shrunk by the necessary amount
-int memory_map_resize(struct memory_segment *area, ssize_t diff)
+int memory_map_resize(struct memory_segment *segment, ssize_t diff)
 {
 	uintptr_t new_addr;
 	struct memory_segment *adjacent;
 
-	if (area->flags & AREA_GROWSDOWN) {
-		new_addr = area->start - diff;
-		adjacent = _queue_prev(&area->node);
+	if (segment->flags & AREA_GROWSDOWN) {
+		new_addr = segment->start - diff;
+		adjacent = _queue_prev(&segment->node);
 		if (adjacent && adjacent->end > new_addr) {
 			// TODO should this be an error or should it move it?
 			if (adjacent->start > new_addr) {
@@ -336,10 +337,10 @@ int memory_map_resize(struct memory_segment *area, ssize_t diff)
 			}
 			adjacent->end = new_addr;
 		}
-		area->start = new_addr;
+		segment->start = new_addr;
 	} else {
-		new_addr = area->end + diff;
-		adjacent = _queue_next(&area->node);
+		new_addr = segment->end + diff;
+		adjacent = _queue_next(&segment->node);
 		if (adjacent && new_addr > adjacent->start) {
 			// TODO should this be an error or should it move it?
 			if (new_addr > adjacent->end) {
@@ -347,7 +348,7 @@ int memory_map_resize(struct memory_segment *area, ssize_t diff)
 			}
 			adjacent->start = new_addr;
 		}
-		area->end = new_addr;
+		segment->end = new_addr;
 	}
 	return 0;
 }
@@ -409,35 +410,49 @@ int memory_map_move_sbrk(struct memory_map *map, int diff)
 }
 
 
-int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size)
+int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size)
 {
 	uintptr_t start;
 	int error = ENOMEM;
-	struct memory_object *object = NULL;
+	struct memory_region *region = NULL;
+	MEMORY_OBJECT_T *heap_object, *stack_object;
 
-	object = memory_object_alloc_user_memory(stack_size, NULL);
-	if (!object)
+	#if defined(CONFIG_MMU)
+
+	// TODO This is so wrong, but is a placeholder for now.  I need to pass in the end of the data region don't I?  Or can I assume the memory map is already set up, and heap_start will already be set?
+	start = heap_start;
+	heap_object = NULL;
+	stack_object = NULL;
+
+	#else
+
+	region = memory_region_alloc_user_memory(stack_size, NULL);
+	if (!region)
 		return ENOMEM;
 
-	start = object->anonymous.address;
-	error = memory_map_mmap(map, start, 0, AREA_TYPE_HEAP | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
+	start = (uintptr_t) region->mem_start;
+	heap_object = MEMORY_OBJECT_MAKE_REF(region);
+	stack_object = region;
+
+	#endif
+
+	error = memory_map_mmap(map, start, 0, AREA_TYPE_HEAP | AREA_READ | AREA_WRITE, heap_object, 0);
 	if (error < 0)
 		goto fail;
-	error = memory_map_mmap(map, start, stack_size, AREA_TYPE_STACK | AREA_GROWSDOWN | AREA_READ | AREA_WRITE, memory_object_make_ref(object));
+	error = memory_map_mmap(map, start, stack_size, AREA_TYPE_STACK | AREA_GROWSDOWN | AREA_READ | AREA_WRITE, stack_object, 0);
 	if (error < 0)
 		goto fail;
 	map->heap_start = start;
 	map->sbrk = start;
 	map->stack_end = start + stack_size;
 
-	// Release the extra reference before exiting
-	memory_object_free(object);
-
 	return 0;
 
 fail:
-	if (object)
-		memory_object_free(object);
+	#if !defined(CONFIG_MMU)
+	if (region)
+		memory_region_free(region);
+	#endif
 	return error;
 }
 

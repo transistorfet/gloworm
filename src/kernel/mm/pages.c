@@ -17,8 +17,11 @@ int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int 
 	block->bitmap_size = bitmap_size;
 	block->base = addr;
 	block->pages = size >> PAGE_ADDR_BITS;
+	memset(block->bitmap, '\0', block->bitmap_size);
+
 	#if defined(CONFIG_MMU)
 	block->page_descriptors = descriptors;
+	memset(block->page_descriptors, '\0', block->pages);
 	#endif
 
 	log_trace("pages %x to %x, %d pages, %d bitmap size\n", addr, addr + size, block->pages, block->bitmap_size);
@@ -26,9 +29,6 @@ int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int 
 	if ((bitmap_size << LOG_OF_PAGES_PER_INDEX) < block->pages) {
 		return -1;
 	}
-
-	memset(block->bitmap, '\0', block->bitmap_size);
-	memset(block->page_descriptors, '\0', block->pages);
 
 	return 0;
 }
@@ -56,7 +56,9 @@ int init_page_block(struct page_block *block, void *addr, int size)
 	pages_addr = &((page_t *) addr)[bitmap_pages + descriptors_pages];
 
 	log_trace("bitmaps at %x, size %d, pages %d, after %x\n", addr, bitmap_size, bitmap_pages, pages_addr);
+	#if defined(CONFIG_MMU)
 	log_trace("descriptors at %x, size %d, pages %d, after %x\n", descriptors_addr, descriptors_size, descriptors_pages, pages_addr);
+	#endif
 	return init_page_block_with_bitmap(block, (bitmap_t *) addr, bitmap_size, pages_addr, allocatable_pages << PAGE_ADDR_BITS, descriptors_addr);
 }
 
@@ -99,7 +101,9 @@ page_t *page_block_alloc_contiguous(struct page_block *block, size_t size)
 
 			// Go through each bit between start and end and set it to 1, and set the refcount to 1
 			for (bit = start_bit; bit < end_bit; bit++) {
+				#if defined(CONFIG_MMU)
 				block->page_descriptors[bit].refcount = 1;
+				#endif
 				bitmap[BIT_INDEX(bit)] |= BIT_MASK(bit);
 			}
 
@@ -125,7 +129,9 @@ page_t *page_block_alloc_single(struct page_block *block)
 			bit += 1;
 		} else {
 			bitmap[BIT_INDEX(bit)] |= BIT_MASK(bit);
+			#if defined(CONFIG_MMU)
 			block->page_descriptors[bit].refcount = 1;
+			#endif
 			return &block->base[bit];
 		}
 	}

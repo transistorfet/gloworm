@@ -33,44 +33,31 @@
 
 struct vfile;
 struct process;
+struct memory_region;
 struct memory_segment;
-struct memory_object;
 
 struct memory_ops {
-	void (*free)(struct memory_object *object);
-	physical_address_t (*load_page_at)(struct memory_segment *area, struct memory_object *object, virtual_address_t vaddr);
+	physical_address_t (*load_page_at)(struct memory_segment *segment, virtual_address_t vaddr);
 };
 
-struct file_backed_memory {
-	/// The open file used for file-backed regions.  (could be NULL)
-	struct vfile *file;
-	offset_t file_offset;
-};
-
-struct anonymous_memory {
-	physical_address_t address;
-};
-
+#if !defined(CONFIG_MMU)
 /// Represents a contiguous piece of physical memory backing a program segment
 ///
-/// By having a separately allocated object, it shared between processes and refcounted
+/// By having a separately allocated region, it shared between processes and refcounted
 /// as a block instead of per-page.  When using an MMU, per-page refcounts will be kept
 /// but in no-MMU systems, per-page refcounts will not be stored and only the
-/// memory_object refcount will be used
-struct memory_object {
-	struct memory_ops *ops;
-
+/// memory_region refcount will be used
+struct memory_region {
 	int refcount;
-	union {
-		struct file_backed_memory file_backed;
-		struct anonymous_memory anonymous;
-	};
 
-	#if !defined(CONFIG_MMU)
+	/// The open file that was used to load data into this region.  (could be NULL)
+	struct vfile *file;
+	/// Start of pre-allocated memory region
 	void *mem_start;
+	/// Length of pre-allocated memory region
 	size_t mem_length;
-	#endif
 };
+#endif
 
 struct memory_segment {
 	struct queue_node node;
@@ -79,13 +66,29 @@ struct memory_segment {
 	uintptr_t start;
 	uintptr_t end;
 
-	struct memory_object *object;
+	#if defined(CONFIG_MMU)
+
+	/// The memory operations used to load data into this segment when a page miss occurs
+	struct memory_ops *ops;
+	/// The open file used for file-backed segments.  (could be NULL)
+	struct vfile *file;
+
+	#else
+
+	/// The pre-allocated region of memory that this segment looks into
+	struct memory_region *region;
+
+	#endif
+
+	/// The offset into either the file, or the memory region where this segment starts
+	offset_t offset;
 };
 
 struct memory_map {
 	int refcount;
 
 	#if defined(CONFIG_MMU)
+	/// Root page table used by the MMU that represents this memory map
 	mmu_descriptor_t *root_table;
 	#endif
 
@@ -101,21 +104,33 @@ struct memory_map {
 };
 
 
-struct memory_object *memory_object_alloc(struct vfile *file);
-static inline struct memory_object *memory_object_make_ref(struct memory_object *object);
-void memory_object_free(struct memory_object *object);
-struct memory_object *memory_object_alloc_user_memory(size_t size, struct vfile *file);
+#if defined(CONFIG_MMU)
+#define MEMORY_OBJECT_T				struct vfile
+#define MEMORY_OBJECT_ACCESS(cur)		((cur)->file)
+#define MEMORY_OBJECT_MAKE_REF(object)		vfs_clone_fileptr((object))
+#define MEMORY_OBJECT_FREE(object)		vfs_close((object))
+#else
+#define MEMORY_OBJECT_T				struct memory_region
+#define MEMORY_OBJECT_ACCESS(cur)		((cur)->region)
+#define MEMORY_OBJECT_MAKE_REF(object)		memory_region_make_ref((object))
+#define MEMORY_OBJECT_FREE(object)		memory_region_free((object))
+#endif
+
+#if !defined(CONFIG_MMU)
+struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile *file);
+void memory_region_free(struct memory_region *region);
+#endif
 
 struct memory_map *memory_map_alloc(void);
 void memory_map_free(struct memory_map *map);
 static inline struct memory_map *memory_map_make_ref(struct memory_map *map);
 
-int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, struct memory_object *object);
+int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset);
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
 int memory_map_remap_copy_on_write(struct memory_map *map, uintptr_t start, size_t length);
 
-int memory_map_resize(struct memory_segment *area, ssize_t diff);
-int memory_map_insert_heap_stack(struct memory_map *map, size_t stack_size);
+int memory_map_resize(struct memory_segment *segment, ssize_t diff);
+int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size);
 
 int memory_map_move_sbrk(struct memory_map *map, int diff);
 
@@ -123,7 +138,7 @@ void print_process_segments(struct process *proc);
 
 
 /************************
- * Memory Object Inlines
+ * Memory Region Inlines
  ************************/
 
 static inline int memory_map_reset_sbrk(struct memory_map *map)
@@ -138,16 +153,18 @@ static inline struct memory_map *memory_map_make_ref(struct memory_map *map)
 	return map;
 }
 
-static inline struct memory_object *memory_object_make_ref(struct memory_object *object)
+#if !defined(CONFIG_MMU)
+static inline struct memory_region *memory_region_make_ref(struct memory_region *region)
 {
-	object->refcount++;
-	return object;
+	region->refcount++;
+	return region;
 }
 
-static inline uintptr_t memory_object_get_start_address(struct memory_object *object)
+static inline uintptr_t memory_region_get_start_address(struct memory_region *region)
 {
-	return object->anonymous.address;
+	return (uintptr_t) region->mem_start;
 }
+#endif
 
 
 /*********************

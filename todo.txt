@@ -1,7 +1,6 @@
 
-* move memory_ops to memory_area instead of memory_object
 * try to isolate memory_object out and make it used only if !MMU
-* separate memory_object out, so that it can be compiled optionally based on !MMU
+* make copy_stack only called if not MMU
 
 * go through and assign proper error numbers to mmu_table_map
 
@@ -12,7 +11,6 @@
   changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
   the case of the heap and stack
 
-* make copy_stack only called if not MMU?
 * make it possible to recover from an exception somehow
 * the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
   arch/m68k?
