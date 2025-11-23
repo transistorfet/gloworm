@@ -73,8 +73,8 @@ struct arch_task_info {
 
 extern void *create_context(void *kernel_stack, void *entry, void *user_stack, int is_kernel);
 extern void *drop_context(void *kernel_stack);
-extern void _exit();
-extern void _sigreturn();
+extern void _user_exit();
+extern void _user_sigreturn();
 
 #endif
 

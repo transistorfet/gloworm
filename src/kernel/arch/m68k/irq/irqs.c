@@ -22,7 +22,7 @@ typedef void (*m68k_irq_handler_t)();
 
 extern void enter_exception(void);
 
-void handle_trace(struct context *context);
+void enter_trace(struct exception_frame frame);
 
 static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
 
@@ -52,7 +52,7 @@ void arch_init_irqs(void)
 	for (short i = IRQ_USER_START; i < IRQ_USER_MAX; i++)
 		vector_table[i] = enter_irq;
 
-	vector_table[IRQ_TRACE] = handle_trace;
+	vector_table[IRQ_TRACE] = (m68k_irq_handler_t) enter_trace;
 
 	// Load the VBR register with the address of our vector table
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
@@ -125,7 +125,7 @@ void handle_exception(struct exception_frame *frame)
 	}
 }
 
-__attribute__((interrupt)) void handle_trace(struct context *context)
+__attribute__((interrupt)) void enter_trace(struct exception_frame frame)
 {
-	log_trace("Trace %x (%x)\n", context->frame.pc, context->frame.pc);
+	log_trace("Trace %x (%x)\n", frame.pc, frame.pc);
 }

@@ -8,8 +8,8 @@
 	.global create_context
 	.global drop_context
 	.global restore_context
-	.global _exit
-	.global _sigreturn
+	.global _user_exit
+	.global _user_sigreturn
 	.global __do_fork
 	.global __do_clone
 	.global __do_sigreturn
@@ -424,7 +424,7 @@ enter_exception:
 	bra.w	restore_context
 
 
-_exit:
+_user_exit:
 	// Execute the exit syscall to terminate the current process
 	moveq	#1, %d0
 	trap	#1
@@ -433,7 +433,7 @@ _exit:
 	stop	#0x2000
 
 
-_sigreturn:
+_user_sigreturn:
 	// Execute the sigreturn syscall to clean up the signal handling
 	moveq	#30, %d0
 	trap	#1

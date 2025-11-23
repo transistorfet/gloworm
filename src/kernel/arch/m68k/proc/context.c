@@ -94,9 +94,9 @@ int arch_release_task_info(struct process *proc)
 
 int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 {
-	//PUSH_STACK(stack_pointer, void *) = _exit;
+	//PUSH_STACK(stack_pointer, void *) = _user_exit;
 	user_sp = ((char *) user_sp) - sizeof(void *);
-	*((void **) user_sp) = _exit;
+	*((void **) user_sp) = _user_exit;
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
@@ -115,9 +115,9 @@ int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 
 int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 {
-	//PUSH_STACK(stack_pointer, void *) = _exit;
+	//PUSH_STACK(stack_pointer, void *) = _user_exit;
 	user_sp = ((char *) user_sp) - sizeof(void *);
-	*((void **) user_sp) = _exit;
+	*((void **) user_sp) = _user_exit;
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
@@ -166,7 +166,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 
 	// Push a return address that will call sigreturn() to the user stack
 	usp = arch_get_user_stackp(proc);
-	PUSH_STACK(usp, void *) = _sigreturn;
+	PUSH_STACK(usp, void *) = _user_sigreturn;
 	// Push a fresh context onto the kernel stack
 	// NOTE the user stack is not updated directly, but is instead added to the new context
 	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp, 0);
