@@ -1295,3 +1295,513 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I mean it's probably because a stack is being shared or something, and there's no copy protection yet, since copy on write is not
   implemented
 
+
+2025-11-23:
+
+- I've added some code to the MMU mode to copy the stack, keep the old segment in the newly forked segment, and also increment the
+  page refs of all the segments, and it's now crashing on pid 4 instead of pid 3, in the same spot, where the RTE instruction in
+  restore_context is executed
+- maybe it's some other code that's swapped with CONFIG_MMU that's causing the the context to be asymmetric?  The stack after the
+  address error info seems to be all 0s, as if it's either the wrong address or it wasn't copied or something
+- can't find anything...
+
+- Ok, I printed out the memory map for exec'd and forked processes, and there's definitely something wrong somewhere somehow
+- also pid 3 is created, but then forked before it's exec'd, which I think is where it runs `sh` on /etc/rc, so maybe that's a weird
+  case that's causing problems here?  I haven't tried compiling the utils into the kernel in a while
+
+      ```
+      ...
+      new process exec'd pid 1
+      pid 1 memory map:
+      203700 to 204000: flags=51
+      204000 to 204200: flags=32
+      204600 to 204600: flags=33
+      204600 to 206600: flags=134
+      begin multitasking...
+      new process forked pid 3
+      pid 3 memory map:
+      203700 to 204000: flags=51
+      204000 to 204200: flags=32
+      204600 to 204600: flags=33
+      204600 to 206600: flags=134
+      207200 to 207200: flags=33
+      207200 to 209200: flags=134
+      new process forked pid 4
+      pid 4 memory map:
+      203700 to 204000: flags=51
+      204000 to 204200: flags=32
+      204600 to 204600: flags=33
+      204600 to 206600: flags=134
+      207200 to 207200: flags=33
+      207200 to 209200: flags=134
+      20A100 to 20A100: flags=33
+      20A100 to 20C100: flags=134
+      new process exec'd pid 4
+      pid 4 memory map:
+      20C300 to 20F300: flags=51
+      20F300 to 20F800: flags=32
+      20FD00 to 20FD00: flags=33
+      20FD00 to 211D00: flags=134
+
+      Error in pid 4 at 103C48 (status: 0, vector: 2)
+      pid 4 memory map:
+      20C300 to 20F300: flags=51
+      20F300 to 20F800: flags=32
+      20FD00 to 20FD00: flags=33
+      20FD00 to 211D00: flags=134
+      Stack: 209AA4
+      209AA4: 0000 0010 3C48 B008 1EEA B64D 0000 0000
+      209AB4: 0020 DB08 0020 9B00 0000 0000 4E73 4E73
+      209AC4: 0020 DB0C 0020 DB0A 0010 3C4A 0020 DB08
+      209AD4: 0000 0000 000F F07C 0000 0000 0000 0000
+      209AE4: 0000 7CF0 0000 0000 2034 0000 0020 9B00
+      209AF4: 0000 0000 0011 FF34 0020 DB08 0020 9C0A
+      209B04: 0000 0000 0000 0000 0000 0000 0000 0000
+      209B14: 0000 0000 0000 0000 0000 0000 0000 0000
+
+
+      Code: 103C48
+      103C48: 4E73 2079 0010 DFBC 2268 000C 5889 48E1
+      103C58: 0F3E 4E7A 4800 2304 233C 0000 0040 2149
+      103C68: 000C 4EB9 0010 1270 2079 0010 DFBC 2268
+
+      freeing 209300 to 209B00
+      new process exec'd pid 3
+      pid 3 memory map:
+      211E00 to 214E00: flags=51
+      214E00 to 215300: flags=32
+      215300 to 215300: flags=33
+      215300 to 217300: flags=134
+
+      Error in pid 3 at 103C48 (status: 0, vector: 2)
+      pid 3 memory map:
+      211E00 to 214E00: flags=51
+      214E00 to 215300: flags=32
+      215300 to 215300: flags=33
+      215300 to 217300: flags=134
+      Stack: 206DA4
+      206DA4: 0000 0010 3C48 B008 1EEA B64D 0000 0000
+      206DB4: 0021 3608 0020 6E00 0000 0000 4E73 4E73
+      206DC4: 0021 360C 0021 360A 0010 3C4A 0021 3608
+      206DD4: 0000 0000 000F F07C 0000 0000 0000 0000
+      206DE4: 0000 7CF0 0000 0000 0020 0000 0020 6E00
+      206DF4: 0000 0000 0000 0021 0021 3608 0000 0000
+      206E04: 0000 0000 0020 6F0A 0000 0000 0000 0000
+      206E14: 0000 0000 0000 0000 0000 0000 0000 0000
+      ```
+
+- the key thing to note here is that the stack address for the first process (pid 4) that crashes is 0x209AA4 which doesn't appear
+  in any of the segments
+- actually I guess that's the kernel stack, and not the user stack, which makes sense to not be mapped, but also, it's wrong...  Is
+  the problem with the kernel stack not being copied?  That would make a lot more sense here
+- there's definitely something weird with arch_clone_task_info, but it's using USER_MODE to select whether to use one stack or two,
+  so it might not be that alone that's the problem.  Either way, the call needs to move or be copied somewhere else so that MMU code
+  will do the right thing when copy_stack is eventually bypassed when MMU is enabled
+
+- ARGHH looking at the manual again, it's a BUS error that's occurring NOT and address error.  It's the same exception frame format
+  that occurs, but it's a bit different.  I didn't think there was an odd numbered address, which would cause an address error, but
+  a bus error has different causes
+- From the manual: "A bus error exception also occurs when the MMU detects that a successful address translation is not possible"
+- so I think it's using 0 as the return address, and 0 is not mapped to any segments, which is why it gives a bus error (or most
+  likely does).  That still doesn't change the above investigation, since there's still a problem with the stack that makes it be
+  all zeros.  This just explains it properly
+
+- everything boots fine, with the arch_clone_task_info() call moved up to the common code, and with CONFIG_MMU not enabled, but when
+  I then also disable CONFIG_M68K_USER_MODE, when the `sh /etc/rc` command completes, it dumps me back to the monitor, with no
+  exception... that really looks like it rte'd to a zero stack, but the MMU didn't catch it this time... it could also be mem ops or
+  something being called on a NULL pointer, so I'd have to trace it a bit to confirm
+
+
+2025-11-28:
+
+- yesterday I looked into the problem where if CONFIG_M68K_USER_MODE was disabled, it would start to boot, and run /etc/rc but then
+  drop to the monitor right after.  I was testing with the wrong config setting to compile the shell and init into the kernel, but
+  once I got that right, and had it all in the kernel space, it booted fine.  I seem to recall I had this issue before which I maybe
+  didn't fix, where when it uses the init on the compactflash disk, it fails on boot?  At least it's not a fundamental stack issue
+  or something
+
+- I tried disabling the MMU, since I haven't actually changed the address space much, and it should be using physical addresses in
+  most locations.  It booted fine and the I could run programs in the shell, so it's not a critical issue.  It's an invalid MMU
+  table that's causing the infinite exceptions
+- I had tested it with the shell and init compiled into the kernel, and it was giving a different error, namely:
+
+      ```
+      Error in pid 1 at 103C64 (status: 0, vector: 2)
+      pid 1 memory map:
+      0 to 45400: flags=51
+      203900 to 203900: flags=33
+      203900 to 205900: flags=134
+      Stack: 2034A4
+      2034A4: 0000 0010 3C64 B008 1EEA B64D 0000 0000
+      2034B4: 0010 B770 0020 3500 0000 0000 4E73 4E73
+      2034C4: 0010 B774 0010 B772 0010 3C66 0010 B770
+      2034D4: 0000 0000 000F F07C 0000 0000 0000 0000
+      2034E4: 0000 7CF0 0000 0000 2034 0000 0020 3500
+      2034F4: 0000 0000 0011 FF34 0010 B770 0020 360A
+      203504: 0000 0000 0000 0000 0000 0000 0000 0000
+      203514: 0000 0000 0000 0000 0000 0000 0000 0000
+      ```
+- the actual fault address in this case is 0x10B770.  Not sure if I was reading the wrong address from previous traces.  It's the
+  first two words on the second line of the trace (words 9 and 10).  Looking at the traces above, the first exception occurs on
+  address 0, and the second exception occurs on address 0x103600, which isn't mapped, and in the second of the two traces above, the
+  addresses are 0x20DB08 and 0x213608.  In the first pair, the addresses are totally wrong.  In the second pair, only the first
+  address is not in the map, and the second fault address does appear to be mapped.  Either way, this is a good step forward
+
+- ok, in the case where the init/shell are compiled in, I'm using the linker's addresses for the kernel start and end, but they
+  don't take into account the actual start and end it would seem, so they're 0 and 45400?
+- kernel start is definitely 0, but kernel end is 0x115000 according to the symbols table...
+- tucking the `__kernel_start = .;` line into the .text section fixed the starting symbol address at least
+- but it still calculates the wrong end address...
+- fixing that with a cast to uintptr_t and now it's got a fatal kernel error
+
+      ```
+      Fatal Error at 101B2A (status: 2700, vector: 2). Halting...
+      Stack: 11FEF4
+      11FEF4: 2700 0010 1B2A B008 16EA 076D 0681 FFFF
+      11FF04: 021F E0BE 021F E0BE 0020 2100 5272 0800
+      11FF14: 0010 1B32 0010 1B30 0010 1B2E 0020 0000
+      ```
+
+      ```
+      00101b00 <page_block_make_ref_contiguous>:
+        101b00:       2f0a            movel %a2,%sp@-
+        101b02:       226f 0008       moveal %sp@(8),%a1
+        101b06:       206f 000c       moveal %sp@(12),%a0
+        101b0a:       222f 0010       movel %sp@(16),%d1
+        101b0e:       2008            movel %a0,%d0
+        101b10:       90a9 0010       subl %a1@(16),%d0
+        101b14:       e088            lsrl #8,%d0
+        101b16:       d080            addl %d0,%d0
+        101b18:       0c81 0000 00ff  cmpil #255,%d1
+        101b1e:       6206            bhis 101b26 <page_block_make_ref_contiguous+0x26>
+        101b20:       2008            movel %a0,%d0
+        101b22:       245f            moveal %sp@+,%a2
+        101b24:       4e75            rts
+        101b26:       2469 0018       moveal %a1@(24),%a2
+        101b2a:       5272 0800       addqw #1,%a2@(0,%d0:l)
+        101b2e:       0681 ffff ff00  addil #-256,%d1
+        101b34:       5480            addql #2,%d0
+        101b36:       60e0            bras 101b18 <page_block_make_ref_contiguous+0x18>
+      ```
+
+- the fault address is 0x021f_e0be which is totally wrong, and it comes from a relative address in page_make_ref_contiguous, which
+  is incrementing the per-page refcounts, so definitely something wrong there, probably the wrong page number is passed in or
+  something
+
+- with the external init/shell it's back to:
+
+      ```
+      Error in pid 4 at 103C08 (status: 0, vector: 2)
+      pid 4 memory map:
+      20C300 to 20F300: flags=51
+      20F300 to 20F800: flags=32
+      20FD00 to 20FD00: flags=33
+      20FD00 to 211D00: flags=134
+      Stack: 209AA4
+      209AA4: 0000 0010 3C08 B008 1EEA B64D 0000 0000
+      209AB4: 0020 DB08 0020 9B00 0000 0000 4E73 4E73
+      209AC4: 0020 DB0C 0020 DB0A 0010 3C0A 0020 DB08
+      ...
+
+      Error in pid 3 at 103C08 (status: 0, vector: 2)
+      pid 3 memory map:
+      211E00 to 214E00: flags=51
+      214E00 to 215300: flags=32
+      215300 to 215300: flags=33
+      215300 to 217300: flags=134
+      Stack: 206DA4
+      206DA4: 0000 0010 3C08 B008 1EEA B64D 0000 0000
+      206DB4: 0021 3608 0020 6E00 0000 0000 4E73 4E73
+      206DC4: 0021 360C 0021 360A 0010 3C0A 0021 3608
+      ```
+
+- the fault addresses are 0x20db08 and 0x213608 which are both mapped locations...
+- the page descriptors *must* be what's wrong here.  Maybe everything else is ok but the page tables themselves aren't set
+  correctly, since I'm using physical addresses still and not using the page fault exception to load a page on demand
+
+- I've been modifying and printing and running for a while now, and I'm pretty sure the mmu table is wrong, which is causing the
+  address error.  I wrote a function to print the entire table in the exception, as well as in the when the memory is mapped at the
+  start, and it prints out the tables correctly when mapping them, but not during the exception.  It skips over a large chunk that
+  includes the fault address
+
+- found it.  During mapping there's this output:
+    ```
+    mapping to 20C200: 20C300 to 20F300
+    mapping 20C300 length 3000 flags 3
+    set new table 20F800 [table: 20C200, i: 0, bits: 26]
+    set new table 20F900 [table: 20F800, i: 2, bits: 20]
+    set new table 20FA00 [table: 20F900, i: 3, bits: 14]
+
+    <the entire range from 20C300 to 20F200>
+
+    mapping to 20C200: 20F300 to 20F800
+    mapping 20F300 length 500 flags 3
+    set new table 20FB00 [table: 20F800, i: 2, bits: 20]
+    set new table 20FC00 [table: 20FB00, i: 3, bits: 14]
+    0020F300: 20F300 (1) [table: 20FC00, i: 51, bits: 8]
+
+    <the range from 20F300 to 20F800>
+    ```
+
+    It overwrites the same entry in the table located at 0x20F800, at index i=2, at the address level bits=20, and then when it
+    prints the table later, it never prints table 0x20F900, which has been erased and leaked by that point
+
+- actually, now I'm not sure the output was correct?  yes it's correct, but I still don't understand how it gets overwritten
+- it's really late (12:30am) and I need to get to bed.  I'll have to find this tomorrow.  I'm so close though (I've said this before
+  though, haven't I?)
+
+
+2025-11-29:
+
+- I'm sure this kind of problem would be easier with an actual debugger.  I wonder how hard it would be to connect gdb?  I know gdb
+  has a remote target option, and we have that working where I work.  In that case, it's using a semi-substantial amount of python
+  code to glue it all together but I wonder if there's a pre-made solution using serial that would be easier to integrate.  It might
+  only need the target-side code to be written
+- using print statements for the time being, but boy do I have a lot.  I can't see any reason why the table, 20F800, would have its
+  entry point to the correct new table, and then when the next segment is mapped, it has 0 again in that spot, causing it to
+  erroneously create another table which overwrites the first.  This really seems like a bug from memory reuse, but I haven't yet
+  confirmed that
+- I have a hard coded watcher that prints the value of the offending memory location before and after entry into the mmu table
+  mapping function
+      ```
+      <call to mmu_table_map to map 20C300 to 20F300>
+      0020F200: 20F200 (1) [table: 20FA00, i: 50, bits: 8]
+      >>> watcher after mmu_table_map 20F902
+      mapping to 20C200: 20F300 to 20F800
+      >>> watcher before mmu_table_map 0
+      mapping 20F300 length 500 flags 3
+      ...
+      ```
+- So the first call ends with the memory location set correctly, and then somewhere outside of the function, between the two calls,
+  that memory location is set to 0...  I think that's conclusive that the problem is not in mmu_table_map() but somewhere else, so
+  I'll check further up the stack
+- Ok, put a watcher print statement on entry to memory_map_mmap(), and one on entry to memory_map_unmap()
+      ```
+      ...
+      0020F200: 20F200 (1) [table: 20FA00, i: 50, bits: 8]
+      >>> watcher after mmu_table_map 20F902
+      >>> watcher entering memory_map_mmap 0
+      mapping to 20C200: 20F300 to 20F800
+      >>> watcher before mmu_table_map 0
+      mapping 20F300 length 500 flags 3
+      ...
+      ```
+- So it's definitely not calling unmap, which is good to confirm, but also the problem is occurring outside of mmap as well...  I
+  think this is called from fork, since it should be the shell forking itself...
+- wait, could it be the fork itself that's broken, which would make the most sense.  That code isn't well tested, but I thought I
+  had fully tested the mmap code already, which is why this has been so confusing, but it's definitely a memory misuse or
+  use-after-free issue.  Did I test what happens when it doesn't fork to run /etc/rc?  I'm using it without the shell built into the
+  kernel blob
+- it's definitely that spot in the init process where it checks for /etc/rc, then forks, and execs if it does (which creates pid 4
+  to run /etc/rc), and then the parent calls exec on itself to run the shell
+- there aren't many spots this could be.  I have another print in duplicate_process_memory(), which is the call to mmap
+- Oh! it's definitely not that spot.  That's not the call to mmap, so I'll look for another location.  This must be the one in
+  binaries, which is called by exec()
+- I notice a memset() call in here, to zero part of memory.  I wonder if that's causing the problem.  A factor here is that the
+  memory addresses being mapped to and the memory locations of the tables themselves are all jumbled together, so a wrong address or
+  size could easily overflow into a memory table
+- aaaand that looks like exactly the problem, the memset.  It's overflowing into the table allocated at 0x20F800
+      ```
+      ...
+      0020F200: 20F200 (1) [table: 20FA00, i: 50, bits: 8]
+      >>> watcher after mmu_table_map 20F902
+      >>> watcher in exec on program segment 1: 20F902
+      memset 20F44C length 464
+      calling memory_map_mmap with 20F300 to 20F800
+      >>> watcher entering memory_map_mmap 0
+      mapping to 20C200: 20F300 to 20F800
+      >>> watcher before mmu_table_map 0
+      mapping 20F300 length 500 flags 3
+      found 20F802 at [table: 20C200, i: 0] so checking 20F800
+      descending into 20F800 [table: 20C200, i: 0, bits: 26]
+      found 0 at [table: 20F800, i: 2] so checking 0
+      ...
+      ```
+- so the watcher after mmu_table_map shows the correct value in the page table, and returns to the for loop in binaries during
+  exec(), which then loops to the next program segment in the elf, and prints the watcher in exec at the top of that for loop, where
+  the value is still correct.  It then calls memset() which will write to 0x20f44c to 0x20f8b0!  0x20f808 is our watched location
+  that's changing erroneously!
+- alright, so what's the solution here.  I think I just have the alignments wrong, or maybe I'm not allocating enough memory
+- this is of course running it from disk, and the build of sh.elf might not match what's on disk.  It's probably been 6 months at
+  least since I last recompiled and copied the version to the compactflash it's running from.  I want to get the address right here
+  for future reference
+- the program segments for sh.elf which is being executed are:
+      ```
+      Program Headers:
+        Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+        LOAD           0x000100 0x00000000 0x00000000 0x02fb9 0x02fb9 R E 0x100
+        LOAD           0x0031b4 0x000030b4 0x000030b4 0x00098 0x004fc RW  0x100
+        GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
+        GNU_RELRO      0x0031b4 0x000030b4 0x000030b4 0x0004c 0x0004c R   0x1
+      ```
+  and it's being loaded into the two segments:
+      user_mem_start: 20C300, file_segment_start: 20F2B9, file_segment_end: 20C300, memory_segment_start: 20F300, memory_segment_end: ???
+      user_mem_start: 20F3B4, file_segment_start: 20F44C, file_segment_end: 20F300, memory_segment_start: 20F800, memory_segment_end: ???
+  (not sure why the memory_segment_end didn't print correctly, it was cut off... a bit odd, but maybe unrelated)
+- it's the memset of the second segment that overwrites the table
+
+- ok, taking a step back... I was just trying to collect some data first but I already notice a problem.  user_mem_start is
+  different between those two print statements when it should be the same both times...  there is no code that could change the
+  value of that.  This now seems suspiciously like stack clobbering, but it's in the kernel, so it must be the kernel stacks being
+  clobbered?
+- the kernel stack size is set to 8 (pages) and page size is 256, so that's 2kB for each process's stack, but it should be using the
+  global stack at this point in the code, shouldn't it?
+- this might explain why the print statement was cut off...
+- so printing out the stack pointer, it's always 0x11FE60 in the elf loading loop
+- unrelated, but the linker is putting the text section at the end for some reason, even though the linker script says to put it at
+  the start =/
+- I can't find a problem here, the code ends at 0x10beaa, BSS goes up to 0x11025c, and then the stack is there with a reserved size
+  but the actual stack starts at 0x120000, and it's only at 0x11fe60, so plenty of room
+- this is soooo weird!  I'm also running out of time again, so will have to pick this back up later, but before I do I'll try
+  printing out the user_mem_start address and value
+  `user_mem_start: 11FE90, value: 20C300`
+  ...
+  `&user_mem_start: 11FE90, value: 20C300`
+- Ok! so it's not a kernel stack clobbering problem
+- *facepalm* it's a print statement mistake.... I'm not printing the user_mem_start, I have the wrong count
+
+- Ok, lets try this again
+- it's still glitching the print statement format string, so bizzare
+- motherfucker, the printk buffer is only 128 characters, and my line was too long...
+
+- Ok, the data is loaded into memory using these values:
+  ```
+  user_mem: 20C300, file_seg_start: 20C300, file_seg_end: 20F2B9, memory_seg_start: 20C300, memory_seg_end: 20F300
+  user_mem: 20C300, file_seg_start: 20F3B4, file_seg_end: 20F44C, memory_seg_start: 20F300, memory_seg_end: 20F800
+  ```
+- for the second segment, virtaddr + filesiz = 0x314c, so the file segment end of 0x20f44c makes sense, and with memory size it
+  would be: virtaddr + memsiz = 0x35b0, which matches 0x20f8b0... so memory segment end is rounding down when it should round up?
+- it's specifically using 0x20F300 (the rounded down address) + 0x4fc and rounding that up!  So it's almost right, but since it's
+  using the value that's rounded down instead of the one that has an offset of 0xb4, it ends up being a page less than it should be
+
+- HAHA *sigh*, I changed the calculation to use file_segment_start instead of memory_segment_start when calculating
+  memory_segment_end, and now it fails to create init task, error -22, which is EINVAL, probably coming from one of the checks in
+  memory_map_mmap
+- Oh, actually it was still wrong.  It was only rounding up the size and not the whole value (the start plus the size)
+  `memory_segment_end = memory_segment_start + roundup(prog_headers[i].p_memsz, PAGE_SIZE);`
+  changed to
+  `memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);`
+- aaaand it's still broken
+- it is now mapping more memory, correctly, but the fault is the same
+- Oh of course, I forgot to also fix the memory calculation further up, so it's still only reserving up to 0x20F800, but mapping
+  up to 0x20F900, so of course it wouldn't work.  It's still using 0x20F800 as the mmu table, which gets overwritten
+- this isn't going to be trivial to fix, since that code is just adding up the memory_size value for each segment, but it needs to
+  factor in the rounding.  I'll have to come back to this later
+- this has problem been the hardest bug to find and fix, made worse by the fact that I've had very little time to spend on it, so
+  it's taken me forever to actually get into it enough to find it.  I'm also not surprised since I've had so much difficulty getting
+  the elf values to work, both here and in ruxpin when I added elf support
+
+
+2025-11-30:
+
+- didn't get any more time yesterday, so now I'm back at it.  [not quite, ended up writing in journal instead, so I'll come back to
+  this later today]
+
+- fixed it, and it seems to run further, and then has a fault in pid 5 this time at address 0x103e74.  I'm not sure if I just last
+  ran with another build of the binary, but 0x103e76 is the user_exit() function that I knew would be a problem when I got to this
+  point.   So I think it's fixed, but there's one more problem in the way
+
+- I finally got past that error by hackishly adding a segment during exec() for the page that the exit signal is located inside.  It
+  didn't work first time of course because it needed an exception for if that area is already mapped or else it would fail to create
+  the init process.  That seems... incorrect, since it should only be adding a kernel segment if it's not launching a binary, but
+  adding the exception got past that fault
+- aaand now I'm back at the same fault, in pid 4 on the RTE instruction, which leads to an exception loop.  I can now see the mmu
+  table, and it's definitely correct and has the faulted address mapped correctly.  I'll check the MMU status byte, which is 1, to
+  make sure it's correct
+- hmm... I see that there WRITE PROTECT bit instead of a WRITE bit, and that's every page's status is just 1, so that bit is not set
+  for read only data, and the other bits are not set correctly either.  That needs to be fixed.  *Maybe* it explains why it's still
+  not working?
+- wtf is going on, I added WP on exec and it failed to create_init_task, and then I removed that and now it's failing on pid 5 on
+  the _user_exit address, which isn't in this process's memory map, but two executables loaded show... oh that print statement is
+  probably printed no matter what, rather than being inside the conditional.  I'll move it
+- ok added that, and then realized the conditional is wrong, it should be inverted...  If it was working before, I'd expect it to
+  fail now, even though that should have fixed it... something weird
+- yup, fails when adding the user exit segment
+- I forgot the bitwise complement on the (PAGE_SIZE - 1) so it was the wrong address.  Rather than rounding the address to a page,
+  it was preserving only the unaligned portion of the address
+- now I'm getting a fatal error in kernel mode when it begins multitasking, which hints that another error is occur as a result of
+  this new code, before it even gets to the original exit error point.  It's a fault when accessing 0x21FE3A, which is the kind of
+  address a process would use, but it's not one that the executable loaded has and the fatal is in kernel mode.  At least I'm
+  further?
+
+- no actually, the fault address is 0x21F_E13A, which is a garbage address
+
+
+2025-12-03:
+
+- Tried commented out the new binaries.c lines that check for an existing kernel memory map location, and if not, creates one for
+  the _user_exit and _user_sigreturn functions
+- without it, it has the fault on exiting pid 4, and with it, it faults in kernel space with the address being 0x101B2A
+      ```
+      mmu: setting TCR to 82806666
+      mmu: read back TCR of 82806666
+      mem0: ram disk of 131072 bytes
+      ata0: found partition with 524288 sectors
+      ata1: found partition with 1048576 sectors
+      minixfs: mounting (400) at /
+      procfs: mounting at /proc
+      slip0: bringing interface up
+      adding _user_exit: 103E00
+      LOAD vaddr: 0 file_addr: 203700, filesz: 83A memsize 83A, mem_start: 203700, mem_end: 204000
+      LOAD vaddr: 93C file_addr: 20403C, filesz: 34 memsize 178, mem_start: 204000, mem_end: 204200
+      begin multitasking...
+
+
+      Fatal Error at 101B2A (status: 2700, vector: 2). Halting...
+      Stack: 11FEF4
+      11FEF4: 2700 0010 1B2A B008 16EA 076D 0681 FFFF
+      11FF04: 021F E13A 021F E13A 0020 2100 5272 0800
+      11FF14: 0010 1B32 0010 1B30 0010 1B2E 0020 0000
+      11FF24: 0800 FF0B 000F F681 0000 0000 0000 0000
+      11FF34: 0000 00FF 0000 0000 0020 0000 021F E13A
+      11FF44: 0000 0001 FFF0 1D00 021F E13A 0012 18B8
+      11FF54: 0010 23C8 0010 CB48 0010 3E00 0000 0100
+      11FF64: 0000 0000 0000 0000 0010 D994 0011 FFB4
+
+
+      Code: 101B2A
+      101B2A: 5272 0800 0681 FFFF FF00 5480 60E0 48E7
+      101B3A: 3020 246F 0010 206A 0004 2628 001C 0683
+      101B4A: 0000 02FF 0243 FF00 42A7 2F0A 4878 0041
+
+      Welcome to the 68k Monitor!
+      ```
+- that address is in `page_block_make_ref_contiguous`
+- I think it's now creating the memory map eariler on and it's failing because it's trying to treat it like an allocated block of
+  memory?
+- yeah, in fork is the only place where page_make_ref_contiguous occurs, and it's when duplicating the parent process's memory.
+  There's no flag for making windowed memory in the memory_map_mmap function, but this code in fork.c would have to selectively
+  ignore calling the page_make_ref function, even though it's slated to be removed later... not sure why?  Oh I think I remember.
+  It's because it'll be using copy_on_write later, so will increment refcounts during that function instead
+
+- how does linux do this?  Does it just have a window flag accessible through mmap(2)
+
+
+2025-12-04:
+
+- I put a simple check around page_make_ref_contiguous, and now it boots into an infinite fault loop starting with pid 4, which is
+  where we started from... It's on 103cc8, which 
+- WAIT A MINUTE ****************
+- that's to remind myself to notice this, this happens a lot where I see the code address of the fatal error, but that's the
+  location going out of the kernel, which is a common time to fault.  Instead, there's a separate fault address on the stack, for a
+  bus error, which is what occurred, and that address is 0x20E108
+- how many times am I going to make this same mistake again?
+- well, that said, the address is mapped as the code segment from 0x20C900 to 0x20F900, so it should be fine
+  From the MMU table:
+  `20E100: 20E100 to 20E1FF (1) [table: 210300, i: 33, bits: 8]`
+- or it is actually the next address that is the fault address?  It's 0x209F00, which isn't mapped, but according to the refman,
+  that's an internal register and not the fault address
+
+- this is just dumb.  It's now failing on some address within the user process's code segment.  It's failing on address 0x20db08,
+  when the code segment starts at 0x20c300.  Which would mean it's 0x1808 into the shell (I think), that fails?  That's the
+  instruction after a bsr.l to strcmp, so that doesn't make sense as a fault address... maybe it ran the process for a bit and then
+  halted when returning from an interrupt?  So unrelated to the process execution?
+
+
+2025-12-05:
+
+- well at least today after sitting off, it's still failing at the same spot, so it's not a cache or TLB issue
+- thorpej was mentioning chasing a bug that involved the 68030 adding negative TLB entries into the TLB cache.  I'm not doing any
+  cache flushing yet, so that could be a bug I come across, but for now I don't think that's the problem
+
+
