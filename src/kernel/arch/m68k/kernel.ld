@@ -8,9 +8,9 @@ MEMORY
 
 SECTIONS
 {
-  __kernel_start = .;
-
   .text : {
+    __kernel_start = .;
+
     *(.text.start)
     *(.text)
   } > ram
