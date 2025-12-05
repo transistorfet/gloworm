@@ -97,11 +97,10 @@ int mmu_table_map(mmu_descriptor_t *root, uintptr_t virtual_addr, ssize_t length
 	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
 	// once in memory_map_mmap() before the map is altered
 
-	//printk("mapping %x length %x flags %x\n", virtual_addr, length, flags);
 	table[0] = root;
 	while (length > 0) {
-		i = ((virtual_address_t) virtual_addr >> bits) & ((1 << MMU_TABLE_ADDR_BITS) - 1);
-		//printk("bits %d, i %d, table: %x\n", bits, i, table[level]);
+		i = (virtual_addr >> bits) & ((1 << MMU_TABLE_ADDR_BITS) - 1);
+		//printk("%08x: bits %d, i %d, table: %x\n", virtual_addr, bits, i, table[level]);
 		if (bits <= PAGE_ADDR_BITS || length >= (1 << bits)) {
 			status = MMU_DT_PAGE_DESCRIPTOR;
 			if (flags & MMU_FLAG_NOCACHE) {
@@ -149,7 +148,7 @@ int mmu_table_map(mmu_descriptor_t *root, uintptr_t virtual_addr, ssize_t length
 
 			// Set the descriptor in the current table
 			table[level][i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
-			//printk("set desc %x\n", table[level][i]);
+			//printk("%08x: %x (%x) [table: %x, i: %d, bits: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(table[level][i]), MMU_TABLE_STATUS(table[level][i]), table[level], i, bits);
 
 			// Advance to the next address
 			length -= 1 << bits;
@@ -168,15 +167,45 @@ int mmu_table_map(mmu_descriptor_t *root, uintptr_t virtual_addr, ssize_t length
 				table[level + 1] = (mmu_descriptor_t *) page_alloc_single();
 				init_mmu_table(table[level + 1]);
 
+				//printk("set new table %x [table: %x, i: %d, bits: %d]\n", table[level + 1], table[level], i, bits);
 				// Set the previous level's table with the address of the newly allocated page
 				table[level][i] = (physical_address_t) MMU_TABLE_DESCRIPTOR(table[level + 1], MMU_DT_TABLE);
 			}
-			//printk("level %d, i %d, table %x, length %d\n", level, i, table[level][i], length);
+			//printk("descending into %x [table: %x, i: %d, bits: %d]\n", table[level + 1], table[level], i, bits);
 
 			// Decend one level into the next table
 			level += 1;
 			bits -= MMU_TABLE_ADDR_BITS;
 		}
+	}
+	return 0;
+}
+
+static int mmu_table_print_inner(mmu_descriptor_t *table, uint8_t bits, uintptr_t virtual_addr);
+
+/// Print the MMU table
+///
+/// NOTE: this uses the log interface
+int mmu_table_print(mmu_descriptor_t *root)
+{
+	return mmu_table_print_inner(root, 32 - MMU_TABLE_INITIAL_SHIFT - MMU_TABLE_ADDR_BITS, 0);
+}
+
+static int mmu_table_print_inner(mmu_descriptor_t *table, uint8_t bits, uintptr_t virtual_addr)
+{
+	int i;
+
+	printk("mmu table for addresses %x to %x [table: %x, bits: %d]\n", virtual_addr, virtual_addr + (1 << bits) - 1, table, bits);
+	for (i = 0; i < MMU_TABLE_SIZE; i++) {
+		if ((table[i] & MMU_STATUS_DESC_TYPE) == MMU_DT_TABLE) {
+			printk("decending at [table: %x, i: %d, bits: %d] into table %x (%x)\n", table, i, bits, MMU_TABLE_ADDRESS(table[i]), MMU_TABLE_STATUS(table[i]));
+			mmu_table_print_inner((mmu_descriptor_t *) MMU_TABLE_ADDRESS(table[i]), bits - MMU_TABLE_ADDR_BITS, virtual_addr);
+		} else {
+			if (table[i]) {
+				printk("%x: %x to %x (%x) [table: %x, i: %d, bits: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(table[i]), MMU_TABLE_ADDRESS(table[i]) + (1 << bits) - 1, MMU_TABLE_STATUS(table[i]), table, i, bits);
+			}
+		}
+		virtual_addr += (1 << bits);
 	}
 	return 0;
 }

@@ -16,9 +16,9 @@ struct sigcontext {
 
 void *arch_get_user_stackp(struct process *proc)
 {
+	#if defined(CONFIG_M68K_USER_MODE)
 	void *usp;
 
-	#if defined(CONFIG_M68K_USER_MODE)
 	if (info_to_regs(&proc->task_info)->size == FULL_CONTEXT_SIZE) {
 		return (void *) access_reg(&proc->task_info, regs.usp);
 	} else if (proc == current_proc) {
@@ -29,7 +29,7 @@ void *arch_get_user_stackp(struct process *proc)
 		return NULL;
 	}
 	#else
-	return proc->task_info->ksp;
+	return proc->task_info.ksp;
 	#endif
 }
 

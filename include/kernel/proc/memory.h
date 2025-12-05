@@ -18,18 +18,18 @@
 
 #define KERNEL_STACK_SIZE	CONFIG_KERNEL_STACK_SIZE * PAGE_SIZE
 
-#define AREA_TYPE		0x000F		// Mask for type of mapping
-#define AREA_TYPE_INVALID	0x0000
-#define AREA_TYPE_CODE		0x0001
-#define AREA_TYPE_DATA		0x0002
-#define AREA_TYPE_HEAP		0x0003
-#define AREA_TYPE_STACK		0x0004
+#define SEG_TYPE		0x000F		// Mask for type of mapping
+#define SEG_TYPE_INVALID	0x0000
+#define SEG_TYPE_CODE		0x0001
+#define SEG_TYPE_DATA		0x0002
+#define SEG_TYPE_HEAP		0x0003
+#define SEG_TYPE_STACK		0x0004
 
-#define AREA_READ		0x0010
-#define AREA_WRITE		0x0020
-#define AREA_EXECUTABLE		0x0040
+#define SEG_READ		0x0010
+#define SEG_WRITE		0x0020
+#define SEG_EXECUTABLE		0x0040
 
-#define AREA_GROWSDOWN		0x0100		// stack-like segment
+#define SEG_GROWSDOWN		0x0100		// stack-like segment
 
 struct vfile;
 struct process;
@@ -192,6 +192,17 @@ static inline struct memory_segment *memory_map_iter_prev(struct memory_segment 
 	return _queue_prev(&cur->node);
 }
 
+static inline struct memory_segment *memory_segment_find_next(struct memory_segment *cur, uintptr_t address)
+{
+	while (cur) {
+		if (address >= cur->start && address <= cur->end) {
+			return cur;
+		}
+		cur = _queue_next(&cur->node);
+	}
+	return NULL;
+}
+
 static inline struct memory_segment *memory_segment_find_prev(struct memory_segment *cur, uintptr_t address)
 {
 	while (cur) {
@@ -201,6 +212,11 @@ static inline struct memory_segment *memory_segment_find_prev(struct memory_segm
 		cur = _queue_prev(&cur->node);
 	}
 	return NULL;
+}
+
+static inline struct memory_segment *memory_map_find(struct memory_map *map, uintptr_t address)
+{
+	return memory_segment_find_next(memory_map_iter_first(map), address);
 }
 
 #endif

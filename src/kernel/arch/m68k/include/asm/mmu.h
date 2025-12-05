@@ -138,6 +138,7 @@ int init_mmu(void);
 mmu_descriptor_t *mmu_table_alloc(void);
 void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, ssize_t length, int flags);
+int mmu_table_print(mmu_descriptor_t *root);
 
 static inline void mmu_table_switch(mmu_descriptor_t *root)
 {

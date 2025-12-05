@@ -213,7 +213,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	#endif
 
 	// Adjust memory markers, if needed
-	if (flags & AREA_EXECUTABLE) {
+	if (flags & SEG_EXECUTABLE) {
 		if (!map->code_start) {
 			map->code_start = start;
 		}
@@ -327,7 +327,7 @@ int memory_map_resize(struct memory_segment *segment, ssize_t diff)
 	uintptr_t new_addr;
 	struct memory_segment *adjacent;
 
-	if (segment->flags & AREA_GROWSDOWN) {
+	if (segment->flags & SEG_GROWSDOWN) {
 		new_addr = segment->start - diff;
 		adjacent = _queue_prev(&segment->node);
 		if (adjacent && adjacent->end > new_addr) {
@@ -436,10 +436,10 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 	#endif
 
-	error = memory_map_mmap(map, start, 0, AREA_TYPE_HEAP | AREA_READ | AREA_WRITE, heap_object, 0);
+	error = memory_map_mmap(map, start, 0, SEG_TYPE_HEAP | SEG_READ | SEG_WRITE, heap_object, 0);
 	if (error < 0)
 		goto fail;
-	error = memory_map_mmap(map, start, stack_size, AREA_TYPE_STACK | AREA_GROWSDOWN | AREA_READ | AREA_WRITE, stack_object, 0);
+	error = memory_map_mmap(map, start, stack_size, SEG_TYPE_STACK | SEG_GROWSDOWN | SEG_READ | SEG_WRITE, stack_object, 0);
 	if (error < 0)
 		goto fail;
 	map->heap_start = start;

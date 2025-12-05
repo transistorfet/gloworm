@@ -54,7 +54,7 @@ struct process *create_init_task(void)
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, &__kernel_start, &__kernel_end - &__kernel_start, AREA_TYPE_CODE | AREA_READ | AREA_EXECUTABLE, NULL);
+	error = memory_map_mmap(proc->map, &__kernel_start, &__kernel_end - &__kernel_start, SEG_TYPE_CODE | SEG_READ | SEG_EXECUTABLE, NULL);
 	if (error < 0)
 		goto fail;
 

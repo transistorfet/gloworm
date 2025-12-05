@@ -102,7 +102,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	#endif
 
-	error = memory_map_mmap(map, user_mem_start, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object, 0);
+	error = memory_map_mmap(map, user_mem_start, mem_size, SEG_TYPE_CODE | SEG_EXECUTABLE, object, 0);
 	if (error < 0) {
 		goto fail;
 	}
@@ -228,17 +228,17 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 			int flags = 0;
 			if (prog_headers[i].p_flags & PF_R) {
-				flags |= AREA_READ;
+				flags |= SEG_READ;
 			}
 			if (prog_headers[i].p_flags & PF_W) {
-				flags |= AREA_WRITE;
+				flags |= SEG_WRITE;
 			}
 			if (prog_headers[i].p_flags & PF_X) {
-				flags |= AREA_EXECUTABLE | AREA_TYPE_CODE;
+				flags |= SEG_EXECUTABLE | SEG_TYPE_CODE;
 			}
 			// If it's not a code area, then mark it as data
-			if (!(flags & AREA_TYPE_CODE)) {
-				flags |= AREA_TYPE_DATA;
+			if (!(flags & SEG_TYPE_CODE)) {
+				flags |= SEG_TYPE_DATA;
 			}
 
 			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, MEMORY_OBJECT_MAKE_REF(object), file_segment_start)) < 0) {
