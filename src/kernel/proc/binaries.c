@@ -72,6 +72,11 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
 	exec_initialize_user_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
 
+	// Usually true, if we exec()'d from the current process, then clear this so we do a full context switch when returning
+	if (previous_proc == proc) {
+		previous_proc = NULL;
+	}
+
 	return error;
 }
 
@@ -138,6 +143,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
 	short num_ph;
 	size_t mem_size;
+	size_t segment_size;
 	int error = ENOMEM;
 	uintptr_t user_mem_start;
 	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
@@ -176,7 +182,8 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 			if (prog_headers[i].p_vaddr > mem_size)
 				mem_size = prog_headers[i].p_vaddr;
-			mem_size += roundup(prog_headers[i].p_memsz, PAGE_SIZE);
+			segment_size = (prog_headers[i].p_vaddr & (PAGE_SIZE - 1)) + prog_headers[i].p_memsz;
+			mem_size += roundup(segment_size, PAGE_SIZE);
 		}
 	}
 	if (mem_size == 0)
@@ -212,11 +219,12 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {
+
 		if (prog_headers[i].p_type == PT_LOAD && prog_headers[i].p_filesz > 0) {
 			file_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 			file_segment_end = file_segment_start + prog_headers[i].p_filesz;
 			memory_segment_start = file_segment_start & ~(PAGE_SIZE - 1);
-			memory_segment_end = memory_segment_start + roundup(prog_headers[i].p_memsz, PAGE_SIZE);
+			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
 			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
 				goto fail;

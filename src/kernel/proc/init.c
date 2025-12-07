@@ -54,12 +54,12 @@ struct process *create_init_task(void)
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, &__kernel_start, &__kernel_end - &__kernel_start, SEG_TYPE_CODE | SEG_READ | SEG_EXECUTABLE, NULL);
+	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_EXECUTABLE, NULL, 0);
 	if (error < 0)
 		goto fail;
 
 	// Add the heap and stack segments
-	error = memory_map_insert_heap_stack(proc->map, &__kernel_end, CONFIG_USER_STACK_SIZE);
+	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) &__kernel_end, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		goto fail;
 
@@ -104,6 +104,12 @@ struct process *create_idle_task(void)
 
 	proc->fd_table = alloc_fd_table();
 	if (!proc->fd_table)
+		goto fail;
+
+	// Add a code segment for this process, which is the entire kernel
+	extern int __kernel_start, __kernel_end;
+	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_EXECUTABLE, NULL, 0);
+	if (error < 0)
 		goto fail;
 
 	alloc_kernel_stack(proc, idle_task, argv, envp);

@@ -92,7 +92,9 @@ struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int 
 void memory_segment_free(struct memory_segment *segment)
 {
 	#if defined(CONFIG_MMU)
-	vfs_close(segment->file);
+	if (segment->file) {
+		vfs_close(segment->file);
+	}
 	#else
 	memory_region_free(segment->region);
 	#endif
@@ -203,8 +205,9 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
 	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	#else
 
@@ -414,17 +417,19 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 {
 	uintptr_t start;
 	int error = ENOMEM;
-	struct memory_region *region = NULL;
 	MEMORY_OBJECT_T *heap_object, *stack_object;
 
 	#if defined(CONFIG_MMU)
 
 	// TODO This is so wrong, but is a placeholder for now.  I need to pass in the end of the data region don't I?  Or can I assume the memory map is already set up, and heap_start will already be set?
 	start = heap_start;
+	start = (uintptr_t) page_alloc_contiguous(stack_size);
 	heap_object = NULL;
 	stack_object = NULL;
 
 	#else
+
+	struct memory_region *region = NULL;
 
 	region = memory_region_alloc_user_memory(stack_size, NULL);
 	if (!region)

@@ -114,11 +114,25 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 		error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, MEMORY_OBJECT_MAKE_REF(MEMORY_OBJECT_ACCESS(cur)), cur->offset);
 		if (error < 0)
 			goto fail;
+		#if defined(CONFIG_MMU)
+		// TODO remove this later
+		// Inecrement the refcount on each page in the new memory area
+		// TODO also probably needs a better check, for SEG_WINDOW or something, or just use the page table addresses to determine?
+		// it might have to check multiple page blocks, but it's a fork, so it's maybe not as big of a deal?
+		if (cur->start >= 0x200000) {
+			page_make_ref_contiguous((page_t *) cur->start, cur->end - cur->start);
+		}
+		#endif
 	}
 
 	#if defined(CONFIG_MMU)
 
 	error = remap_all_copy_on_write(parent_proc, proc, new_map);
+	if (error < 0)
+		goto fail;
+
+	// TODO remove later
+	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
 
@@ -131,6 +145,15 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 	#endif
 
 	proc->map = new_map;
+
+	char *stack_pointer = NULL;
+	// TODO this needs to move to a common location, but the reason it can't (hasn't been) moved is because it needs the stack pointer?
+	// because it's adjusting both the user and kernel stacks, due to the fact that enabling user mode uses two stacks instead of one
+	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
+	if (!stack_pointer)
+		return EFAULT;
+	arch_clone_task_info(parent_proc, proc, stack_pointer);
+
 	return 0;
 
 fail:
@@ -166,22 +189,19 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	int error = 0;
 	uintptr_t heap_start;
 	uintptr_t stack_size;
-	char *stack_pointer = NULL;
 
 	heap_start = parent_proc->map->heap_start;
 	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
 
+	#if !defined(CONFIG_MMU)
 	error = memory_map_unmap(new_map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
 	if (error < 0)
 		return error;
+	#endif
 
 	error = memory_map_insert_heap_stack(new_map, heap_start, stack_size);
 	if (error < 0)
 		return error;
-
-	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
-	if (!stack_pointer)
-		return EFAULT;
 
 	error = memory_map_move_sbrk(new_map, parent_proc->map->sbrk - parent_proc->map->heap_start);
 	if (error < 0)
@@ -192,9 +212,6 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	// Adjust the pointers to the command line arguments to point to the new stack
 	new_map->argv = (const char *const *) adjust_string_array((char **) parent_proc->map->argv, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
 	new_map->envp = (const char *const *) adjust_string_array((char **) parent_proc->map->envp, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
-
-	proc->map = new_map;
-	arch_clone_task_info(parent_proc, proc, stack_pointer);
 
 	return 0;
 }

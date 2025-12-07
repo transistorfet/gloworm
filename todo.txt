@@ -1,8 +1,11 @@
 
-* try to isolate memory_object out and make it used only if !MMU
-* make copy_stack only called if not MMU
-
-* go through and assign proper error numbers to mmu_table_map
+* fix the _user_exit problem properly
+* cleanup init.c
+* test page faults, and a custom handler to recover from them
+* don't duplicate the stack in mmu mode
+* replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
+* test with CONFIG_MMU=n to make sure nothing broke
+* fix the stack allocation when MMU is enabled
 
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
   unfreed in the middle of the segment

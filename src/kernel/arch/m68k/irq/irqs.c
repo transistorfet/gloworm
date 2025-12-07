@@ -89,7 +89,7 @@ void user_error(struct exception_frame *frame)
 	print_process_segments(current_proc);
 	print_stack(frame, (void *) frame->pc);
 
-	dispatch_signal(current_proc, SIGKILL);
+	dispatch_signal(current_proc, SIGABRT);
 }
 
 void fatal_error(struct exception_frame *frame)

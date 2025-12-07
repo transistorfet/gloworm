@@ -1780,7 +1780,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 2025-12-04:
 
 - I put a simple check around page_make_ref_contiguous, and now it boots into an infinite fault loop starting with pid 4, which is
-  where we started from... It's on 103cc8, which 
+  where we started from... It's on 103cc8, which
 - WAIT A MINUTE ****************
 - that's to remind myself to notice this, this happens a lot where I see the code address of the fatal error, but that's the
   location going out of the kernel, which is a common time to fault.  Instead, there's a separate fault address on the stack, for a
@@ -1803,5 +1803,76 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - well at least today after sitting off, it's still failing at the same spot, so it's not a cache or TLB issue
 - thorpej was mentioning chasing a bug that involved the 68030 adding negative TLB entries into the TLB cache.  I'm not doing any
   cache flushing yet, so that could be a bug I come across, but for now I don't think that's the problem
+
+- I tried printing out the value of the root table, and the CRP root pointer when printing out the table, and lo and behold:
+   `??? root table: 20C200, MMU: 209B00 (2, 7FFF)`
+- the current pid should have the root table 0x20c200, but the CRP is set to use 0x209b00, which is also a valid table, so that's
+  good, but it's the wrong table, which would explain the faults.  It must not be switching correctly
+- what the FUUUCK, added a print statement to print the value of CRP before returning to the process, and not only is it working in
+  that the CRP matches the pid's root table, it now fails on the _user_exit error
+- something is very weird, where sometimes it works and sometimes fails due to another error that seems to happen with certain
+  kernel builds.  It's reproducable with the same kernel image, but each time i build the kernel, there's a chance it will switch
+  between the possible errors
+
+- I turned off the system over lunch, and then turn it on, uncommented the conditional around the page_make_ref_contiguous call in
+  fork, and it's now switched to erroring on 0x20DB08, and the CRP is wrong in the only two restore_context calls that returns to
+  pid 4
+- restoring the last change I made doesn't make it switch back to _user_exit error
+
+- ok, it's still erroring on 0x20db08, but I can see the bug now, and it's fairly obvious.  When exec() is called, the new process
+  uses the old memory map, and that gets replaced, but when it returns to the process, since it's the same process struct/id, it
+  won't call the arch_extended_context_switch(), so it's using the old process's memory table
+- so how to fix it?  Should the context switch be explicitly called in exec() somewhere (or binaries.c?) or should it invalidate the
+  previous_process value such that it will always to a full switch?
+- I feel like for the latter case, there's probably some code from before MMU additions that tries to handle that case.  It will
+  either handle it fine, or break because it expects previous_proc to only be NULL on first run
+
+- I added a conditional and `previous_proc = NULL` to the load_binary() function at the end, which should clear the previous_proc
+  and hopefully do a full context switch when returning.  Running that, it then errored on the _user_exit call, which is expected,
+  but didn't error on the other odd one
+- I enabled the exception for _user_exit and it's now failing on a kernel error much earlier on, which is a bit weird, 0x101b2a is
+  the code position, and 0x21fe13c is the fault address, which I think is the same as I was getting somewhere above
+- oh I thought the conditional around page_make_ref_contiguous was still there, but it was commented out
+
+- now we get pid 2 error, fault address 0x103854, code address 0x103d46.  The code address is the rte instruction in restore_context
+  and the fault address is the idle task loop, so something's broken with the _user_exit exception code??
+
+- ok I just removed the _user_exit function from the stack, although I could have just ignored it and lookd at previous runs, but
+  the first process just exits and terminates abnormally, the second process is pid 6 which terminates on 0x217d8c, which is mapped
+  in the table, buuut `??? root table: 217B00, MMU: 209F00 (2, 7FFF)`, so the previous_proc hack isn't enough?
+- but it seems to call an exec() from the other print statements?  So why didn't previous_proc not work?
+
+- I added more print statements, and of course it doesn't fail like before, but now it fails again at the idle process, which it
+  then can't recover from, and it turned out the kernel thread creation code wasn't creating an exception for the kernel itself.
+  That might have been the wrong fix, to add it to alloc_kernel_thread, since I think it should be sharing the same memory map, but
+  it didn't have the code segment (it was empty).  Maybe the problem is actually elsewhere.
+- even with that change, it's still showing pid 2's memory map as being empty?  What gives?  I guess something went wrong, like a
+  refcount didn't work, so it freed the kernel's table when it shouldn't have
+- oh there's actually a another function for creating the idle task.  I need to clean up those functions in init.c
+
+- adding the kernel code segment to the idle process's memory map, I think fixed the last problem, so now it actually gets to the
+  shell, and I can run ls from there!
+
+
+2025-12-06:
+
+- looking at the diffs, there were a lot of things that were wrong and needed fixing
+    - the binaries size and offset calculations were wrong, so it wasn't allocating enough memory for each program segment
+    - it wasn't allocating memory for the stack, which was causing it to be reused (I think)
+    - the code without the stack duplication would not have created the task info struct on the stack
+    - it wasn't incrementing the per-page refcounts
+    - the process wasn't doing a full context switch after an exce() call, which meant the mmu crp register wasn't set correctly
+    - the idle task didn't have a segment for the kernel code
+    - the processes that still require _user_exit didn't have an exception so that they could access it
+    - it would sometimes try to free a NULL file ptr when freeing a memory segment with file = NULL
+
+- and that's just the ones in the most recent work, not including the commits I made to clean up the diff
+- has this taught me to take it really slow and incrementally?  No
+- I need to clean this up and commit it, and then fix the _user_exit issue properly, and then I'll need to work towards not
+  duplicating the stack by getting copy on write to work.  That will require getting page faults working, primarily
+- I also need to test with CONFIG_MMU=n to make sure my recent changes didn't/don't break anything
+
+- the issue with _user_exit, I think, is moreso the kernel threads, to avoid the need for some kind of weird generic main function
+  that calls exit at the end
 
 

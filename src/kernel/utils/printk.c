@@ -5,7 +5,7 @@
 #include <kernel/printk.h>
 
 
-#define PRINTK_BUFFER	128
+#define PRINTK_BUFFER	512
 
 /// Functions that must be provided by the console driver
 void console_prepare_for_panic();

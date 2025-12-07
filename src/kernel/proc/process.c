@@ -87,8 +87,9 @@ void close_proc(struct process *proc)
 {
 	// Set the previous process to NULL so that we skip over attempting to
 	// save the context during restore_context
-	if (proc == previous_proc)
+	if (proc == previous_proc) {
 		previous_proc = NULL;
+	}
 
 	remove_timer(&proc->timer);
 	if (proc->fd_table) {
