@@ -79,7 +79,7 @@ struct process *create_init_task(void)
 
 fail:
 	if (proc)
-		close_proc(proc);
+		exit_proc(proc, -1);
 	panic("failed to create init task, %d; stopping\n", error);
 	while (1) {}
 }
@@ -120,7 +120,7 @@ struct process *create_idle_task(void)
 
 fail:
 	if (proc)
-		close_proc(proc);
+		exit_proc(proc, -1);
 	panic("failed to create primordial process, %d; stopping\n", error);
 	while (1) {}
 }
@@ -152,7 +152,7 @@ struct process *create_kernel_thread(const char *name, int (*task_start)())
 
 fail:
 	if (proc)
-		close_proc(proc);
+		exit_proc(proc, -1);
 	log_error("error when creating kernel task: %d\n", error);
 	return NULL;
 }

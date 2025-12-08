@@ -1876,3 +1876,27 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   that calls exit at the end
 
 
+- I tried banging out a load_page_at impl for anonymous memory, and made the stack use it when allocating.  It's not working, but
+  I'll debug it tomorrow
+
+
+2025-12-07:
+
+- well that was relatively easy to figure out.  There was a page fault when accessing address 0, but that didn't make much sense
+  The difference between working and not was a line commented out: `start = page_alloc_contiguous(...)` in
+  memory_map_insert_stack_and_heap() to allocate memory for the heap/stack.  Without it, the stack segment would not be allocated
+  and it would use the heap_start argument instead.  That change won't do what I expected it to do since mmap will still use WINDOW
+  to map the segment, but there were a bunch of other bugs that occurred at the same time
+- the error occurred in pid 0, which maked no sense at first.  It turns out since the segment is already mapped, it fails with an
+  EEXISTS error when forking the shell, pid 3.  There's no error saying that that happened, but either way it bails out and kills
+  the process
+- at that point, the pid is set to 0, but it's still the current process!!!!  that's a big bug.  It runs a dead process.  I think it
+  might still be in the run queue, which is why it says "switching to pid 0", even though it's what was pid 3, and the memory map is
+  already NULL and freed
+- when the page fault occurs, it doesn't call memory_map_load_page_at because the map is NULL, so it just prints the error and
+  terminates
+- so when a process is terminated during a fork at least, it might still be runnable
+
+- also easy to fix, just replaced close_proc everywhere with exit_proc(), which is defined in the scheduler, and which calls
+  close_proc, as well as removing the process from the queues.  I fixed it in clone() and in init.c
+

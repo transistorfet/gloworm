@@ -35,7 +35,8 @@ int clone_process(struct process *parent_proc, struct clone_args *args, struct p
 
 	error = clone_process_memory(parent_proc, proc, args->flags);
 	if (error < 0) {
-		close_proc(proc);
+		log_debug("failed to clone process %d from %d: %d\n", proc->pid, parent_proc->pid, error);
+		exit_proc(proc, error);
 		cleanup_proc(proc);
 		return error;
 	}
