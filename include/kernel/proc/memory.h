@@ -16,6 +16,8 @@
 #include <asm/mmu.h>
 #endif
 
+#define rounddown(value, size)	((value) & ~((size) - 1))
+
 #define KERNEL_STACK_SIZE	CONFIG_KERNEL_STACK_SIZE * PAGE_SIZE
 
 #define SEG_TYPE		0x000F		// Mask for type of mapping
@@ -32,7 +34,6 @@
 #define SEG_GROWSDOWN		0x0100		// stack-like segment
 
 struct vfile;
-struct process;
 struct memory_region;
 struct memory_segment;
 
@@ -127,14 +128,16 @@ static inline struct memory_map *memory_map_make_ref(struct memory_map *map);
 
 int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset);
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
-int memory_map_remap_copy_on_write(struct memory_map *map, uintptr_t start, size_t length);
+int memory_map_copy(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment);
 
 int memory_map_resize(struct memory_segment *segment, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size);
 
 int memory_map_move_sbrk(struct memory_map *map, int diff);
 
-void print_process_segments(struct process *proc);
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr);
+
+void memory_map_print_segments(struct memory_map *map);
 
 
 /************************

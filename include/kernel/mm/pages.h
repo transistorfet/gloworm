@@ -3,6 +3,7 @@
 #define _KERNEL_PAGES_H
 
 #include <stdint.h>
+#include <string.h>
 #include <kconfig.h>
 #include <kernel/utils/queue.h>
 
@@ -77,6 +78,11 @@ void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t si
 page_t *page_block_make_ref_single(struct page_block *block, page_t *ptr);
 page_t *page_block_make_ref_contiguous(struct page_block *block, page_t *ptr, size_t size);
 #endif
+
+static inline void zero_page(page_t *ptr)
+{
+	memset(ptr, 0, PAGE_SIZE);
+}
 
 extern struct page_block pages;
 #define init_pages(start, end)					init_page_block(&pages, (void *) start, end)

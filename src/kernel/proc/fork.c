@@ -14,7 +14,6 @@
 #include <kernel/proc/process.h>
 
 char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
-static inline int remap_all_copy_on_write(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
 static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
 
@@ -111,39 +110,19 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 		return ENOMEM;
 
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
-		// TODO enable copy on write for both the new map, and the parent map
-		error = memory_map_mmap(new_map, cur->start, cur->end - cur->start, cur->flags, MEMORY_OBJECT_MAKE_REF(MEMORY_OBJECT_ACCESS(cur)), cur->offset);
+		error = memory_map_copy(new_map, parent_proc->map, cur);
 		if (error < 0)
 			goto fail;
-		#if defined(CONFIG_MMU)
-		// TODO remove this later
-		// Inecrement the refcount on each page in the new memory area
-		// TODO also probably needs a better check, for SEG_WINDOW or something, or just use the page table addresses to determine?
-		// it might have to check multiple page blocks, but it's a fork, so it's maybe not as big of a deal?
-		if (cur->start >= 0x200000) {
-			page_make_ref_contiguous((page_t *) cur->start, cur->end - cur->start);
-		}
-		#endif
 	}
 
-	#if defined(CONFIG_MMU)
-
-	error = remap_all_copy_on_write(parent_proc, proc, new_map);
-	if (error < 0)
-		goto fail;
-
-	// TODO remove later
-	error = copy_stack(parent_proc, proc, new_map);
-	if (error < 0)
-		goto fail;
-
-	#else
+	// TODO temporarily using copy stack in MMU-mode as well, until copy-on-write is working
+	//#if !defined(CONFIG_MMU)
 
 	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
 
-	#endif
+	//#endif
 
 	proc->map = new_map;
 
@@ -163,28 +142,6 @@ fail:
 	return error;
 }
 
-static inline int remap_all_copy_on_write(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
-{
-	int error = 0;
-	struct memory_segment *cur;
-
-	// Remap all in parent process
-	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
-		error = memory_map_remap_copy_on_write(parent_proc->map, cur->start, cur->end - cur->start);
-		if (error < 0)
-			return error;
-	}
-
-	// Remap all in child process
-	for (cur = memory_map_iter_first(new_map); cur; cur = memory_map_iter_next(cur)) {
-		error = memory_map_remap_copy_on_write(new_map, cur->start, cur->end - cur->start);
-		if (error < 0)
-			return error;
-	}
-
-	return 0;
-}
-
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
 {
 	int error = 0;
@@ -194,6 +151,7 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	heap_start = parent_proc->map->heap_start;
 	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
 
+	// TODO this #if is temporary, until MMU-mode stops using copy_stack
 	#if !defined(CONFIG_MMU)
 	error = memory_map_unmap(new_map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
 	if (error < 0)

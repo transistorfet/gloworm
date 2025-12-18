@@ -23,6 +23,7 @@ typedef void (*m68k_irq_handler_t)();
 extern void enter_exception(void);
 
 void enter_trace(struct exception_frame frame);
+static void page_fault_handler(struct exception_frame *frame);
 
 static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
 
@@ -86,7 +87,8 @@ extern struct process *current_proc;
 void user_error(struct exception_frame *frame)
 {
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
-	print_process_segments(current_proc);
+	printk("pid %d memory map:\n", current_proc->pid);
+	memory_map_print_segments(current_proc->map);
 	print_stack(frame, (void *) frame->pc);
 
 	dispatch_signal(current_proc, SIGABRT);
@@ -116,12 +118,16 @@ void fatal_error(struct exception_frame *frame)
 
 void handle_exception(struct exception_frame *frame)
 {
-	extern int kernel_reentries;
-	if (kernel_reentries <= 1) {
-		user_error(frame);
+	if (((frame->vector & 0xFFF) >> 2) == IRQ_BUS_ERROR) {
+		page_fault_handler(frame);
 	} else {
-		fatal_error(frame);
-		asm volatile("stop #0x2700\n");
+		extern int kernel_reentries;
+		if (kernel_reentries <= 1) {
+			user_error(frame);
+		} else {
+			fatal_error(frame);
+			asm volatile("stop #0x2700\n");
+		}
 	}
 }
 
@@ -129,3 +135,31 @@ __attribute__((interrupt)) void enter_trace(struct exception_frame frame)
 {
 	log_trace("Trace %x (%x)\n", frame.pc, frame.pc);
 }
+
+static void page_fault_handler(struct exception_frame *frame)
+{
+	int error = 0;
+
+	#if defined(CONFIG_MMU)
+
+	print_stack(frame, (void *) frame->pc);
+
+	log_error("page fault @ %x\n", frame->formatb.fault_addr);
+	log_error("current %x, pid %d, map %x\n", current_proc, current_proc->pid, current_proc->map);
+	if (current_proc && current_proc->map) {
+		//mmu_table_print(current_proc->map->root_table);
+		error = memory_map_load_page_at(current_proc->map, frame->formatb.fault_addr);
+		if (error < 0) {
+			user_error(frame);
+		}
+	} else {
+		user_error(frame);
+	}
+
+	#else
+
+	user_error(frame);
+
+	#endif
+}
+

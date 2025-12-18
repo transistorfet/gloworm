@@ -219,7 +219,6 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {
-
 		if (prog_headers[i].p_type == PT_LOAD && prog_headers[i].p_filesz > 0) {
 			file_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 			file_segment_end = file_segment_start + prog_headers[i].p_filesz;

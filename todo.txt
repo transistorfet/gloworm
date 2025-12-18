@@ -1,4 +1,6 @@
 
+* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
+* move memory.c to mm/
 * fix the _user_exit problem properly
 * cleanup init.c
 * test page faults, and a custom handler to recover from them

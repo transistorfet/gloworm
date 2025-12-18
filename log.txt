@@ -1900,3 +1900,59 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - also easy to fix, just replaced close_proc everywhere with exit_proc(), which is defined in the scheduler, and which calls
   close_proc, as well as removing the process from the queues.  I fixed it in clone() and in init.c
 
+- pushing further, it also has the descriptor type set in the mmu tables despite being set to a table of NULL when using the
+  MMU_FLAG_UNALLOCATED, so it would think it had correctly updated the tables and returned to the process 
+
+
+2025-12-13:
+
+- I'm working on rewriting the mmu table mapping code so it can be more easily reused with another function to traverse and modify
+  the mapping (for copy_on_write)
+- what I wrote seems to work fine, I separated out a function that gets the most terminal table given a virtual address and returns
+  it.  The mapping code can then just call this function when it gets to the end of the current table, and it will do all the
+  complicated `bits` and stuff, and it doesn't need `levels` and multitiered table pointers because it just looks it up fresh each
+  time it changes, which isn't often
+- that said, there's a problem with it.  It's really slow on boot.  I'm pretty sure the old code would map with early termination
+  descriptors, so when the kernel tables are created, it doesn't have to fill them all out.  That's likely the only code that would
+  benefit from early terminators, but either way, I should add them again.  The question is how it should be requested in the
+  get_leaf_table()
+
+
+2025-12-17:
+
+- I've been writing some of the necessary table manipulation code for eventually getting copy on write.  I had to refactor the map
+  code so that some of it could be reused in other functions.  That allowed me to add a separate mmu_table_copy() function, which
+  couldn't be easily integrated into the map function.  It will copy a range of addresses in an existing table to another table, so
+  if some of that data is already assigned a page, the page will be assigned to both.  I'm sure there's still some bugs in it, at
+  least related to page refcounts or something.
+- I also implemented code to free an entire table.  I don't think it's being used yet, or maybe it is when the process is removed,
+  but the map function doesn't properly remove the tables when unmapping.  I probably have some bugs in the unmap code since the
+  page free call is weird
+- one of the issues that probably still exists is the single page vs page block difference.  The mapping code can map an entire
+  granuale (ARM's MMU term for a early termination).  With the current config of 256 byte pages, a 64kb region could be mapped and
+  save an entire table.  I haven't tested that though, and it will likely run into other problems
+
+- so the issue I'm facing now is that I've changed a bunch of things, and even though copy on write isn't implemented yet, most of
+  the segment copying and such should be in place.  I compiled it without MMU though, and it boots into the shell, but crashes when
+  running a command, so I've clearly got something wrong.  I'd like to fix this first before switching back to the MMU code, since
+  this bug probably applies to both
+- I'm pretty sure it's related to the new memory_map_copy() function, which is the only common code that's new
+
+- didn't take long to find the issue.  The new copy code wasn't incrementing references on the memory region or file pointer, which
+  for non-MMU mode means it would have freed and reused the memory region of a process.  It seems to be running fine with no
+  exceptions in non-MMU mode
+
+- compiling for MMU mode, there's a bunch of errors for some reason... I thought it was compiling fine before
+- was just the wrong names for the other segment fields that are copied when copying the whole segment
+- it boots into the shell with just the normal _user_exit exception, but when running a command like `ls`, it crashes
+- it does seem to return to the shell though, and I can run a second command, but the command I run doesn't actually run.  It
+  crashes quite soon after starting
+- I think all the programs are crashing from a page fault @ address 0 (null pointer dereference), but since the program should be
+  fine (exact code runs perfectly with no-MMU), then it must be memory related, either the stack getting clobbered because copy on
+  write is not fully working, or some page is 0 or something?
+- oh interesting, in the mmu tables, some of the status values for the page descriptors are 9 or 19 instead of just 1.  1 is the
+  page descriptor type, 0x08 would be the U bit, which I think is the updated or dirty bit, so the CPU sets that when it's written
+  to that page.  The 0x10 bit though is the M bit.  Oh, the M bit is modified, and the U bit is updated, which isn't the same as the
+  dirty bit (M is the dirty bit).  U is set when the descriptor is accessed as part of a table search.  I'm not sure what the
+  utility of that is to be honest
+

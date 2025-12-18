@@ -59,13 +59,56 @@ void memory_region_free(struct memory_region *region)
 }
 #endif
 
+
+#if defined(CONFIG_MMU)
+physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+{
+
+	return NULL;
+}
+
 struct memory_ops file_memory_ops = {
 	.load_page_at	= NULL,
 };
 
+
+physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+{
+	page_t *page;
+
+	page = page_alloc_single();
+	if (!page) {
+		return ENOMEM;
+	}
+	zero_page(page);
+	return (physical_address_t) page;
+}
+
 struct memory_ops anonymous_memory_ops = {
-	.load_page_at	= NULL,
+	.load_page_at	= anonymous_memory_ops_load_page_at,
 };
+
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr)
+{
+	physical_address_t new_page;
+	struct memory_segment *segment;
+
+	segment = memory_map_find(map, vaddr);
+	if (!segment) {
+		return ENOENT;
+	}
+
+	if (segment->ops && segment->ops->load_page_at) {
+		new_page = segment->ops->load_page_at(segment, vaddr);
+		if (!new_page) {
+			return EEXIST;
+		}
+		mmu_table_set_page(map->root_table, vaddr & ~(PAGE_SIZE - 1), new_page);
+	}
+
+	return ENOENT;
+}
+#endif
 
 struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int flags)
 {
@@ -147,6 +190,50 @@ void memory_map_free(struct memory_map *map)
 	}
 }
 
+static inline struct memory_segment *memory_map_insert_segment(struct memory_map *map, uintptr_t start, size_t length, int flags)
+{
+	uintptr_t end;
+	struct memory_segment *cur, *next, *segment;
+
+	end = start + length;
+
+	// Find the location to insert the new segment before allocating it
+	for (cur = _queue_head(&map->segments); cur; cur = next) {
+		next = _queue_next(&cur->node);
+		if (cur->end <= start && (!next || end <= next->start)) {
+			break;
+		}
+	}
+
+	segment = memory_segment_alloc(start, end, flags);
+	if (!segment) {
+		return NULL;
+	}
+
+	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
+	_queue_insert_after(&map->segments, &segment->node, cur ? &cur->node : NULL);
+
+	return segment;
+}
+
+static inline void memory_map_adjust_markers(struct memory_map *map, struct memory_segment *segment)
+{
+	// Adjust memory markers, if needed
+	if (segment->flags & SEG_EXECUTABLE) {
+		if (!map->code_start) {
+			map->code_start = segment->start;
+		}
+	} else {
+		if (!map->data_start) {
+			map->data_start = segment->start;
+		}
+	}
+
+	if ((segment->flags & SEG_TYPE_STACK) && segment->end > map->stack_end) {
+		map->stack_end = segment->end;
+	}
+}
+
 /// Map the given address range to the given region
 ///
 /// NOTE: this will not unmap any previously mapped regions nor will it check for
@@ -155,10 +242,7 @@ void memory_map_free(struct memory_map *map)
 int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset)
 {
 	int error = 0;
-	uintptr_t end;
-	struct memory_segment *cur, *next, *segment;
-
-	end = start + length;
+	struct memory_segment *segment;
 
 	// Check that the length is a multiple of the page size, or raise an error
 	if (length & (PAGE_SIZE - 1)) {
@@ -176,22 +260,11 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 		return EINVAL;
 	}
 
-	// Find the location to insert the new segment before allocating it
-	for (cur = _queue_head(&map->segments); cur; cur = next) {
-		next = _queue_next(&cur->node);
-		if (cur->end <= start && (!next || end <= next->start)) {
-			break;
-		}
-	}
-
-	segment = memory_segment_alloc(start, end, flags);
+	segment = memory_map_insert_segment(map, start, length, flags);
 	if (!segment) {
 		error = ENOMEM;
 		goto fail;
 	}
-
-	// If cur is NULL (ie. no space found after first segment), then insert it at the beginning
-	_queue_insert_after(&map->segments, &segment->node, cur ? &cur->node : NULL);
 
 	#if defined(CONFIG_MMU)
 
@@ -203,8 +276,14 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	segment->file = object;
 	segment->offset = offset;
 
+	int mmu_flags = 0;
+	if (flags & SEG_WRITE) {
+		mmu_flags = MMU_FLAG_WRITE;
+	}
+
 	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
-	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW);
+	//error = mmu_table_map(map->root_table, start, length, (!object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);
+	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW | mmu_flags);
 	if (error < 0) {
 		goto fail;
 	}
@@ -215,20 +294,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	#endif
 
-	// Adjust memory markers, if needed
-	if (flags & SEG_EXECUTABLE) {
-		if (!map->code_start) {
-			map->code_start = start;
-		}
-	} else {
-		if (!map->data_start) {
-			map->data_start = start;
-		}
-	}
-
-	if (end > map->stack_end) {
-		map->stack_end = end;
-	}
+	memory_map_adjust_markers(map, segment);
 
 	return 0;
 
@@ -304,16 +370,35 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 	return 0;
 }
 
-int memory_map_remap_copy_on_write(struct memory_map *map, uintptr_t start, size_t length)
+int memory_map_copy(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment)
 {
+	int error;
+	struct memory_segment *segment;
 
-	// TODO would this have to be one exact segment entry to work?
-	// TODO well I guess the page loading strategy function could be the same and check
-	//	the page descriptor for a read only bit, while the segment would be read write
-	//	I guess this could skip any segments that are read only, since write isn't needed?
-	// TODO so this would primarily be a pages.c impl for remapping, and it's mostly touching
-	//	the page descriptors, but would also increment all refcounts?
-	// TODO actually, should it be the caller (fork.c) to increment the page references?
+	segment = memory_map_insert_segment(dest_map, src_segment->start, src_segment-> end - src_segment->start, src_segment->flags);
+	if (!segment) {
+		return ENOMEM;
+	}
+
+	segment->offset = src_segment->offset;
+
+	#if defined(CONFIG_MMU)
+
+	segment->ops = src_segment->ops;
+	segment->file = MEMORY_OBJECT_MAKE_REF(src_segment->file);
+
+	//error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, MMU_FLAG_COPY_ON_WRITE);
+	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, 0);
+	if (error < 0)
+		return error;
+
+	#else
+
+	segment->region = MEMORY_OBJECT_MAKE_REF(src_segment->region);
+
+	#endif
+
+	memory_map_adjust_markers(dest_map, segment);
 
 	return 0;
 }
@@ -461,17 +546,14 @@ fail:
 	return error;
 }
 
-void print_process_segments(struct process *proc)
+void memory_map_print_segments(struct memory_map *map)
 {
 	struct memory_segment *cur;
 
-	if (proc->map) {
-		printk("pid %d memory map:\n", proc->pid);
-		for (cur = _queue_head(&proc->map->segments); cur; cur = _queue_next(&cur->node)) {
+	if (map) {
+		for (cur = _queue_head(&map->segments); cur; cur = _queue_next(&cur->node)) {
 			printk("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
 		}
-	} else {
-		printk("pid %d memory map: NULL\n", proc->pid);
 	}
 }
 

@@ -5,6 +5,8 @@
 #include <asm/mmu.h>
 #endif
 
+void page_fault_handler();
+
 int arch_init_mm(void)
 {
 	#if defined(CONFIG_MMU)
