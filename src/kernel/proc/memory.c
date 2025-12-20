@@ -63,12 +63,34 @@ void memory_region_free(struct memory_region *region)
 #if defined(CONFIG_MMU)
 physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
 {
+	int error;
+	page_t *page;
+	offset_t file_offset;
 
-	return NULL;
+	page = page_alloc_single();
+	if (!page) {
+		return NULL;
+	}
+
+	file_offset = rounddown(vaddr - segment->start, PAGE_SIZE) + rounddown(segment->offset, PAGE_SIZE);
+	//printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
+	error = vfs_seek(segment->file, file_offset, SEEK_SET);
+	if (error < 0) {
+		return NULL;
+	}
+	error = vfs_read(segment->file, (char *) page, PAGE_SIZE);
+	if (error < 0) {
+		return NULL;
+	}
+
+	//printk("newly loaded page\n");
+	//printk_dump((uint16_t *) page, PAGE_SIZE);
+
+	return (physical_address_t) page;
 }
 
 struct memory_ops file_memory_ops = {
-	.load_page_at	= NULL,
+	.load_page_at	= file_memory_ops_load_page_at,
 };
 
 
@@ -78,7 +100,7 @@ physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segm
 
 	page = page_alloc_single();
 	if (!page) {
-		return ENOMEM;
+		return NULL;
 	}
 	zero_page(page);
 	return (physical_address_t) page;
@@ -90,6 +112,7 @@ struct memory_ops anonymous_memory_ops = {
 
 int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr)
 {
+	int error;
 	physical_address_t new_page;
 	struct memory_segment *segment;
 
@@ -103,10 +126,15 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr)
 		if (!new_page) {
 			return EEXIST;
 		}
-		mmu_table_set_page(map->root_table, vaddr & ~(PAGE_SIZE - 1), new_page);
+		error = mmu_table_set_page(map->root_table, rounddown(vaddr, PAGE_SIZE), new_page);
+		if (error < 0) {
+			page_free_single((page_t *) new_page);
+			return error;
+		}
+		return 0;
+	} else {
+		return ENOENT;
 	}
-
-	return ENOENT;
 }
 #endif
 
@@ -283,6 +311,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
 	//error = mmu_table_map(map->root_table, start, length, (!object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);
+	//error = mmu_table_map(map->root_table, start, length, (object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);
 	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW | mmu_flags);
 	if (error < 0) {
 		goto fail;
@@ -370,7 +399,7 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 	return 0;
 }
 
-int memory_map_copy(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment)
+int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment)
 {
 	int error;
 	struct memory_segment *segment;

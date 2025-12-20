@@ -1821,7 +1821,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 
 - ok, it's still erroring on 0x20db08, but I can see the bug now, and it's fairly obvious.  When exec() is called, the new process
   uses the old memory map, and that gets replaced, but when it returns to the process, since it's the same process struct/id, it
-  won't call the arch_extended_context_switch(), so it's using the old process's memory table
+  won't call the arch_extended_switch_context(), so it's using the old process's memory table
 - so how to fix it?  Should the context switch be explicitly called in exec() somewhere (or binaries.c?) or should it invalidate the
   previous_process value such that it will always to a full switch?
 - I feel like for the latter case, there's probably some code from before MMU additions that tries to handle that case.  It will
@@ -1955,4 +1955,153 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   to that page.  The 0x10 bit though is the M bit.  Oh, the M bit is modified, and the U bit is updated, which isn't the same as the
   dirty bit (M is the dirty bit).  U is set when the descriptor is accessed as part of a table search.  I'm not sure what the
   utility of that is to be honest
+
+
+2025-12-18:
+
+- so I've been playing with it in various ways.  I added the file-backed segment loading, which does seem to actually be working.
+  I'm still using copy stack and leaving the anonymous memory as WINDOW for now
+- it does seem to have page faults that make sense for running the init process, and it seems to load the data correctly, but it
+  still ends with pid 1 terminating (and the idle process continuing to run in the background).  I was wracking my brain as to why
+  it's failing, and I think I finally realized the issue
+- it's likely using the wrong addresses when a systemcall comes in.  The user program has loaded the program into 0x40000 in virtual
+  addresss, and the data segment will be in that range too, so any addresses passed into the kernel will be wrong, and the syscall
+  will probably fail.  I would have expected it to print the failed to execute message at the end, but it doesn't.  It doesn't call
+  exec() either, from what I gather.  But it's got to be the lack of address translation in the kernel that's messing things up,
+  because it otherwise seems to be running correctly
+- I had been hoping to put off the address translation changes for a while, but unfortunately everything is pretty interdependent.
+  I think I might be better off backtracking a bit, disabling the changes that cause page faults, and implement the translation
+  first, which should be a no-op in non-MMU mode, and with MMU enabled but phys addresses used, should translate to the exact same
+  address
+
+- so pretty sure that's the problem.  I confirmed it by printing out the address of the string passed into open()
+- I tried putting it back so that it won't page fault anymore, but there's still one transient page fault.  When starting up, pid 6
+  (which I think might be ntpdate or something in the /etc/rc) has a page fault for address 20AC88.  The address seems to be mapped
+  correctly, and points to a fixed location in memory according to the table, but for some reason, it has that page fault!  Still
+  trying to track down the cause
+- my hunch is that the CRP or something is incorrect at that moment, which is why the page fault occurs?
+
+- yup
+  ```
+  page fault @ 20AC88
+  current 10E3C8, pid 6, map 125CA4, pc 103DF4
+  root table for pid is 20AA00
+  SRP 202100 (2)
+  CRP 20A500 (2)
+  printing table 20AA00
+  ```
+- 20A500 is the table for pid 5 (not pid 6), and it definitely doesn't have the address 20AC88 in its mapping
+- it doesn't happen every time, sometimes I need to recompile and reupload.  I think I've tried booting again with the same memory
+  contents and not had it happen twice, but maybe that's coincidence.  It probably has more to do with the properties of the timer,
+  whether it just so happens to catch things at the right time
+- it's either a context switch not happening when it should (possibly during a fork or exec), or it could be... well I was thinking
+  could be stack corruption, but in this case, the table is for pid 5, but pid 5 has already exited, and only pid 5 would share a
+  stack with pid 6?  Or is it pid 4 that forks pid 6, in which case they would share a stack, but an address for pid 5 shouldn't be
+  on either pid 4 or 6's stack anyways...
+
+- tried 2 times running `boot` again on the same load of the kernel, which doesn't seem to produce the 20AC88 page fault issue.  It
+  boots normally, and times out when running ntpdate
+- next I'll try reloading the kernel over serial again.  That produced the issue!  So reloading it has something to do with it, but
+  not the compiling of it, but just `boot`ing again doesn't seem to cause it
+
+- this is weird, I've put some messages into the code about the extended context switch, and it says, after pid 5 terminates, that
+  it switches from NULL (ie. invalidated previous process) to pid 4 (twice), and then switching from 4 to pid 6 which has the page
+  fault.  But despite the root table for pid 6 being 20AA00, the CRP register is still reading back as 20A500, so is it not being
+  written always?  is it failing to write sometimes?
+- Ah ha!
+  `EXTENDED SWITCHEROO from pid 4 to pid 6 (with table 20A500)`
+  So the root_table of the current_proc in the last extended context switch was 20A500, even though by the time the page fault
+  occurs, it's 20AA00!  So why is it the same as pid 5's until later?
+- Is it the same map, or just the same table?  I would assume it's literally the same map, and this is before the exec or something
+- the plot thickens?  This is a working run, without the page fault issue
+  ```
+  EXTENDED SWITCHEROO from pid 5 to pid 4 (with table 20C400 and map 1232C8)
+  EXTENDED SWITCHEROO from pid 4 to pid 5 (with table 20A500 and map 1230A8)
+  ...
+  EXTENDED SWITCHEROO from pid -1 to pid 4 (with table 20C400 and map 1232C8)
+  EXTENDED SWITCHEROO from pid 4 to pid 6 (with table 20A500 and map 1230F8)
+  EXTENDED SWITCHEROO from pid 6 to pid 4 (with table 20C400 and map 1232C8)
+  EXTENDED SWITCHEROO from pid 4 to pid 6 (with table 20A500 and map 1230F8)
+  exec
+  EXTENDED SWITCHEROO from pid -1 to pid 6 (with table 20AA00 and map 125CA4)
+  EXTENDED SWITCHEROO from pid 6 to pid 2 (with table 202C00 and map 120008)
+  EXTENDED SWITCHEROO from pid 2 to pid 6 (with table 20AA00 and map 125CA4)
+  ```
+- so the map is different between pid 5 and early on in pid 6's life, but after the exec, the map and root are very different, which
+  is the correct thing.  When the issue happens, it must be happening before the exec when the map is in a weird state
+
+- ok, so I commented out the conditional around previous_proc = NULL in the exec code, hoping it would always do an extended switch
+  when an exec occurs, but that didn't fix the problem.  It reoccurred after 3 attempts.  The page fault occurs right after `exec`
+  is printed, at the start of the exec, and when it occurs, pid 6 does actually have does still have the same root, despite having a
+  slightly different map address
+- does it have to do with duplicate_memory_map() in fork.c?  that seems the most likely culprit
+
+- what if the fact that the root table is the same is a red herring, because pid 5 exits before pid 4 forks to pid 6, so it might
+  just reallocate the same table, but otherwise erase it
+- this is so weird.  Printing out the mmu table on each switch, and pid 4, 5, and 6 seem to all have same MMU map, even when they
+  have different root tables
+
+- when the error occurs, it calls exec, and exec exits, and then it has the page fault as soon as rte is executed in
+  restore_context, but it doesn't print that it did a context switch...  Could blocking print (or lack there of in this case) be
+  part of the problem? (a delayed extended switch message)?  Or is it really just failing to call schedule
+- well... it looks like the syscall entry code, where schedule() is called from, only checks if needs_reschedule is true or not, and
+  skips it (I think, I just looked briefly), but that would make sense.  Invalidating the previous proc would not be enough
+- there's an explicit `request_reschedule()` function that should be called from exec instead...  I want to make sure there isn't
+  another bug here though, so I'll do some diligence before trying that.  Anyways, I'll stop for today and pick it up tomorrow
+
+
+2025-12-19:
+
+- ok I'm pretty sure I've confirmed that the same table address (20A500) is not a bug.  It's just reallocating the same page when
+  the new process is created, and the table is empty at that point, before the segments are duplicated into it
+- I'm still not sure why the segments are all the same between pid 4, 5,  and 6...
+- I don't think it's a problem.  Pid 4 has those segments, and they appear when printing out the segments for pid 5 and 6 after the
+  fork, as expected, but then those processes exec, and while I haven't looked closely at the tables after the exec of pid 5, I know
+  pid 6 ends up different
+- well actually it looks like pid 5 doesn't exec() which is a bit weird, but maybe that's because the shell has some utilities built
+  into it?  It looks like it prints the `Running /etc/rc` message right after the fork, which is an `echo` command in the /etc/rc
+  file
+
+- Ok, I'll leave that as is.  Back to the original problem
+- last night in bed, I quickly searched through the code and found that the syscall_entry.S file is checking the `needs_reschedule`
+  flag for whether it should call `schedule()` or not, so `previous_proc = NULL` is not enough to guarantee the extended context
+  switch happens!
+- the `request_reschedule()` function will set the flag (that's all it does atm), and there's only one place that that's used, which
+  is in the tty_68681.c file after the timer interrupt fires.  It calls that function to switch running tasks.  That might not quite
+  be what I want for after exec() but at least it will force the extended switch
+- the `previous_proc = NULL` on the other hand is used in two locations, one of which is the location in binaries.c that I recently
+  added, and the other is in process.c in `close_proc()` which has a specific comment saying
+  	// Set the previous process to NULL so that we skip over attempting to
+	// save the context during restore_context
+- So setting previous_proc = NULL will skip over trying to save the context when it's returning to user space, which might not be
+  what we want always (in terms of adding it to request_reschedule())
+- that said, in binaries.c during exec(), we might actually want that, as in we don't want to save the extra registers of the
+  process we're returning to, or if we switch to another process, we don't want to save the previous process's pre-exec() register
+  values to the newly exec'd process's task struct, so I think it makes sense to invalidate the previous process in that case
+- I don't like how it's directly modifying that value though, so maybe we can wrap it in a function
+- how does linux deal with this?  minix might not have anything special since it might not have a delayed extended switch?
+
+- in section 20.4 of Understanding the Linux Kernel 3rd edition, it talks about what happens during an exec(), and item 8 mentions
+  it calls flush_old_exec(), which does a whole bunch of things to free resources from the old process before launching the new one,
+  including releasing signal handlers, unsharing shared files, releasing all memory descriptors and such, and calling
+  `flush_thread()` to clear the floating point registers and debug registers saved in the TSS
+- it doesn't explicitly mention the MMU registers, but it would make sense for that to be part of flush_thread, or the memory
+  freeing code.  Either way, I think there's a lot of things I haven't thought to reset during an exec, which I should
+
+- after looking into the code, I found that the file descriptor table wasn't being freed properly.  I had modified it to have a
+  refcount, and it was incrementing the refcount when cloned/forked with CLONE_FILES, but I was still using the `release_fd_table`
+  function without freeing the allocation when the process exited.  The free_fd_table() function also wasn't checking the refcount,
+  or releasing the table.  I've fixed that now so it actually decrements the refcount and frees the table properly if it reaches 0
+- I added a reset_proc() function to process.c which will copy the stdin, stdout, and stderr files to a new table, and decrement the
+  refcount to the old one (so if it's held by another process, it won't be modified when one of the processes exec()s).  The
+  function also resets the signal table and the blocked and waiting process data.
+- It might need to reset even more data.  I'm not sure about start time and such, and I think there was a reference to some of the
+  pid fields being changed by an exec() as well
+- I put the arch_extended_switch_context() call into the exec_initialize_user_stack_with_args call, and the kernel one too.  I don't
+  like them being there, but it works for now
+- I've tried loading it a bunch of times, and it seems to run ntpdate and reach the timeout every time now
+- there were quite a few bugs fixed by all of this, which weren't caught before when the MMU was disabled, so I'm pretty happy about
+  this
+
+- tomorrow I'll clean up the code a bit, and commit it, and then start in on some of the userspace-to-kernelspace translations
 

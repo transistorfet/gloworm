@@ -18,6 +18,9 @@
 #define MMU_MOVE_TO_SRP(value)		\
 	asm volatile("pmove	%0, %%srp\n" : : "m" (value))
 
+#define MMU_MOVE_FROM_SRP(value)	\
+	asm volatile("pmove	%%srp, %0\n" : "=m" (value))
+
 #define MMU_MOVE_TO_CRP(value)		\
 	asm volatile("pmove	%0, %%crp\n" : : "m" (value))
 
@@ -147,6 +150,7 @@ void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, ssize_t length, int flags);
 int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, ssize_t length, int flags);
 int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr);
+page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr);
 int mmu_table_print(mmu_descriptor_t *root);
 
 static inline void mmu_table_switch(mmu_descriptor_t *root)

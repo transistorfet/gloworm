@@ -1,9 +1,15 @@
 
+* go through all the syscalls and add address translation from user space to kernel space
+  linux actually copies filenames from user space to a cache location allocated on each syscall, but maybe I can get away with copying them to the stack
+* where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
+
+* add user-to-kernel address translations
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 * move memory.c to mm/
 * fix the _user_exit problem properly
-* cleanup init.c
-* test page faults, and a custom handler to recover from them
+* cleanup init.c to reduce the duplication
+* should you make the page fault/exception numbers configurable like irqs?
+* do you need a privilege exception handler as well, or do all MMU exceptions produce a bus error?
 * don't duplicate the stack in mmu mode
 * replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
 * test with CONFIG_MMU=n to make sure nothing broke

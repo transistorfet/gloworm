@@ -83,6 +83,35 @@ struct process *get_proc(pid_t pid)
 	return NULL;
 }
 
+int reset_proc(struct process *proc)
+{
+	// TODO should you free the memory map here, instead of in binaries.c?
+
+	proc->wait_events = 0;
+	proc->wait_check = NULL;
+	memset(&proc->blocked_call, 0, sizeof(struct syscall_record));
+	init_timer(&proc->timer);
+	init_signal_data(proc);
+
+	if (proc->fd_table) {
+		struct fd_table *fd_table;
+
+		fd_table = alloc_fd_table();
+		if (!fd_table) {
+			return ENOMEM;
+		}
+		dup_fd_table(fd_table, proc->fd_table, 2);
+		free_fd_table(proc->fd_table);
+		proc->fd_table = fd_table;
+	}
+
+	if (previous_proc == proc) {
+		previous_proc = NULL;
+	}
+
+	return 0;
+}
+
 void close_proc(struct process *proc)
 {
 	// Set the previous process to NULL so that we skip over attempting to
@@ -93,7 +122,7 @@ void close_proc(struct process *proc)
 
 	remove_timer(&proc->timer);
 	if (proc->fd_table) {
-		release_fd_table(proc->fd_table);
+		free_fd_table(proc->fd_table);
 	}
 	if (proc->map) {
 		memory_map_free(proc->map);

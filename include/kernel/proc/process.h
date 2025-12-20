@@ -81,6 +81,7 @@ struct process_iter {
 int init_proc();
 struct process *new_proc(pid_t pid, uid_t uid);
 struct process *get_proc(pid_t pid);
+int reset_proc(struct process *proc);
 void close_proc(struct process *proc);
 void cleanup_proc(struct process *proc);
 struct process *find_exited_child(pid_t parent, pid_t child);

@@ -128,7 +128,7 @@ static inline struct memory_map *memory_map_make_ref(struct memory_map *map);
 
 int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset);
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
-int memory_map_copy(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment);
+int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment);
 
 int memory_map_resize(struct memory_segment *segment, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size);

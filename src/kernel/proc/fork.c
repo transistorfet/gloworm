@@ -78,10 +78,15 @@ int clone_process_memory(struct process *parent_proc, struct process *proc, int 
 	if (flags & CLONE_FILES) {
 		proc->fd_table = make_ref_fd_table(parent_proc->fd_table);
 	} else {
+		if (proc->fd_table) {
+			free_fd_table(proc->fd_table);
+		}
+
 		proc->fd_table = alloc_fd_table();
-		if (!proc->fd_table)
+		if (!proc->fd_table) {
 			return ENOMEM;
-		dup_fd_table(proc->fd_table, parent_proc->fd_table);
+		}
+		dup_fd_table(proc->fd_table, parent_proc->fd_table, 0);
 	}
 
 	// Copy the relevant process data from the parent to child
@@ -110,7 +115,7 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 		return ENOMEM;
 
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
-		error = memory_map_copy(new_map, parent_proc->map, cur);
+		error = memory_map_copy_segment(new_map, parent_proc->map, cur);
 		if (error < 0)
 			goto fail;
 	}

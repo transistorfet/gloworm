@@ -86,10 +86,18 @@ extern struct process *current_proc;
 
 void user_error(struct exception_frame *frame)
 {
+	page_t *page;
+
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
-	print_stack(frame, (void *) frame->pc);
+	// TODO this is for when the user-mode PC is pointing to its private virtual address space
+	//#if defined(CONFIG_MMU)
+	//page = mmu_table_get_page(current_proc->map->root_table, frame->pc);
+	//#else
+	page = (page_t *) frame->pc;
+	//#endif
+	print_stack(frame, page);
 
 	dispatch_signal(current_proc, SIGABRT);
 }
@@ -136,17 +144,16 @@ __attribute__((interrupt)) void enter_trace(struct exception_frame frame)
 	log_trace("Trace %x (%x)\n", frame.pc, frame.pc);
 }
 
+#include <asm/mmu.h>
 static void page_fault_handler(struct exception_frame *frame)
 {
 	int error = 0;
 
 	#if defined(CONFIG_MMU)
 
-	print_stack(frame, (void *) frame->pc);
-
 	log_error("page fault @ %x\n", frame->formatb.fault_addr);
-	log_error("current %x, pid %d, map %x\n", current_proc, current_proc->pid, current_proc->map);
 	if (current_proc && current_proc->map) {
+		//printk("printing table %x\n", current_proc->map->root_table);
 		//mmu_table_print(current_proc->map->root_table);
 		error = memory_map_load_page_at(current_proc->map, frame->formatb.fault_addr);
 		if (error < 0) {

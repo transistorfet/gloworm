@@ -42,6 +42,9 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 		return EISDIR;
 	}
 
+	// Reset the fd table and signal handlers for the executing proc
+	reset_proc(proc);
+
 	// Allocate the process memory and initialize the memory maps
 	map = memory_map_alloc();
 	if (!map)
@@ -73,9 +76,9 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	exec_initialize_user_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
 
 	// Usually true, if we exec()'d from the current process, then clear this so we do a full context switch when returning
-	if (previous_proc == proc) {
+	//if (previous_proc == proc) {
 		previous_proc = NULL;
-	}
+	//}
 
 	return error;
 }
@@ -225,6 +228,8 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 			memory_segment_start = file_segment_start & ~(PAGE_SIZE - 1);
 			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
+			// TODO if we're going to not pre-load the binary data and rely on page faults, then these #ifs are needed
+			//#if !defined(CONFIG_MMU)
 			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
 				goto fail;
 			}
@@ -232,6 +237,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 				goto fail;
 			}
 			memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
+			//#endif
 
 			int flags = 0;
 			if (prog_headers[i].p_flags & PF_R) {
@@ -248,7 +254,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 				flags |= SEG_TYPE_DATA;
 			}
 
-			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, MEMORY_OBJECT_MAKE_REF(object), file_segment_start)) < 0) {
+			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, MEMORY_OBJECT_MAKE_REF(object), prog_headers[i].p_offset)) < 0) {
 				goto fail;
 			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {

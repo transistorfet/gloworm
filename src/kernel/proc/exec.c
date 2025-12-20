@@ -72,6 +72,10 @@ void exec_initialize_kernel_stack_with_args(struct process *proc, void *stack_po
 	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
 
 	arch_add_process_context(proc, stack_pointer, entry);
+	// TODO this is probably not a good place for this, but I'm not sure where else it could go
+	if (current_proc == proc) {
+		arch_extended_switch_context(NULL, proc);
+	}
 }
 
 void exec_initialize_user_stack_with_args(struct process *proc, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
@@ -80,5 +84,9 @@ void exec_initialize_user_stack_with_args(struct process *proc, void *stack_poin
 	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
 
 	arch_add_process_context(proc, stack_pointer, entry);
+	// TODO this is probably not a good place for this, but I'm not sure where else it could go
+	if (current_proc == proc) {
+		arch_extended_switch_context(NULL, proc);
+	}
 }
 
