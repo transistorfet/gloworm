@@ -131,7 +131,7 @@ pid_t do_clone(void)
 	return proc->pid;
 }
 
-int do_exec(const char *path, const char *const argv[], const char *const envp[])
+int do_exec(const char __user *path, const char __user *const argv[], const char __user *const envp[])
 {
 	int error;
 
@@ -149,7 +149,7 @@ int do_exec(const char *path, const char *const argv[], const char *const envp[]
 	return 0;
 }
 
-int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[])
+int do_execbuiltin(void __user *addr, const char __user *const argv[], const char __user *const envp[])
 {
 	int error;
 
@@ -165,7 +165,7 @@ int do_execbuiltin(void *addr, const char *const argv[], const char *const envp[
 }
 
 
-pid_t do_waitpid(pid_t pid, int *status, int options)
+pid_t do_waitpid(pid_t pid, int __user *status, int options)
 {
 	struct process *proc;
 
@@ -204,7 +204,7 @@ int do_sigreturn(void)
 	return 0;
 }
 
-int do_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+int do_sigaction(int signum, const struct sigaction __user *act, struct sigaction __user *oldact)
 {
 	if (oldact)
 		get_signal_action(current_proc, signum, oldact);
@@ -226,7 +226,7 @@ int do_pause(void)
 	return 0;
 }
 
-int do_brk(void *addr)
+int do_brk(void __user *addr)
 {
 	int diff;
 
@@ -238,7 +238,7 @@ int do_brk(void *addr)
 	return memory_map_move_sbrk(current_proc->map, diff);
 }
 
-void *do_sbrk(intptr_t diff)
+void *do_sbrk(intptr_t __user diff)
 {
 	if (diff) {
 		if (current_proc->map->heap_start + diff >= (uintptr_t) arch_get_user_stackp(current_proc)) {
@@ -339,7 +339,7 @@ int do_setuid(uid_t uid)
 
 
 
-int do_mount(const char *source, const char *target, struct mount_opts *opts)
+int do_mount(const char __user *source, const char __user *target, struct mount_opts __user *opts)
 {
 	extern struct mount_ops *filesystems[];
 	extern struct mount_ops minix_mount_ops;
@@ -368,7 +368,7 @@ int do_mount(const char *source, const char *target, struct mount_opts *opts)
 	return vfs_mount(current_proc->cwd, target, vnode->rdev, fsptr, opts ? opts->mountflags : 0, current_proc->uid);
 }
 
-int do_umount(const char *source)
+int do_umount(const char __user *source)
 {
 	struct vnode *vnode;
 
@@ -383,7 +383,7 @@ int do_sync(void)
 	return vfs_sync(0);
 }
 
-int do_mknod(const char *path, mode_t mode, device_t dev)
+int do_mknod(const char __user *path, mode_t mode, device_t dev)
 {
 	int error;
 	struct vnode *vnode;
@@ -395,22 +395,22 @@ int do_mknod(const char *path, mode_t mode, device_t dev)
 	return 0;
 }
 
-int do_link(const char *oldpath, const char *newpath)
+int do_link(const char __user *oldpath, const char __user *newpath)
 {
 	return vfs_link(current_proc->cwd, oldpath, newpath, current_proc->uid);
 }
 
-int do_unlink(const char *path)
+int do_unlink(const char __user *path)
 {
 	return vfs_unlink(current_proc->cwd, path, current_proc->uid);
 }
 
-int do_rename(const char *oldpath, const char *newpath)
+int do_rename(const char __user *oldpath, const char __user *newpath)
 {
 	return vfs_rename(current_proc->cwd, oldpath, newpath, current_proc->uid);
 }
 
-int do_mkdir(const char *path, mode_t mode)
+int do_mkdir(const char __user *path, mode_t mode)
 {
 	int error;
 	struct vfile *file = NULL;
@@ -423,19 +423,19 @@ int do_mkdir(const char *path, mode_t mode)
 	return 0;
 }
 
-char *do_getcwd(char *buf, size_t size)
+char *do_getcwd(char __user *buf, size_t size)
 {
 	if (vfs_reverse_lookup(current_proc->cwd, buf, size, current_proc->uid))
 		return NULL;
 	return buf;
 }
 
-int do_creat(const char *path, mode_t mode)
+int do_creat(const char __user *path, mode_t mode)
 {
 	return do_open(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
 
-int do_open(const char *path, int oflags, mode_t mode)
+int do_open(const char __user *path, int oflags, mode_t mode)
 {
 	int fd;
 	int error;
@@ -468,7 +468,7 @@ int do_close(int fd)
 	return 0;
 }
 
-size_t do_read(int fd, char *buf, size_t nbytes)
+size_t do_read(int fd, char __user *buf, size_t nbytes)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file)
@@ -477,7 +477,7 @@ size_t do_read(int fd, char *buf, size_t nbytes)
 }
 
 
-size_t do_write(int fd, const char *buf, size_t nbytes)
+size_t do_write(int fd, const char __user *buf, size_t nbytes)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file)
@@ -493,7 +493,7 @@ int do_lseek(int fd, offset_t offset, int whence)
 	return vfs_seek(file, offset, whence);
 }
 
-int do_readdir(int fd, struct dirent *dir)
+int do_readdir(int fd, struct dirent __user *dir)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file)
@@ -501,7 +501,7 @@ int do_readdir(int fd, struct dirent *dir)
 	return vfs_readdir(file, dir);
 }
 
-int do_ioctl(int fd, unsigned int request, void *argp)
+int do_ioctl(int fd, unsigned int request, void __user *argp)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file)
@@ -509,13 +509,13 @@ int do_ioctl(int fd, unsigned int request, void *argp)
 	return vfs_ioctl(file, request, argp, current_proc->uid);
 }
 
-extern int do_fcntl(int fd, int cmd, void *argp)
+extern int do_fcntl(int fd, int cmd, void __user *argp)
 {
 	// TODO what are the arguments it can take?
 	return -1;
 }
 
-int do_chdir(const char *path)
+int do_chdir(const char __user *path)
 {
 	int error;
 	struct vnode *vnode;
@@ -530,22 +530,22 @@ int do_chdir(const char *path)
 	return 0;
 }
 
-int do_access(const char *path, int mode)
+int do_access(const char __user *path, int mode)
 {
 	return vfs_access(current_proc->cwd, path, mode, current_proc->uid);
 }
 
-int do_chmod(const char *path, int mode)
+int do_chmod(const char __user *path, int mode)
 {
 	return vfs_chmod(current_proc->cwd, path, mode, current_proc->uid);
 }
 
-int do_chown(const char *path, uid_t owner, gid_t group)
+int do_chown(const char __user *path, uid_t owner, gid_t group)
 {
 	return vfs_chown(current_proc->cwd, path, owner, group, current_proc->uid);
 }
 
-int do_stat(const char *path, struct stat *statbuf)
+int do_stat(const char __user *path, struct stat __user *statbuf)
 {
 	int error;
 	struct vnode *vnode;
@@ -569,7 +569,7 @@ int do_stat(const char *path, struct stat *statbuf)
 	return 0;
 }
 
-int do_fstat(int fd, struct stat *statbuf)
+int do_fstat(int fd, struct stat __user *statbuf)
 {
 	struct vfile *file;
 
@@ -652,7 +652,7 @@ mode_t do_umask(mode_t mask)
 	return previous;
 }
 
-int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
+int do_select(int nfds, fd_set __user *readfds, fd_set __user *writefds, fd_set __user *exceptfds, struct timeval __user *timeout)
 {
 	if (nfds <= 0 || nfds > OPEN_MAX)
 		return EINVAL;
@@ -662,7 +662,7 @@ int do_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, st
 }
 
 
-time_t do_time(time_t *t)
+time_t do_time(time_t __user *t)
 {
 	time_t current = get_system_time();
 	if (t)
@@ -670,7 +670,7 @@ time_t do_time(time_t *t)
 	return current;
 }
 
-int do_stime(const time_t *t)
+int do_stime(const time_t __user *t)
 {
 	if (current_proc->uid != SU_UID)
 		return EPERM;
@@ -704,7 +704,7 @@ int do_socketpair(int domain, int type, int protocol, int fds[2])
 	return -1;
 }
 
-int do_connect(int fd, const struct sockaddr *addr, socklen_t len)
+int do_connect(int fd, const struct sockaddr __user *addr, socklen_t len)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -712,7 +712,7 @@ int do_connect(int fd, const struct sockaddr *addr, socklen_t len)
 	return net_socket_connect(file, addr, len);
 }
 
-int do_bind(int fd, const struct sockaddr *addr, socklen_t len)
+int do_bind(int fd, const struct sockaddr __user *addr, socklen_t len)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -728,7 +728,7 @@ int do_listen(int fd, int n)
 	return net_socket_listen(file, n);
 }
 
-int do_accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
+int do_accept(int fd, struct sockaddr __user *addr, socklen_t __user *addr_len)
 {
 	int newfd;
 	int error;
@@ -761,7 +761,7 @@ int do_shutdown(int fd, int how)
 }
 
 
-ssize_t do_send(int fd, const void *buf, size_t n, int flags)
+ssize_t do_send(int fd, const void __user *buf, size_t n, int flags)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -770,7 +770,7 @@ ssize_t do_send(int fd, const void *buf, size_t n, int flags)
 }
 
 // Unistd Declaration:ssize_t do_sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len)
-ssize_t do_sendto(int fd, const void *buf, size_t n, int flags, int opts[2])
+ssize_t do_sendto(int fd, const void __user *buf, size_t n, int flags, int opts[2])
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -778,14 +778,14 @@ ssize_t do_sendto(int fd, const void *buf, size_t n, int flags, int opts[2])
 	return net_socket_sendto(file, buf, n, flags, (const struct sockaddr *) opts[0], (socklen_t) opts[1]);
 }
 
-ssize_t do_sendmsg(int fd, const struct msghdr *message, int flags)
+ssize_t do_sendmsg(int fd, const struct msghdr __user *message, int flags)
 {
 	// TODO implement
 	return -1;
 }
 
 
-ssize_t do_recv(int fd, void *buf, size_t n, int flags)
+ssize_t do_recv(int fd, void __user *buf, size_t n, int flags)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -794,7 +794,7 @@ ssize_t do_recv(int fd, void *buf, size_t n, int flags)
 }
 
 // Unistd Declaration:ssize_t do_recvfrom(int fd, void *buf, size_t n, int flags, struct sockaddr *addr, socklen_t *addr_len)
-ssize_t do_recvfrom(int fd, void *buf, size_t n, int flags, int opts[2])
+ssize_t do_recvfrom(int fd, void __user *buf, size_t n, int flags, int opts[2])
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -802,13 +802,13 @@ ssize_t do_recvfrom(int fd, void *buf, size_t n, int flags, int opts[2])
 	return net_socket_recvfrom(file, buf, n, flags, (struct sockaddr *) opts[0], (socklen_t *) opts[1]);
 }
 
-ssize_t do_recvmsg(int fd, struct msghdr *message, int flags)
+ssize_t do_recvmsg(int fd, struct msghdr __user *message, int flags)
 {
 	// TODO implement
 	return -1;
 }
 
-int do_getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen)
+int do_getsockopt(int fd, int level, int optname, void __user *optval, socklen_t __user *optlen)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))
@@ -816,7 +816,7 @@ int do_getsockopt(int fd, int level, int optname, void *optval, socklen_t *optle
 	return net_socket_get_options(file, level, optname, optval, optlen);
 }
 
-int do_setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen)
+int do_setsockopt(int fd, int level, int optname, const void __user *optval, socklen_t optlen)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode))

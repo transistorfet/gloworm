@@ -2071,8 +2071,8 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   be what I want for after exec() but at least it will force the extended switch
 - the `previous_proc = NULL` on the other hand is used in two locations, one of which is the location in binaries.c that I recently
   added, and the other is in process.c in `close_proc()` which has a specific comment saying
-  	// Set the previous process to NULL so that we skip over attempting to
-	// save the context during restore_context
+        // Set the previous process to NULL so that we skip over attempting to
+        // save the context during restore_context
 - So setting previous_proc = NULL will skip over trying to save the context when it's returning to user space, which might not be
   what we want always (in terms of adding it to request_reschedule())
 - that said, in binaries.c during exec(), we might actually want that, as in we don't want to save the extra registers of the
@@ -2104,4 +2104,27 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   this
 
 - tomorrow I'll clean up the code a bit, and commit it, and then start in on some of the userspace-to-kernelspace translations
+
+
+2025-12-21:
+
+- I'm having a really hard to getting started on the userspace-to-kernelspace translation code.  I've tried looking at the minix and
+  linux source to understand how they're doing it, but I can't seem to discern much.  There's a few functions in linux which are
+  relevant, like copy_to_user, copy_from_user, strncpy_from_user, and get_user (which seems to be used for small values like ints).
+  And there are some higher level functions like getname() in fs/namei.c which copies a filename/path into a temporarily allocated
+  cache area to be passed into other functions (it loads it into a `struct filename`).  But from what I can tell of the code, I
+  can't see it doing per-page lookups.  It's almost as if it's relying on the user process's page tables, but I don't know how it
+  could and still have access to kernel memory that the process shouldn't be able to access directly.
+- I couldn't really find how minix is doing translations, and instead only found the vir2phys function that seems to just use the
+  data segment address in the memory map to calculate the physical address (as if it's linearly mapped, which might be the case)
+- For my implementation, I can only see a table lookup per-page, with a loop for when it hits the end of the current page, being the
+  only "correct" option, but making matters worse is the fact that my current means of syscall restarting will erase all stack
+  values, so I can't store the buffer on the stack unless I "redo" the copy when restarting.  This might only be an issue for
+  file read/write and socket read/write, which are the primary syscalls that would block, and in those cases, I might be better off
+  doing the user copying in the actual data read/write functions rather than using an intermediate buffer.  I'll need such a buffer
+  for path syscalls though
+- I just really don't like any of this
+- oh and I don't think I implemented this is ruxpin.  At least I have some comments about needing to add it later, so I might be
+  getting away with it by using physical address for the elf segments, and only the stack is copy on write, and the fact that most
+  things fork and then exec() means I rarely run into trouble?
 

@@ -75,11 +75,6 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
 	exec_initialize_user_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
 
-	// Usually true, if we exec()'d from the current process, then clear this so we do a full context switch when returning
-	//if (previous_proc == proc) {
-		previous_proc = NULL;
-	//}
-
 	return error;
 }
 

@@ -2,6 +2,7 @@
 #ifndef _M68K_SYSCALL_TABLE_H
 #define _M68K_SYSCALL_TABLE_H
 
+#include <errno.h>
 #include <kernel/api.h>
 #include <kernel/printk.h>
 
@@ -10,11 +11,18 @@
 
 #define __SYSCALL(number, label)	label
 
+// NOTE these syscalls require a special syscall entry to save the extended registers
+// and will be defined in the architecture-specific syscall entry code
 extern int __do_fork(void);
 extern int __do_clone(void);
 extern int __do_sigreturn(void);
 
 void test(void) { printk("It's a test!\n"); }
+
+static int __invalid_syscall(void)
+{
+	return EINVAL;
+}
 
 void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(0, test),
@@ -43,7 +51,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(23, do_setuid),
 	__SYSCALL(24, do_getuid),
 	__SYSCALL(25, do_stime),
-	__SYSCALL(26, test),		// 26 = ptrace, not yet implemented
+	__SYSCALL(26, __invalid_syscall),		// 26 = ptrace, not yet implemented
 	__SYSCALL(27, do_alarm),
 	__SYSCALL(28, do_fstat),
 	__SYSCALL(29, do_pause),
@@ -54,7 +62,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(34, do_kill),
 	__SYSCALL(35, do_rename),
 	__SYSCALL(36, do_mkdir),
-	__SYSCALL(37, test),		// 37 = rmdir, not yet implemented
+	__SYSCALL(37, __invalid_syscall),		// 37 = rmdir, not yet implemented
 	__SYSCALL(38, do_getcwd),
 	__SYSCALL(39, do_dup2),
 	__SYSCALL(40, do_pipe),
@@ -62,7 +70,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(42, do_fcntl),
 	__SYSCALL(43, do_readdir),
 	__SYSCALL(44, do_getppid),
-	__SYSCALL(45, test),		// 45 = symlink, not yet implemented
+	__SYSCALL(45, __invalid_syscall),		// 45 = symlink, not yet implemented
 	__SYSCALL(46, do_getpgid),
 	__SYSCALL(47, do_setpgid),
 	__SYSCALL(48, do_getsid),
@@ -88,21 +96,21 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(66, do_getsockopt),
 	__SYSCALL(67, do_setsockopt),
 	#else
-	__SYSCALL(53, test),
-	__SYSCALL(54, test),
-	__SYSCALL(55, test),
-	__SYSCALL(56, test),
-	__SYSCALL(57, test),
-	__SYSCALL(58, test),
-	__SYSCALL(59, test),
-	__SYSCALL(60, test),
-	__SYSCALL(61, test),
-	__SYSCALL(62, test),
-	__SYSCALL(63, test),
-	__SYSCALL(64, test),
-	__SYSCALL(65, test),
-	__SYSCALL(66, test),
-	__SYSCALL(67, test),
+	__SYSCALL(53, __invalid_syscall),
+	__SYSCALL(54, __invalid_syscall),
+	__SYSCALL(55, __invalid_syscall),
+	__SYSCALL(56, __invalid_syscall),
+	__SYSCALL(57, __invalid_syscall),
+	__SYSCALL(58, __invalid_syscall),
+	__SYSCALL(59, __invalid_syscall),
+	__SYSCALL(60, __invalid_syscall),
+	__SYSCALL(61, __invalid_syscall),
+	__SYSCALL(62, __invalid_syscall),
+	__SYSCALL(63, __invalid_syscall),
+	__SYSCALL(64, __invalid_syscall),
+	__SYSCALL(65, __invalid_syscall),
+	__SYSCALL(66, __invalid_syscall),
+	__SYSCALL(67, __invalid_syscall),
 	#endif
 
 	__SYSCALL(68, do_execbuiltin),
