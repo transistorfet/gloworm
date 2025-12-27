@@ -336,32 +336,6 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 	return 0;
 }
 
-int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr)
-{
-	int i;
-	int error;
-	struct get_table_result result;
-
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, CREATE_IF_NEEDED, &result);
-	if (error < 0) {
-		return error;
-	}
-
-	if (result.bits != PAGE_ADDR_BITS) {
-		printk("ERROR: there's something odd in mmu_table_set_page(), I expected only a single page, but got a higher level granule\n");
-		return EFAULT;
-	}
-
-	i = TABLE_INDEX(virtual_addr, result.bits);
-	if (MMU_TABLE_ADDRESS(result.table[i]) != 0) {
-		printk("ERROR: already has a page set at %x\n", virtual_addr);
-		return EEXIST;
-	}
-
-	result.table[i] = MMU_TABLE_DESCRIPTOR(physical_addr, MMU_TABLE_STATUS(result.table[i]) | MMU_DT_PAGE_DESCRIPTOR);
-	return 0;
-}
-
 page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
 {
 	int error;
@@ -375,6 +349,35 @@ page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
 	return (page_t *) MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
 }
 
+int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, int flags)
+{
+	int i;
+	int error;
+	int status;
+	struct get_table_result result;
+
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, CREATE_IF_NEEDED, &result);
+	if (error < 0) {
+		return error;
+	}
+
+	if (result.bits != PAGE_ADDR_BITS) {
+		printk("ERROR: there's something odd in mmu_table_set_page(), I expected only a single page, but got a higher level granule\n");
+		return EFAULT;
+	}
+
+	i = TABLE_INDEX(virtual_addr, result.bits);
+
+	status = MMU_TABLE_STATUS(result.table[i]) | MMU_DT_PAGE_DESCRIPTOR;
+	if (flags & MMU_FLAG_WRITE) {
+		status &= ~MMU_STATUS_DESC_WP;
+	} else {
+		status |= MMU_STATUS_DESC_WP;
+	}
+
+	result.table[i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
+	return 0;
+}
 
 static int mmu_table_print_inner(mmu_descriptor_t *table, uint8_t bits, uintptr_t virtual_addr)
 {

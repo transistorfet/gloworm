@@ -61,7 +61,7 @@ void memory_region_free(struct memory_region *region)
 
 
 #if defined(CONFIG_MMU)
-physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
 {
 	int error;
 	page_t *page;
@@ -86,7 +86,7 @@ physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, 
 	//printk("newly loaded page\n");
 	//printk_dump((uint16_t *) page, PAGE_SIZE);
 
-	return (physical_address_t) page;
+	return page;
 }
 
 struct memory_ops file_memory_ops = {
@@ -94,7 +94,7 @@ struct memory_ops file_memory_ops = {
 };
 
 
-physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+page_t *anonymous_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
 {
 	page_t *page;
 
@@ -103,17 +103,38 @@ physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segm
 		return NULL;
 	}
 	zero_page(page);
-	return (physical_address_t) page;
+	return page;
 }
 
 struct memory_ops anonymous_memory_ops = {
 	.load_page_at	= anonymous_memory_ops_load_page_at,
 };
 
-int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr)
+static inline int memory_map_convert_copy_on_write(struct memory_map *map, uintptr_t page_address, page_t *existing_page)
 {
 	int error;
-	physical_address_t new_page;
+	page_t *page_copy;
+
+	page_copy = page_alloc_single();
+	if (!page_copy) {
+		return ENOMEM;
+	}
+	memcpy(page_copy, existing_page, PAGE_SIZE);
+
+	error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) page_copy, MMU_FLAG_WRITE);
+	if (error < 0) {
+		return error;
+	}
+
+	page_free_single(existing_page);
+	return 0;
+}
+
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag)
+{
+	int error;
+	uintptr_t page_address;
+	page_t *existing_page, *new_page;
 	struct memory_segment *segment;
 
 	segment = memory_map_find(map, vaddr);
@@ -122,14 +143,24 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr)
 	}
 
 	if (segment->ops && segment->ops->load_page_at) {
-		new_page = segment->ops->load_page_at(segment, vaddr);
-		if (!new_page) {
-			return EEXIST;
-		}
-		error = mmu_table_set_page(map->root_table, rounddown(vaddr, PAGE_SIZE), new_page);
-		if (error < 0) {
-			page_free_single((page_t *) new_page);
-			return error;
+		page_address = rounddown(vaddr, PAGE_SIZE);
+		existing_page = mmu_table_get_page(map->root_table, page_address);
+		if (existing_page) {
+			if (write_flag && (segment->flags & SEG_WRITE)) {
+				return memory_map_convert_copy_on_write(map, page_address, existing_page);
+			} else {
+				return EEXIST;
+			}
+		} else {
+			new_page = segment->ops->load_page_at(segment, vaddr);
+			if (!new_page) {
+				return EEXIST;
+			}
+			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
+			if (error < 0) {
+				page_free_single((page_t *) new_page);
+				return error;
+			}
 		}
 		return 0;
 	} else {
@@ -401,7 +432,6 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 
 int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment)
 {
-	int error;
 	struct memory_segment *segment;
 
 	segment = memory_map_insert_segment(dest_map, src_segment->start, src_segment-> end - src_segment->start, src_segment->flags);
@@ -416,7 +446,10 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 	segment->ops = src_segment->ops;
 	segment->file = MEMORY_OBJECT_MAKE_REF(src_segment->file);
 
+	int error;
+
 	//error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, MMU_FLAG_COPY_ON_WRITE);
+	//error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, (src_segment->flags & SEG_TYPE_STACK) ? MMU_FLAG_COPY_ON_WRITE : 0);
 	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, 0);
 	if (error < 0)
 		return error;

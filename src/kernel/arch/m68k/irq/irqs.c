@@ -147,26 +147,57 @@ __attribute__((interrupt)) void enter_trace(struct exception_frame frame)
 #include <asm/mmu.h>
 static void page_fault_handler(struct exception_frame *frame)
 {
-	int error = 0;
-
 	#if defined(CONFIG_MMU)
 
-	log_error("page fault @ %x\n", frame->formatb.fault_addr);
+	int error = 0;
+	uint16_t ssw;
+	uint16_t mmu_sr;
+	uintptr_t fault_addr;
+
 	if (current_proc && current_proc->map) {
-		//printk("printing table %x\n", current_proc->map->root_table);
+		fault_addr = frame->formatb.fault_addr;
+		ssw = frame->formatb.ssw;
+		log_error("page fault @ %x in pid %d\n", fault_addr, current_proc->pid);
+		log_info("pc: %x\n", frame->pc);
+		log_info("ssw: %x\n", ssw);
+
+		asm volatile(
+			"ptestr %2, %1@, #7\n"
+			"pmove %%psr, %0\n"
+			: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw)
+		);
+		log_info("mmu sr: %x\n", mmu_sr);
+
+		//printk("printing table %x for pid %d\n", current_proc->map->root_table, current_proc->pid);
 		//mmu_table_print(current_proc->map->root_table);
-		error = memory_map_load_page_at(current_proc->map, frame->formatb.fault_addr);
+		//memory_map_print_segments(current_proc->map);
+		error = memory_map_load_page_at(current_proc->map, fault_addr, !(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE));
 		if (error < 0) {
-			user_error(frame);
+			goto fail;
 		}
-	} else {
-		user_error(frame);
+
+		//mmu_table_print(current_proc->map->root_table);
+
+		// Otherwise, we loaded the page, so return successfully
+		//frame->formatb.ssw |= SSW_FAULT_OR_RERUN | SSW_RERUN_STAGE_B;
+		//MMU_FLUSH_ALL();
+		if (!(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE)) {
+			asm volatile(
+				"ploadw	%1, %0@\n"
+				: : "a" (fault_addr), "d" (ssw)
+			);
+		}
+		else {
+			asm volatile(
+				"ploadr	%1, %0@\n"
+				: : "a" (fault_addr), "d" (ssw)
+			);
+		}
+		return;
 	}
 
-	#else
-
-	user_error(frame);
-
 	#endif
+fail:
+	user_error(frame);
 }
 

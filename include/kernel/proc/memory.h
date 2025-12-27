@@ -38,7 +38,7 @@ struct memory_region;
 struct memory_segment;
 
 struct memory_ops {
-	physical_address_t (*load_page_at)(struct memory_segment *segment, virtual_address_t vaddr);
+	page_t *(*load_page_at)(struct memory_segment *segment, virtual_address_t vaddr);
 };
 
 #if !defined(CONFIG_MMU)
@@ -135,7 +135,7 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 int memory_map_move_sbrk(struct memory_map *map, int diff);
 
-int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr);
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag);
 
 void memory_map_print_segments(struct memory_map *map);
 

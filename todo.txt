@@ -2,6 +2,7 @@
 * go through all the syscalls and add address translation from user space to kernel space
   linux actually copies filenames from user space to a cache location allocated on each syscall, but maybe I can get away with copying them to the stack
 * where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
+* should reset_proc() free the memory map as well?
 
 * add user-to-kernel address translations
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??

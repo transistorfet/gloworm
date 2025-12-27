@@ -1901,7 +1901,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   close_proc, as well as removing the process from the queues.  I fixed it in clone() and in init.c
 
 - pushing further, it also has the descriptor type set in the mmu tables despite being set to a table of NULL when using the
-  MMU_FLAG_UNALLOCATED, so it would think it had correctly updated the tables and returned to the process 
+  MMU_FLAG_UNALLOCATED, so it would think it had correctly updated the tables and returned to the process
 
 
 2025-12-13:
@@ -2127,4 +2127,198 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - oh and I don't think I implemented this is ruxpin.  At least I have some comments about needing to add it later, so I might be
   getting away with it by using physical address for the elf segments, and only the stack is copy on write, and the fact that most
   things fork and then exec() means I rarely run into trouble?
+
+- I'm looking through the 68030 manual again for the MMU, and one thing that jumped out was a note about the MOVES instruction being
+  an exception for some things (which bypasses the protection mechanisms).  In the linux code for the m68k that copies data from
+  user space to kernel space, I did notice there were MOVES instructions inserted (in a weird way by exiting the quotes of the asm()
+  inline).  I'm sure that's significant for how copy_from_user() works.  Those functions were entirely implemented in inline
+  assembly, presumably for speed, but maybe also the need to specifically use MOVES?
+- hmm... the MOVES instruction is called "Move Address Space", available on CPUs without an MMU, which moves data to or from a
+  register into a different function code address space, using the DFC or SFC registers to select the address space.  So it doesn't
+  seem like it's doing an MMU table lookup.  I don't think my hardware is using the function code address spaces, so not sure how
+  useful this is to me
+
+- Ah! ok, reading the manual, section 9.5.5.4 WRITE PROTECT, it clearly says that if a write access is requested for a page with the
+  WP bit set, then it results in a bus error, which is what I'm seeing (rather than a privilege exception, as I would have
+  expected).  I currently don't have the page fault code recognizing a copy-on-write violation
+- I had tried to enable copy on write only on the stack segment when fork is called, but it fails with a page fault where a page is
+  already set, therefore it terminates the process, so fixing this might be enough to get copy-on-write working for stack segments
+- I'm trying to do something other than implementing the copy_from_user function
+- but how the hell do I know that the bus error that caused a page fault was a write access?!?
+- looking at the linux kernel's m68k implementation (unsurprisingly, it has a different impl for the 030, 040, and 060, among others
+  because motorola in their infinite (ass-backwards) wisdom decided to make them all slightly different and incompatible)
+  But those impls use the SSW (special status word) in the mass of otherwise meaningless stack info that a bus error produces.  I
+  thought it wasn't documented because the bus error format is at the end of that section of the manual, but scrolling up, the
+  special status word is defined above (8.2.1)
+  Special Status Word
+  ---------------------------------------------------------------------
+  | FC | FB | RC | RB | × | × | × | DF | RM | RW | SIZE | X | FC2-FC0 |
+  ---------------------------------------------------------------------
+    FC -- Fault on stageC of the instruction pipe
+    FB -- Fault on stageB of the instruction pipe
+    RC -- Rerun flag for stageC of the instruction pipe*
+    RB -- Rerun flag for stageB of the instruction pipe*
+    DF -- Fault/rerun flag for datecycle*
+    RM -- Read-modify-write on datacycle
+    RW -- Read/write for datacycle-- 1= read,0= write
+    SIZE -- Size code for datacycle
+    FC2-FCO -- Addressspace for data cycle
+
+- looking at ruxpin source for copy on write, and was reminded that I don't have to find the other uses of the page and convert
+  them.  I only need to convert the page that faulted.  If I wanted to save one unnecessary copy, I can check the page refcount, but
+  it's probably not worth it?
+- well I think I got copy on write working.  It boots into the shell, although it doesn't have the normal _user_exit faults, nor
+  does it timeout on ntpdate, so I think there's something wrong, some kind of bug, but it does boot and run commands, so it works
+  better than it did before I remembered to actually implement the copying page fault
+- that's really all I did was add an extra case to the memory_map_load_page_at() function, which converts the faulted page into a
+  new copied version of the original page
+
+- why doesn't it get to the exit syscall on pid 1 and others?
+- echo seemed to work, but ls didn't seem to, or at least the second command didn't work correctly?  It seems to have the same copy
+  on write page fault in pid 3 at two addresses in the same page... 2067AA and 2067C2, which resolved to page 206700, and was
+  replaced twice... which makes me think it's not changing the status bits correctly???
+
+
+2025-12-22:
+
+- oh, looking closer at the output now, it doesn't double fault on the same page.  It faults in pid 1, and then it faults in pid 3,
+  so different pages for different processes.  Pid 3 faults on another page later on.  But yeah, neither seem to fail with the
+  _user_exit exception, which makes me think they didn't run correctly, maybe the faulted addresses weren't retried?o
+
+- unrelated to above, I was skimming through the manual a bit, and came across the diagram, figure 9-31, which shows the cpu root
+  pointer pointing to a small table with the function codes being used to index user data space, user program space, supervisor data
+  space, and supervisor program space.  I wonder if that's being used by linux's m68k impl, which could be in supervisor mode, with
+  the same root pointer as userspace uses, and have the supervisor entries point to the normal kernelspace addresses, but the user
+  spaces are still accessible, and in user mode, only the user space tables would be accessible.  The supervisor mode would then
+  only have to use the MOVES instruction, to read data from userspace, which will use the current user process's address space!  No
+  switching necessary, so no TLB flush, and it still uses hardware to lookup data, making it faster.
+- I'm not using the function code portion of the address at the moment.  Not sure how easy that would be.  I guess it would make
+  sense to make it architecture-specific to copy_from_user, and point it to generic functions for now, and later implementing a
+  custom assembly function, like linux does
+
+- oh, that seemed to be easy to at least get a change in behaviour.  I was previously setting the SSW_FAULT_OR_RERUN bit, but
+  changed it to also set the STAGE_B rerun and STAGE_C rerun bits, and it's now getting the _user_exit exception on pid 5 and pid 4,
+  which I think is right
+- I'm noticing two page faults in pid 3 which occur after pid 4 exits, and just before the prompt is displayed, which is for
+  adjacent addresses (same page), and the page is swapped out, and then the same page swapped back in on the next fault.  It
+  shouldn't be doing that at all.  It should only have at most one page fault there, so something's still broken
+- oh yeah, it's also not stopping for the timeout, and there's a string of diamond characters (non-printable) that gets printed out
+  just before a page fault
+- could it need a flush after the page fault?  Does it need specific rerun bits set based on what happened?
+- some of the SSW values are different for these page faults, now that it's executing more of them.  I think some might have the RM
+  bit set, instead of just the RW bit (read-modify-write vs read-write), so maybe it's misunderstanding the cause sometimes?  But if
+  it was, then it should be terminate the process early, which isn't happening
+
+- only having the rerun stage C bit set (and the rerun or fault set), makes it behave the same as if no bits are set, that is to
+  say, it never has the expected exceptions and doesn't really run most of the programs it should on boot
+- having only the rerun stage B bit set (and the rerun or fault bit set), makes it fail on pid 1.  The error looks like it's
+  attempting to write to a segment that is not writeable.  It's trying to write to its code segment, from the looks of it
+- pid 3 also fails because of the same thing...
+
+- from 8.2.1:
+    Depending on the state of the pipeline, either RB and RC are both set, or RC alone is set. To correct the pipeline contents and
+    continue execution of the suspended instruction, software must place the correct instruction stream data in the stage C and/or
+    stage B images requested by the rerun bits and clear the rerun bits.
+- So it sounds like it needs a very specific recovery, and it's up to software to sort out which...  Not terribly impressed
+- section 8.2.2 talks about how to use software to complete the bus cycle, which sounds super complicated and involve, but then
+  right after it is section 8.2.3, which is titled Completing the Bus Cycle with RTE, which *seems* to explain that just calling RTE
+  without changing any bits will restart the cycle automatically?  So I need to change no bits? =|
+- clearly no, that behaves the same as having only the DF bit set, which is to say, it doesn't seem to run the boot processes
+  correctly, and has no _user_exit exceptions, just a couple page faults, no timeout, no "Running /etc/rc"
+- honestly, the manual is hard to read, and not very clear on details.  It's very similar to the S32 manuals from NXP, so not
+  surprising that they're still kinda shit, and the chips are still needlessly complicated.  I might as well dig into the linux code
+  for all the good the manual will do me
+- yikes, this thing is complicated!  Yeah, it's definitely not doing nothing.  It looks like it's checking a bunch of conditions in
+  SSW and others, and in some cases executing special assembly instructions to get values from the MMU and such.  This is really
+  non-trival...  But I think this is going to be a better guide than the manual.  In either case, it does seem to be doing more of
+  what 8.2.2 says to do?  *shrug*
+- it actually doesn't seem to modify the SSW value at all, but what it *does* do is update the TLB (called the ATC is the manual),
+  and it does that using the PLOADR and PLOADW instructions.  I assume there's a different ATC entry for reading and for writing?
+  One part of the bus_error_030 handler runs both instructions (probably a write to read only page), and the other part using just a
+  PLOADR instruction (probably a missing page).  I'm definitely not doing that, which might explain the problem.
+- I wonder if a PFLUSH would work just as well (but of course not as fast, potentially, as a PLOAD would be)
+- no, I guess not, tried a single flush or flush all, and neither seemed to change the behaviour from skipping over everything (no
+  SSW change)
+- the linux impl is treating the data fault and the instruction fault conditions separately.  It's also reading in the MMUSR
+  register, which seems to be accessed as the %psr register with PMOVE, but in either case, it seems to execute a PTEST instruction
+  just before, and the manual seems to imply that the MMUSR register will only be set after a PTEST instruction, and not from a
+  the fault that caused the exception (ie. you have to re-try the same fault address just to figure out what acutally caused the
+  fault in the first place?  This seems so dumb on Motorola's part)
+- doing the same ptestr/pmove that the linux handler does fetches the mmu_sr value, which when SSW is not changed (so only 3 page
+  faults occur), each page fault has SSW 0x709 and MMUSR 0xA04.  That corresponds to "Write Protected" and "Modified" bits being
+  set, and the level the fault occurs at being 4, which is the correct leaf table, so each should be a copy-on-write fault, and they
+  all seem to convert a copy on write page... the only thing is that the flush doesn't do anything and I'm not doing the PLOAD
+  instead...
+- adding the pload instructions doesn't change anything either, so there's probably something I'm still doing incorrectly
+- I'm not looking too closely, I'm just trying quick fixes atm, but it's late and I should come back to this tomorrow
+
+- the DF bit *is* set in all 3 of these faults, so it seems like it should be running the code I copied
+
+
+2025-12-23:
+
+- I've looked through the linux page fault handler a lot, and while it does check a bunch of bits to determine what to do, most of
+  those things end in a fault that terminates the process, or a kernel panic.  The one that handles the page fault is the only
+  condition that occurs in my program, and I'm doing the exact same things, namely fetching MMUSR, and the PLOAD instructions.  All
+  the other cases that linux handles don't occur in my example, since the only page faults are the copy-on-write exceptions
+- In all 3 cases, SSW is 0x709, and MMUSR is 0xA04, which means DF is set, when the RTE instruction executes it will retry the
+  fault, no other fault bits are set, and in MMUSR it's only a write protect exception and the modified bit, and the number of
+  levels searched.  Linux in that case will only run the page fault handler, and then the PLOAD instructions that I copied
+- so, the first page fault in pid 3, I dumped the mmu table and it shows the same   status bit as before 0x1D instead of 0x19 in the
+  table.  I'll trying printing it after the change, but maybe my status changing code is wrong?  I'd still expect repeated faults on
+  the same address though if that were the case
+- the first time it occurs, the status is changed to 0x19, but I guess the process forks which sets it back to 1D? Then the second
+  page fault is for another address, 0x209300, which has the status correctly updated to 0x19
+- I keep getting confused by these page faults, thinking they're the same page, but they aren't.  The addresses are just inverted
+- Something to note though, is that pid 3 has two heaps and two stacks, which I assume is that hack I put in place when copying the
+  stack so that it can access both stacks.  Maybe that's causing problems?
+
+- I removed the copy_stack by uncommenting the #if block around it, and I ran it again, and I'm pretty sure I'm seeing two page
+  faults for the same address in the same pid, but I'm pretty sure it's because there's a fork.  There are 4 page faults this time,
+  pid 1 for 0x2067AA, then pid 3 for 0x2067AA, then again for pid 3 for 0x2067AA, and then pid 4 for 0x2067AA
+- 0x206800 is the top of the stack in all the forks of these processes, so that makes sense, and when a process is forked, I think
+  it returns to the parent process before switching to the child.
+- the first page fault for pid 3 occurs when it first runs, and writes to its stack, and then it forks itself to make pid 4, which
+  enables write protect for both the child and parent processes.  The first to page fault on that is pid 3 again, which copies the
+  page, and then pid 4 runs and page faults because the first time it writes to its stack.  Pid 4's original page is 0x207500, which
+  is also the original page for the second pid 3 page fault, and it's the new page that the first pid 3 page fault allocated to
+  replace the original 0x206700 page
+- so in short, this looks like it's doing exactly what's expected, and it runs pid 4, but it does not seem to run pid 5, since
+  there's no page faults for it, implying it's somewhere in pid 4 that the problem occurs?
+- running `ls` produces no output, but many page faults, and a null pointer exception...
+
+- Ah!  `sh` has a RELRO section, for relative read only data if I'm not mistaken, and I haven't change that section yet.  Could that
+  be messing up something, or not being loaded?  I only have copy on write for the stack, and the segments are still preloaded, so I
+  don't see how this could have any effect... hmm...
+
+- you know what might be going on... so I tried running `ls` and no output, just null exception, and then I ran `echo hey` and it
+  printed a bunch of garbage characters.  Since it's using copy on write, the stack addresses are all in the 206700 range, but only
+  pid 1 actually has a stack that points to the same physical address as the stack address.  Every other process has a physical page
+  mapped there with an address that doesn't match, and the api syscalls are not translating still, so it's using the wrong addresses
+  and getting the wrong data as arguments
+- so it doesn't matter that it's only the stack, the translations are still required to make any of this work =(
+- I don't think ruxpin has the same problem, despite having a copy on write stack... not sure why it worked there
+
+- yup, adding the copy_stack and removing the COPY_ON_WRITE flag from memory_map_copy_segment's mmu_table_copy() call makes it work
+  as expected
+- interesting to note though, that with just the copy on write removed, but also not having copy_stack() called made all the same
+  null exceptions and garbage characters printed exceptions occur, but without the page faults... So I think the copy on write stuff
+  is working fine, but there are translation problems
+
+
+2025-12-26:
+
+- I've been avoiding the translation stuff, but also chipping away around it, looking at linux's source, and looking at the 68030
+  manual.  The MOVES instruction seems to do what I need, even though the manual isn't explicit about it using the MMU or CRP
+  register to do the access.  I've already made a simple implementation of copy_to/from_user with it, and debugged it enough to know
+  it will actually copy data.  I have it in the exec() syscall, and it's certainly copying the data
+- the big thing that I haven't yet figured out, is how to avoid copying or allocating a buffer entirely when CONFIG_MMU is not
+  enabled
+- I was looking very seriously at copying linux's iovec/iov_iter pattern to hide the details of user memory and copying from deeper
+  within the kernel than just the first level of syscalls, but any syscall that might block is still susceptable to erasing the
+  stack before the syscall restart, so that won't work unless I change how that works (and the alternative way is to use the stack
+  (possible the user stack when CONFIG_M68K_USER_MODE is not enabled) throughout the kernel).  At the moment, I'm going to try not
+  using iovec to avoid that question
+- Oh, and one thing I came across in the manual was that the SFC/DFC registers were significant to the PFLUSH instruction, so since
+  that's not set, that might explain some things, and also need to be fixed
 

@@ -1,6 +1,6 @@
 
-#ifndef _SRC_ASM_MMU_H
-#define _SRC_ASM_MMU_H
+#ifndef _ARCH_M68K_ASM_MMU_H
+#define _ARCH_M68K_ASM_MMU_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -38,6 +38,9 @@
 
 #define MMU_FLUSH_USER_TLB()		\
 	asm volatile("pflush	#4, #1\n")
+
+#define MMU_FLUSH_ONE(addr)		\
+	asm volatile("pflush	#4, #1, %0\n" : : "m" (addr))
 
 
 #define MMU_DT_INVALID		0
@@ -149,8 +152,8 @@ mmu_descriptor_t *mmu_table_alloc(void);
 void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, ssize_t length, int flags);
 int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, ssize_t length, int flags);
-int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr);
 page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr);
+int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, int flags);
 int mmu_table_print(mmu_descriptor_t *root);
 
 static inline void mmu_table_switch(mmu_descriptor_t *root)
