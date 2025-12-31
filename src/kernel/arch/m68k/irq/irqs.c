@@ -163,15 +163,15 @@ static void page_fault_handler(struct exception_frame *frame)
 		fault_addr = frame->formatb.fault_addr;
 		ssw = frame->formatb.ssw;
 		log_error("page fault @ %x in pid %d\n", fault_addr, current_proc->pid);
-		log_info("pc: %x\n", frame->pc);
-		log_info("ssw: %x\n", ssw);
+		//log_info("pc: %x\n", frame->pc);
+		//log_info("ssw: %x\n", ssw);
 
 		asm volatile(
 			"ptestr %2, %1@, #7\n"
 			"pmove %%psr, %0\n"
 			: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw)
 		);
-		log_info("mmu sr: %x\n", mmu_sr);
+		//log_info("mmu sr: %x\n", mmu_sr);
 
 		//printk("printing table %x for pid %d\n", current_proc->map->root_table, current_proc->pid);
 		//mmu_table_print(current_proc->map->root_table);

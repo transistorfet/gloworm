@@ -450,9 +450,7 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 
 	int error;
 
-	//error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, MMU_FLAG_COPY_ON_WRITE);
-	//error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, (src_segment->flags & SEG_TYPE_STACK) ? MMU_FLAG_COPY_ON_WRITE : 0);
-	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, 0);
+	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, (src_segment->flags & SEG_WRITE) ? MMU_FLAG_COPY_ON_WRITE : 0);
 	if (error < 0)
 		return error;
 

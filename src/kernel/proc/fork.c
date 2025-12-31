@@ -120,23 +120,30 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 			goto fail;
 	}
 
-	// TODO temporarily using copy stack in MMU-mode as well, until copy-on-write is working
-	//#if !defined(CONFIG_MMU)
+	#if defined(CONFIG_MMU)
+
+	new_map->heap_start = parent_proc->map->heap_start;
+	new_map->sbrk = parent_proc->map->sbrk;
+	new_map->argv = parent_proc->map->argv;
+	new_map->envp = parent_proc->map->envp;
+
+	#else
 
 	error = copy_stack(parent_proc, proc, new_map);
 	if (error < 0)
 		goto fail;
 
-	//#endif
+	#endif
 
 	proc->map = new_map;
-
+ 
 	char *stack_pointer = NULL;
 	// TODO this needs to move to a common location, but the reason it can't (hasn't been) moved is because it needs the stack pointer?
 	// because it's adjusting both the user and kernel stacks, due to the fact that enabling user mode uses two stacks instead of one
 	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
-	if (!stack_pointer)
+	if (!stack_pointer) {
 		return EFAULT;
+	}
 	arch_clone_task_info(parent_proc, proc, stack_pointer);
 
 	return 0;
@@ -156,12 +163,9 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc, 
 	heap_start = parent_proc->map->heap_start;
 	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
 
-	// TODO this #if is temporary, until MMU-mode stops using copy_stack
-	#if !defined(CONFIG_MMU)
 	error = memory_map_unmap(new_map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
 	if (error < 0)
 		return error;
-	#endif
 
 	error = memory_map_insert_heap_stack(new_map, heap_start, stack_size);
 	if (error < 0)

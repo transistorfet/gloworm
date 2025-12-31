@@ -2394,3 +2394,29 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   aren't being forwarded correctly.  Maybe something's changed with the networking on debian since I last tried this, which has made
   my commands no longer work as expected.  I'm not convinced the problem is with gloworm, and not with my desktop's setup
 
+- ok, I committed the big chunk of changes to add address translations and iovec.  There's definitely a few things I've forgotten,
+  but I needed to get it added to debug more effectively
+- I've disabled the stack copying in MMU mode, and enabled copy-on-write for the stack segment only.  It's running and will execute
+  ntpdate with the right timeout, but what's failing is the execbuiltin() syscall.  The echo in /etc/rc won't run, and `ls` and `ps`
+  won't run because they're using the shell's builtin versions, but it runs when I try running `/bin/ls` and `hello` works fine.  So
+  it's definitely something with that syscall
+- the address passed to execbuiltin() seems correct, and in the forked process, that segment is there, so it should be a correct
+  address to use (no translation needed), but it seems to fail with an bus error exception on address 0, so a null pointer
+  somewhere?
+- a thought that just occurred to me, during an exec or fork, if there's a page fault caused by accessing the new process's memory,
+  it might not resolve correctly because the current_proc won't be the new proc yet
+- some more print statements shows it's memory_map_reset_sbrk() that's failing.  Maybe one of the addresses in the map aren't copied
+  correctly, or not recreated correctly
+
+- the sbrk and heap_start values are 0, as are the argv and envp values, which are only copied over when duplicating the stack,
+  which adjusts all those values
+- all those values are correct when copy_stack() runs (when CONFIG_MMU is disabled)
+- fixing those values (just manually copying them over when CONFIG_MMU is enabled) fixed the problem with execbuiltin() not running.
+  It will now run `ls` and `ps` correctly too (the ones built into the shell)
+
+- I've removed the copy_stack when CONFIG_MMU is enabled, and set the copy-on-write flag when copying segments, and that all seems
+  to be working now
+- when I tried to change the other things with the code segments or switching to unallocated segments, it won't even start
+  multitasking.  Not sure what's wrong, but it's likely something significant, perhaps something I forgot to switch over.  It can't
+  be looping page faults because I've got a print statement when a page fault occurs, and that's not printing
+
