@@ -65,8 +65,9 @@ int arch_init_task_info(struct process *proc)
 
 	if (!proc->task_info.kernel_stack_start) {
 		proc->task_info.kernel_stack_start = (char *) page_alloc_contiguous(KERNEL_STACK_SIZE);
-		if (!proc->task_info.kernel_stack_start)
+		if (!proc->task_info.kernel_stack_start) {
 			return ENOMEM;
+		}
 	}
 	proc->task_info.ksp = proc->task_info.kernel_stack_start + KERNEL_STACK_SIZE;
 

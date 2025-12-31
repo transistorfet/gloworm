@@ -34,24 +34,29 @@ void arch_init_irqs(void)
 	extern void enter_irq();
 
 	// Processor exceptions
-	for (short i = IRQ_BUS_ERROR; i < IRQ_AUTOVEC1; i++)
+	for (short i = IRQ_BUS_ERROR; i < IRQ_AUTOVEC1; i++) {
 		vector_table[i] = enter_exception;
+	}
 
 	// Autovec interrupts
-	for (short i = IRQ_AUTOVEC1; i <= IRQ_AUTOVEC7; i++)
+	for (short i = IRQ_AUTOVEC1; i <= IRQ_AUTOVEC7; i++) {
 		vector_table[i] = enter_irq;
+	}
 
 	// Trap instructions handlers
-	for (short i = IRQ_TRAP0; i <= IRQ_TRAP15; i++)
+	for (short i = IRQ_TRAP0; i <= IRQ_TRAP15; i++) {
 		vector_table[i] = enter_syscall;
+	}
 
 	// Reserved interrupts vectors
-	for (short i = IRQ_TRAP15 + 1; i < IRQ_USER_START; i++)
+	for (short i = IRQ_TRAP15 + 1; i < IRQ_USER_START; i++) {
 		vector_table[i] = enter_exception;
+	}
 
 	// User interrupts
-	for (short i = IRQ_USER_START; i < IRQ_USER_MAX; i++)
+	for (short i = IRQ_USER_START; i < IRQ_USER_MAX; i++) {
 		vector_table[i] = enter_irq;
+	}
 
 	vector_table[IRQ_TRACE] = (m68k_irq_handler_t) enter_trace;
 
@@ -196,8 +201,9 @@ static void page_fault_handler(struct exception_frame *frame)
 		return;
 	}
 
-	#endif
 fail:
+	#endif
+
 	user_error(frame);
 }
 

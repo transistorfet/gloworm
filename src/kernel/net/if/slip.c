@@ -62,8 +62,9 @@ int slip_if_init()
 	devices[0].rdev = DEVNUM(DEVMAJOR_TTY68681, 1);
 
 	register_bh(BH_SLIP, slip_if_process_input, NULL);
-	for (short i = 0; i < SLIP_DEVICES; i++)
+	for (short i = 0; i < SLIP_DEVICES; i++) {
 		net_if_register_device((struct if_device *) &devices[i]);
+	}
 	return 0;
 }
 
@@ -74,8 +75,9 @@ int slip_if_up(struct if_device *ifdev)
 	// TODO you need to notify the serial driver to request the net bottom half run after any input
 	// TODO should you have a mode flag to exclusively open a device, which gives an error if it's already open
 	error = dev_open(SLIP_IFDEV(ifdev)->rdev, O_RDWR | O_NONBLOCK);
-	if (error)
+	if (error) {
 		return error;
+	}
 	enable_bh(BH_SLIP);
 	return 0;
 }
@@ -100,8 +102,9 @@ static void slip_encode_packet(struct slip_if_device *ifdev)
 
 	// NOTE we assume the tx buffer is empty when this is called
 
-	if (!ifdev->ifdev.tx_queue.head)
+	if (!ifdev->ifdev.tx_queue.head) {
 		return;
+	}
 
 	pack = (struct packet *) ifdev->ifdev.tx_queue.head;
 	_queue_remove(&ifdev->ifdev.tx_queue, &pack->node);
@@ -160,15 +163,17 @@ static void slip_decode_packet(struct slip_if_device *ifdev, short length)
 			} else if (ifdev->rx_buffer[i] == SLIP_FRAME_ESC_ESC) {
 				pack->data[j] = SLIP_FRAME_ESC;
 			}
-		} else
+		} else {
 			pack->data[j] = ifdev->rx_buffer[i];
+		}
 	}
 	pack->length = j;
 
 	if (ifdev->ifdev.flags & IFF_DEBUG) {
 		log_debug("DEBUG: recv packet: ");
-		for (int i = 0; i < pack->length; i++)
+		for (int i = 0; i < pack->length; i++) {
 			log_debug("%x ", (int) pack->data[i]);
+		}
 		log_debug("\n");
 	}
 
@@ -179,15 +184,18 @@ static void slip_decode_packet(struct slip_if_device *ifdev, short length)
 static void slip_if_write_data(struct slip_if_device *ifdev)
 {
 	int written;
+	struct iovec_iter iter;
 
 	do {
 		written = 0;
 
-		if (!ifdev->tx_write)
+		if (!ifdev->tx_write) {
 			slip_encode_packet(ifdev);
+		}
 
 		if (ifdev->tx_read < ifdev->tx_write) {
-			written = dev_write(ifdev->rdev, (const char *) &ifdev->tx_buffer[ifdev->tx_read], 0, ifdev->tx_write - ifdev->tx_read);
+			iovec_iter_init_kernel_buf(&iter, (char *) &ifdev->tx_buffer[ifdev->tx_read], ifdev->tx_write - ifdev->tx_read);
+			written = dev_write(ifdev->rdev, 0, &iter);
 			if (written < 0) {
 				//devices[i].error = read;
 				return;
@@ -205,8 +213,10 @@ static void slip_if_write_data(struct slip_if_device *ifdev)
 static void slip_if_read_data(struct slip_if_device *ifdev)
 {
 	int read;
+	struct iovec_iter iter;
 
-	read = dev_read(ifdev->rdev, (char *) &ifdev->rx_buffer[ifdev->rx_write], 0, SLIP_MTU_MAX - ifdev->rx_write);
+	iovec_iter_init_kernel_buf(&iter, (char *) &ifdev->rx_buffer[ifdev->rx_write], SLIP_MTU_MAX - ifdev->rx_write);
+	read = dev_read(ifdev->rdev, 0, &iter);
 	if (read < 0) {
 		//devices[i].error = read;
 		return;
@@ -219,10 +229,12 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 
 	for (; read; read--) {
 		if (ifdev->rx_buffer[ifdev->rx_read] == SLIP_FRAME_END) {
-			if (ifdev->rx_read)
+			if (ifdev->rx_read) {
 				slip_decode_packet(ifdev, ifdev->rx_read);
-			if (++ifdev->rx_read < ifdev->rx_write)
+			}
+			if (++ifdev->rx_read < ifdev->rx_write) {
 				memcpy(ifdev->rx_buffer, &ifdev->rx_buffer[ifdev->rx_read], ifdev->rx_write - ifdev->rx_read);
+			}
 			ifdev->rx_write -= ifdev->rx_read;
 			ifdev->rx_read = 0;
 		} else {

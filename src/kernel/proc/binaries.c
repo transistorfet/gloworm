@@ -82,6 +82,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
 	size_t mem_size;
 	int error = ENOMEM;
+	struct iovec_iter iter;
 	uintptr_t user_mem_start;
 
 	// The extra data is for the bss segment, which we don't know the proper size of
@@ -113,7 +114,8 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 	// so we set the pointer to NULL again to avoid a double-free
 	object = NULL;
 
-	error = vfs_read(file, (void *) user_mem_start, mem_size);
+	iovec_iter_init_kernel_buf(&iter, (void *) user_mem_start, mem_size);
+	error = vfs_read(file, &iter);
 	if (error <= 0) {
 		goto fail;
 	}
@@ -143,12 +145,14 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	size_t mem_size;
 	size_t segment_size;
 	int error = ENOMEM;
+	struct iovec_iter iter;
 	uintptr_t user_mem_start;
 	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
 	Elf32_Ehdr header;
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
 
-	if (!(error = vfs_read(file, (char *) &header, sizeof(Elf32_Ehdr))))
+	iovec_iter_init_kernel_buf(&iter, (char *) &header, sizeof(Elf32_Ehdr));
+	if (!(error = vfs_read(file, &iter)))
 		return error;
 
 	// Look for the ELF signature, 32-bit Big Endian ELF Version 1
@@ -163,7 +167,8 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	num_ph = header.e_phnum <= PROG_HEADER_MAX ? header.e_phnum : PROG_HEADER_MAX;
 	if (!(error = vfs_seek(file, header.e_phoff, SEEK_SET)))
 		return error;
-	if (!(error = vfs_read(file, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph)))
+	iovec_iter_init_kernel_buf(&iter, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
+	if (!(error = vfs_read(file, &iter)))
 		return error;
 
 	// Calculate the total size of memory to allocate (not including the stack)
@@ -228,7 +233,8 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
 				goto fail;
 			}
-			if ((error = vfs_read(file, (char *) file_segment_start, prog_headers[i].p_filesz)) < 0) {
+			iovec_iter_init_kernel_buf(&iter, (char *) file_segment_start, prog_headers[i].p_filesz);
+			if ((error = vfs_read(file, &iter)) < 0) {
 				goto fail;
 			}
 			memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);

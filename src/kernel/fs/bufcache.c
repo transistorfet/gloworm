@@ -41,8 +41,9 @@ void init_bufcache()
 void sync_bufcache()
 {
 	for (short i = 0; i < BLOCKCACHE_MAX; i++) {
-		if (blocks[i].flags & BCF_ALLOCATED)
+		if (blocks[i].flags & BCF_ALLOCATED) {
 			_write_entry(&blocks[i]);
+		}
 	}
 }
 
@@ -66,8 +67,9 @@ struct buf *get_block(device_t dev, block_t num)
 
 int release_block(struct buf *buf, short dirty)
 {
-	if (dirty)
+	if (dirty) {
 		mark_block_dirty(buf);
+	}
 
 	if (--buf->refcount == 0) {
 		// TODO we actually maybe don't want to write until this entry is recycled, or else any bit changes will require an immediate writeback
@@ -90,8 +92,9 @@ static struct buf *_load_block(device_t dev, block_t num)
 
 	entry = _find_free_entry();
 	// TODO set errno?
-	if (!entry)
+	if (!entry) {
 		return NULL;
+	}
 
 	entry->refcount = 1;
 	entry->flags = BCF_ALLOCATED;
@@ -132,21 +135,30 @@ static inline struct buf *_find_free_entry()
 
 static inline int _read_entry(struct buf *entry)
 {
+	struct iovec_iter iter;
+
 	//printk("READING %x: %x <- %x x %x\n", entry->dev, entry->block, (entry->num * BC_BLOCK_SIZE), BC_BLOCK_SIZE);
-	int size = dev_read(entry->dev, entry->block, (entry->num * BC_BLOCK_SIZE), BC_BLOCK_SIZE);
-	if (size != BC_BLOCK_SIZE)
+	iovec_iter_init_kernel_buf(&iter, entry->block, BC_BLOCK_SIZE);
+	int size = dev_read(entry->dev, (entry->num * BC_BLOCK_SIZE), &iter);
+	if (size != BC_BLOCK_SIZE) {
 		return -1;
+	}
 	return 0;
 }
 
 static inline int _write_entry(struct buf *entry)
 {
-	if (!(entry->flags & BCF_DIRTY))
+	struct iovec_iter iter;
+
+	if (!(entry->flags & BCF_DIRTY)) {
 		return 0;
+	}
 	//printk("WRITING %x: %x <- %x x %x\n", entry->dev, (entry->num * BC_BLOCK_SIZE), entry->block, BC_BLOCK_SIZE);
-	int size = dev_write(entry->dev, entry->block, (entry->num * BC_BLOCK_SIZE), BC_BLOCK_SIZE);
-	if (size != BC_BLOCK_SIZE)
+	iovec_iter_init_kernel_buf(&iter, entry->block, BC_BLOCK_SIZE);
+	int size = dev_write(entry->dev, (entry->num * BC_BLOCK_SIZE), &iter);
+	if (size != BC_BLOCK_SIZE) {
 		return -1;
+	}
 	entry->flags &= ~BCF_DIRTY;
 	return 1;
 }

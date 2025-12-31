@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <kernel/drivers.h>
+#include <kernel/utils/iovec.h>
 
 #define MAX_DRIVERS	6
 
@@ -36,34 +37,34 @@ int dev_close(device_t dev)
 	return drv_table[major]->close(minor);
 }
 
-int dev_read(device_t dev, char *buffer, offset_t offset, size_t size)
+int dev_read(device_t dev, offset_t offset, struct iovec_iter *iter)
 {
 	devmajor_t major = dev >> 8;
 	devminor_t minor = (devminor_t) dev;
 
 	if (major >= MAX_DRIVERS)
 		return ENXIO;
-	return drv_table[major]->read(minor, buffer, offset, size);
+	return drv_table[major]->read(minor, offset, iter);
 }
 
-int dev_write(device_t dev, const char *buffer, offset_t offset, size_t size)
+int dev_write(device_t dev, offset_t offset, struct iovec_iter *iter)
 {
 	devmajor_t major = dev >> 8;
 	devminor_t minor = (devminor_t) dev;
 
 	if (major >= MAX_DRIVERS)
 		return ENXIO;
-	return drv_table[major]->write(minor, buffer, offset, size);
+	return drv_table[major]->write(minor, offset, iter);
 }
 
-int dev_ioctl(device_t dev, unsigned int request, void *argp, uid_t uid)
+int dev_ioctl(device_t dev, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	devmajor_t major = dev >> 8;
 	devminor_t minor = (devminor_t) dev;
 
 	if (major >= MAX_DRIVERS)
 		return ENXIO;
-	return drv_table[major]->ioctl(minor, request, argp, uid);
+	return drv_table[major]->ioctl(minor, request, iter, uid);
 }
 
 int dev_poll(device_t dev, int events)

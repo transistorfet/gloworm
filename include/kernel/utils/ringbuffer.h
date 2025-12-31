@@ -2,6 +2,8 @@
 #ifndef _KERNEL_UTILS_RINGBUFFER_H
 #define _KERNEL_UTILS_RINGBUFFER_H
 
+#include <kernel/utils/iovec.h>
+
 #define RING_BUFFER_SIZE	512
 
 struct ringbuffer {
@@ -141,6 +143,79 @@ static inline short _buf_drop(struct ringbuffer *cb, short size)
 	return size;
 }
 
+static inline short _buf_get_iter(struct ringbuffer *cb, struct iovec_iter *iter)
+{
+	size_t size;
+	short chunk1, chunk2;
+
+	size = iovec_iter_length(iter);
+
+	// Calculate the maximum readable chunk from the current out pointer to either
+	// the in pointer, or if the in pointer is less than the out pointer, then to
+	// the end of the buffer
+	if (cb->in > cb->out) {
+		chunk1 = (cb->in - cb->out < size) ? cb->in - cb->out : size;
+	} else {
+		chunk1 = (cb->max - cb->out < size) ? cb->max - cb->out : size;
+	}
+
+	memcpy_into_iter(iter, (char *) &cb->buffer[cb->out], chunk1);
+
+	cb->out += chunk1;
+	if (cb->out >= cb->max)
+		cb->out = 0;
+
+	// If we've read the full size, or the buffer is empty, then return early
+	size -= chunk1;
+	if (size <= 0 || cb->out == cb->in)
+		return chunk1;
+
+	// Calculate the maximum readable second chunk, from the bottom of the buffer to
+	// the in pointer, or the remaining size if there's more data available than requested
+	chunk2 = (cb->in - cb->out < size) ? cb->in - cb->out : size;
+
+	memcpy_into_iter(iter, (char *) &cb->buffer[cb->out], chunk2);
+	cb->out += chunk2;
+
+	return chunk1 + chunk2;
+}
+
+static inline short _buf_put_iter(struct ringbuffer *cb, struct iovec_iter *iter)
+{
+	size_t size;
+	short chunk1, chunk2;
+
+	size = iovec_iter_length(iter);
+
+	// Calculate the maximum writable chunk from the current in pointer to either
+	// the out pointer, or if the out pointer is less than the in pointer, then to
+	// the end of the buffer
+	if (cb->out > cb->in) {
+		chunk1 = (cb->out - cb->in - 1 < size) ? cb->out - cb->in - 1 : size;
+	} else {
+		chunk1 = (cb->max - cb->in < size) ? cb->max - cb->in - (cb->out ? 0 : 1) : size;
+	}
+
+	memcpy_out_of_iter(iter, (char *) &cb->buffer[cb->in], chunk1);
+
+	cb->in += chunk1;
+	if (cb->in >= cb->max)
+		cb->in = 0;
+
+	// If we've read the full size, or the buffer is empty, then return early
+	size -= chunk1;
+	if (size <= 0 || cb->in + 1 == cb->out || cb->in + 1 == cb->max)
+		return chunk1;
+
+	// Calculate the maximum writable second chunk, from the bottom of the buffer to
+	// the out pointer, or the remaining size if there's more data available than requested
+	chunk2 = (cb->out - cb->in - 1 < size) ? cb->out - cb->in - 1 : size;
+
+	memcpy_out_of_iter(iter, (char *) &cb->buffer[cb->in], chunk2);
+	cb->in += chunk2;
+
+	return chunk1 + chunk2;
+}
 
 #endif
 

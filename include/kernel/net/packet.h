@@ -3,6 +3,7 @@
 #define _KERNEL_NET_PACKET_H
 
 #include <stdint.h>
+#include <kernel/utils/iovec.h>
 #include <kernel/utils/queue.h>
 
 #define PACKET_CUSTOM_DATA	32
@@ -30,5 +31,6 @@ struct packet {
 struct packet *packet_alloc(struct if_device *ifdev, struct protocol *proto, size_t capacity);
 void packet_free(struct packet *pack);
 int packet_append(struct packet *pack, const void *buf, int nbytes);
+int packet_append_iovec(struct packet *pack, struct iovec_iter *iter);
 
 #endif

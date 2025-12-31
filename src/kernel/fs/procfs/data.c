@@ -19,8 +19,9 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 		strncpy(&buffer[i], *arg, max - i);
 		i += strlen(*arg) + 1;
 		buffer[i - 1] = ' ';
-		if (i > max)
+		if (i > max) {
 			break;
+		}
 	}
 	buffer[i - 1] = '\0';
 	return i;

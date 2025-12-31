@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include "../include/kernel/utils/iovec.h"
 #include "../include/kernel/utils/ringbuffer.h"
 
 #define BUF_SIZE	16
@@ -57,6 +58,12 @@ int main()
 
 	printf("In: %d\n", buffer.in);
 	printf("Out: %d\n", buffer.out);
+
+	struct iovec_iter iter;
+	char array[256];
+
+	iovec_iter_init_kernel_buf(&iter, array, 256);
+	_buf_put_iter(&buffer, &iter);
 
 	return 0;
 }

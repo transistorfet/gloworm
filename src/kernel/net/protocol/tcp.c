@@ -31,8 +31,8 @@ int tcp_endpoint_listen(struct endpoint *ep, int queue);
 int tcp_endpoint_accept(struct endpoint *ep, struct sockaddr *sockaddr, socklen_t *len, struct endpoint **result);
 int tcp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len);
 int tcp_endpoint_shutdown(struct endpoint *ep, int how);
-int tcp_endpoint_send(struct endpoint *ep, const unsigned char *buf, int nbytes);
-int tcp_endpoint_recv(struct endpoint *ep, unsigned char *buf, int nbytes);
+int tcp_endpoint_send(struct endpoint *ep, struct iovec_iter *iter);
+int tcp_endpoint_recv(struct endpoint *ep, struct iovec_iter *iter);
 int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen);
 int tcp_endpoint_set_options(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen);
 int tcp_endpoint_poll(struct endpoint *ep, int events);
@@ -107,8 +107,9 @@ int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 	struct tcp_header *hdr;
 	struct ipv4_custom_data *custom;
 
-	if (pack->length - offset < sizeof(struct tcp_header))
+	if (pack->length - offset < sizeof(struct tcp_header)) {
 		return -5;
+	}
 
 	hdr = (struct tcp_header *) &pack->data[offset];
 	hdr->src = be16toh(hdr->src);
@@ -129,8 +130,9 @@ int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
-	if (checksum != tcp_calculate_checksum(proto, pack))
+	if (checksum != tcp_calculate_checksum(proto, pack)) {
 		return -7;
+	}
 	hdr->checksum = checksum;
 
 	return 0;
@@ -142,8 +144,9 @@ int tcp_forward_packet(struct protocol *proto, struct packet *pack)
 	struct ipv4_custom_data *custom = (struct ipv4_custom_data *) pack->custom_data;
 
 	ep = tcp_lookup_endpoint(proto, &custom->dest, &custom->src);
-	if (!ep)
+	if (!ep) {
 		return PACKET_DROPPED;
+	}
 
 	switch (TCP_ENDPOINT(ep)->state) {
 		case TS_CLOSED:
@@ -180,16 +183,19 @@ int tcp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 
 	// Get the real IP and port number to send from
 	error = inet_resolve_address(sockaddr, len, (const struct sockaddr *) &ifdev->address, &src);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	// Make sure the address and port aren't already in use
-	if (tcp_lookup_endpoint(proto, &src, NULL))
+	if (tcp_lookup_endpoint(proto, &src, NULL)) {
 		return EADDRINUSE;
+	}
 
 	tep = tcp_alloc_endpoint(proto, sock, ifdev, &src, NULL);
-	if (!tep)
+	if (!tep) {
 		return ENOMEM;
+	}
 	*result = (struct endpoint *) tep;
 
 	return 0;
@@ -204,8 +210,9 @@ int tcp_destroy_endpoint(struct endpoint *ep)
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
 	// TODO this would need to close properly or return an error??
-	if (tep->remote.addr && tep->state != TS_CLOSED && tep->state != TS_CLOSING && !tep->fin_sent)
+	if (tep->remote.addr && tep->state != TS_CLOSED && tep->state != TS_CLOSING && !tep->fin_sent) {
 		tcp_send_packet(tep, RST | ACK, 0, 0);
+	}
 
 	for (struct packet *next, *cur = _queue_head(&tep->recv_queue); cur; cur = next) {
 		next = _queue_next(&cur->node);
@@ -215,10 +222,12 @@ int tcp_destroy_endpoint(struct endpoint *ep)
 
 	_queue_remove(&tcp_endpoints, &ep->node);
 
-	if (tep->rx)
+	if (tep->rx) {
 		kmfree(tep->rx);
-	if (tep->tx)
+	}
+	if (tep->tx) {
 		kmfree(tep->tx);
+	}
 	kmfree(tep);
 	return 0;
 }
@@ -227,8 +236,9 @@ int tcp_endpoint_listen(struct endpoint *ep, int queue)
 {
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
-	if (tep->state != TS_CLOSED)
+	if (tep->state != TS_CLOSED) {
 		return EISCONN;
+	}
 
 	tep->listen_queue_max = queue < 10 ? queue : 10;
 	tep->state = TS_LISTEN;
@@ -241,23 +251,27 @@ int tcp_endpoint_accept(struct endpoint *ep, struct sockaddr *sockaddr, socklen_
 	struct packet *pack;
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
-	if (tep->state != TS_LISTEN)
+	if (tep->state != TS_LISTEN) {
 		return EINVAL;
+	}
 
 	pack = _queue_head(&tep->recv_queue);
-	if (!pack)
+	if (!pack) {
 		return EWOULDBLOCK;
+	}
 
 	_queue_remove(&tep->recv_queue, &pack->node);
 	tep->queue_size -= 1;
 
 	error = tcp_create_client_endpoint(tep, pack, result);
 	packet_free(pack);
-	if (error)
+	if (error) {
 		return error;
+	}
 
-	if (sockaddr)
+	if (sockaddr) {
 		inet_load_sockaddr(sockaddr, len, &TCP_ENDPOINT(*result)->remote);
+	}
 	return 0;
 }
 
@@ -266,11 +280,13 @@ int tcp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, s
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 	struct sockaddr_in *addr = (struct sockaddr_in *) sockaddr;
 
-	if (tep->state == TS_ESTABLISHED && tep->connect_return != 0)
+	if (tep->state == TS_ESTABLISHED && tep->connect_return != 0) {
 		return tep->connect_return < 0 ? tep->connect_return : 0;
+	}
 
-	if (tep->state != TS_CLOSED)
+	if (tep->state != TS_CLOSED) {
 		return EISCONN;
+	}
 
 	tep->remote.addr = addr->sin_addr.s_addr;
 	tep->remote.port = addr->sin_port;
@@ -287,8 +303,9 @@ int tcp_endpoint_shutdown(struct endpoint *ep, int how)
 {
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
-	if (tep->state != TS_SYN_RECV && tep->state != TS_ESTABLISHED && tep->state != TS_CLOSE_WAIT)
+	if (tep->state != TS_SYN_RECV && tep->state != TS_ESTABLISHED && tep->state != TS_CLOSE_WAIT) {
 		return 0;
+	}
 
 	tep->fin_sent = 1;
 	tcp_send_packet(tep, FIN | ACK, 0, 0);
@@ -300,17 +317,20 @@ int tcp_endpoint_shutdown(struct endpoint *ep, int how)
 	return 0;
 }
 
-int tcp_endpoint_send(struct endpoint *ep, const unsigned char *buf, int nbytes)
+int tcp_endpoint_send(struct endpoint *ep, struct iovec_iter *iter)
 {
+	size_t nbytes;
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
-	if (!(tep->remote.port))
+	if (!(tep->remote.port)) {
 		return ENOTCONN;
+	}
 
-	if (tep->state != TS_ESTABLISHED || _buf_free_space(tep->tx) < nbytes)
+	if (tep->state != TS_ESTABLISHED || _buf_free_space(tep->tx) < iovec_iter_length(iter)) {
 		return EWOULDBLOCK;
+	}
 
-	_buf_put(tep->tx, buf, nbytes);
+	nbytes = _buf_put_iter(tep->tx, iter);
 	tep->tx_last_seq += nbytes;
 
 	tcp_send_packet(tep, PSH | ACK, nbytes, 0);
@@ -318,36 +338,43 @@ int tcp_endpoint_send(struct endpoint *ep, const unsigned char *buf, int nbytes)
 	return nbytes;
 }
 
-int tcp_endpoint_recv(struct endpoint *ep, unsigned char *buf, int nbytes)
+int tcp_endpoint_recv(struct endpoint *ep, struct iovec_iter *iter)
 {
+	size_t nbytes;
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
-	if (tep->state == TS_CLOSED)
+	if (tep->state == TS_CLOSED) {
 		return 0;
-	if (tep->state == TS_LISTEN)
+	}
+	if (tep->state == TS_LISTEN) {
 		return EINVAL;
-	if (tep->state == TS_SYN_SENT || tep->state == TS_SYN_RECV)
+	}
+	if (tep->state == TS_SYN_SENT || tep->state == TS_SYN_RECV) {
 		return EWOULDBLOCK;
+	}
 
-	nbytes = _buf_get(tep->rx, buf, nbytes);
-	if (nbytes == 0 && !tep->fin_recv)
+	nbytes = _buf_get_iter(tep->rx, iter);
+	if (nbytes == 0 && !tep->fin_recv) {
 		return EWOULDBLOCK;
+	}
 	return nbytes;
 }
 
 int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen)
 {
 	switch (optname) {
-		case SO_GETSOCKNAME:
+		case SO_GETSOCKNAME: {
 			if (!TCP_ENDPOINT(ep)->local.addr)
 				return ENOTCONN;
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &TCP_ENDPOINT(ep)->local);
 			return 0;
-		case SO_GETPEERNAME:
+		}
+		case SO_GETPEERNAME: {
 			if (!TCP_ENDPOINT(ep)->remote.addr)
 				return ENOTCONN;
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &TCP_ENDPOINT(ep)->remote);
 			return 0;
+		}
 		default:
 			return EINVAL;
 	}
@@ -371,11 +398,13 @@ int tcp_endpoint_poll(struct endpoint *ep, int events)
 		    (tep->state == TS_ESTABLISHED && !_buf_is_empty(tep->rx))
 		 || (tep->state == TS_LISTEN && _queue_head(&tep->recv_queue))
 		 || (tep->state == TS_CLOSED || tep->state >= TS_FIN_WAIT1)
-		)
+		) {
 			revents |= VFS_POLL_READ;
+		}
 	}
-	if ((events & VFS_POLL_WRITE) && !_buf_is_full(tep->tx))
+	if ((events & VFS_POLL_WRITE) && !_buf_is_full(tep->tx)) {
 		revents |= VFS_POLL_WRITE;
+	}
 	// TODO add error events
 	return revents;
 }
@@ -425,8 +454,9 @@ static struct tcp_endpoint *tcp_alloc_endpoint(struct protocol *proto, struct so
 static struct endpoint *tcp_lookup_endpoint(struct protocol *proto, struct ipv4_address *local, struct ipv4_address *remote)
 {
 	for (struct tcp_endpoint *cur = _queue_head(&tcp_endpoints); cur; cur = _queue_next(&cur->ep.node)) {
-		if (cur->local.port == local->port && (cur->state == TS_LISTEN || (remote && cur->remote.addr == remote->addr && cur->remote.port == remote->port)))
+		if (cur->local.port == local->port && (cur->state == TS_LISTEN || (remote && cur->remote.addr == remote->addr && cur->remote.port == remote->port))) {
 			return (struct endpoint *) cur;
+		}
 	}
 	return NULL;
 }
@@ -438,8 +468,9 @@ static int tcp_create_client_endpoint(struct tcp_endpoint *tep, struct packet *p
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
 	client_ep = tcp_alloc_endpoint(tep->ep.proto, NULL, pack->ifdev, &tep->local, &custom->src);
-	if (!client_ep)
+	if (!client_ep) {
 		return ENOMEM;
+	}
 
 	client_ep->state = TS_SYN_RECV;
 	client_ep->rx_last_seq = hdr->seqnum;
@@ -471,10 +502,10 @@ static int tcp_setup_packet(struct packet *pack, const struct ipv4_address *src,
 	int error;
 	struct tcp_header *hdr;
 
-	// TODO the NULL is data, but ipv4_encode doesn't use it
-	error = ipv4_encode_header(pack, src, dest, NULL, sizeof(struct tcp_header) + length);
-	if (error)
+	error = ipv4_encode_header(pack, src, dest, sizeof(struct tcp_header) + length);
+	if (error) {
 		return error;
+	}
 
 	pack->transport_offset = pack->length;
 	pack->length += sizeof(struct tcp_header);
@@ -529,8 +560,9 @@ static int tcp_send_packet(struct tcp_endpoint *tep, int flags, int nbytes, int 
 	struct tcp_header *hdr;
 
 	// TODO there needs to be a limit on how big packets can get.  But should the splitting happen here or in the caller?
-	if ((flags & PSH) && nbytes == -1)
+	if ((flags & PSH) && nbytes == -1) {
 		nbytes = _buf_used_space(tep->tx);
+	}
 
 	pack = tcp_create_empty_packet(tep->ep.proto, &tep->local, &tep->remote, nbytes);
 	hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
@@ -547,8 +579,9 @@ static int tcp_send_packet(struct tcp_endpoint *tep, int flags, int nbytes, int 
 		pack->length += nbytes;
 	} else {
 		hdr->seqnum = tep->tx_last_seq;
-		if (flags == SYN || (flags & FIN))
+		if (flags == SYN || (flags & FIN)) {
 			tep->tx_last_seq += 1;
+		}
 	}
 
 	return tcp_finalize_and_send_packet(tep, pack);
@@ -563,8 +596,9 @@ static void tcp_queue_packet(struct tcp_endpoint *tep, struct packet *pack)
 	seq = hdr->seqnum;
 	for (cur = _queue_head(&tep->recv_queue), prev = NULL; cur; prev = (struct packet *) cur, cur = _queue_next(&cur->node)) {
 		hdr = (struct tcp_header *) &cur->data[cur->transport_offset];
-		if (seq < hdr->seqnum)
+		if (seq < hdr->seqnum) {
 			break;
+		}
 	}
 
 	_queue_insert_after(&tep->recv_queue, &pack->node, &prev->node);
@@ -581,8 +615,9 @@ static int tcp_check_waiting_packet(struct tcp_endpoint *tep)
 		next = _queue_next(&cur->node);
 
 		hdr = (struct tcp_header *) &cur->data[cur->transport_offset];
-		if (tep->rx_last_seq < hdr->seqnum)
+		if (tep->rx_last_seq < hdr->seqnum) {
 			break;
+		}
 
 		length = cur->length - cur->data_offset;
 		if (hdr->seqnum + length > tep->rx_last_seq) {
@@ -591,8 +626,9 @@ static int tcp_check_waiting_packet(struct tcp_endpoint *tep)
 
 			index = _buf_put(tep->rx, &cur->data[cur->data_offset + index], length);
 			tep->rx_last_seq += index;
-			if (index < length)
+			if (index < length) {
 				return 0;
+			}
 		}
 		_queue_remove(&tep->recv_queue, &cur->node);
 		packet_free(cur);
@@ -606,12 +642,14 @@ static int tcp_forward_listen(struct tcp_endpoint *tep, struct packet *pack)
 	//struct tcp_endpoint *client_ep;
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
-	if (hdr->flags != SYN)
+	if (hdr->flags != SYN) {
 		return PACKET_DROPPED;
+	}
 
-	if (tep->queue_size >= tep->listen_queue_max)
+	if (tep->queue_size >= tep->listen_queue_max) {
 		// TODO probably send a connection refused message
 		return PACKET_DROPPED;
+	}
 
 	_queue_insert_after(&tep->recv_queue, &pack->node, tep->recv_queue.tail);
 	tep->queue_size += 1;
@@ -625,14 +663,17 @@ static int tcp_forward_syn_recv(struct tcp_endpoint *tep, struct packet *pack)
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
 	// TODO since this is server-side, we need to possible destroy the endpoint that was created by listen?
-	if (tcp_check_close(tep, pack) == PACKET_DELIVERED)
+	if (tcp_check_close(tep, pack) == PACKET_DELIVERED) {
 		return PACKET_DELIVERED;
+	}
 
-	if (hdr->flags != ACK)
+	if (hdr->flags != ACK) {
 		return PACKET_DROPPED;
+	}
 	// If the acknum of the packet doesn't match our expected seqnum, then drop the packet
-	if (hdr->seqnum != tep->rx_last_seq)
+	if (hdr->seqnum != tep->rx_last_seq) {
 		return PACKET_DROPPED;
+	}
 	tep->tx_last_seq = hdr->acknum;
 	tep->tx_acks_repeated = 0;
 
@@ -648,14 +689,17 @@ static int tcp_forward_syn_sent(struct tcp_endpoint *tep, struct packet *pack)
 {
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
-	if (tcp_check_close(tep, pack) == PACKET_DELIVERED)
+	if (tcp_check_close(tep, pack) == PACKET_DELIVERED) {
 		return PACKET_DELIVERED;
+	}
 
-	if (hdr->flags != (SYN | ACK))
+	if (hdr->flags != (SYN | ACK)) {
 		return PACKET_DROPPED;
+	}
 	// If the acknum of the packet doesn't match our expected seqnum, then drop the packet
-	if (hdr->acknum != tep->tx_last_seq)
+	if (hdr->acknum != tep->tx_last_seq) {
 		return PACKET_DROPPED;
+	}
 
 	tep->rx_last_seq = hdr->seqnum;
 	tep->state = TS_ESTABLISHED;
@@ -672,8 +716,9 @@ static int tcp_forward_established(struct tcp_endpoint *tep, struct packet *pack
 {
 	struct tcp_header *hdr = (struct tcp_header *) &pack->data[pack->transport_offset];
 
-	if (tcp_check_close(tep, pack) == PACKET_DELIVERED)
+	if (tcp_check_close(tep, pack) == PACKET_DELIVERED) {
 		return PACKET_DELIVERED;
+	}
 
 	if (hdr->flags & ACK) {
 		// Discard the data that's been acknowledged
@@ -697,11 +742,13 @@ static int tcp_forward_established(struct tcp_endpoint *tep, struct packet *pack
 
 	if (pack->length - pack->data_offset > 0) {
 		tcp_queue_packet(tep, pack);
-		if (tcp_check_waiting_packet(tep))
+		if (tcp_check_waiting_packet(tep)) {
 			tcp_send_packet(tep, ACK, 0, 0);
+		}
 
-		if (tep->ep.sock && !_buf_is_empty(tep->rx))
+		if (tep->ep.sock && !_buf_is_empty(tep->rx)) {
 			net_socket_wakeup(tep->ep.sock, VFS_POLL_READ);
+		}
 		return PACKET_DELIVERED;
 	}
 
@@ -712,8 +759,9 @@ static int tcp_forward_established(struct tcp_endpoint *tep, struct packet *pack
 static int tcp_forward_closing(struct tcp_endpoint *tep, struct packet *pack)
 {
 	// For now, this is the same behaviour as TS_CLOSING
-	if (tcp_check_close(tep, pack) == PACKET_DELIVERED)
+	if (tcp_check_close(tep, pack) == PACKET_DELIVERED) {
 		return PACKET_DELIVERED;
+	}
 	return PACKET_DROPPED;
 }
 
@@ -733,8 +781,9 @@ static int tcp_check_close(struct tcp_endpoint *tep, struct packet *pack)
 
 	if (hdr->flags & FIN) {
 		tep->fin_recv = 1;
-		if (hdr->seqnum != tep->rx_last_seq)
+		if (hdr->seqnum != tep->rx_last_seq) {
 			return PACKET_DROPPED;
+		}
 
 		if (tep->state == TS_ESTABLISHED) {
 			tep->state = TS_CLOSE_WAIT;
@@ -752,8 +801,9 @@ static int tcp_check_close(struct tcp_endpoint *tep, struct packet *pack)
 		ret = PACKET_DELIVERED;
 	}
 
-	if (ret == PACKET_DELIVERED)
+	if (ret == PACKET_DELIVERED) {
 		packet_free(pack);
+	}
 
 	return ret;
 }

@@ -9,6 +9,7 @@
 #include <kernel/net/if.h>
 #include <kernel/net/socket.h>
 #include <kernel/net/protocol.h>
+#include <kernel/utils/iovec.h>
 
 #include "ipv4.h"
 #include "inet_af.h"
@@ -31,8 +32,8 @@ int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 
 int udp_destroy_endpoint(struct endpoint *ep);
 int udp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len);
-int udp_endpoint_send_to(struct endpoint *ep, const unsigned char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len);
-int udp_endpoint_recv_from(struct endpoint *ep, unsigned char *buf, int nbytes, struct sockaddr *sockaddr, socklen_t *len);
+int udp_endpoint_send_to(struct endpoint *ep, struct iovec_iter *iter, const struct sockaddr *sockaddr, socklen_t len);
+int udp_endpoint_recv_from(struct endpoint *ep, struct iovec_iter *iter, struct sockaddr *sockaddr, socklen_t *len);
 int udp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen);
 int udp_endpoint_set_options(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen);
 int udp_endpoint_poll(struct endpoint *ep, int events);
@@ -76,8 +77,8 @@ struct udp_endpoint {
 };
 
 
-static struct packet *udp_create_packet(struct protocol *proto, const struct ipv4_address *src, const struct ipv4_address *dest, const unsigned char *buf, int nbytes);
-static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, const unsigned char *data, int length);
+static struct packet *udp_create_packet(struct protocol *proto, const struct ipv4_address *src, const struct ipv4_address *dest, struct iovec_iter *iter);
+static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, struct iovec_iter *iter);
 static uint16_t udp_calculate_checksum(struct protocol *proto, struct packet *pack);
 static struct udp_endpoint *udp_lookup_endpoint(struct protocol *proto, uint32_t addr, uint16_t port);
 
@@ -97,8 +98,9 @@ int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 	struct udp_header *hdr;
 	struct ipv4_custom_data *custom;
 
-	if (pack->length - offset < sizeof(struct udp_header))
+	if (pack->length - offset < sizeof(struct udp_header)) {
 		return -5;
+	}
 
 	hdr = (struct udp_header *) &pack->data[offset];
 	hdr->src = be16toh(hdr->src);
@@ -106,8 +108,9 @@ int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 	hdr->length = be16toh(hdr->length);
 	hdr->checksum = be16toh(hdr->checksum);
 
-	if (hdr->length != pack->length - offset)
+	if (hdr->length != pack->length - offset) {
 		return -6;
+	}
 	pack->transport_offset = offset;
 	pack->data_offset = offset + sizeof(struct udp_header);
 
@@ -117,8 +120,9 @@ int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offs
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
-	if (checksum != udp_calculate_checksum(proto, pack))
+	if (checksum != udp_calculate_checksum(proto, pack)) {
 		return -7;
+	}
 	hdr->checksum = checksum;
 
 	return 0;
@@ -130,35 +134,39 @@ int udp_forward_packet(struct protocol *proto, struct packet *pack)
 	struct ipv4_custom_data *custom = (struct ipv4_custom_data *) pack->custom_data;
 
 	uep = udp_lookup_endpoint(proto, custom->dest.addr, custom->dest.port);
-	if (!uep)
+	if (!uep) {
 		return PACKET_DROPPED;
+	}
 
 	_queue_insert_after(&uep->recv_queue, &pack->node, uep->recv_queue.tail);
 	net_socket_wakeup(uep->ep.sock, VFS_POLL_READ);
 	return PACKET_DELIVERED;
 }
 
-static struct packet *udp_create_packet(struct protocol *proto, const struct ipv4_address *src, const struct ipv4_address *dest, const unsigned char *buf, int nbytes)
+static struct packet *udp_create_packet(struct protocol *proto, const struct ipv4_address *src, const struct ipv4_address *dest, struct iovec_iter *iter)
 {
 	struct packet *pack;
 
-	pack = packet_alloc(NULL, proto, nbytes + 100);
+	pack = packet_alloc(NULL, proto, iovec_iter_length(iter) + 100);
 
-	if (udp_encode_packet(pack, src, dest, buf, nbytes)) {
+	if (udp_encode_packet(pack, src, dest, iter)) {
 		packet_free(pack);
 		return NULL;
 	}
 	return pack;
 }
 
-static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, const unsigned char *data, int length)
+static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, struct iovec_iter *iter)
 {
 	int error;
+	size_t length;
 	struct udp_header *hdr;
 
-	error = ipv4_encode_header(pack, src, dest, data, sizeof(struct udp_header) + length);
-	if (error)
+	length = iovec_iter_length(iter);
+	error = ipv4_encode_header(pack, src, dest, sizeof(struct udp_header) + length);
+	if (error) {
 		return error;
+	}
 
 	pack->transport_offset = pack->length;
 	pack->length += sizeof(struct udp_header);
@@ -170,7 +178,7 @@ static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src
 	hdr->checksum = htobe16(0);
 
 	pack->data_offset = pack->length;
-	if (packet_append(pack, data, length)) {
+	if (packet_append_iovec(pack, iter)) {
 		packet_free(pack);
 		return NULL;
 	}
@@ -206,12 +214,14 @@ int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 
 	// Get the real IP and port number to send from
 	error = inet_resolve_address(sockaddr, len, (const struct sockaddr *) &ifdev->address, &src);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	// Make sure the address and port aren't already in use
-	if (udp_lookup_endpoint(proto, src.addr, src.port))
+	if (udp_lookup_endpoint(proto, src.addr, src.port)) {
 		return EADDRINUSE;
+	}
 
 	ep = kmalloc(sizeof(struct udp_endpoint));
 	_queue_node_init(&ep->ep.node);
@@ -232,8 +242,9 @@ int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 static struct udp_endpoint *udp_lookup_endpoint(struct protocol *proto, uint32_t addr, uint16_t port)
 {
 	for (struct udp_endpoint *cur = _queue_head(&udp_endpoints); cur; cur = _queue_next(&cur->ep.node)) {
-		if (cur->src.port == port)
+		if (cur->src.port == port) {
 			return cur;
+		}
 	}
 	return NULL;
 }
@@ -262,13 +273,15 @@ int udp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, s
 	return NULL;
 }
 
-int udp_endpoint_send_to(struct endpoint *ep, const unsigned char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len)
+int udp_endpoint_send_to(struct endpoint *ep, struct iovec_iter *iter, const struct sockaddr *sockaddr, socklen_t len)
 {
+	size_t nbytes;
 	struct packet *pack;
 	struct ipv4_address dest;
 
-	if (!sockaddr && !(UDP_ENDPOINT(ep)->dest.port))
+	if (!sockaddr && !(UDP_ENDPOINT(ep)->dest.port)) {
 		return ENOTCONN;
+	}
 
 	if (sockaddr) {
 		dest.addr = ((struct sockaddr_in *) sockaddr)->sin_addr.s_addr;
@@ -277,26 +290,31 @@ int udp_endpoint_send_to(struct endpoint *ep, const unsigned char *buf, int nbyt
 		dest = UDP_ENDPOINT(ep)->dest;
 	}
 
-	pack = udp_create_packet(ep->proto, &UDP_ENDPOINT(ep)->src, &dest, buf, nbytes);
+	nbytes = iovec_iter_length(iter);
+	pack = udp_create_packet(ep->proto, &UDP_ENDPOINT(ep)->src, &dest, iter);
 	net_if_send_packet(ep->ifdev, pack);
 	return nbytes;
 }
 
-int udp_endpoint_recv_from(struct endpoint *ep, unsigned char *buf, int nbytes, struct sockaddr *sockaddr, socklen_t *len)
+int udp_endpoint_recv_from(struct endpoint *ep, struct iovec_iter *iter, struct sockaddr *sockaddr, socklen_t *len)
 {
+	size_t nbytes;
 	struct packet *pack;
 	struct ipv4_custom_data *custom;
 	struct udp_endpoint *uep = UDP_ENDPOINT(ep);
 
 	pack = _queue_head(&uep->recv_queue);
-	if (!pack)
+	if (!pack) {
 		return EWOULDBLOCK;
+	}
 
 	_queue_remove(&uep->recv_queue, &pack->node);
 
-	if (pack->length - pack->data_offset < nbytes)
+	nbytes = iovec_iter_length(iter);
+	if (pack->length - pack->data_offset < nbytes) {
 		nbytes = pack->length - pack->data_offset;
-	memcpy(buf, &pack->data[pack->data_offset], nbytes);
+	}
+	memcpy_into_iter(iter, &pack->data[pack->data_offset], nbytes);
 
 	if (sockaddr) {
 		custom = (struct ipv4_custom_data *) &pack->custom_data;
@@ -310,18 +328,21 @@ int udp_endpoint_recv_from(struct endpoint *ep, unsigned char *buf, int nbytes, 
 int udp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen)
 {
 	switch (optname) {
-		case SO_GETSOCKNAME:
+		case SO_GETSOCKNAME: {
 			if (!UDP_ENDPOINT(ep)->src.addr)
 				return ENOTCONN;
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &UDP_ENDPOINT(ep)->src);
 			return 0;
-		case SO_GETPEERNAME:
+		}
+		case SO_GETPEERNAME: {
 			if (!UDP_ENDPOINT(ep)->dest.addr)
 				return ENOTCONN;
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &UDP_ENDPOINT(ep)->dest);
 			return 0;
-		default:
+		}
+		default: {
 			return EINVAL;
+		}
 	}
 }
 
@@ -338,8 +359,9 @@ int udp_endpoint_poll(struct endpoint *ep, int events)
 	int revents = 0;
 	struct udp_endpoint *uep = UDP_ENDPOINT(ep);
 
-	if ((events & VFS_POLL_READ) && _queue_head(&uep->recv_queue))
+	if ((events & VFS_POLL_READ) && _queue_head(&uep->recv_queue)) {
 		revents |= VFS_POLL_READ;
+	}
 	// Writing is always available
 	revents |= VFS_POLL_WRITE;
 

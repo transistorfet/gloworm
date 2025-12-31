@@ -1,4 +1,9 @@
 
+* should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
+  doing so will avoid unnecessarily using iovec
+* fix the _buf_get_iovec/_buf_put_iovec functions, which haven't been tested yet and are probably buggy
+
+
 * go through all the syscalls and add address translation from user space to kernel space
   linux actually copies filenames from user space to a cache location allocated on each syscall, but maybe I can get away with copying them to the stack
 * where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()

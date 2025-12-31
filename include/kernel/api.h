@@ -11,8 +11,8 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
-/// A marker that signifies the given address is relative to the user address space
-#define __user
+#include <kernel/utils/usercopy.h>
+
 
 void init_syscall(void);
 void do_syscall(void);
@@ -30,7 +30,7 @@ extern int do_sigaction(int signum, const struct sigaction __user *act, struct s
 extern unsigned int do_alarm(unsigned int seconds);
 extern int do_pause(void);
 extern int do_brk(void __user *addr);
-extern void *do_sbrk(intptr_t __user increment);
+extern void *do_sbrk(intptr_t increment);
 extern pid_t do_gettid(void);
 extern pid_t do_getpid(void);
 extern pid_t do_getppid(void);

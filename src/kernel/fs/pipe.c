@@ -13,8 +13,8 @@
 #define PIPE_BUFFER_MAX		512
 
 int pipe_close(struct vfile *file);
-int pipe_read(struct vfile *file, char *buf, size_t nbytes);
-int pipe_write(struct vfile *file, const char *buf, size_t nbytes);
+int pipe_read(struct vfile *file, struct iovec_iter *iter);
+int pipe_write(struct vfile *file, struct iovec_iter *iter);
 int pipe_release(struct vnode *vnode);
 int pipe_poll(struct vfile *file, int events);
 
@@ -101,14 +101,16 @@ int pipe_close(struct vfile *file)
 	return 0;
 }
 
-int pipe_read(struct vfile *file, char *buf, size_t nbytes)
+int pipe_read(struct vfile *file, struct iovec_iter *iter)
 {
+	size_t nbytes;
 	register struct vnode *vnode = file->vnode;
 	struct pipe_data *vnode_data = ((struct pipe_data *) &vnode->data);
 	register char *buffer = vnode_data->buffer;
 
-	if (!buffer)
+	if (!buffer) {
 		return EIO;
+	}
 
 	// TODO Do you also need to add a check for a broken pipe here too?
 
@@ -117,9 +119,11 @@ int pipe_read(struct vfile *file, char *buf, size_t nbytes)
 		return 0;
 	}
 
-	if (nbytes > vnode->size - file->position)
+	nbytes = iovec_iter_length(iter);
+	if (nbytes > vnode->size - file->position) {
 		nbytes = vnode->size - file->position;
-	memcpy(buf, &buffer[file->position], nbytes);
+	}
+	memcpy_into_iter(iter, &buffer[file->position], nbytes);
 	file->position += nbytes;
 
 	if (file->position == vnode->size) {
@@ -133,17 +137,20 @@ int pipe_read(struct vfile *file, char *buf, size_t nbytes)
 	return nbytes;
 }
 
-int pipe_write(struct vfile *file, const char *buf, size_t nbytes)
+int pipe_write(struct vfile *file, struct iovec_iter *iter)
 {
+	size_t nbytes;
 	register struct vnode *vnode = file->vnode;
 	struct pipe_data *vnode_data = ((struct pipe_data *) &vnode->data);
 	register char *buffer = vnode_data->buffer;
 
-	if (!buffer)
+	if (!buffer) {
 		return EIO;
+	}
 
 	// TODO you need to detect a broken pipe and raise SIGPIPE
 
+	nbytes = iovec_iter_length(iter);
 	if (nbytes > PIPE_BUFFER_MAX - file->position) {
 		// TODO this will work for now, but any write operation that's larger than the buffer size wont ever complete
 		// Trying to write more bytes than are available in the buffer, so block until the reader has caught up
@@ -151,11 +158,12 @@ int pipe_write(struct vfile *file, const char *buf, size_t nbytes)
 		return 0;
 		//nbytes = PIPE_BUFFER_MAX - file->position;
 	}
-	memcpy(&buffer[file->position], buf, nbytes);
+	memcpy_out_of_iter(iter, &buffer[file->position], nbytes);
 	file->position += nbytes;
 
-	if (file->position > vnode->size)
+	if (file->position > vnode->size) {
 		vnode->size = file->position;
+	}
 
 	// Wake up any processes that are blocked while reading from this vnode
 	resume_blocked_procs(VFS_POLL_READ, vnode, 0);
@@ -168,10 +176,12 @@ int pipe_poll(struct vfile *file, int events)
 	int revents = 0;
 	register struct vnode *vnode = file->vnode;
 
-	if ((events & VFS_POLL_READ) && (vnode->size - file->position > 0))
+	if ((events & VFS_POLL_READ) && (vnode->size - file->position > 0)) {
 		revents |= VFS_POLL_READ;
-	if ((events & VFS_POLL_WRITE) && vnode->size >= PIPE_BUFFER_MAX)
+	}
+	if ((events & VFS_POLL_WRITE) && vnode->size >= PIPE_BUFFER_MAX) {
 		revents |= VFS_POLL_WRITE;
+	}
 	return revents;
 }
 

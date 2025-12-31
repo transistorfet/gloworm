@@ -12,6 +12,7 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/scheduler.h>
+#include <kernel/utils/iovec.h>
 
 #include <asm/irqs.h>
 
@@ -60,9 +61,9 @@ struct termios default_tio = {
 int tty_init();
 int tty_open(devminor_t minor, int access);
 int tty_close(devminor_t minor);
-int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size);
-int tty_write(devminor_t minor, const char *buffer, offset_t offset, size_t size);
-int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid);
+int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int tty_poll(devminor_t minor, int events);
 
 struct driver tty_driver = {
@@ -91,6 +92,7 @@ static inline void tty_read_input(device_t minor)
 {
 	char ch;
 	int error;
+	struct iovec_iter iter;
 	struct tty_device *tty = &devices[minor];
 
 	while (1) {
@@ -101,7 +103,8 @@ static inline void tty_read_input(device_t minor)
 			return;
 		}
 
-		error = dev_read(tty->rdev, &ch, 0, 1);
+		iovec_iter_init_kernel_buf(&iter, &ch, 1);
+		error = dev_read(tty->rdev, 0, &iter);
 		if (error <= 0) {
 			tty->error = error;
 			return;
@@ -132,9 +135,11 @@ static inline void tty_read_input(device_t minor)
 				if ((tty->tio.c_lflag & ECHOE)) {
 					if (tty->buffer[tty->buf_write] == '\t') {
 						// TODO proper handling of this might require window dimensions and cursor position tracking
-						dev_write(tty->rdev, "\x08\x08\x08\x08\x08\x08\x08\x08", 0, 8);
+						iovec_iter_init_kernel_buf(&iter, "\x08\x08\x08\x08\x08\x08\x08\x08", 8);
+						dev_write(tty->rdev, 0, &iter);
 					} else {
-						dev_write(tty->rdev, "\x08 \x08", 0, 3);
+						iovec_iter_init_kernel_buf(&iter, "\x08 \x08", 3);
+						dev_write(tty->rdev, 0, &iter);
 					}
 				}
 			}
@@ -142,8 +147,10 @@ static inline void tty_read_input(device_t minor)
 			// Ignore
 		} else {
 			tty->buffer[tty->buf_write++] = ch;
-			if ((tty->tio.c_lflag & ECHO))
-				dev_write(tty->rdev, &ch, 0, 1);
+			if ((tty->tio.c_lflag & ECHO)) {
+				iovec_iter_init_kernel_buf(&iter, &ch, 1);
+				dev_write(tty->rdev, 0, &iter);
+			}
 			if (ch == '\n') {
 				tty->ready = 1;
 				resume_blocked_procs(VFS_POLL_READ, NULL, DEVNUM(DEVMAJOR_TTY, minor));
@@ -156,8 +163,9 @@ static inline void tty_read_input(device_t minor)
 static void tty_process_input(void *_unused)
 {
 	for (short minor = 0; minor < TTY_DEVICE_NUM; minor++) {
-		if (devices[minor].opens && (devices[minor].tio.c_lflag & ICANON))
+		if (devices[minor].opens && (devices[minor].tio.c_lflag & ICANON)) {
 			tty_read_input(minor);
+		}
 	}
 }
 
@@ -202,8 +210,10 @@ int tty_close(devminor_t minor)
 	return 0;
 }
 
-int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
+int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
+	size_t size;
+
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
 
@@ -214,19 +224,20 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 		return error;
 	}
 
+	size = iovec_iter_length(iter);
 	if (!(devices[minor].tio.c_lflag & ICANON)) {
 		if (devices[minor].buf_read < devices[minor].buf_write) {
 			size_t max = devices[minor].buf_write - devices[minor].buf_read;
 			if (size < max)
 				max = size;
-			memcpy(buffer, &devices[minor].buffer[devices[minor].buf_read], max);
+			memcpy_into_iter(iter, &devices[minor].buffer[devices[minor].buf_read], max);
 			devices[minor].buf_read += max;
 			if (devices[minor].buf_read >= devices[minor].buf_write)
 				tty_reset_input(minor);
 			return max;
 		}
 
-		int read = dev_read(devices[minor].rdev, buffer, offset, size);
+		int read = dev_read(devices[minor].rdev, offset, iter);
 		if (read == 0) {
 			suspend_current_syscall(VFS_POLL_READ);
 			return 0;
@@ -235,6 +246,7 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 	} else {
 		size_t max;
 		size_t count;
+		uint8_t byte;
 
 		// If an entire line is not available yet, then suspend the process
 		if (!devices[minor].ready) {
@@ -247,10 +259,11 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 		if (size < max)
 			max = size;
 		for (count = 0; count < max; count++) {
-			buffer[count] = devices[minor].buffer[devices[minor].buf_read++];
+			byte = devices[minor].buffer[devices[minor].buf_read++];
+			copy_uint8_into_iter(iter, byte);
 
 			// If we reach the end of a line, shift any remaining data over to make room, and exit the loop
-			if (buffer[count] == '\n') {
+			if (byte == '\n') {
 				count += 1;
 				int remaining = devices[minor].buf_write - devices[minor].buf_read;
 				if (remaining) {
@@ -271,14 +284,14 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 	}
 }
 
-int tty_write(devminor_t minor, const char *buffer, offset_t offset, size_t size)
+int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
 	int written;
 
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
 
-	written = dev_write(devices[minor].rdev, buffer, offset, size);
+	written = dev_write(devices[minor].rdev, offset, iter);
 	if (!written) {
 		suspend_current_syscall(VFS_POLL_WRITE);
 		return 0;
@@ -286,7 +299,7 @@ int tty_write(devminor_t minor, const char *buffer, offset_t offset, size_t size
 	return written;
 }
 
-int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
+int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	short saved_status;
 
@@ -296,27 +309,31 @@ int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
 	switch (request) {
 		case TCGETS: {
 			LOCK(saved_status);
-			memcpy((struct termios *) argp, &devices[minor].tio, sizeof(struct termios));
+			memcpy_into_iter(iter, &devices[minor].tio, sizeof(struct termios));
 			UNLOCK(saved_status);
 			return 0;
 		}
 		case TCSETS: {
 			LOCK(saved_status);
-			memcpy(&devices[minor].tio, (struct termios *) argp, sizeof(struct termios));
+			memcpy_out_of_iter(iter, &devices[minor].tio, sizeof(struct termios));
 			UNLOCK(saved_status);
 			return 0;
 		}
 
 		case TIOCGPGRP: {
-			*((int *) argp) = devices[minor].pgid;
+			int arg;
+			arg = devices[minor].pgid;
+			memcpy_into_iter(iter, &arg, sizeof(int));
 			return 0;
 		}
 		case TIOCSPGRP: {
-			devices[minor].pgid = *((int *) argp);
+			int arg;
+			memcpy_out_of_iter(iter, &arg, sizeof(int));
+			devices[minor].pgid = arg;
 			return 0;
 		}
 		default:
-			return dev_ioctl(devices[minor].rdev, request, argp, uid);
+			return dev_ioctl(devices[minor].rdev, request, iter, uid);
 	}
 }
 

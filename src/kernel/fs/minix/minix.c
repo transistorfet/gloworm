@@ -11,7 +11,7 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>
 #include <kernel/fs/bufcache.h>
- 
+
 #include "minix.h"
 #include "bitmaps.h"
 #include "inodes.h"
@@ -293,18 +293,20 @@ int minix_close(struct vfile *file)
 	return 0;
 }
 
-int minix_read(struct vfile *file, char *buffer, size_t nbytes)
+int minix_read(struct vfile *file, struct iovec_iter *iter)
 {
 	if (S_ISDIR(file->vnode->mode))
 		return EISDIR;
 
 	short zpos;
 	short zlen;
-	size_t offset = 0;
 	zone_t znum;
 	zone_t zone;
 	struct buf *buf;
+	size_t nbytes;
+	size_t wbytes = 0;
 
+	nbytes = iovec_iter_length(iter);
 	if (nbytes > file->vnode->size - file->position)
 		nbytes = file->vnode->size - file->position;
 
@@ -323,20 +325,20 @@ int minix_read(struct vfile *file, char *buffer, size_t nbytes)
 		if (zlen > nbytes)
 			zlen = nbytes;
 
-		memcpy(&buffer[offset], &(((char *) buf->block)[zpos]), zlen);
+		memcpy_into_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		release_block(buf, 0);
 
-		offset += zlen;
+		wbytes += zlen;
 		nbytes -= zlen;
 		znum += 1;
 		zpos = 0;
 	} while (nbytes > 0);
 
-	file->position += offset;
-	return offset;
+	file->position += wbytes;
+	return wbytes;
 }
 
-int minix_write(struct vfile *file, const char *buffer, size_t nbytes)
+int minix_write(struct vfile *file, struct iovec_iter *iter)
 {
 	if (S_ISDIR(file->vnode->mode))
 		return EISDIR;
@@ -344,11 +346,13 @@ int minix_write(struct vfile *file, const char *buffer, size_t nbytes)
 	short zpos;
 	short zlen;
 	int error = 0;
-	size_t offset = 0;
 	zone_t znum;
 	zone_t zone;
 	struct buf *buf;
+	size_t nbytes;
+	size_t wbytes = 0;
 
+	nbytes = iovec_iter_length(iter);
 	znum = file->position >> MINIX_V1_LOG_ZONE_SIZE;
 	zpos = file->position & (MINIX_V1_ZONE_SIZE - 1);
 
@@ -368,27 +372,27 @@ int minix_write(struct vfile *file, const char *buffer, size_t nbytes)
 		if (zlen > nbytes)
 			zlen = nbytes;
 
-		memcpy(&(((char *) buf->block)[zpos]), &buffer[offset], zlen);
+		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		release_block(buf, BCF_DIRTY);
 
-		offset += zlen;
+		wbytes += zlen;
 		nbytes -= zlen;
 		znum += 1;
 		zpos = 0;
 	} while (nbytes > 0);
 
-	file->position += offset;
+	file->position += wbytes;
 	if (file->position > file->vnode->size) {
 		file->vnode->size = file->position;
 		mark_vnode_dirty(file->vnode);
 	}
 
-	if (offset)
+	if (wbytes)
 		vfs_update_time(file->vnode, MTIME);
 
 	if (error)
 		return error;
-	return offset;
+	return wbytes;
 }
 
 int minix_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)

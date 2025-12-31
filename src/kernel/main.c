@@ -107,8 +107,9 @@ void create_dir_or_panic(const char *path)
 	if (!vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode)) {
 		vfs_release_vnode(vnode);
 	} else {
-		if (vfs_open(NULL, path, O_CREAT, S_IFDIR | 0755, SU_UID, &file))
+		if (vfs_open(NULL, path, O_CREAT, S_IFDIR | 0755, SU_UID, &file)) {
 			panic("Unable to create %s\n", path);
+		}
 		vfs_close(file);
 	}
 }
@@ -118,8 +119,9 @@ void create_special_or_panic(const char *path, device_t rdev)
 	struct vnode *vnode;
 
 	if (vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode)) {
-		if (vfs_mknod(NULL, path, S_IFCHR | 0755, rdev, SU_UID, &vnode))
+		if (vfs_mknod(NULL, path, S_IFCHR | 0755, rdev, SU_UID, &vnode)) {
 			panic("Unable to create special file %s\n", path);
+		}
 	}
 	vfs_release_vnode(vnode);
 }
@@ -153,14 +155,16 @@ int main()
 	init_scheduler();
 
 	// Initialize drivers before VFS
-	for (short i = 0; drivers[i]; i++)
+	for (short i = 0; drivers[i]; i++) {
 		drivers[i]->init();
+	}
 
 	init_vfs();
 
 	// Initialize specific filesystems
-	for (short i = 0; filesystems[i]; i++)
+	for (short i = 0; filesystems[i]; i++) {
 		filesystems[i]->init();
+	}
 
 	// Initialize the networking subsystem
 	#if defined(CONFIG_NET)
@@ -168,12 +172,14 @@ int main()
 	init_net_protocol();
 
 	// Initialize specific network interfaces
-	for (short i = 0; interfaces[i]; i++)
+	for (short i = 0; interfaces[i]; i++) {
 		interfaces[i]->init();
+	}
 
 	// Initialize specific network protocols
-	for (short i = 0; protocols[i]; i++)
+	for (short i = 0; protocols[i]; i++) {
 		protocols[i]->init();
+	}
 	#endif
 
 	#if defined(CONFIG_MINIX_FS)

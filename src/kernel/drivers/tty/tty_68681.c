@@ -27,9 +27,9 @@
 int tty_68681_init();
 int tty_68681_open(devminor_t minor, int access);
 int tty_68681_close(devminor_t minor);
-int tty_68681_read(devminor_t minor, char *buffer, offset_t offset, size_t size);
-int tty_68681_write(devminor_t minor, const char *buffer, offset_t offset, size_t size);
-int tty_68681_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid);
+int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int tty_68681_poll(devminor_t minor, int events);
 offset_t tty_68681_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
 
@@ -536,9 +536,10 @@ int tty_68681_close(devminor_t minor)
 	return 0;
 }
 
-int tty_68681_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
+int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
-	int i = size;
+	size_t size = iovec_iter_length(iter);
+	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
 	if (!channel)
@@ -547,21 +548,23 @@ int tty_68681_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 	if (channel->error)
 		return EIO;
 
-	for (; i > 0; i--, buffer++) {
+	for (; remain > 0; remain--) {
 		if (_buf_is_empty(&channel->rx)) {
 			// Suspend the process only if we haven't read any data yet
-			if (size == i && !(channel->open_mode & O_NONBLOCK))
+			if (size == remain && !(channel->open_mode & O_NONBLOCK)) {
 				suspend_current_syscall(VFS_POLL_READ);
-			return size - i;
+			}
+			return size - remain;
 		}
-		*buffer = tty_68681_getchar_buffered(channel);
+		copy_uint8_into_iter(iter, tty_68681_getchar_buffered(channel));
 	}
 	return size;
 }
 
-int tty_68681_write(devminor_t minor, const char *buffer, offset_t offset, size_t size)
+int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
-	int i = size;
+	size_t size = iovec_iter_length(iter);
+	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
 	if (!channel)
@@ -575,13 +578,13 @@ int tty_68681_write(devminor_t minor, const char *buffer, offset_t offset, size_
 		return 0;
 	}
 
-	for (; i > 0; i--, buffer++) {
-		tty_68681_putchar_buffered(channel, *buffer);
+	for (; remain > 0; remain--) {
+		tty_68681_putchar_buffered(channel, copy_uint8_out_of_iter(iter));
 	}
 	return size;
 }
 
-int tty_68681_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
+int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	struct serial_channel *channel = from_minor_dev(minor);
 
@@ -590,7 +593,9 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t ui
 
 	switch (request) {
 		case TSETLEDS: {
-			int leds = *((int *) argp) & 0x03;
+			int leds;
+			memcpy_out_of_iter(iter, &leds, sizeof(int));
+			leds &= 0x03;
 			tty_68681_reset_leds(~leds);
 			tty_68681_set_leds(leds);
 			return 0;

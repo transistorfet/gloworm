@@ -10,15 +10,16 @@
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/partition.h>
+#include <kernel/utils/iovec.h>
 
 
 // Driver Definition
 int ata_init();
 int ata_open(devminor_t minor, int access);
 int ata_close(devminor_t minor);
-int ata_read(devminor_t minor, char *buffer, offset_t offset, size_t size);
-int ata_write(devminor_t minor, const char *buffer, offset_t offset, size_t size);
-int ata_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid);
+int ata_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int ata_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int ata_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int ata_poll(devminor_t minor, int events);
 offset_t ata_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
 
@@ -243,8 +244,9 @@ static inline struct partition *ata_get_device(devminor_t minor)
 	short drive = minor >> 4;
 	minor &= 0xf;
 
-	if (drive >= ATA_MAX_DRIVES || minor > PARTITION_MAX || drives[drive].parts[minor].base == 0)
+	if (drive >= ATA_MAX_DRIVES || minor > PARTITION_MAX || drives[drive].parts[minor].base == 0) {
 		return NULL;
+	}
 	return &drives[drive].parts[minor];
 }
 
@@ -253,8 +255,9 @@ int ata_init()
 {
 	//*COMET_VME_CF_CONTROL = 0xb8;
 
-	for (short i = 0; i < PARTITION_MAX; i++)
+	for (short i = 0; i < PARTITION_MAX; i++) {
 		drives[0].parts[i].base = 0;
+	}
 	register_driver(DEVMAJOR_ATA, &ata_driver);
 
 	// TODO this doesn't work very well
@@ -269,8 +272,9 @@ int ata_init()
 	read_partition_table(buffer, drives[0].parts);
 
 	for (short i = 0; i < PARTITION_MAX; i++) {
-		if (drives[0].parts[i].size)
+		if (drives[0].parts[i].size) {
 			log_notice("ata%d: found partition with %d sectors\n", i, drives[0].parts[i].size);
+		}
 	}
 
 	return 0;
@@ -278,57 +282,80 @@ int ata_init()
 
 int ata_open(devminor_t minor, int access)
 {
-	if (!ata_get_device(minor))
+	if (!ata_get_device(minor)) {
 		return ENXIO;
+	}
 	return 0;
 }
 
 int ata_close(devminor_t minor)
 {
-	if (!ata_get_device(minor))
+	if (!ata_get_device(minor)) {
 		return ENXIO;
+	}
 	return 0;
 }
 
-int ata_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
+int ata_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
-	struct partition *device = ata_get_device(minor);
-	if (!device)
-		return ENXIO;
+	size_t size;
+	char buffer[512];
+	struct partition *device;
 
-	if (offset > (device->size << 9))
+	device = ata_get_device(minor);
+	size = iovec_iter_length(iter);
+	if (!device) {
+		return ENXIO;
+	}
+
+	if (offset > (device->size << 9)) {
 		return EINVAL;
-	if (offset + size > (device->size << 9))
+	}
+	if (offset + size > (device->size << 9)) {
 		size = (device->size << 9) - offset;
+	}
 
 	offset >>= 9;
-	for (int count = size >> 9; count > 0; count--, offset++, buffer = &buffer[512])
+	for (int count = size >> 9; count > 0; count--, offset++) {
 		ata_read_sector(device->base + offset, buffer);
+		memcpy_into_iter(iter, buffer, 512);
+	}
 	return size;
 }
 
-int ata_write(devminor_t minor, const char *buffer, offset_t offset, size_t size)
+int ata_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
-	struct partition *device = ata_get_device(minor);
-	if (!device)
-		return ENXIO;
+	size_t size;
+	char buffer[512];
+	struct partition *device;
 
-	if (offset > (device->size << 9))
+	device = ata_get_device(minor);
+	size = iovec_iter_length(iter);
+	if (!device) {
+		return ENXIO;
+	}
+
+	if (offset > (device->size << 9)) {
 		return EINVAL;
-	if (offset + size > (device->size << 9))
+	}
+	if (offset + size > (device->size << 9)) {
 		size = (device->size << 9) - offset;
+	}
 
 	offset >>= 9;
-	for (int count = size >> 9; count > 0; count--, offset++, buffer = &buffer[512])
+	for (int count = size >> 9; count > 0; count--, offset++) {
+		memcpy_out_of_iter(iter, buffer, 512);
 		ata_write_sector(device->base + offset, buffer);
+	}
 	return size;
 }
 
-int ata_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
+int ata_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	struct partition *device = ata_get_device(minor);
-	if (!device)
+	if (!device) {
 		return ENXIO;
+	}
 	return EINVAL;
 }
 
@@ -341,8 +368,9 @@ int ata_poll(devminor_t minor, int events)
 offset_t ata_seek(devminor_t minor, offset_t position, int whence, offset_t offset)
 {
 	struct partition *device = ata_get_device(minor);
-	if (!device)
+	if (!device) {
 		return ENXIO;
+	}
 
 	switch (whence) {
 	    case SEEK_SET:
@@ -357,8 +385,9 @@ offset_t ata_seek(devminor_t minor, offset_t position, int whence, offset_t offs
 		return EINVAL;
 	}
 
-	if (position > device->size)
+	if (position > device->size) {
 		position = device->size;
+	}
 	return position;
 
 }

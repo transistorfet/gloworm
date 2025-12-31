@@ -66,6 +66,7 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	int error;
 	page_t *page;
 	offset_t file_offset;
+	struct iovec_iter iter;
 
 	page = page_alloc_single();
 	if (!page) {
@@ -78,7 +79,8 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	if (error < 0) {
 		return NULL;
 	}
-	error = vfs_read(segment->file, (char *) page, PAGE_SIZE);
+	iovec_iter_init_kernel_buf(&iter, (char *) page, PAGE_SIZE);
+	error = vfs_read(segment->file, &iter);
 	if (error < 0) {
 		return NULL;
 	}

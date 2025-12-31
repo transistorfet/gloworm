@@ -2322,3 +2322,75 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - Oh, and one thing I came across in the manual was that the SFC/DFC registers were significant to the PFLUSH instruction, so since
   that's not set, that might explain some things, and also need to be fixed
 
+- I quickly tried initializing the kernel stack with 0xAA and then ran it, and dumped the stack area to see how much of the kernel
+  stack was being used.  I put it just before the begin multitasking, so it should have be post-initialization.  It still ended up
+  using 1008 bytes of the stack, which is quite a bit to be putting on the user stack, if I used the user stack when user mode is
+  not enabled
+- the stack usage is probably the biggest obstacle to using the stack for syscalls (and thus being able to access buffers on the
+  stack when restarting a syscall)
+- but that said, it doesn't seem like anything except the READ and WRITE syscalls will suspend, with the exception of select() which
+  is kinda custom implemented as well
+
+- actually, the syscall restart isn't an issue because it will always reenter at the very start of the syscall, thus reallocating
+  a stack buffer and recopying data. So I think it's safe to have a stack allocated value, and that opens up the possibility of
+  using an iovec like abstraction. That might allow both userband kernel users of the vfs interface
+
+
+2025-12-28:
+
+- looking through the code I'm changing to add iovec into the read/write functions, I came across the driver interface, and debated
+  again whether to actually get rid of it, and make the next level in drivers be the subsystems (block and tty for the moment, and
+  eventually moving kernel/net/if into kernel/drivers/net/ or something).  The bufcache code would then move to block/ and always
+  take an offset, and tty drivers (possibly renamed char/ or tty being put under char/)
+- it would fix the awkwardness of the offset being passed in
+- but then again, why didn't I want to just do an lseek + read w/o offset?  I feel like that's how it was before, but I changed it
+  at some point for some reason
+
+
+2025-12-30:
+
+- I haven't written here much in the last few days, but I've been slowly refactoring the code to use the new iovec/iovec_iter stuff,
+  and humming and hawing about how and what I want to change
+- I ended up side-stepping the exec arguments/environment variables by just copying them to a temporary buffer, which works for now.
+- I activated the copy-on-write for the stacks (I think) and got page faults without it breaking like it did before, so I *think*
+  the user space copying is working, but I'll test it again once I get more of the translations in place
+- I ended up converting a lot of the networking code to use iovec, which went all the way into the packet and ringbuffer code.  The
+  packet one was easy enough, because I could just add another function to copy an iovec into the buffer, and left the existing one
+  to copy a kernel buffer directly
+- for the tcp code, it uses a ringbuffer to store the data received, and I tried adding new functions to the ringbuffer impl that
+  will get/put to/from an iovec.  It's quite a different implementation, since rather than doing it byte-by-byte, I'm using the
+  memcpy functions and trying to calculate the maximum chunk of data I can read.  It should only ever require 2 chunks if the buffer
+  wraps around, so I coded it like that, without a loop.  It might end up being bigger code-wise than using a loop.  Since they're
+  static inline functions though, it should only use them in the tcp code for now
+- that said, I suppose I could use some of them in the tty code if I wanted to
+
+- I tried to get the slip line setup again, and haven't had any luck getting data through.  I tried stashing my changes and the
+  previous commit doesn't work either, so it's not (only) related to my refactoring
+
+- I'm finding a lot of bugs.  When I tried to run httpd, it gives an error about double freeing the fileptr, which I've traced to
+  being the executable itself, but it only seems to do this for httpd, or anything that forks
+- after running that, trying to run `ls` produces no actual directory listings, but when running `ls` right after boot, while it
+  prints the permissions and stuff, it's missing the filenames, so something didn't get copied correctly somewhere
+
+- the readdir() bug was just because I allocated a pointer instead of a struct for the intermediate buffer
+- also signals don't work, but I expected that
+- interestingly enough, daemontest seems to work, at least they both attempt to exit, but there is also an error that gets split up,
+  about it failing to open something
+
+- the signals issue was were Ctrl-C did nothing, but that's controlled by the TTY, and it turns out the ioctl function that I just
+  converted to use iovec was actually what was broken.  Still is, I thought it might have been because I switched int to pid_t for
+  the hackish "set pgid" function, but I think it might be the iovec being size 0 that's causing it to not work
+- yup, it was the length that was causing the problem, which is kind of unfortunate, since we don't have a size
+- I found another bug in the process where running `test` (which I had forgotten about) starts an interactive program with a prompt,
+  and ctrl-c will kill it and then also kill the shell (pid 3)
+
+- oh I see, httpd uses select(), which I don't think I've ported over.  It should still *work* since I don't have any page fault
+  conditions enabled.  It could still be something else
+
+
+2025-12-31:
+
+- playing around with the networking a bit more, there are some packets that get through, but it seems like pings from the host
+  aren't being forwarded correctly.  Maybe something's changed with the networking on debian since I last tried this, which has made
+  my commands no longer work as expected.  I'm not convinced the problem is with gloworm, and not with my desktop's setup
+

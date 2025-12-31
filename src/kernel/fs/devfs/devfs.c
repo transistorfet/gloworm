@@ -124,14 +124,14 @@ int devfs_close(struct vfile *file)
 	return dev_close(DEVFS_DATA(file->vnode).device);
 }
 
-int devfs_read(struct vfile *file, char *buf, size_t nbytes)
+int devfs_read(struct vfile *file, struct iovec_iter *iter)
 {
-	return dev_read(DEVFS_DATA(file->vnode).device, buf, 0, nbytes);
+	return dev_read(DEVFS_DATA(file->vnode).device, 0, iter);
 }
 
-int devfs_write(struct vfile *file, const char *buf, size_t nbytes)
+int devfs_write(struct vfile *file, struct iovec_iter *iter)
 {
-	return dev_write(DEVFS_DATA(file->vnode).device, buf, 0, nbytes);
+	return dev_write(DEVFS_DATA(file->vnode).device, 0, iter);
 }
 
 int devfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)

@@ -28,22 +28,22 @@ int device_ops_close(struct vfile *file)
 	return dev_close(file->vnode->rdev);
 }
 
-int device_ops_read(struct vfile *file, char *buffer, size_t size)
+int device_ops_read(struct vfile *file, struct iovec_iter *iter)
 {
 	int nbytes;
 
-	nbytes = dev_read(file->vnode->rdev, buffer, file->position, size);
+	nbytes = dev_read(file->vnode->rdev, file->position, iter);
 	if (nbytes < 0)
 		return nbytes;
 	file->position += nbytes;
 	return nbytes;
 }
 
-int device_ops_write(struct vfile *file, const char *buffer, size_t size)
+int device_ops_write(struct vfile *file, struct iovec_iter *iter)
 {
 	int nbytes;
 
-	nbytes = dev_write(file->vnode->rdev, buffer, file->position, size);
+	nbytes = dev_write(file->vnode->rdev, file->position, iter);
 	if (nbytes < 0)
 		return nbytes;
 	file->position += nbytes;

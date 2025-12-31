@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <kernel/time.h>
+#include <kernel/utils/iovec.h>
 
 #ifndef F_OK
 #define F_OK		0	// Test if file exists
@@ -83,8 +84,8 @@ struct vnode_ops {
 struct vfile_ops {
 	int (*open)(struct vfile *file, int flags);
 	int (*close)(struct vfile *file);
-	int (*read)(struct vfile *file, char *buffer, size_t size);
-	int (*write)(struct vfile *file, const char *buffer, size_t size);
+	int (*read)(struct vfile *file, struct iovec_iter *iter);
+	int (*write)(struct vfile *file, struct iovec_iter *iter);
 	int (*ioctl)(struct vfile *file, unsigned int request, void *argp, uid_t uid);
 	int (*poll)(struct vfile *file, int events);
 	offset_t (*seek)(struct vfile *file, offset_t position, int whence);
@@ -156,8 +157,8 @@ int vfs_rename(struct vnode *cwd, const char *oldpath, const char *newpath, uid_
 int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t uid, struct vfile **file);
 
 int vfs_close(struct vfile *file);
-int vfs_read(struct vfile *file, char *buffer, size_t size);
-int vfs_write(struct vfile *file, const char *buffer, size_t size);
+int vfs_read(struct vfile *file, struct iovec_iter *iter);
+int vfs_write(struct vfile *file, struct iovec_iter *iter);
 int vfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
 int vfs_poll(struct vfile *file, int events);
 offset_t vfs_seek(struct vfile *file, offset_t position, int whence);

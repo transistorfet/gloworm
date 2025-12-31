@@ -51,9 +51,10 @@ static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, s
 	int error;
 	struct icmp_header *hdr;
 
-	error = ipv4_encode_header(pack, src, dest, data, length);
-	if (error)
+	error = ipv4_encode_header(pack, src, dest, length);
+	if (error) {
 		return error;
+	}
 
 	hdr = (struct icmp_header *) data;
 	hdr->type = type;
@@ -63,8 +64,9 @@ static int icmp_encode_packet(struct packet *pack, uint8_t type, uint8_t code, s
 
 	pack->data_offset = pack->length;
 	error = packet_append(pack, data, length);
-	if (error)
+	if (error) {
 		return error;
+	}
 	return 0;
 }
 
@@ -87,8 +89,9 @@ int icmp_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 	uint16_t checksum;
 	struct icmp_header *hdr;
 
-	if (pack->length - offset < sizeof(struct icmp_header))
+	if (pack->length - offset < sizeof(struct icmp_header)) {
 		return -1;
+	}
 
 	pack->transport_offset = offset;
 	pack->data_offset = offset + sizeof(struct icmp_header);
@@ -99,8 +102,9 @@ int icmp_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
-	if (checksum != ipv4_calculate_checksum(&pack->data[offset], pack->length - offset, 0))
+	if (checksum != ipv4_calculate_checksum(&pack->data[offset], pack->length - offset, 0)) {
 		return -2;
+	}
 	hdr->checksum = checksum;
 
 	return 0;
@@ -118,8 +122,9 @@ int icmp_forward_packet(struct protocol *proto, struct packet *pack)
 			struct packet *reply;
 
 			reply = icmp_create_packet(proto, 0, 0, &custom->dest, &custom->src, &pack->data[pack->transport_offset], pack->length - pack->transport_offset);
-			if (!reply)
+			if (!reply) {
 				return PACKET_DROPPED;
+			}
 
 			reply->ifdev = pack->ifdev;
 			packet_free(pack);
