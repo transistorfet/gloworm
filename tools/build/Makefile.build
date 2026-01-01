@@ -96,7 +96,7 @@ $(user-cmulti): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%/built-in.o $(libex-obj-
 
 $(OUTPUT)%.strip: $(OUTPUT)%.elf
 	$(STRIP) $< -o $@
-	$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $< $@
+	#$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $< $@
 
 
 # Generic Build Rules

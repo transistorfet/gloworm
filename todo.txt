@@ -1,25 +1,21 @@
 
+* it's time to fix the size in the load scripts
+
 * should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
   doing so will avoid unnecessarily using iovec
 * fix the _buf_get_iovec/_buf_put_iovec functions, which haven't been tested yet and are probably buggy
 
 
-* go through all the syscalls and add address translation from user space to kernel space
-  linux actually copies filenames from user space to a cache location allocated on each syscall, but maybe I can get away with copying them to the stack
 * where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
 * should reset_proc() free the memory map as well?
 
-* add user-to-kernel address translations
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 * move memory.c to mm/
 * fix the _user_exit problem properly
 * cleanup init.c to reduce the duplication
 * should you make the page fault/exception numbers configurable like irqs?
-* do you need a privilege exception handler as well, or do all MMU exceptions produce a bus error?
-* don't duplicate the stack in mmu mode
 * replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
 * test with CONFIG_MMU=n to make sure nothing broke
-* fix the stack allocation when MMU is enabled
 
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
   unfreed in the middle of the segment
@@ -28,19 +24,12 @@
   changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
   the case of the heap and stack
 
-* make it possible to recover from an exception somehow
 * the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
   arch/m68k?
 
 * there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
   memory without duplicating them
 
-* add mmu mapping to memory_map
-* add mmu table to context and switch
-* make functions to translate between physical and virtual addresses
-* convert user facing code to translate from user space to kernel space (?)
-
-* implement mmu/tables
 * convert bufcache/disk blocks to use pages
 
 ---

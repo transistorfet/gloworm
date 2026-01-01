@@ -92,7 +92,14 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	struct vfile *object = file;
 	// TODO this is wrong, it should be some known address?
-	user_mem_start = 0x40000;
+	//user_mem_start = 0x40000;
+
+	// TODO this is temporary until you get page faults working
+	user_mem_start = (uintptr_t) page_alloc_contiguous(mem_size);
+	if (!user_mem_start) {
+		error = ENOMEM;
+		goto fail;
+	}
 
 	#else
 

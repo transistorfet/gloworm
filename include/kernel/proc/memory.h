@@ -198,7 +198,7 @@ static inline struct memory_segment *memory_map_iter_prev(struct memory_segment 
 static inline struct memory_segment *memory_segment_find_next(struct memory_segment *cur, uintptr_t address)
 {
 	while (cur) {
-		if (address >= cur->start && address <= cur->end) {
+		if (address >= cur->start && address < cur->end) {
 			return cur;
 		}
 		cur = _queue_next(&cur->node);
@@ -209,7 +209,7 @@ static inline struct memory_segment *memory_segment_find_next(struct memory_segm
 static inline struct memory_segment *memory_segment_find_prev(struct memory_segment *cur, uintptr_t address)
 {
 	while (cur) {
-		if (address >= cur->start && address <= cur->end) {
+		if (address >= cur->start && address < cur->end) {
 			return cur;
 		}
 		cur = _queue_prev(&cur->node);

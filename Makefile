@@ -110,10 +110,10 @@ commandfiles:
 
 devicefiles:
 	$(SUDO) mkdir -p $(MOUNTPOINT)/dev
-	$(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
-	$(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
-	$(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
-	$(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty0 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty1 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/mem0 && $(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/ata0 && $(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
 
 otherfiles:
 	$(SUDO) mkdir -p $(MOUNTPOINT)/etc

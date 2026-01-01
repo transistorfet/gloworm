@@ -2420,3 +2420,25 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   multitasking.  Not sure what's wrong, but it's likely something significant, perhaps something I forgot to switch over.  It can't
   be looping page faults because I've got a print statement when a page fault occurs, and that's not printing
 
+- I decide to try tackling the _user_exit problem next
+- it looked like I only needed to change the crt0 file with _start(), so I changed that and tried updating the compact flash card
+  image, but that wouldn't boot because the flat binary loading is using the hardcoded 0x40000 starting address, but why the held
+  did it produce flat binaries?
+- I couldn't for the life of me find a time in the history when it was producing elf outputs instead.  I guess I had manually
+  commented out the rule in Makefile.build which does objcopy (right after strip, which looks like objcopy overwrites).  Commenting
+  out the objcopy made it work, but it still didn't boot
+- it was having an exception on pid 1 and then pid 3, which seemed to be because a page fault occur right on the boundary between
+  code and data.  Sure enough, I was using >= =< for comparing segments, and changing it to >= < fixed that problem, so it was
+  booting now
+- aaaaand it's still got the _user_exit exeception, so what gives?  It shouldn't be doing that.  Is it not using the right entry
+  point?  The main() function appears before _start() in the file, but if it uses the elf entry point, it should be fine
+
+- I thought for a second that the httpd binary might have been failing because it was a flat binary, but that's not the case.  It
+  was however last updated in January, so it might have been before some breaking changes, which might explain why it wasn't working
+- the latest build of it is also not working, but in a completely new way.  It's infinite excepting on a page fault for address
+  11FFD4 which must be a kernel stack address.  No idea why that address is being used.  It happens right after the exec though
+  It should also be killing the process, but it's not for some reason
+
+- back to the exit problem, and aha!  it is actually working if I run the non-builtin executables (ie. /bin/ls).  The builtins don't
+  have the problem fixed because they only call the main function, which is renamed using the C preprocessor
+
