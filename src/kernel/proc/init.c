@@ -54,7 +54,7 @@ struct process *create_init_task(void)
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_EXECUTABLE, NULL, 0);
+	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE, NULL, 0);
 	if (error < 0)
 		goto fail;
 
@@ -108,7 +108,7 @@ struct process *create_idle_task(void)
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_EXECUTABLE, NULL, 0);
+	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE, NULL, 0);
 	if (error < 0)
 		goto fail;
 

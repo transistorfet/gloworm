@@ -166,7 +166,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 		restorer = proc->signals.actions[signum - 1].sa_restorer;
 	} else {
 		#if !defined(CONFIG_MMU)
-		restorer = _user_action;
+		restorer = _user_sigreturn;
 		#else
 		log_error("attempted to call a signal handler with no restorer\n");
 		return EINVAL;

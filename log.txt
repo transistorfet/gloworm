@@ -2621,3 +2621,26 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I'm kind of going in circles.  I had so many bugs in the new string_array code, and I've introduced a bunch more in adding it to
   the exec() code.  I think I need to step back and undo some of those changes to get back to a working system, and then try again
 
+- So I committed the signal code, and stashed the exec arguments/string array code, and I thought while I had that done, and the
+  kernel was booting again, I'd try removing the execbuiltin syscall, which shouldn't be needed because the shell already forks
+  itself to run a command, so it can just call main() and exit.  That seems to be working fine
+- in the process I found that init also has a call when it's compiled into the kernel, so I thought I'd test that, and I'm falling
+  down that rabbit hole now.  I had to compile the kernel without net support in order to get it small enough to load.  I tried
+  increasing the max size, but that's going to be harder to do and require a firmware update, so I'll hold off on that
+- the kernel is not booting with init in the kernel, because it has a page fault.  Initially it was trying to load a page, which is
+  so wrong, but I added a check to the page fault code to check that it's not trying to write to a read-only segment first, and
+  raise EPERM, which is also wrong, it should be a segfault, but I'll fix that later
+- looking into the code to find why the init process has a page fault on address 0x10E208 right at bootup, it seems to be writing to
+  errno during the open() syscall.  I can easily just make the kernel segment that's inserted be read/write, but maybe I make two
+  segments instead?
+- it wouldn't be hard, but I would have to add another tag to the linker script, and this is a mode that is intended for testing, so
+  I think I might just make it read/write/execute
+- having second thoughts, maybe I'll just add it
+- changed my mind again.  I tried adding it but was getting EINVAL because the segments were aligned, and the linker script can't
+  seem to easily access the PAGE_SIZE, so I have a hardcoded 4k alignment at the end that I'd prefer not to copy in order to make
+  the code and data segments align, which would make the kernel size problem more of an issue, so I'll just make one read/write/exec
+  segment
+- well, it doesn't work when CONFIG_MMU is enabled, but it does work without it, so I'm going to go with that.  There's definitely
+  some bugs lurking in the MMU code still, and I could try to find it though this setup, but... I kind of don't want to if it could
+  be a red herring...
+

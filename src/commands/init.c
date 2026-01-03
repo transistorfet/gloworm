@@ -4,7 +4,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioc_tty.h>
-#include <sys/syscall.h>
 
 #include "prototype.h"
 
@@ -22,8 +21,8 @@ int MAIN(init_task)()
 	dup2(fd, 2);
 
 	// TODO temporary, for testing
-	int test_files();
-	int test_dirs();
+	int test_files(void);
+	int test_dirs(void);
 	//test_files();
 	//test_dirs();
 
@@ -44,9 +43,10 @@ int MAIN(init_task)()
 		#if defined(CONFIG_SHELL_IN_KERNEL) && defined(IN_KERNEL)
 
 		// Run the builtin shell if compiled inside the kernel
-		extern void sh_task();
+		extern int sh_task(int argc, char *argv[], char *envp[]);
 		argv[0] = "sh";
-		status = SYSCALL3(SYS_EXECBUILTIN, (int) sh_task, (int) argv, (int) envp);
+		status = (sh_task)(1, argv, envp);
+		exit(status);
 
 		#else
 

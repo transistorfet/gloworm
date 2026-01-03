@@ -155,6 +155,9 @@ printk("copied page (CoW)\n");
 				return EEXIST;
 			}
 		} else {
+			if (write_flag && !(segment->flags & SEG_WRITE)) {
+				return EPERM;
+			}
 printk(">>> %x\n", segment->flags);
 			new_page = segment->ops->load_page_at(segment, vaddr);
 			if (!new_page) {
