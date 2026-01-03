@@ -33,6 +33,10 @@
 
 #define SEG_GROWSDOWN		0x0100		// stack-like segment
 
+#define SEG_ANONYMOUS		0x1000
+#define SEG_FIXED		0x2000
+#define SEG_POPULATE		0x4000
+
 struct vfile;
 struct memory_region;
 struct memory_segment;

@@ -31,6 +31,7 @@
 
 typedef unsigned int sigset_t;
 typedef void (*sighandler_t)(int);
+typedef void (*sigrestorer_t)(void);
 
 #define SIG_DFL		((sighandler_t) 0)
 #define SIG_IGN		((sighandler_t) 1)
@@ -39,6 +40,7 @@ struct sigaction {
 	sighandler_t sa_handler;	// SIG_DFL, SIG_IGN, or pointer to function
 	sigset_t sa_mask;		// signals to be blocked during handler
 	int sa_flags;			// special flags
+	sigrestorer_t sa_restorer;	// Do Not Set; internal field - sigreturn trampoline function
 };
 
 // fields for sa_flags
@@ -49,6 +51,7 @@ struct sigaction {
 #define SA_SIGINFO	0x0010	// extended signal handling
 #define SA_NOCLDWAIT	0x0020	// don't create zombies
 #define SA_NOCLDSTOP	0x0040	// don't receive SIGCHLD when child stops
+#define SA_RESTORER	0x100000 // (internal use only) a restorer function is provided
 
 int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 int sigemptyset(sigset_t *set);

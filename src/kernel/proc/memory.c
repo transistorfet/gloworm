@@ -74,7 +74,7 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	}
 
 	file_offset = rounddown(vaddr - segment->start, PAGE_SIZE) + rounddown(segment->offset, PAGE_SIZE);
-	//printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
+	printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
 	error = vfs_seek(segment->file, file_offset, SEEK_SET);
 	if (error < 0) {
 		return NULL;
@@ -149,15 +149,18 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 		existing_page = mmu_table_get_page(map->root_table, page_address);
 		if (existing_page) {
 			if (write_flag && (segment->flags & SEG_WRITE)) {
+printk("copied page (CoW)\n");
 				return memory_map_convert_copy_on_write(map, page_address, existing_page);
 			} else {
 				return EEXIST;
 			}
 		} else {
+printk(">>> %x\n", segment->flags);
 			new_page = segment->ops->load_page_at(segment, vaddr);
 			if (!new_page) {
 				return EEXIST;
 			}
+printk("loading page %x\n", new_page);
 			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
 			if (error < 0) {
 				page_free_single((page_t *) new_page);
@@ -166,6 +169,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 		}
 		return 0;
 	} else {
+printk("not found\n");
 		return ENOENT;
 	}
 }
@@ -339,9 +343,19 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	int mmu_flags = 0;
 	if (flags & SEG_WRITE) {
-		mmu_flags = MMU_FLAG_WRITE;
+		mmu_flags |= MMU_FLAG_WRITE;
+	}
+	if (flags & SEG_ANONYMOUS) {
+		mmu_flags |= MMU_FLAG_UNALLOCATED;
+	}
+	if (flags & SEG_FIXED) {
+		mmu_flags |= MMU_FLAG_WINDOW;
+	}
+	if (flags & SEG_POPULATE) {
+		mmu_flags |= MMU_FLAG_PREALLOCATED;
 	}
 
+printk("mmu flags for new seg: %x\n", mmu_flags);
 	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
 	//error = mmu_table_map(map->root_table, start, length, (!object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);
 	//error = mmu_table_map(map->root_table, start, length, (object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);

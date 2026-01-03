@@ -38,7 +38,7 @@
 
 /**
  * Create a new context given a future stack address, return address
- * 	void *create_context(void *kernel_stack, void *entry, void *user_stack);
+ * 	void *create_context(void *kernel_stack, void *entry, void *user_stack, int is_kernel);
  */
 create_context:
 	movea.l	(4,%sp), %a0	// void *kernel_stack

@@ -1,4 +1,7 @@
 
+* you need a way to align data on an architectural-specific amount
+* confirm that signalling a process that's not the current process will properly switch to that process
+
 * it's time to fix the size in the load scripts
 
 * should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?

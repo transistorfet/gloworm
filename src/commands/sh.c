@@ -505,7 +505,7 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 			#ifndef LINUXHOST
 			status = SYSCALL3(SYS_EXECBUILTIN, (int) main, (int) argv, (int) envp);
 			#else
-			status = main(argc, argv, envp);
+			status = (main)(argc, argv, envp);
 			#endif
 		} else {
 			status = execve(argv[0], argv, envp);

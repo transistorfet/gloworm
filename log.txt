@@ -2442,3 +2442,182 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - back to the exit problem, and aha!  it is actually working if I run the non-builtin executables (ie. /bin/ls).  The builtins don't
   have the problem fixed because they only call the main function, which is renamed using the C preprocessor
 
+- found some code in the insert_heap_and_stack function that allocates the stack even in MMU mode.  Commenting it out, it still
+  boots, but when I try to run any program, it has an infinite exception.  The problem seems to be in `sh` between the fork and the
+  exec().  It forks, and then has 3 page faults that correspond to the data segment, and one to the stack segment, and then it has a
+  null pointer exception
+
+- it happens in the shell at address 0x208154, which works out to 0x1b54 into the code segment, which is the rts instruction in the
+  fork() library function.  The first page fault occurs just after the fork() syscall ends.  That address is in the code read only
+  segment, which is odd, because I'm loading all the code in the shell when it launches, so that address shouldn't fault...
+
+- what if there's some code somewhere in the kernel that assumes the segment start and end are always "windowed", so writing to it
+  causes corruption in other processes?
+
+- playing around a bit, and get it back to what should be working, and it has the ntpdate timeout, and the shell comes up fine, but
+  the exceptions that occur are actually weird addresses.  A not entirely valid code reference to _user_sigreturn, or possibly
+  _user_exit which comes before it, for pid 6, ntpdate (which should have been updated to not have the exit problem), but then the
+  second one, in pid 4, seems to be for E0C6 0020, but it's probably meant to be 0020 E0C6, which is an address at the top of the
+  stack of that process
+- so it's actually broken even with the minimal CoW enabled.  Adding more is just making it more frequent I think, but the problem
+  lies elsewhere
+- actually, out of 3 exceptions, the first is a builtin echo command and it's the exit, the second is pid 6 which is ntpdate, which
+  shouldn't have the exit problem, but it's timing out, which might dispatch a sig alarm? in which case it truely is _user_sigaction
+  that's executing and causing the termination there, so that might actually be ok, and then the 3rd is the weird one, but seems to
+  be a misalignment issue?  or else corruption
+- the fault is in pid 4 which is `sh /etc/rc`, at address 0x209ED0, which is 0x18d0 into the shell program
+- that seems to be an RTS instruction in `sh_task` which is the normal main() for sh()... so the stack is corrupted?  This should be
+  the version of the shell on disk
+
+
+2026-01-01:
+
+- I'm still stumped by this.  I figure it's either that MOVES doesn't work the way I expect, or there's something else copying data
+  using the virtual address as if it were a physical address somewhere in the kernel, but I could be off base.  The third exception
+  is definitely broken though
+- I was looking through the shell code and it hooks two signals with custom handlers, SIGINT and SIGALRM.  On a hunch, I pressed
+  Ctrl-C at the shell and it had an exception and was killed, so there's definitely a bug there.  Not sure if it's related to the
+  erroneous termination above, I wouldn't think it would be, but I'll look into it for now
+- Oddly enough, it's actually an address error instead of a bus error, but the fault address is 0x20CFCC which isn't an odd number,
+  so it's not an alignment issue.  It's also a valid stack address.  Code offset is 0xa24, which is RTS in `handle_signal()` so that
+  checks out.  The address is not the _user_sigreturn error though
+- the code before the RTS is a puts() call that prints "^C" but I don't see that printed in the output here, as if it didn't
+  actually run that syscall (or had the wrong address, and printed nothing?)
+- Or actually, it could have checked the stack value to see if it was SIGINT (ie. the value on the stack was wrong) and it skipped
+  the puts()
+- well... I added a print statement to the signal handler runner, and reloaded it, and pressing Ctrl-C did nothing, no messages, no
+  prompt change, no nothing.  The last time I tried this, I had run ls and /bin/ls.  I tried running /bin/ls and then pressed Ctrl-C
+  again and it printed the message in the kernel signal dispatcher (but not the puts() in the custom handler) and then had a bus
+  error on address 0, so it's not working normally on first boot, but not causing an exception either, and only after running
+  another program does it cause the exception.  This really feels like stack corruption somewhere
+- the exception occurs at the exact same code location (the RTS in the custom handler), even though the fault address is different
+  this time
+- wait a minute, maybe there's something in the signal context code that hasn't been updated given it needs to write to the user
+  stack to put the argument on there...
+- yeah, it does push a value onto the user stack, without using the MOVES code, which would definitely explain why the custom
+  handler is not getting the correct signal number
+- I saw the pushing of the _user_exit value onto the user stack here and tested what would happen if it was removed, and the shell
+  crashes on boot, so I'll have to fix that later
+- well... ok, so I changed the code that pushes _user_sigreturn onto the user stack (very hackish code that assumes MMU enabled atm)
+  and now it's crashing on the _user_sigreturn address when it executes that RTS instruction, so progress?  That's very likely the
+  cause of the problem here, but I don't see any existing code that pushes the signal number onto the user stack.  The rest of the
+  code in the add_signal_context() function is dealing with the kernel stack.  I wonder if the signal number was working previously
+  when USER_MODE is enabled
+
+- From https://man7.org/linux/man-pages/man2/sigreturn.2.html
+       Once upon a time, UNIX systems placed the signal trampoline code
+       onto the user stack.  Nowadays, pages of the user stack are
+       protected so as to disallow code execution.  Thus, on contemporary
+       Linux systems, depending on the architecture, the signal
+       trampoline code lives either in the vdso(7) or in the C library.
+       In the latter case, the C library's sigaction(2) wrapper function
+       informs the kernel of the location of the trampoline code by
+       placing its address in the sa_restorer field of the sigaction
+       structure, and sets the SA_RESTORER flag in the sa_flags field.
+
+       The saved process context information is placed in a ucontext_t
+       structure (see <sys/ucontext.h>).  That structure is visible
+       within the signal handler as the third argument of a handler
+       established via sigaction(2) with the SA_SIGINFO flag.
+
+       On some other UNIX systems, the operation of the signal trampoline
+       differs a little.  In particular, on some systems, upon
+       transitioning back to user mode, the kernel passes control to the
+       trampoline (rather than the signal handler), and the trampoline
+       code calls the signal handler (and then calls sigreturn() once the
+       handler returns).
+
+- So it looks like linux actually does what I was trying to avoid, which is mapping some special code into each process which
+  contains the sigreturn syscall, but it sounds like other systems might add an extra argument when registering the signal which
+  gives the address of the sigreturn stub which I assume gets added to the stack by the kernel
+- the latter idea seems like a workable solution maybe...
+- So it looks like according to the linux manpages, the sigaction struct has some extra fields, one for an alternate signal handler
+  function which takes more arguments than just the signum, and then at the bottom a field called sa_restorer field, which it says
+  to not touch, and that posix doesn't define that field.  So it looks like it is indeed passing in another argument that is the
+  trampoline/_user_sigreturn equivalent
+
+- alright, so added that, recompiled the commands and uploaded them to the compact flash card, so that the sigreturn syscall is
+  inside each application, and the tried again.  The third exception on boot is still there, so this doesn't change that, but when I
+  try Ctrl-C after running /bin/ls, it didn't have an exception!  It still exited the process for some reason, and it didn't print
+  ^C so signum is still not being put on the stack.  This must have been broken for quite a while
+- So it seemed to print "Error: -1" which was interrupted by page fault print statements.  There's some code in read_input in the
+  shell which prints that out if it gets an error that isn't EINTR.  I think it probably should get EINTR but it's getting -1
+  instead.  Either way, I think it's passing control back to the shell after the signal is run
+- I tried adding the signum to the user stack and it did print ^C!  It didn't print "Error: -1" either, but it did still exit the
+  shell.  `Process 3 exited with 0` (instead of exited with -1 like the previous run
+
+- Oh btw, I'm sure this will get lost in the noise of these logs, but I saw an old tab which confirmed that linux is using a memory
+  map where the kernel is mapped into every process's address space in the upper part of memory, likely protected with a
+  supervisor-like bit which prevents the user application from actually accessing that memory, but it's active when the kernel code
+  is running, so it can directly access the user process's memory.  It was mentioned on a page talking about
+  copy_from_user/copy_to_user.  I'm not sure if I maybe did the same thing with ruxpin, which might be why I could get away without
+  user address translations.  I can possibly do the same thing on the m68k arch, but only if I use the long descriptor type, which
+  has the supervisor bit to protect kernel pages from being accessed by the user
+- I don't actually see anything like that in ruxpin on a quick look, so not sure, maybe not.  I seem to recall something about the
+  aarch64 MMU treating upper memory as special or something though
+
+- looking in the git history, it seems like it never put the signum on the user stack.  Before I added USER_MODE, and it only had
+  one stack that had the sigcontext and such on it, it might have been able to get the signum from the sigcontext if it just so
+  happened to be put in the right location, but that's really hacky if that's how it used to work
+- that said, I think I might be getting away with not explicitly clearing it after the signal because the saved context has USP
+  which will overwrite the old version.  The add_signal_context function doesn't write the usp back because it passes it to the
+  function that adds the process context on top of it.  I should probably confirm that though
+- hmm.... looking through the signal and scheduler code to see how it actually transfers control to the process running the signal,
+  and I'm not sure it's actually doing the right thing here... it might be at least missing the arch_extended_context() switch,
+  which would leave the MMU table incorrect.  I'm not sure it's setting current_proc either, which would be quite bad.  Not sure if
+  I can confirm this somehow...
+- well in the two cases that's occurring, the proc being signalled and the current_proc when cleaning up the signal afterwards is the
+  same, but in both cases, the process being signalled might have been the current process anyways.  It was the timeout in ntpdate,
+  and the Ctrl-C after a command.  Can I use kill to test another proc?  Maybe daemontest since it seems to leave a zombie process
+- I couldn't get that to leave the zombie process.  It exited with an error of some kind.  So I tried killing pid 2, which caused a
+  series of exceptions in the kill process.  I didn't see it try to send a signal though, so still not able to confirm that it's
+  properly switching the current process
+- the reason why this is particularly pertinent atm is that if we're switching to the process that will receive the signal anyways,
+  we can possibly switch early and use the CRP/MMU/MOVES/memcpy_to/from_user to put values on the user stack, but if we aren't, then
+  we might need to use the slower way of doing it
+- it looks like reschedule_proc_to_now() is not actually rescheduling but putting the proc just after the current proc, so that it
+  will run next, but it doesn't seem to set the "needs_reschedule" flag, so it might not actually switch to the task right away
+
+- so... I'm kind of getting sidetracked.  I tried removing the pushes of _user_exit onto the user stack in the process context
+  functions (to see if they're related to the exceptions I'm getting) but when I run it, despite the shell having the proper
+  _user_exit syscall inside of them, the two shell processes that are launched on boot (pid 3 and 4) both terminate shortly after
+  they start because they access the word just above the top of the stack...
+- as I wrote that, I think I answered my own question about why this is happening.  The C code expects a return address, and when it
+  looks for arguments on the stack, it's likely assuming there's a return address and going around them.  This would make sense
+  since the code that causes the fault is at address 0x189e, which is just before calling `open`, where the argument passed to
+  `open()` is the second argument in argv, ie. the script that it should run
+- this definitely makes sense for pid 4, which is `sh /etc/rc`, but seems a bit odd in the second case?  Oh actually it's a
+  different code address?  No it's the same one.  It's probably because argc is wrong because of the missing return address
+- either way, this might be a red herring.  There's still the bug where it's likely putting the return address at the wrong address
+  because it assumes the stack pointer is a physical address, but there needs to be something on the stack there
+- I tried just adjusting the stack pointer without putting the actual value on the stack, and it's not actually changing any
+  behaviours, so those contexts pushing a value to the user stack isn't alone causing the stack corruption
+
+- what if it's the address being passed into these?  Maybe it's not the right address which can cause problems?
+- Ah ok, so yes, the exec_ functions are what do most of the stack building.  They put the arguments onto the user stack before
+  passing it off to the arch_context functions which put the return address basically, and everything else goes onto the kernel
+  stack.  The exec_ functions normally take the stack pointer, map->stack_end, which is technically supposed to be a user virtual
+  address, and then the exec_ functions treat it as if it's normal contiguous memory.  So that definitely needs to be fixed.  Not
+  sure if that explains everything, or is just one of many problems, but I'll have to test it out properly after dinner
+
+- well I very hackishly made the binary loader fetch the page and load the stack from the last stack page, but that didn't make any
+  of the behaviour different for any of the conditions going on, so I'm not sure this alone explains what's causing these various
+  issues.  I'm really disappointed.  I don't have much time in my break left, and while I got things done, I haven't actually gotten
+  this MMU feature working, and I'm still stuck banging my head against everything
+- I also don't have a proper clean solution for these user stack loading issues.  Only hackish solutions that use direct mmu calls
+  to get the underlying page to manipulate.  I'm not even sure if MMU translation is working, or if the MOVES functions are copying
+  data correctly, because it seems any attempt at using virtual addresses that differ from the physical ones results in a bunch of
+  exceptions
+
+- I think the signal problem might be minor or unrelated to the other issues.  The third exception after boot (well maybe it's the
+  second one now, the one with the misaligned address), is still an issue, and then enabling more translation things, I haven't
+  debugged much because it's such a catastrophic failure
+- I should maybe see about consoladating the argument code such that I can more easily copy and pack it, ideally using an iovec so
+  that it's easier to copy across the user/kernel boundary
+
+
+2025-01-03:
+
+- I'm kind of going in circles.  I had so many bugs in the new string_array code, and I've introduced a bunch more in adding it to
+  the exec() code.  I think I need to step back and undo some of those changes to get back to a working system, and then try again
+

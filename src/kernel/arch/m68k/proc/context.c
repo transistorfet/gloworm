@@ -1,5 +1,6 @@
 
 #include <string.h>
+#include <signal.h>
 
 #include <kconfig.h>
 #include <asm/context.h>
@@ -157,7 +158,20 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 int arch_add_signal_context(struct process *proc, int signum)
 {
 	void *ksp, *usp;
+	sigrestorer_t restorer;
 	struct sigcontext *context;
+
+	// Get the restorer function pointer, or raise an error if one is not set
+	if (proc->signals.actions[signum - 1].sa_flags & SA_RESTORER) {
+		restorer = proc->signals.actions[signum - 1].sa_restorer;
+	} else {
+		#if !defined(CONFIG_MMU)
+		restorer = _user_action;
+		#else
+		log_error("attempted to call a signal handler with no restorer\n");
+		return EINVAL;
+		#endif
+	}
 
 	// Save signal data on the stack for use by sigreturn
 	context = (((struct sigcontext *) arch_get_kernel_stackp(proc)) - 1);
@@ -167,7 +181,8 @@ int arch_add_signal_context(struct process *proc, int signum)
 
 	// Push a return address that will call sigreturn() to the user stack
 	usp = arch_get_user_stackp(proc);
-	PUSH_STACK(usp, void *) = _user_sigreturn;
+	PUSH_STACK(usp, void *) = restorer;
+
 	// Push a fresh context onto the kernel stack
 	// NOTE the user stack is not updated directly, but is instead added to the new context
 	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp, 0);
