@@ -196,34 +196,6 @@ int do_exec(const char __user *path, const char __user *const argv[], const char
 	return 0;
 }
 
-int do_execbuiltin(void __user *addr, const char __user *const argv[], const char __user *const envp[])
-{
-	int error;
-
-	#if defined(CONFIG_MMU)
-
-	struct exec_args argv_buffer;
-	struct exec_args envp_buffer;
-
-	exec_args_copy_strings(&argv_buffer, argv);
-	argv = (const char *const *) argv_buffer.words;
-	exec_args_copy_strings(&envp_buffer, envp);
-	envp = (const char *const *) envp_buffer.words;
-
-	#endif
-
-	// Reset sbrk to the start of the heap
-	error = memory_map_reset_sbrk(current_proc->map);
-	if (error < 0) {
-		return error;
-	}
-
-	// NOTE no modification of the memory maps here, since the code should be in the same process
-	exec_initialize_user_stack_with_args(current_proc, (void *) current_proc->map->stack_end, addr, argv, envp);
-	return 0;
-}
-
-
 pid_t do_waitpid(pid_t pid, int __user *status, int options)
 {
 	struct process *proc;

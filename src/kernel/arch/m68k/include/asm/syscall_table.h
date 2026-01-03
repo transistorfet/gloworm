@@ -113,7 +113,7 @@ void *syscall_table[SYSCALL_MAX] = {
 	__SYSCALL(67, __invalid_syscall),
 	#endif
 
-	__SYSCALL(68, do_execbuiltin),
+	__SYSCALL(68, __invalid_syscall),
 	__SYSCALL(69, __do_clone),
 	__SYSCALL(70, do_gettid),
 };

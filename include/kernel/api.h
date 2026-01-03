@@ -22,7 +22,6 @@ extern void do_exit(int exitcode);
 extern pid_t do_fork(void);
 extern pid_t do_clone(void);
 extern int do_exec(const char __user *path, const char __user *const argv[], const char __user *const envp[]);
-int do_execbuiltin(void __user *addr, const char __user *const argv[], const char __user *const envp[]);
 extern pid_t do_waitpid(pid_t pid, int __user *status, int options);
 extern int do_kill(pid_t pid, int sig);
 extern int do_sigreturn(void);
