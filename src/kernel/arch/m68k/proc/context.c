@@ -157,6 +157,7 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 
 int arch_add_signal_context(struct process *proc, int signum)
 {
+	char *phys_usp;
 	void *ksp, *usp;
 	sigrestorer_t restorer;
 	struct sigcontext *context;
@@ -173,15 +174,30 @@ int arch_add_signal_context(struct process *proc, int signum)
 		#endif
 	}
 
-	// Save signal data on the stack for use by sigreturn
+	// Save signal data on the kernel stack for use by sigreturn
 	context = (((struct sigcontext *) arch_get_kernel_stackp(proc)) - 1);
 	context->signum = signum;
 	context->prev_mask = proc->signals.blocked;
 	proc->signals.blocked |= proc->signals.actions[signum - 1].sa_mask;
 
-	// Push a return address that will call sigreturn() to the user stack
+	// Get the user stack pointer's physical address
 	usp = arch_get_user_stackp(proc);
-	PUSH_STACK(usp, void *) = restorer;
+	#if defined(CONFIG_MMU)
+	phys_usp = (char *) mmu_table_get_page(proc->map->root_table, ((uintptr_t) usp) & ~(PAGE_SIZE - 1));
+	phys_usp += (((uintptr_t) usp) & (PAGE_SIZE - 1));
+	#else
+	phys_usp = usp;
+	#endif
+
+	// Push to the user stack the signum argument, and the return address that will call sigreturn()
+	//PUSH_STACK(usp, int) = signum;
+	//PUSH_STACK(usp, void *) = restorer;
+	phys_usp -= sizeof(int);
+	usp -= sizeof(int);
+	*((uintptr_t *) phys_usp) = (uintptr_t) signum;
+	phys_usp -= sizeof(void *);
+	usp -= sizeof(void *);
+	*((uintptr_t *) phys_usp) = (uintptr_t) restorer;
 
 	// Push a fresh context onto the kernel stack
 	// NOTE the user stack is not updated directly, but is instead added to the new context
@@ -196,7 +212,10 @@ int arch_remove_signal_context(struct process *proc)
 	void *ksp;
 	struct sigcontext *context;
 
+	// Drop the handler context
 	ksp = drop_context(arch_get_kernel_stackp(proc));
+
+	// Use the sigcontext on the process's kernel stack to restore the previous signal state
 	context = (struct sigcontext *) ksp;
 	proc->signals.blocked = context->prev_mask;
 	ksp = (((struct sigcontext *) ksp) + 1);

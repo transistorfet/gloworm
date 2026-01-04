@@ -24,7 +24,7 @@
 int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry);
 int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry);
 
-int load_binary(const char *path, struct process *proc, const char *const argv[], const char *const envp[])
+int load_binary(const char *path, struct process *proc, struct string_array *argv, struct string_array *envp)
 {
 	int error;
 	void *entry;
@@ -73,7 +73,17 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	proc->map = map;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_user_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
+	#if defined(CONFIG_MMU)
+	// TODO I want to remove this, but right now it causes a fault because current_proc is not set, and with the
+	// stack unpopulated, it will not be able to know it should create a new page
+	// a nofault mode might help here
+	page_t *page = mmu_table_get_page(map->root_table, map->stack_end - PAGE_SIZE);
+	if (!page) {
+		page = page_alloc_single();
+		mmu_table_set_page(map->root_table, map->stack_end - PAGE_SIZE, (uintptr_t) page, MMU_FLAG_WRITE);
+	}
+	#endif
+	exec_initialize_user_stack_with_args(proc, map->stack_end, entry, argv, envp);
 
 	return error;
 }
@@ -247,7 +257,7 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 			memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
 			//#endif
 
-			int flags = 0;
+			int flags = SEG_FIXED;
 			if (prog_headers[i].p_flags & PF_R) {
 				flags |= SEG_READ;
 			}

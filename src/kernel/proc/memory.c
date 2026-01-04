@@ -74,7 +74,7 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	}
 
 	file_offset = rounddown(vaddr - segment->start, PAGE_SIZE) + rounddown(segment->offset, PAGE_SIZE);
-	printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
+	//printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
 	error = vfs_seek(segment->file, file_offset, SEEK_SET);
 	if (error < 0) {
 		return NULL;
@@ -149,21 +149,19 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 		existing_page = mmu_table_get_page(map->root_table, page_address);
 		if (existing_page) {
 			if (write_flag && (segment->flags & SEG_WRITE)) {
-printk("copied page (CoW)\n");
 				return memory_map_convert_copy_on_write(map, page_address, existing_page);
 			} else {
 				return EEXIST;
 			}
 		} else {
 			if (write_flag && !(segment->flags & SEG_WRITE)) {
+				log_error("attempting to write to a read-only segment %x to %x\n", segment->start, segment->end);
 				return EPERM;
 			}
-printk(">>> %x\n", segment->flags);
 			new_page = segment->ops->load_page_at(segment, vaddr);
 			if (!new_page) {
-				return EEXIST;
+				return ENOMEM;
 			}
-printk("loading page %x\n", new_page);
 			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
 			if (error < 0) {
 				page_free_single((page_t *) new_page);
@@ -172,7 +170,6 @@ printk("loading page %x\n", new_page);
 		}
 		return 0;
 	} else {
-printk("not found\n");
 		return ENOENT;
 	}
 }
@@ -348,21 +345,17 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	if (flags & SEG_WRITE) {
 		mmu_flags |= MMU_FLAG_WRITE;
 	}
-	if (flags & SEG_ANONYMOUS) {
-		mmu_flags |= MMU_FLAG_UNALLOCATED;
-	}
 	if (flags & SEG_FIXED) {
 		mmu_flags |= MMU_FLAG_WINDOW;
-	}
-	if (flags & SEG_POPULATE) {
+	} else if (flags & SEG_ANONYMOUS) {
+		mmu_flags |= MMU_FLAG_UNALLOCATED;
+	} else if (flags & SEG_POPULATE) {
 		mmu_flags |= MMU_FLAG_PREALLOCATED;
+	} else {
+		mmu_flags |= MMU_FLAG_UNALLOCATED;
 	}
 
-printk("mmu flags for new seg: %x\n", mmu_flags);
-	// TODO the flag here should be changed to MMU_FLAG_UNALLOCATED when it's working properly
-	//error = mmu_table_map(map->root_table, start, length, (!object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);
-	//error = mmu_table_map(map->root_table, start, length, (object ? MMU_FLAG_UNALLOCATED : MMU_FLAG_WINDOW) | mmu_flags);
-	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_WINDOW | mmu_flags);
+	error = mmu_table_map(map->root_table, start, length, mmu_flags);
 	if (error < 0) {
 		goto fail;
 	}
@@ -395,8 +388,13 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 
 	#if defined(CONFIG_MMU)
 	int error;
+	#endif
+
+	// TODO this needs to be done per-segment, but that's not easy here because there's 4 cases and I don't want to repeat the call 4 times
+	#if defined(CONFIG_MMU)
 	// TODO the MMU_FLAG_PAGE_BACKED flag is a bit of a hack atm to make it not free the underlying data when using MMU_FLAG_WINDOW
-	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | MMU_FLAG_PAGE_BACKED);
+	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | MMU_FLAG_WINDOW);
+	//error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | (cur->flags & SEG_FIXED ? MMU_FLAG_WINDOW : 0));
 	if (error < 0)
 		return error;
 	#endif
@@ -585,9 +583,9 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 	#if defined(CONFIG_MMU)
 
-	// TODO This is so wrong, but is a placeholder for now.  I need to pass in the end of the data region don't I?  Or can I assume the memory map is already set up, and heap_start will already be set?
 	start = heap_start;
-	start = (uintptr_t) page_alloc_contiguous(stack_size);
+	// TODO this is for testing, it preallocated the stack
+	//start = (uintptr_t) page_alloc_contiguous(stack_size);
 	heap_object = NULL;
 	stack_object = NULL;
 
@@ -605,10 +603,10 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 	#endif
 
-	error = memory_map_mmap(map, start, 0, SEG_TYPE_HEAP | SEG_READ | SEG_WRITE, heap_object, 0);
+	error = memory_map_mmap(map, start, 0, SEG_TYPE_HEAP | SEG_READ | SEG_WRITE | SEG_ANONYMOUS, heap_object, 0);
 	if (error < 0)
 		goto fail;
-	error = memory_map_mmap(map, start, stack_size, SEG_TYPE_STACK | SEG_GROWSDOWN | SEG_READ | SEG_WRITE, stack_object, 0);
+	error = memory_map_mmap(map, start, stack_size, SEG_TYPE_STACK | SEG_GROWSDOWN | SEG_READ | SEG_WRITE | SEG_ANONYMOUS, stack_object, 0);
 	if (error < 0)
 		goto fail;
 	map->heap_start = start;

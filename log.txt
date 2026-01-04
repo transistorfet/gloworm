@@ -2644,3 +2644,136 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   some bugs lurking in the MMU code still, and I could try to find it though this setup, but... I kind of don't want to if it could
   be a red herring...
 
+- ok what in the actual fuck!  I restored the stashed changes that had the string array code, and compiled it (while it still had a
+  printk that showed the syscall number) and it worked and I could run ls and such, so I removed the syscall print and compiled it
+  and ran it again, and now it's got an infinite exception in pid 6 at some non-sensical address!  Why would the print statement
+  change that!?!
+- this fault address doesn't look dissimilar to the the fault address when compiling init into the kernel, although it's certainly
+  not the same address.  I wonder if it's related to issues with the user stack construction still, which is partially changed by the
+  string_array stuff, or if it's an unrelated bug somewhere (that is also affecting the case where init is in the kernel)
+- the error I'm getting now is the same I was getting last night before I separated the commits.  It's an error in strlen() where
+  the address passed in is totally wrong.  It's likely a bug in the string_array code since it uses strlen()
+
+- something's a little funny here.  I'm not sure if the execbuiltin removal has affected something inadvertently, since it seems
+  like it's launching something unexpected after the ntpdate timeout occurs.  It's behaving differently this time compared to last,
+  where it's got an error in pid 3 now instead of in pid 6 (ntpdate)
+- after the timeout, it prints this:
+      starting exec()
+      exec(): /bin/sh
+      arg 0: p␁NANr
+      arg 1:
+      arg 2:
+      arg 3:
+      arg 4: /bin/sh
+      arg 5: /etc/rc
+      arg 6: init
+      page fault @ 2F62696E in pid 3
+  which is definitely a bug in the arguments code, but I'm not sure where exactly, since it shouldn't be doing this...  maybe it's
+  even related to the signum I'm putting on the stack now??  corrupting things after the signal handler runs?  I didn't add that
+  change to the sigreturn commit I made earlier
+- yup! that was exactly it.  So adding the signum is causing the problem.  I think it might be because it's not removed from the
+  stack.  I wasn't sure where the removal should be, but I think it might be the sigcontext restore code that then has the problem,
+  so in order to put the signum on the stack, it has to be removed before the sigcontext?
+- no that's not right, because the sigcontext is on the kernel stack, not the user stack...
+- I tried adding some code to remove it by fetching the usp, adding the size of signum, and then setting it, but that didn't seem to
+  work.  It's still getting this error in pid 6 or something
+- oh, hmm... I put that change after the context was dropped, so maybe I need to put it before?
+- that doesn't make much sense though because dropping the old context should change the value of usp back to the old value before
+  the signal was dispatched, so this should break in the same way... but it doesn't seem to?
+- man this is weird.  It does seem to work now with the removal of signum before the context is dropped
+
+- I went down to lunch, and tried it again when I got back, and now it's got a fault at address A18220C8 in pid 6 during boot.  This
+  is with the change to add and remove the signum argument.  So it may be unrelated to the signal stuff
+
+- I had turned the computer on, and loaded the kernel from before lunch, and it went into the infinite exception in pid 6 error.  I
+  recompiled the kernel, and loaded it (without turning the computer off), and it booted fine, and then I turned the computer off
+  and had a quick shower and turn it back on, loaded the exact same kernel, and it had the infinite exception on pid 6 error.  So it
+  seems to be unrelated to the code changes I'm making.  It's some kind of random bug
+- it does seem to occur more reliably after turning the computer off and back on, I think
+- this is still the error where strlen is given the wrong address, occurring at 10D382
+- ok looking at the stack output, there's a return address to 10D05C, which is inside vsnprintf, which calls strlen with the broken
+  address (A182 A0C8), but the rest of the trace is stack addresses, probably arguments or local variables inside vsnprintf
+- dumping more of the stack from the monitor, I'm seeing 106BA6, which is console_putchar_direct (the start of the address) so I
+  don't think that's a return address.  Kind of odd to see that function on the stack
+- I'm also seeing 10CA30 (vprintk) a couple times, 10D754 (appears to be in read only data), 10CA7E (printk) so that's the call that
+  starts this all.  Then there's a big buffer on the stack.
+- the string on the stack is then: `arg 0: pdate` so it's trying to print the arguments, but it's got some messed up string because
+  that should be `ntpdate` not `pdate`
+- some return address to 10CA92 a couple of times, which is also printk
+- the next address I can find is 100A4A which is right at the end of the do_exec() function... so I think this might be related to
+  the code that prints out the arguments (which makes sense given the above calls)
+- Oh shit, it's printing out the user arguments, not the buffered list, so that might explain the problem...
+- modified code didn't print out the right thing but didn't crash either
+- ok now it seems to be working somewhat reliably
+
+- now that I have that bug fixed, I tried removing the code that removes the signum from the user stack, and it doesn't seem to have
+  any affect.  I can have signum added to the stack and then not remove it after, and it's not causing any problems, which is how I
+  thought it should work.  The errors were because of that argument printing code
+
+- so I went back to the function that builds the user stack during an exec() call, where I have the new string_array struct passed
+  in, and which then uses an iovec to copy it into user memory.  If I make it use a user buf with iovec (and don't add the
+  mmu_table_switch() call), it hangs during boot.  If I add the mmu_table_switch() call (in binaries.c before it calls the exec
+  functions) it seems to work fine.  It *should* always be the case that when exec() is called, it will be operating on the current
+  process, and there's actually already a hack in the exec functions to call the extended switch since it's changed the memory map,
+  so I guess it's not that bad to have it like this.  Doing this means it should copy the stack data into the right memory location,
+  without needing to do weird things with pages
+- looking at the code that calls the exec function, it was actually passing in the actual page as the stack, instead of using the
+  user stack address (map->stack_end), which maybe is not actually correct...
+- I changed that to use map->stack_end again, and it also seems to work fine, so that's good
+- there's still a few locations that do user stack manipulation, namely the context.c code
+
+- hmm... not ideal, I tried rewriting the exec functions a bit so that rather than skipping the extended switch, it produces an
+  error, and it's failing of course, because the init.c functions call exec without being the current process
+
+- bunch of debugging and refactoring, trying to get everything into the iovec including a new push_back function for easily creating
+  a stack
+- I'm stumped on a problem where making the user exec function use a user buf instead of a kernel buf makes it except, but on pid
+  2440 which makes no sense.  I've seen this error before but can't remember the cause.  The pid was the same even number even, 2440.
+- I thought I'd found the error when the stack passed in by alloc_kernel_process had a page added to the start of the stack address,
+  but that's not fixing it.  It's not even calling the user exec function yet!!!
+- scratch that, didn't look closely.  The kernel task is allocating a single page for the stack
+- also it is actually calling the user function, which I can tell from a unique print statement
+- it doesn't work for the initial process because the current_proc variable isn't set yet!
+- I moved the extended switch outside the conditional and now it's working.  So CRP wasn't set which was causing the MMU to mis-map
+
+- tried anonymous memory for the stack again, and I'm getting a error -22 when creating init task *frustration*
+- I'll come back to it tomorrow.  I should be close but I'm not
+
+
+2025-01-04:
+
+- ok, so that bug where it fails to init, which I did get in the past but didn't dig enough into, was caused because I had a
+  hardcoded MMU_FLAG_WINDOW in the flags, which combined with the SEG_ANONYMOUS flag made the type be 6 which is invalid, so it
+  would return an EINVAL error from the mmu mapper
+- and trying to fix it is resulting in the same error, it seems because there's no default type when a mapped segment doesn't
+  specify... so it's not so easy to solve I guess, which explains why I gave up before and looked for other causes
+- I had to add a SEG_FIXED to the init.c maps
+- well, fixed that and now it's booting but getting into an exception loop in pid 6 with a weird addresss
+- it tries to load a page, which I think is where it goes wrong?
+- the exception itself is in memcpy_from_user, called by do_sendto, in ntpdate.  Is it trying to load a page that's already loaded?
+
+- omg, the last issue there was that since it was ntpdate using udp, it used the sendto and recv_from syscalls which take an extra
+  array passed in for the address buffer, and while I was copying the contents of the address buffers into/out of kernel space, I
+  wasn't actually using `get_user_uintptr()` to fetch the address of the address buffer, or the length of the address buffer, so it
+  was returning garbage which caused an exception!  It's actually running with anonymous (not-preallocated/fixed) stack pages!
+- I'm going to have to be careful going through everything to make sure I'm actually copying everything properly user<->kernel
+- also, I should add a check like linux does to make sure a user address is valid before dereferencing it, and also maybe copy
+  functions that won't cause a fault, but can still invoke the page loader code if a page is missing?  Not entirely sure what linux
+  does there
+
+- alright, so it's working for the stack pages, but it's still crashing when I try to make it load the executable file's pages on
+  demand.  It sort of works a bit, and it seems to be loading the correct pages, but for some reason, the SSW word in the page fault
+  exception says it's a write operation, but it should be executing a branch to main() in the init process.  It loads the first page
+  that contains _start and writes to a location in the data segment, and then faults on address 203900 which is the first page of
+  the executable, and the data seems to match the code, the instruction looks good, it should be a branch, but for some reason,  the
+  write flag is set, so it fails and is terminated
+- I should note, I have an exception in the binaries.c file which will preallocate if and only if there's a RELRO segment in the
+  binary
+- I commented out the check for the write flag, and it got much further, but both the shell processes that are launched, pid 3 and
+  4, crash with an access to address 0, so something's not quite right
+
+- just to reiterate, when it says pid 2440 has an error, it's likely that current_proc is NULL and it's getting the pid from an
+  invalid memory location
+- I just got that error again after removing the hackish code in binaries that allocates a page on the stack for arguments before
+  calling exec_initialize_...  I need to replace that code somehow
+

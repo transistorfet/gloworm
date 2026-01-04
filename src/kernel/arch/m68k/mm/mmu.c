@@ -223,7 +223,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 		// Determine which address to map to
 		switch (flags & MMU_FLAG_TYPE) {
 			case MMU_FLAG_UNMAP: {
-				if (!(flags & MMU_FLAG_PAGE_BACKED)) {
+				if (!(flags & MMU_FLAG_WINDOW)) {
 					// TODO this was causing the crashing problems, because a page was being freed and reused causing corruption (on a user stack I think)
 					page_free_single((page_t *) MMU_TABLE_ADDRESS(result.table[i]));
 					printk("problematic free page %x\n", MMU_TABLE_ADDRESS(result.table[i]));

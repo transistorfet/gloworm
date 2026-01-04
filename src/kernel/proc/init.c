@@ -15,6 +15,7 @@
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 #include <kernel/proc/binaries.h>
+#include <kernel/utils/strarray.h>
 
 
 /// The process which is cloned to make either kernel threads or user processes
@@ -36,7 +37,11 @@ struct process *create_init_task(void)
 {
 	int error = 0;
 	struct process *proc;
+	struct string_array argv_buffer, envp_buffer;
 	const char *argv[2] = { "init", NULL }, *envp[1] = { NULL };
+
+	string_array_copy(&argv_buffer, argv, FROM_KERNEL);
+	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
 
 	proc = new_proc(INIT_PID, SU_UID);
 	if (!proc)
@@ -50,11 +55,14 @@ struct process *create_init_task(void)
 	if (!proc->fd_table)
 		goto fail;
 
+	// Set the current proc, or some of the functions that will be called won't do the right thing
+	current_proc = proc;
+
 	#if defined(CONFIG_SHELL_IN_KERNEL)
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE, NULL, 0);
+	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE | SEG_FIXED, NULL, 0);
 	if (error < 0)
 		goto fail;
 
@@ -65,11 +73,11 @@ struct process *create_init_task(void)
 
 	extern void init_task();
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_user_stack_with_args(proc, (char *) proc->map->stack_end, init_task, argv, envp);
+	exec_initialize_kernel_stack_with_args(proc, (char *) proc->map->stack_end, init_task, &argv_buffer, &envp_buffer);
 
 	#else
 
-	error = load_binary("/bin/init", proc, argv, envp);
+	error = load_binary("/bin/init", proc, &argv_buffer, &envp_buffer);
 	if (error)
 		goto fail;
 
@@ -108,7 +116,7 @@ struct process *create_idle_task(void)
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE, NULL, 0);
+	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE | SEG_FIXED, NULL, 0);
 	if (error < 0)
 		goto fail;
 
@@ -160,10 +168,14 @@ fail:
 void alloc_kernel_stack(struct process *proc, int (*task_start)(), const char *const argv[], const char *const envp[])
 {
 	char *stack;
+	struct string_array argv_buffer, envp_buffer;
+
+	string_array_copy(&argv_buffer, argv, FROM_KERNEL);
+	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
 
 	stack = kzalloc(PAGE_SIZE);
 	proc->map->sbrk = (uintptr_t) stack;
-	exec_initialize_kernel_stack_with_args(proc, stack + PAGE_SIZE, task_start, argv, envp);
+	exec_initialize_kernel_stack_with_args(proc, (uintptr_t) stack + PAGE_SIZE, task_start, &argv_buffer, &envp_buffer);
 }
 
 int idle_task(void)

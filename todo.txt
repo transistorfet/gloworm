@@ -1,4 +1,6 @@
 
+* make sure a SEG_FIXED segment doesn't have its memory freed
+
 * make it kill processes with SIGSEGV instead of SIGKILL when a segfault or bus error occurs
 * you need a way to align data on an architectural-specific amount
 * confirm that signalling a process that's not the current process will properly switch to that process

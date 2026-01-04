@@ -28,6 +28,7 @@
 #include <kernel/net/socket.h>
 #include <kernel/utils/iovec.h>
 #include <kernel/utils/usercopy.h>
+#include <kernel/utils/strarray.h>
 
 
 #include <asm/syscall_table.h>
@@ -122,6 +123,7 @@ pid_t do_clone(void)
 	struct process *proc;
 	struct clone_args args;
 
+	// TODO these addresses need to be translated?
 	args.entry = (int (*)(void *)) current_syscall->arg1;
 	args.stack = (void *) current_syscall->arg2;
 	args.flags = current_syscall->arg3;
@@ -135,54 +137,18 @@ pid_t do_clone(void)
 	return proc->pid;
 }
 
-#define EXEC_ARGS_COUNT_MAX	32
-#define EXEC_ARGS_LENGTH_MAX	1024
-
-struct exec_args {
-	char *words[EXEC_ARGS_COUNT_MAX];
-	char buffer[EXEC_ARGS_LENGTH_MAX];
-};
-
-int exec_args_copy_strings(struct exec_args *args, const char __user *const src_words[])
-{
-	int count = 0;
-	size_t len;
-	size_t used = 0;
-	char __user *word;
-
-	while (count < EXEC_ARGS_COUNT_MAX) {
-		word = (char *) get_user_uintptr((void *) &src_words[count]);
-		if (word == 0) {
-			args->words[count] = 0;
-			return count;
-		}
-		args->words[count] = &args->buffer[used];
-		len = strncpy_from_user(&args->buffer[used], word, EXEC_ARGS_LENGTH_MAX - used);
-		used += len + 1;
-		count += 1;
-	}
-	return count;
-}
-
 int do_exec(const char __user *path, const char __user *const argv[], const char __user *const envp[])
 {
 	int error;
+	struct string_array argv_buffer;
+	struct string_array envp_buffer;
 
 	COPY_USER_STRING(path, CONFIG_PATH_MAX);
 
-	#if defined(CONFIG_MMU)
+	string_array_copy(&argv_buffer, argv, FROM_USER);
+	string_array_copy(&envp_buffer, envp, FROM_USER);
 
-	struct exec_args argv_buffer;
-	struct exec_args envp_buffer;
-
-	exec_args_copy_strings(&argv_buffer, argv);
-	argv = (const char *const *) argv_buffer.words;
-	exec_args_copy_strings(&envp_buffer, envp);
-	envp = (const char *const *) envp_buffer.words;
-
-	#endif
-
-	error = load_binary(path, current_proc, argv, envp);
+	error = load_binary(path, current_proc, &argv_buffer, &envp_buffer);
 	if (error == EKILL) {
 		// An error occurred past the point of no return.  The memory maps have been irrepairably damaged, so kill the process
 		log_error("Process terminated\n");
@@ -710,6 +676,7 @@ int do_fstat(int fd, struct stat __user *statbuf)
 int do_pipe(int pipefd[2])
 {
 	int error;
+	int kernel_pipefd[2];
 	struct vfile *file[2] = { NULL, NULL };
 
 	if (!pipefd) {
@@ -717,13 +684,17 @@ int do_pipe(int pipefd[2])
 	}
 
 	// Find two unused file descriptor slots in the current process's fd table (no need to free them until set_fd())
-	pipefd[PIPE_READ_FD] = find_unused_fd(current_proc->fd_table);
+	kernel_pipefd[PIPE_READ_FD] = find_unused_fd(current_proc->fd_table);
 	// TODO this is terrible and I shouldn't do this, but at least it works for the time being
-	set_fd(current_proc->fd_table, pipefd[PIPE_READ_FD], (struct vfile *) 1);
-	pipefd[PIPE_WRITE_FD] = find_unused_fd(current_proc->fd_table);
-	set_fd(current_proc->fd_table, pipefd[PIPE_READ_FD], NULL);
+	// the reason for this hack is because without it, the same fd slot will be found by find_usused_fd, so
+	// temporarily setting it to 1 will bypass this and give a new slot
+	set_fd(current_proc->fd_table, kernel_pipefd[PIPE_READ_FD], (struct vfile *) 1);
+	kernel_pipefd[PIPE_WRITE_FD] = find_unused_fd(current_proc->fd_table);
+	set_fd(current_proc->fd_table, kernel_pipefd[PIPE_READ_FD], NULL);
+	// TODO part of the hack, we write NULL in case there's an error and we exit early
+	set_fd(current_proc->fd_table, kernel_pipefd[PIPE_WRITE_FD], NULL);
 
-	if (pipefd[PIPE_READ_FD] < 0 || pipefd[PIPE_WRITE_FD] < 0) {
+	if (kernel_pipefd[PIPE_READ_FD] < 0 || kernel_pipefd[PIPE_WRITE_FD] < 0) {
 		return EMFILE;
 	}
 
@@ -732,8 +703,11 @@ int do_pipe(int pipefd[2])
 		return error;
 	}
 
-	set_fd(current_proc->fd_table, pipefd[PIPE_READ_FD], file[PIPE_READ_FD]);
-	set_fd(current_proc->fd_table, pipefd[PIPE_WRITE_FD], file[PIPE_WRITE_FD]);
+	set_fd(current_proc->fd_table, kernel_pipefd[PIPE_READ_FD], file[PIPE_READ_FD]);
+	set_fd(current_proc->fd_table, kernel_pipefd[PIPE_WRITE_FD], file[PIPE_WRITE_FD]);
+
+	put_user_uintptr(&pipefd[PIPE_READ_FD], kernel_pipefd[PIPE_READ_FD]);
+	put_user_uintptr(&pipefd[PIPE_WRITE_FD], kernel_pipefd[PIPE_WRITE_FD]);
 
 	return 0;
 }
@@ -949,8 +923,8 @@ ssize_t do_sendto(int fd, const void __user *buf, size_t nbytes, int flags, int 
 		return EBADF;
 	}
 
-	addr = (const struct sockaddr *) opts[0];
-	addr_len = (socklen_t) opts[1];
+	addr = (const struct sockaddr *) get_user_uintptr(&opts[0]);
+	addr_len = (socklen_t) get_user_uintptr(&opts[1]);
 
 	#if defined(CONFIG_MMU)
 	if (addr_len > 256)
@@ -999,8 +973,8 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 		return EBADF;
 	}
 
-	addr = (struct sockaddr *) opts[0];
-	addr_len = (socklen_t *) opts[1];
+	addr = (struct sockaddr *) get_user_uintptr(&opts[0]);
+	addr_len = (socklen_t *) get_user_uintptr(&opts[1]);
 
 	#if defined(CONFIG_MMU)
 	char addr_buffer[256];
@@ -1022,10 +996,10 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 
 	#if defined(CONFIG_MMU)
 	if (addr) {
-		memcpy_to_user((char *) opts[0], addr_buffer, kernel_len);
+		memcpy_to_user((char *) addr, addr_buffer, kernel_len);
 	}
 	if (addr_len) {
-		put_user_uintptr((socklen_t *) opts[1], kernel_len);
+		put_user_uintptr((socklen_t *) addr_len, kernel_len);
 	}
 	#endif
 	return error;

@@ -137,7 +137,6 @@ typedef mmu_table_short_t mmu_table_t;
 #define MMU_FLAG_MODIFY		0x0005	/// Modify an existing mapping
 
 #define MMU_FLAG_SUPERVISOR	0x0010	/// Set the supervisor flag on mapped pages
-#define MMU_FLAG_PAGE_BACKED	0x0020	/// Allocate pages from the global pool for the mapped range
 #define MMU_FLAG_NOCACHE	0x0040	/// Disable hardware caching for the mapped range (eg. for memory-mapped device access)
 #define MMU_FLAG_COPY_ON_WRITE	0x0080	/// Force the page descriptors to be read-only so that a write will cause a page fault
 
