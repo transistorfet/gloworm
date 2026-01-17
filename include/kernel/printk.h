@@ -32,6 +32,7 @@ int printk(const char *fmt, ...);
 __attribute__((noreturn)) void panic(const char *fmt, ...);
 
 void printk_dump(uint16_t *data, uint32_t length);
+void printk_dump_bytes(uint8_t *data, uint32_t length);
 
 
 #define log_fatal(...)		printk(__VA_ARGS__)

@@ -4,7 +4,8 @@
 
 #include <stddef.h>
 
-unsigned long strlen(const char *str);
+size_t strlen(const char *str);
+size_t strnlen(const char *s, size_t maxlen);
 char *strcpy(char *dest, const char *src);
 char *strncpy(char *dest, const char *src, unsigned long max);
 int strcmp(const char *str1, const char *str2);

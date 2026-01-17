@@ -11,9 +11,9 @@
 int string_array_copy(struct string_array *array, const char __user *const src_words[], int from_user)
 {
 	size_t i;
+	size_t result;
 	size_t len = 0;
 	size_t used = 0;
-	size_t str_len;
 	const char *str;
 
 	// Count the arguments
@@ -39,12 +39,14 @@ int string_array_copy(struct string_array *array, const char __user *const src_w
 		array->strings[i] = used;
 		if (from_user) {
 			str = (char *) get_user_uintptr((void *) &src_words[i]);
-			str_len = strncpy_from_user(&array->buffer[used], str, EXEC_ARGS_LENGTH_MAX - used);
+			result = strncpy_from_user(&array->buffer[used], str, EXEC_ARGS_LENGTH_MAX - used);
+			if (result < 0)
+				return result;
 		} else {
-			str_len = strlen(src_words[i]);
+			result = strnlen(src_words[i], EXEC_ARGS_LENGTH_MAX - used);
 			strncpy(&array->buffer[used], src_words[i], EXEC_ARGS_LENGTH_MAX - used);
 		}
-		used += str_len + 1;
+		used += result + 1;
 	}
 	array->used = roundup(used, sizeof(uintptr_t));
 	return len;
@@ -70,6 +72,7 @@ void string_array_remove_offset(struct string_array *array, uintptr_t offset)
 
 int string_array_copy_to_iter(struct string_array *array, virtual_address_t vaddr, struct iovec_iter *iter)
 {
+	int result;
 	// TODO should this insert it into the end of the iter, or should it put it at the start and rely on it being set up to actually be the end?
 
 	if (iovec_iter_length(iter) < array->used) {
@@ -77,9 +80,9 @@ int string_array_copy_to_iter(struct string_array *array, virtual_address_t vadd
 	}
 
 	string_array_add_offset(array, (uintptr_t) vaddr);
-	memcpy_into_iter(iter, array->buffer, array->used);
+	result = memcpy_into_iter(iter, array->buffer, array->used);
 	string_array_remove_offset(array, (uintptr_t) vaddr);
 
-	return 0;
+	return result;
 }
 
