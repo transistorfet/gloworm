@@ -2616,7 +2616,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   that it's easier to copy across the user/kernel boundary
 
 
-2025-01-03:
+2026-01-03:
 
 - I'm kind of going in circles.  I had so many bugs in the new string_array code, and I've introduced a bunch more in adding it to
   the exec() code.  I think I need to step back and undo some of those changes to get back to a working system, and then try again
@@ -2740,7 +2740,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I'll come back to it tomorrow.  I should be close but I'm not
 
 
-2025-01-04:
+2026-01-04:
 
 - ok, so that bug where it fails to init, which I did get in the past but didn't dig enough into, was caused because I had a
   hardcoded MMU_FLAG_WINDOW in the flags, which combined with the SEG_ANONYMOUS flag made the type be 6 which is invalid, so it
@@ -2776,4 +2776,173 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   invalid memory location
 - I just got that error again after removing the hackish code in binaries that allocates a page on the stack for arguments before
   calling exec_initialize_...  I need to replace that code somehow
+
+
+2026-01-05:
+
+- oh my fucking god!  So last night, I tried enabling the page loader code, and it crashes early on because something that should be
+  a read cycle appears to have bits set for a write cycle.  So I ignored that, and then later on pid 4 (and sometimes 3) would
+  crash because it tried to read from a page that was already loaded.  Looking through the manual it mentioned the FC (function
+  code) and I thought maybe it was a different FC which was why it seemed to be a repeated cycle.  I tried ignoring the read to
+  existing page as well, skipping the attempt to load another page and just return instead.  It fucking boots!  It boots fine!  What
+  in the actual fuck
+- it even has the same FC for both repeat cycles, so that's not it
+    ```
+    bus error: w fc=1 addr=20C3FC ssw=709 mmusr=404 pid=4 pc=208484
+    ...
+    bus error: r fc=1 addr=20C3FC ssw=B649 mmusr=204 pid=4 pc=207EFE
+    ```
+- So the first access has the I bit set in MMUSR, which means the table entry is invalid, but the second fault only has the M bit
+  set meaning...??  The manual says "This bit is set if the page descriptor has the modified bit set".  So it just causes a fault no
+  matter what, just because that bit is set?  Why would you want that?
+
+- It's now the evening, and the first day back to work is done, so I can fully turn my attention back to this, after testing that
+  change first thing in the morning
+- I've had all day to think about this in the back of my brain, and search random things on the web.  I didn't turn up anything on
+  the web.  I thought for a brief time that maybe I had the wrong SSW location, but it's definitely the SSW I'm looking at
+- I was just reading through the manual again after taking another look at Linux's m68k page fault handler.  There's a comment in
+  the linux code that says "if an instruction fault and a data fault occur at the same time, then map in both pages".  It can have
+  two faults at the same time??
+- so that got me thinking and reading the SSW section again, and it does say, in one sentence:
+    "The least significant half of the SSW applies to data cycles only."
+- the RW and RM bits are in the lower half of the SSW *facepalm*  So they only apply if DF is set, otherwise you must ignore them
+  and assume it's a read-only instruction fault cycle
+
+- talking to thorpej, and he mentioned the figuring out the fault only from the MMU SR bits.  You really only need to know if it was
+  a write protect error, which is its own bit in MMU SR. The invalid (I) bit would mean you should load the page if possible.  And
+  there's a privilege bit too
+- that said, I could also use the SSW value, now that I know how to interpret it
+
+- I understand the case where it reads an instruction, but the write flag is set.  But I don't understand the other fault, where it
+  seems like a read, but the page already exists, and the mmusr shows only the M fault(?) occurring
+- the line is: `bus error: r fc=1 addr=20C3FC ssw=B649 mmusr=204 pid=4 pc=207EFE`
+  So it's only an instruction fault, not a data fault
+- wait... do they need to be fetched separately?  Since instruction and data are separate spaces (and the ATC entries have the FC
+  included in them) then it needs load the page twice for instruction or data, so... only copy-on-write if DF is set and write bits
+  are set, and instruction fetching a page that's already loaded just returns
+
+- Haha! I thought it was working, and then I ran the `ps` command and it's infinite excepting with a totally messed up address of
+  4CDF0C04, which is some kind of incorrect value
+- you know, there is the PVALID instruction which can be used to validate an address before dereferencing it, but also, you need to
+  make the exception handler actually kill the process
+
+
+2026-01-06:
+
+- tracing the stack of this `ps` error, it's a fault in printing to a string, which comes from the procfs's `get_data_stat`
+  function, which makes sense given it's in `ps`
+- one look at that function, and I can see it's indexing into proc->map->argv, so I'm almost certain that's the source of the fault.
+  It's a userspace address, so the kernel shouldn't be accessing it directly
+
+- I went and made generic mmu copy functions, but then I made them only defined when MMU is enabled, and added the to procfs, but
+  forgot that since it's I used the user copy functions, they won't work and crash all the time, but they shouldn't use them at all
+  since it looks up each page instead
+
+
+2026-01-08:
+
+- I think there's some kind of corruption somewhere.  One of the clues is that when printing the idle task's args, it prints a weird
+  character instead of the last digit and newline, but it only does it then
+- at the same time, dumping the stack after it boots, based on the address that ps prints, the args look fine, but not the envs, or
+  just something is weird with that stack
+- the other addresses printed by ps show what look like valid addresses, but the on those stacks is definitely not arguments.  It
+  looks like code (4e75, 660C, etc opcodes), so something is getting a page wrong, or a page is being erroneously freed and reused,
+  or somethings written past its own memory, or an address calculation is going awry
+
+
+2026-01-10:
+
+- trying various prints to trace the memory allocation, I wasn't able to find an obvious problem causing the ps command to fail to
+  fetch the correct command names.  I printed the stack traces sometimes, and was getting the wrong data, but the more I tried to
+  inspect it properly, and found bugs in my assumptions when printing stack data, I found that it actually does seem to be correct
+- there was one minor/sorta bug, where the idle task was allocating a stack on the kernel heap instead of as a page, so it wasn't
+  page aligned, which threw me off.  I changed that since it won't be able to make it out properly, even though it doesn't use the
+  stack at all
+- I think the actual bug might be that the proc filesystem data functions are not actually getting the right pages somehow, since
+  the data is definitely wrong, like it's clearly 68k instructions and not a stack.  Hmm... need to verify again with a different
+  process
+
+- yup, looking at pid 4's stack, and also pid 6's when it was first created, and again with dump (when that page was not otherwise
+  reused after being freed and filled with code instead), the stack looked more or less fine, and the addresses still matched the
+  virtual address despite copy on write and such
+- ah I see a problem.  The generic_memcpy_from_user seems to work fine, and the pages it fetching look fine, but when it copies
+  using generic_strncpy_from_user, it gets a totally wrong address
+
+- well, there was definitely a problem in the memcpy version, which was indexing into a `page_t *` type, so instead of being a byte
+  offset, it was a number of pages offset, which explained why the data was so weird.  I've fixed that
+- and then once that was fixed, I'm seeing parts of names, but they are cut off, and seemingly not in a consistent way, but
+  something a bit more complicated, so I'm sure I have some off by one errors in the complex pointer calcs.  I'll have to fix that
+  tomorrow though, since it's already really late, and I have an ear infection that is causing me immense pain
+
+
+2026-01-11:
+
+- it turned out that I was both incrementing the `i` and `page_offset` index values for each character being copied, and also adding
+  the total chunk size to both indices at the end of the chunk, which is why it stopped early.
+- it still wasn't working for the idle task, and that turned out to be because the stack wasn't mapped into the idle process's
+  memory map
+- that got me thinking that maybe I should make the idle task truely be a kernel thread, where the memory map is shared with the
+  rest of the kernel.  The possible issue there is if there are some functions that might get called that might try to add or remove
+  segments from the map, which shouldn't be done for the kernel areas
+
+
+2026-01-12:
+
+- I added a bunch more usercopy functions, which can be defined arch-specific, so that it can use the generic versions if needed,
+  and passes in a map, but instead of referring directly to the generic versions that use the memory_map (mmu), it will use the
+  version that only works with current_proc, if the map passed in matches current_proc.  It may be able to optimize out the
+  selection when passing in current_proc->map, but I'm not positive, and not sure if it can optimize even more complicated but still
+  static references to current_proc
+- either way, it should be the best of either, and since it's defined as just memcpy/strncpy when no-mmu is selected, it shouldn't
+  add much more overhead.  That said, there's a growing amount of bloat in the kernel.  I'm sure some part of it is unavoidable
+  though
+- well so much for that idea.  The .bin takes up 216 more bytes when I use the _to/_from_user_map versions and pass in
+  current_proc->map than when I leave it as _to/_from_user in the COPY_USER_STRING macro, which is used in 17 places in syscall...
+  so it's not zero overhead, maybe because -Os? but honestly it would be smaller to optimize so maybe it just can't
+
+
+2026-01-13:
+
+- slowly puttering away at cleaning up the usercopy code
+- trying some rough optimizations to cut down on the size of code, but no real gains tbh
+- I tried O3, and intially it didn't work, but it turned out to just be the monitor that wouldn't compile.  It turns out, while the
+  -Os version takes 61160 bytes at the moment, the -O3 version takes 105232 bytes, which I was shocked by the size increase in the
+  name of performance, but I then thought to checkt what no optimizations would do, and it turned out to be 104360, so the -O3
+  version isn't really much bigger than the unoptimized version, but the -Os version is *tiny* by comparison, almost have the size!
+- for completeness, the -O2 version is 75936, and the -O1 version is 68480.  That's so weird that the -O1 version is almost as small
+  as -Os, but waaay smaller than -O0
+- I got the monitor's -O3 working by adding fread and fwrite that just reads/writes to serial.  Not sure why I didn't implement that
+  earlier.  Maybe I had intended to allow it to target other serial devices, but *shrug* I can add that later
+
+- I need to add error checks to everything using usercopy functions, including all iter operations
+- should you add a mode to iter to copy to a specific user process's memory, now that you have functions that can do that? or should
+  always use the user_map functions when selecting the user_buf option?
+- should you actually have an iter mode specifically for other user processes besides the current one, that always uses the no-fault
+  method of reading data from pages, and also make usercopy functions specifically for that case, so when you actually want to force
+  it to use the manual method, you can.  The thinking here is that sometimes you might know that the current process's state is
+  invalid, and even though proc->map == current_proc->map, the MMU register is not set, or you cannot service an exception or
+  something???
+
+- actually, now that i've walked down two flights of stairs and am away from my computer, I just thought, about the place in exec
+  where it's manually loading a page, and the need for this extra iter mode (which might still be useful), I can probably just force
+  the CRP switch and use the faster usercpy functions, which would be better anyways, right?
+
+
+2026-01-14:
+
+- now that I've done all that work on the generic usercopy functions, looking at Linux, it has nothing like that, but it does have
+  various means of using the iovec_iter with either an iovec-like struct, or folioq or others that can write to disjoint memory (ie.
+  pages), so maybe instead, I should think about a function that can create such a struct from pages from the page table, which
+  could be faster overall to fetch the pages (all at once) and then it doesn't need to do all the complex setup each time an iter
+  function is called, which for the places I want to use it (exec, context) which is stack manipulation and pushing small values
+  onto the stack, it could be a lot of overhead
+
+- I guess I really went different with iovec, but am now kind of going closer to what linux does.  I started adding an iovec-like
+  struct, but the previous def assumes it's a user buffer, so I made a new one call kiovec, then kio_vec, then kvec (<- same as
+  linux), and that basically means 4 different impls, but doesn't have simple buffers.  It only has vectors of buffers.  So maybe I
+  should do the same and cut out two impls.  It might be a bit slower, but if there's only one buffer in the vec, it should be about
+  the same, maybe with a couple more instructions to check that there's only one buffer, and then the normal index, single memcpy,
+  etc.  Most of the `generic_*_to/from_user_map` functions would turn into iter functions.  The creation of the iovec separate from
+  the iter would also be an extra step, decl, etc, which might be a bit cumbersome.  Maybe I can find a way to simplify that with
+  preproc macros?
 

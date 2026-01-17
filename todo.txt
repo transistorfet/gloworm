@@ -1,4 +1,25 @@
 
+- the main areas to fix re: fetching pages for copying, are the exec calls, and the context.c stack manipulation
+
+- should you actually have an iter mode specifically for other user processes besides the current one, that always uses the no-fault method of
+  reading data from pages, and also make usercopy functions specifically for that case, so when you actually want to force it to use the manual
+  method, you can.  The thinking here is that sometimes you might know that the current process's state is invalid, and even though
+  proc->map === current_proc->map, the MMU register is not set, or you cannot service an exception or something???
+- should you add a mode to iter to copy to a specific user process's memory, now that you have functions that can do that? or should always use
+  the user_map functions when selecting the user_buf option?
+- make everything that uses iters check for errors
+- make everything that uses usercopy functions check for errors
+
+- figure out what's causing ps to not print cmds, likely some kind of corruption (caused by a subtle bug introduced by the recent MMU changes)
+
+* make it so that it's easy to run just one test
+* the ringbuffer implementation has an off by one error I think (or it has no way to avoid one, which would suck)
+* I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
+* make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
+
+* make the exception handler actually kill the process when it needs to die, instead of causing infinite exceptions
+* use the PVALID instruction to validate user addresses before dereferencing them
+
 * make sure a SEG_FIXED segment doesn't have its memory freed
 
 * make it kill processes with SIGSEGV instead of SIGKILL when a segfault or bus error occurs
