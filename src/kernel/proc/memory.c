@@ -13,6 +13,7 @@
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/iovec.h>
 
 
 #if !defined(CONFIG_MMU)

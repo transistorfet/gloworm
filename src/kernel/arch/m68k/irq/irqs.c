@@ -16,6 +16,10 @@
 #include <asm/context.h>
 #include <asm/exceptions.h>
 
+#if defined(CONFIG_MMU)
+#include <asm/mmu.h>
+#endif
+
 #define INTERRUPT_MAX		128
 
 typedef void (*m68k_irq_handler_t)();
@@ -149,7 +153,6 @@ __attribute__((interrupt)) void enter_trace(struct exception_frame frame)
 	log_trace("Trace %x (%x)\n", frame.pc, frame.pc);
 }
 
-#include <asm/mmu.h>
 static void page_fault_handler(struct exception_frame *frame)
 {
 	#if defined(CONFIG_MMU)
@@ -159,49 +162,76 @@ static void page_fault_handler(struct exception_frame *frame)
 	uint16_t mmu_sr;
 	uintptr_t fault_addr;
 
+	fault_addr = frame->formatb.fault_addr;
+	ssw = frame->formatb.ssw;
+	int df = ssw & SSW_DATA_FAULT;
+	int ff = (ssw & SSW_FAULT_STAGE_C) || (ssw & SSW_FAULT_STAGE_B);
+	char rwm_type = !df ? 'r' : (!(ssw & SSW_READ_WRITE) ? 'w' : ((ssw & SSW_READ_MODIFY_WRITE) ? 'm' : 'r'));
+	int write_flag = df && (!(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE));
+
 	if (current_proc && current_proc->map) {
-		fault_addr = frame->formatb.fault_addr;
-		ssw = frame->formatb.ssw;
-		log_error("page fault @ %x in pid %d\n", fault_addr, current_proc->pid);
+		if (rwm_type == 'r') {
+			asm volatile(
+				"ptestr %2, %1@, #7\n"
+				"pmove %%psr, %0\n"
+				: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw & 0x7)
+			);
+		} else {
+			asm volatile(
+				"ptestw %2, %1@, #7\n"
+				"pmove %%psr, %0\n"
+				: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw & 0x7)
+			);
+		}
+		log_error("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
+		//log_info("mmu sr: %x\n", mmu_sr);
 		//log_info("pc: %x\n", frame->pc);
 		//log_info("ssw: %x\n", ssw);
 
-		asm volatile(
-			"ptestr %2, %1@, #7\n"
-			"pmove %%psr, %0\n"
-			: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw)
-		);
-		//log_info("mmu sr: %x\n", mmu_sr);
+		if (ff && df) {
+			log_error("the infamous ff+df cycle fault\n");
+		} else if (ff) {
+			// An instruction fault has occurred, and if there's already a page mapped to that address,
+			// it will be returned when we RTE.  It's being recorded in a Program Space function codes, and
+			// was previously only recorded in the Data Space function codes
+			page_t *existing_page = mmu_table_get_page(current_proc->map->root_table, fault_addr & ~(PAGE_SIZE - 1));
+			if (existing_page) {
+				return;
+			}
 
-		//printk("printing table %x for pid %d\n", current_proc->map->root_table, current_proc->pid);
-		//mmu_table_print(current_proc->map->root_table);
-		//memory_map_print_segments(current_proc->map);
-		error = memory_map_load_page_at(current_proc->map, fault_addr, !(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE));
-		if (error < 0) {
+			// The page doesn't already exist, so load it
+			error = memory_map_load_page_at(current_proc->map, fault_addr, 0);
+			if (error < 0) {
+				goto fail;
+			}
+		} else if (df) {
+			error = memory_map_load_page_at(current_proc->map, fault_addr, write_flag);
+			if (error < 0) {
+				goto fail;
+			}
+		} else {
+			log_error("segfault\n");
 			goto fail;
 		}
 
-		//mmu_table_print(current_proc->map->root_table);
-
-		// Otherwise, we loaded the page, so return successfully
-		//frame->formatb.ssw |= SSW_FAULT_OR_RERUN | SSW_RERUN_STAGE_B;
 		//MMU_FLUSH_ALL();
-		if (!(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE)) {
-			asm volatile(
-				"ploadw	%1, %0@\n"
-				: : "a" (fault_addr), "d" (ssw)
-			);
-		}
-		else {
-			asm volatile(
-				"ploadr	%1, %0@\n"
-				: : "a" (fault_addr), "d" (ssw)
-			);
-		}
+		//if (write_flag) {
+		//	asm volatile(
+		//		"ploadw	%1, %0@\n"
+		//		: : "a" (fault_addr), "d" (ssw)
+		//	);
+		//}
+		//else {
+		//	asm volatile(
+		//		"ploadr	%1, %0@\n"
+		//		: : "a" (fault_addr), "d" (ssw)
+		//	);
+		//}
 		return;
 	}
 
 fail:
+	log_error("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
 	#endif
 
 	user_error(frame);
