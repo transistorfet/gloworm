@@ -9,6 +9,7 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/fileptr.h>
 #include <kernel/proc/scheduler.h>
+#include <kernel/utils/iovec.h>
 
 #define PIPE_BUFFER_MAX		512
 

@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include <kconfig.h>
+#include <kernel/proc/process.h>
+#include <kernel/proc/memory.h>
 #include <kernel/utils/usercopy.h>
 
 #define M68K_FC_USER_DATA		1
@@ -15,6 +17,8 @@
 #define M68K_FC_CPU_SPACE		7
 
 #if defined(CONFIG_MMU)
+
+extern struct process *current_proc;
 
 static inline uint8_t get_user_uint8(const void __user *src)
 {
@@ -136,6 +140,42 @@ static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 	return bytes;
 }
 
+static inline int memcpy_from_user_map(struct memory_map *map, void *dest, const void __user *src, int n)
+{
+	if (map == current_proc->map) {
+		return memcpy_from_user(dest, src, n);
+	} else {
+		return generic_memcpy_from_user_map(map, dest, (virtual_address_t) src, n);
+	}
+}
+
+static inline int memcpy_to_user_map(struct memory_map *map, void __user *dest, const void *src, int n)
+{
+	if (map == current_proc->map) {
+		return memcpy_to_user(dest, src, n);
+	} else {
+		return generic_memcpy_to_user_map(map, (virtual_address_t) dest, src, n);
+	}
+}
+
+static inline int strncpy_from_user_map(struct memory_map *map, char *dest, const char __user *src, int max)
+{
+	if (map == current_proc->map) {
+		return strncpy_from_user(dest, src, max);
+	} else {
+		return generic_strncpy_from_user_map(map, dest, (virtual_address_t) src, max);
+	}
+}
+
+static inline int strncpy_to_user_map(struct memory_map *map, char __user *dest, const char *src, int max)
+{
+	if (map == current_proc->map) {
+		return strncpy_to_user(dest, src, max);
+	} else {
+		return generic_strncpy_to_user_map(map, (virtual_address_t) dest, src, max);
+	}
+}
+
 #else // CONFIG_MMU
 
 static inline uint8_t get_user_uint8(const void __user *src)
@@ -172,14 +212,46 @@ static inline int memcpy_to_user(void __user *dest, const void *src, int n)
 
 static inline int strncpy_from_user(char *dest, const char __user *src, int max)
 {
+	int size;
+
 	strncpy(dest, src, max);
-	return strlen(dest);
+	size = strnlen(dest, max);
+	if (size == max) {
+		dest[max - 1] = '\0';
+	}
+	return size;
 }
 
 static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 {
+	int size;
+
 	strncpy(dest, src, max);
-	return strlen(src);
+	size = strnlen(dest, max);
+	if (size == max) {
+		dest[max - 1] = '\0';
+	}
+	return size;
+}
+
+static inline int memcpy_from_user_map(struct memory_map *map, void *dest, const void __user *src, int n)
+{
+	return memcpy_from_user(dest, src, max);
+}
+
+static inline int memcpy_to_user_map(struct memory_map *map, void __user *dest, const void *src, int n)
+{
+	return memcpy_to_user(dest, src, max);
+}
+
+static inline int strncpy_from_user_map(struct memory_map *map, char *dest, const char __user *src, int max)
+{
+	return strncpy_from_user(dest, src, max);
+}
+
+static inline int strncpy_to_user_map(struct memory_map *map, char __user *dest, const char *src, int max)
+{
+	return strncpy_to_user(dest, src, max);
 }
 
 #endif // CONFIG_MMU

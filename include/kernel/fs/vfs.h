@@ -7,7 +7,6 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <kernel/time.h>
-#include <kernel/utils/iovec.h>
 
 #ifndef F_OK
 #define F_OK		0	// Test if file exists
@@ -55,6 +54,7 @@
 struct mount;
 struct vnode;
 struct vfile;
+struct iovec_iter;
 
 
 struct mount_ops {
