@@ -43,14 +43,26 @@ static inline int memcpy_to_user(void __user *dest, const void *src, int n)
 
 static inline int strncpy_from_user(char *dest, const char __user *src, int max)
 {
+	int size;
+
 	strncpy(dest, src, max);
-	return strlen(dest);
+	size = strnlen(dest, max);
+	if (size == max) {
+		dest[max - 1] = '\0';
+	}
+	return size;
 }
 
 static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 {
+	int size;
+
 	strncpy(dest, src, max);
-	return strlen(src);
+	size = strnlen(dest, max);
+	if (size == max) {
+		dest[max - 1] = '\0';
+	}
+	return size;
 }
 
 #endif

@@ -37,8 +37,14 @@ ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
 
 export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 
+HOST_ARCH			= testapp
+HOST_LD				?= gcc
 HOST_CC				?= gcc
-HOST_CFLAGS			?= -I$(src-root)/include -I$(src-root)/src/kernel/arch/testapp/include -Wall -O3
+HOST_CFLAGS			?=
+HOST_LDFLAGS			?=
 
-export HOST_GCC HOST_CFLAGS
+host-ccflags-y			+= -I$(include-dir) -g -Wall -O3
+host-ccflags-y			+= -Isrc/libc/arch/$(HOST_ARCH)/include -Isrc/kernel/arch/$(HOST_ARCH)/include
+
+export HOST_ARCH HOST_LD HOST_CC HOST_GCC HOST_CFLAGS HOST_LDFLAGS
 

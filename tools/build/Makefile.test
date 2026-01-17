@@ -14,9 +14,12 @@ bare-tests: $(bare-tests-load) $(tests-subdir-y)
 %.test.run: %.test.host
 	./$<
 
-%.test.host: HOST_CFLAGS += -DHOST_TARGET
-%.test.host: %.c
-	$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
+%.test.host: HOST_CFLAGS += -DHOST_TARGET -DHOST_TEST
+%.test.host: %.host.o $(tests-extra-y)
+	$(cmd_host_ld_elf)
+
+%.host.o: %.c
+	$(cmd_host_cc_o)
 
 %.test.load: ccflags-y += $(firmware-ccflags-y)
 %.test.load: %.bin
