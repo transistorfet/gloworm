@@ -13,9 +13,13 @@
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
 
+
+static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
+#if !defined(CONFIG_MMU)
 char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
-static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
+#endif
+
 
 int clone_process(struct process *parent_proc, struct clone_args *args, struct process **result)
 {
@@ -154,6 +158,7 @@ fail:
 	return error;
 }
 
+#if !defined(CONFIG_MMU)
 static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
 {
 	int error = 0;
@@ -198,4 +203,5 @@ char **adjust_string_array(char **source, char *parent_stack_start, char *new_st
 
 	return dest;
 }
+#endif
 

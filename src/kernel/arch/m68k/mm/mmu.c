@@ -11,8 +11,6 @@
 	( ((vaddr) >> (bits)) & ((1 << MMU_TABLE_ADDR_BITS) - 1) )
 
 
-mmu_descriptor_t *kernel_mmu_table = NULL;
-
 static inline int init_mmu_table(mmu_descriptor_t *root_table)
 {
 	memset(root_table, '\0', sizeof(mmu_table_t));
@@ -20,28 +18,18 @@ static inline int init_mmu_table(mmu_descriptor_t *root_table)
 }
 
 
-int init_mmu(void)
+int init_mmu(mmu_descriptor_t *supervisor_table)
 {
 	uint32_t tt = 0;
 	uint32_t tcr = 0;
 	struct mmu_root_pointer root_pointer;
-
-	kernel_mmu_table = mmu_table_alloc();
-
-	// Initialize the top-level kernel page table to map directly to real memory
-	if (mmu_table_map(kernel_mmu_table, (uintptr_t) 0x00000000, 0x01000000, MMU_FLAG_WINDOW | MMU_FLAG_SUPERVISOR | MMU_FLAG_WRITE) < 0) {
-		log_error("error mapping lower memory\n");
-	}
-	if (mmu_table_map(kernel_mmu_table, (uintptr_t) 0xFF000000, 0x01000000, MMU_FLAG_WINDOW | MMU_FLAG_NOCACHE | MMU_FLAG_SUPERVISOR | MMU_FLAG_WRITE) < 0) {
-		log_error("error mapping upper memory\n");
-	}
 
 	MMU_MOVE_TO_TT0(tt);
 	MMU_MOVE_TO_TT1(tt);
 
 	root_pointer.limit = 0x7fff;
 	root_pointer.status = MMU_DT_TABLE;
-	root_pointer.table = (uint32_t) kernel_mmu_table;
+	root_pointer.table = (uint32_t) supervisor_table;
 	MMU_MOVE_TO_SRP(root_pointer);
 	MMU_MOVE_TO_CRP(root_pointer);
 
@@ -105,19 +93,23 @@ void mmu_table_free(mmu_descriptor_t *root_table)
 }
 
 
-#define CREATE_IF_NEEDED		1
+#define GET_TABLE_CREATE_IF_NEEDED		0x01
+#define GET_TABLE_RETURN_ANY_SIZE		0x02
 
 struct get_table_result {
 	mmu_descriptor_t *table;
 	uint8_t bits;
 };
 
-static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, ssize_t length, int create_if_needed, struct get_table_result *result)
+static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, ssize_t length, int flags, struct get_table_result *result)
 {
 	int i;
+	char create_if_needed;
 	char request_covers_whole_chunk;
 	mmu_descriptor_t *table, *next_table;
 	uint8_t bits = 32 - MMU_TABLE_INITIAL_SHIFT - MMU_TABLE_ADDR_BITS;
+
+	create_if_needed = flags & GET_TABLE_CREATE_IF_NEEDED;
 
 	table = root_table;
 	while (1) {
@@ -128,7 +120,7 @@ static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virt
 
 		if (MMU_DT(table[i]) == MMU_DT_PAGE_DESCRIPTOR) {
 			result->bits = bits;
-			if (!request_covers_whole_chunk) {
+			if (!request_covers_whole_chunk && !(flags & GET_TABLE_RETURN_ANY_SIZE)) {
 				// There's an early termination page descriptor entry, but we're only mapping a virtual address that's within this single page
 				// instead of mapping the whole page, which is an error
 				result->table = NULL;
@@ -194,7 +186,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
 		if (i + 1 >= MMU_TABLE_SIZE) {
-			error = get_table(root_table, virtual_addr, length, CREATE_IF_NEEDED, &result);
+			error = get_table(root_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED, &result);
 			if (error < 0) {
 				return error;
 			}
@@ -303,7 +295,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 				return error;
 			}
 
-			error = get_table(dest_table, virtual_addr, length, CREATE_IF_NEEDED, &dest_result);
+			error = get_table(dest_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED, &dest_result);
 			if (error < 0) {
 				return error;
 			}
@@ -339,14 +331,21 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
 {
 	int error;
+	uint32_t entry;
 	struct get_table_result result;
 
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, 0, &result);
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
 	if (error < 0) {
 		return NULL;
 	}
 
-	return (page_t *) MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
+	entry = MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
+	if (entry && result.bits != PAGE_ADDR_BITS) {
+		// Early termination entry, so calculate the offset into the chunk
+		return (page_t *) (entry + (virtual_addr & ((1 << result.bits) - 1) & ~(PAGE_SIZE - 1)));
+	} else {
+		return (page_t *) entry;
+	}
 }
 
 int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, int flags)
@@ -356,7 +355,7 @@ int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uin
 	int status;
 	struct get_table_result result;
 
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, CREATE_IF_NEEDED, &result);
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_CREATE_IF_NEEDED, &result);
 	if (error < 0) {
 		return error;
 	}
@@ -377,6 +376,29 @@ int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uin
 
 	result.table[i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
 	return 0;
+}
+
+int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
+{
+	uint16_t mmu_sr;
+	struct mmu_root_pointer root_pointer;
+
+	MMU_MOVE_FROM_CRP(root_pointer);
+	if (root_pointer.table == (uintptr_t) root_table) {
+		// TODO should you optionally validate writing?
+		asm volatile(
+			"ptestr %2, %1@, #7\n"
+			"pmove %%psr, %0\n"
+			: "=m" (mmu_sr) : "a" (virtual_addr), "i" (0x1)
+		);
+
+		return !(mmu_sr & 0xEC00);
+	} else {
+		page_t *page;
+
+		page = mmu_table_get_page(root_table, virtual_addr & ~(PAGE_SIZE - 1));
+		return page != NULL;
+	}
 }
 
 static int mmu_table_print_inner(mmu_descriptor_t *table, uint8_t bits, uintptr_t virtual_addr)

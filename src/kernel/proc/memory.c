@@ -73,6 +73,7 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	if (!page) {
 		return NULL;
 	}
+	memset(page, 0, PAGE_SIZE);
 
 	file_offset = rounddown(vaddr - segment->start, PAGE_SIZE) + rounddown(segment->offset, PAGE_SIZE);
 	//printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
@@ -80,13 +81,14 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	if (error < 0) {
 		return NULL;
 	}
+
 	iovec_iter_init_kernel_buf(&iter, (char *) page, PAGE_SIZE);
 	error = vfs_read(segment->file, &iter);
 	if (error < 0) {
 		return NULL;
 	}
 
-	//printk("newly loaded page\n");
+	//printk("newly loaded page, %d bytes\n", error);
 	//printk_dump((uint16_t *) page, PAGE_SIZE);
 
 	return page;
@@ -113,7 +115,7 @@ struct memory_ops anonymous_memory_ops = {
 	.load_page_at	= anonymous_memory_ops_load_page_at,
 };
 
-static inline int memory_map_convert_copy_on_write(struct memory_map *map, uintptr_t page_address, page_t *existing_page)
+static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtual_address_t page_address, page_t *existing_page)
 {
 	int error;
 	page_t *page_copy;
@@ -124,6 +126,7 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, uintp
 	}
 	memcpy(page_copy, existing_page, PAGE_SIZE);
 
+	//log_debug("copying page for %x (originally %x) to %x\n", page_address, existing_page, page_copy);
 	error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) page_copy, MMU_FLAG_WRITE);
 	if (error < 0) {
 		return error;
@@ -133,7 +136,8 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, uintp
 	return 0;
 }
 
-int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag)
+// TODO rename to something inclusive of CoW
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_error)
 {
 	int error;
 	uintptr_t page_address;
@@ -149,13 +153,14 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 		page_address = rounddown(vaddr, PAGE_SIZE);
 		existing_page = mmu_table_get_page(map->root_table, page_address);
 		if (existing_page) {
-			if (write_flag && (segment->flags & SEG_WRITE)) {
+			if (write_error && (segment->flags & SEG_WRITE)) {
 				return memory_map_convert_copy_on_write(map, page_address, existing_page);
 			} else {
+				log_error("attempting to read in data space a page that already exists\n");
 				return EEXIST;
 			}
 		} else {
-			if (write_flag && !(segment->flags & SEG_WRITE)) {
+			if (write_error && !(segment->flags & SEG_WRITE)) {
 				log_error("attempting to write to a read-only segment %x to %x\n", segment->start, segment->end);
 				return EPERM;
 			}
@@ -163,8 +168,10 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 			if (!new_page) {
 				return ENOMEM;
 			}
+			//log_debug("loading new page for %x -> %x\n", vaddr, new_page);
 			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
 			if (error < 0) {
+				log_error("error setting newly loaded page: %d\n", error);
 				page_free_single((page_t *) new_page);
 				return error;
 			}
@@ -334,7 +341,9 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	#if defined(CONFIG_MMU)
 
-	if (object) {
+	if (flags & SEG_FIXED) {
+		segment->ops = NULL;
+	} else if (object) {
 		segment->ops = &file_memory_ops;
 	} else {
 		segment->ops = &anonymous_memory_ops;
@@ -346,6 +355,7 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	if (flags & SEG_WRITE) {
 		mmu_flags |= MMU_FLAG_WRITE;
 	}
+
 	if (flags & SEG_FIXED) {
 		mmu_flags |= MMU_FLAG_WINDOW;
 	} else if (flags & SEG_ANONYMOUS) {
@@ -354,6 +364,14 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 		mmu_flags |= MMU_FLAG_PREALLOCATED;
 	} else {
 		mmu_flags |= MMU_FLAG_UNALLOCATED;
+	}
+
+	if (flags & SEG_NOCACHE) {
+		mmu_flags |= MMU_FLAG_NOCACHE;
+	}
+
+	if (flags & SEG_SUPERVISOR) {
+		mmu_flags |= MMU_FLAG_SUPERVISOR;
 	}
 
 	error = mmu_table_map(map->root_table, start, length, mmu_flags);
@@ -384,37 +402,34 @@ fail:
 /// it will be deleted or shrunk accordingly to make room.
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 {
-	uintptr_t end;
+	uintptr_t end, sub_start, sub_end;
 	struct memory_segment *cur, *next, *new;
 
 	#if defined(CONFIG_MMU)
 	int error;
 	#endif
 
-	// TODO this needs to be done per-segment, but that's not easy here because there's 4 cases and I don't want to repeat the call 4 times
-	#if defined(CONFIG_MMU)
-	// TODO the MMU_FLAG_PAGE_BACKED flag is a bit of a hack atm to make it not free the underlying data when using MMU_FLAG_WINDOW
-	error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | MMU_FLAG_WINDOW);
-	//error = mmu_table_map(map->root_table, start, length, MMU_FLAG_UNMAP | (cur->flags & SEG_FIXED ? MMU_FLAG_WINDOW : 0));
-	if (error < 0)
-		return error;
-	#endif
-
 	end = start + length;
 	for (cur = memory_map_iter_first(map); cur; cur = next) {
+		sub_start = sub_end = 0;
 		next = memory_map_iter_next(cur);
 		if (cur->start >= start && cur->start <= end) {
+			sub_start = cur->start;
 			if (cur->end >= start && cur->end <= end) {
 				// The segment is entirely within the unmap region so delete it entirely
 				_queue_remove(&map->segments, &cur->node);
 				memory_segment_free(cur);
+				sub_end = cur->end;
 			} else {
 				// The start will be unmapped but not the end, so move the segment start
 				cur->start = end;
+				sub_end = end;
 			}
 		} else if (cur->end >= start && cur->end <= end) {
 			// The end will be unmapped but not the start, so move the segment end
 			cur->end = start;
+			sub_start = start;
+			sub_end = cur->end;
 		} else if (start >= cur->start && start <= cur->end) {
 			//  The unmapped region is entirely within this segment, so we need to split it in two
 			new = memory_segment_alloc(end, cur->end, cur->flags);
@@ -432,7 +447,17 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 
 			// Adjust the current segment to end at the start of the region to be unmapped
 			cur->end = start;
+			sub_start = start;
+			sub_end = end;
 		}
+
+		#if defined(CONFIG_MMU)
+		if (sub_start) {
+			error = mmu_table_map(map->root_table, sub_start, sub_end - sub_start, MMU_FLAG_UNMAP | (cur->flags & SEG_FIXED ? MMU_FLAG_WINDOW : 0));
+			if (error < 0)
+				return error;
+		}
+		#endif
 	}
 
 	// TODO this is wrong, they should find the next lowest valid mapped address to assign
@@ -465,8 +490,13 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 	segment->file = MEMORY_OBJECT_MAKE_REF(src_segment->file);
 
 	int error;
+	int mmu_flags = 0;
 
-	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, (src_segment->flags & SEG_WRITE) ? MMU_FLAG_COPY_ON_WRITE : 0);
+	if (src_segment->flags & SEG_WRITE && !(src_segment->flags & SEG_FIXED)) {
+		mmu_flags |= MMU_FLAG_COPY_ON_WRITE;
+	}
+
+	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, mmu_flags);
 	if (error < 0)
 		return error;
 

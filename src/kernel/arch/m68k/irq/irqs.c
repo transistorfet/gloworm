@@ -95,18 +95,27 @@ extern struct process *current_proc;
 
 void user_error(struct exception_frame *frame)
 {
-	page_t *page;
-
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
-	// TODO this is for when the user-mode PC is pointing to its private virtual address space
-	//#if defined(CONFIG_MMU)
-	//page = mmu_table_get_page(current_proc->map->root_table, frame->pc);
-	//#else
-	page = (page_t *) frame->pc;
-	//#endif
-	print_stack(frame, page);
+
+	#if defined(CONFIG_MMU)
+
+	char *stack = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame & ~(PAGE_SIZE - 1));
+	stack += (uintptr_t) frame & (PAGE_SIZE - 1);
+	printk("Stack: %x (phys: %x)\n", frame, stack);
+	printk_dump((uint16_t *) stack, 128);
+
+	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1));
+	code += (uintptr_t) frame->pc & (PAGE_SIZE - 1);
+	printk("\nCode: %x (phys: %x)\n", frame->pc, code);
+	printk_dump((uint16_t *) code, 48);
+
+	#else
+
+	print_stack(frame, frame->pc);
+
+	#endif
 
 	dispatch_signal(current_proc, SIGABRT);
 }

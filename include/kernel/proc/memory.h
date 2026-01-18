@@ -37,6 +37,11 @@
 #define SEG_FIXED		0x2000
 #define SEG_POPULATE		0x4000
 
+#define SEG_NOCACHE		0x10000
+
+#define SEG_SUPERVISOR		0x80000
+
+struct kvec;
 struct vfile;
 struct memory_region;
 struct memory_segment;
@@ -121,6 +126,10 @@ struct memory_map {
 #define MEMORY_OBJECT_FREE(object)		memory_region_free((object))
 #endif
 
+#if defined(CONFIG_MMU)
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag);
+#endif
+
 #if !defined(CONFIG_MMU)
 struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile *file);
 void memory_region_free(struct memory_region *region);
@@ -136,10 +145,7 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 
 int memory_map_resize(struct memory_segment *segment, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size);
-
 int memory_map_move_sbrk(struct memory_map *map, int diff);
-
-int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag);
 
 void memory_map_print_segments(struct memory_map *map);
 
