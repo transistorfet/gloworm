@@ -22,7 +22,7 @@
 #endif
 
 int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry);
-int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry);
+int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map *map, void **entry);
 
 int load_binary(const char *path, struct process *proc, struct string_array *argv, struct string_array *envp)
 {
@@ -50,7 +50,7 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 	if (!map)
 		return ENOMEM;
 
-	error = load_elf_binary(file, map, &entry);
+	error = load_elf_binary(proc, file, map, &entry);
 	// If the file was not a valid ELF binary, then execute it as a flat binary
 	if (error == ENOEXEC) {
 		error = vfs_seek(file, 0, SEEK_SET);
@@ -156,7 +156,7 @@ fail:
 
 #define PROG_HEADER_MAX	    6
 
-int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
+int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map *map, void **entry)
 {
 	short num_ph;
 	size_t mem_size;
@@ -275,6 +275,8 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, MEMORY_OBJECT_MAKE_REF(object), prog_headers[i].p_offset)) < 0) {
 				goto fail;
 			}
+
+
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
 			memory_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 

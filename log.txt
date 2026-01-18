@@ -2946,3 +2946,15 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   the iter would also be an extra step, decl, etc, which might be a bit cumbersome.  Maybe I can find a way to simplify that with
   preproc macros?
 
+
+2026-01-16:
+
+- I was trying to rewrite the generic usercopy/iovec/kvec stuff and tried running it after committing a bunch of work in progress,
+  in small bits, but now I can't get it to run.  Either it compiles to a bit over 62230 bytes and then doesn't load fully because
+  the kernel tries to boot (and fails), or it boots fine, but as soon as you press any key, it either hangs or just doesn't respond.
+  I'm not sure what's causing it
+- I did a clean and then reloaded it, and now I can enter a command, but it says "command not found"
+- fuuuck, stashing the changes to get to the latest commit seems to not work either =(  I've broken it somehow, and all the commits
+  are probably broken too
+
+

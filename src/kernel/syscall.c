@@ -371,9 +371,8 @@ int do_mount(const char __user *source, const char __user *target, struct mount_
 			return EINVAL;
 		}
 	}
-	// TODO what's this doing?  Can you remove it entirely
-	// this is setting the default filesystem type to minix, so you don't have to pass in the type
 	#if defined(CONFIG_MINIX_FS)
+	// Set the default file system if none was given
 	if (!fsptr) {
 		fsptr = &minix_mount_ops;
 	}

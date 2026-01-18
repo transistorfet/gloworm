@@ -4,6 +4,7 @@
 
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/usercopy.h>
 
 #include "data.h"
 
@@ -15,9 +16,17 @@ static inline size_t get_proc_size(struct process *proc);
 int get_data_cmdline(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
-	for (const char *const *arg = proc->map->argv; *arg; arg++) {
-		strncpy(&buffer[i], *arg, max - i);
-		i += strlen(*arg) + 1;
+	char *argstr;
+	for (const char *const *arg = proc->map->argv; ; arg++) {
+		argstr = (char *) get_user_uintptr(&arg);
+		if (!argstr) {
+			break;
+		}
+		int result = strncpy_from_user_map(proc->map, &buffer[i], argstr, max - i);
+		if (result < 0) {
+			return result;
+		}
+		i += result + 1;
 		buffer[i - 1] = ' ';
 		if (i > max) {
 			break;
@@ -30,10 +39,27 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 
 int get_data_stat(struct process *proc, char *buffer, int max)
 {
+	char *cmd;
+
+	#if defined(CONFIG_MMU)
+	int result;
+	uintptr_t arg;
+	char cmd_buffer[32];
+	result = memcpy_from_user_map(proc->map, &arg, &proc->map->argv[0], sizeof(uintptr_t));
+	if (result < 0)
+		return result;
+	result = strncpy_from_user_map(proc->map, cmd_buffer, (const char *) arg, 32);
+	if (result < 0)
+		return result;
+	cmd = cmd_buffer;
+	#else
+	cmd = proc->map->argv[0];
+	#endif
+
 	return snprintf(buffer, max,
 		"%d %s %c %d %d %d %d %ld %ld\n",
 		proc->pid,
-		proc->map->argv[0],
+		cmd,
 		get_proc_state(proc),
 		proc->parent,
 		proc->pgid,

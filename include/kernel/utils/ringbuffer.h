@@ -199,13 +199,15 @@ static inline short _buf_put_iter(struct ringbuffer *cb, struct iovec_iter *iter
 	memcpy_out_of_iter(iter, (char *) &cb->buffer[cb->in], chunk1);
 
 	cb->in += chunk1;
-	if (cb->in >= cb->max)
+	if (cb->in >= cb->max) {
 		cb->in = 0;
+	}
 
 	// If we've read the full size, or the buffer is empty, then return early
 	size -= chunk1;
-	if (size <= 0 || cb->in + 1 == cb->out || cb->in + 1 == cb->max)
+	if (size <= 0 || cb->in + 1 == cb->out || cb->in + 1 == cb->max) {
 		return chunk1;
+	}
 
 	// Calculate the maximum writable second chunk, from the bottom of the buffer to
 	// the out pointer, or the remaining size if there's more data available than requested
