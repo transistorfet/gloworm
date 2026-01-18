@@ -34,7 +34,7 @@ void init_scheduler()
 	_queue_init(&run_queue);
 	_queue_init(&blocked_queue);
 
-	idle_proc = create_idle_task();
+	idle_proc = create_idle_thread();
 	if (!idle_proc) {
 		panic("eternal slumber\n");
 	}

@@ -25,7 +25,8 @@
 struct process *primordial_process = NULL;
 
 int idle_task(void);
-void alloc_kernel_stack(struct process *proc, int (*task_start)(), const char *const argv[], const char *const envp[]);
+int alloc_kernel_stack(struct process *proc, int (*thread_start)(), const char *const argv[], const char *const envp[]);
+int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char **argv, const char **envp);
 
 /// Create the init process
 ///
@@ -37,11 +38,6 @@ struct process *create_init_task(void)
 {
 	int error = 0;
 	struct process *proc;
-	struct string_array argv_buffer, envp_buffer;
-	const char *argv[2] = { "init", NULL }, *envp[1] = { NULL };
-
-	string_array_copy(&argv_buffer, argv, FROM_KERNEL);
-	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
 
 	proc = new_proc(INIT_PID, SU_UID);
 	if (!proc)
@@ -60,24 +56,24 @@ struct process *create_init_task(void)
 
 	#if defined(CONFIG_SHELL_IN_KERNEL)
 
-	// Add a code segment for this process, which is the entire kernel
-	extern int __kernel_start, __kernel_end;
-	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE | SEG_FIXED, NULL, 0);
-	if (error < 0)
-		goto fail;
-
-	// Add the heap and stack segments
-	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) &__kernel_end, CONFIG_USER_STACK_SIZE);
-	if (error < 0)
-		goto fail;
+	const char *envp[1] = { NULL };
+	const char *argv[2] = { "init", NULL };
 
 	extern void init_task();
-	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_kernel_stack_with_args(proc, (char *) proc->map->stack_end, init_task, &argv_buffer, &envp_buffer);
+	error = launch_user_task_in_kernel(proc, init_task, argv, envp);
+	if (error)
+		goto fail;
 
 	#else
 
-	error = load_binary("/bin/init", proc, &argv_buffer, &envp_buffer);
+	const char *envp[1] = { NULL };
+	const char *argv[2] = { "/bin/init", NULL };
+	struct string_array argv_buffer, envp_buffer;
+
+	string_array_copy(&argv_buffer, argv, FROM_KERNEL);
+	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
+
+	error = load_binary(argv[0], proc, &argv_buffer, &envp_buffer);
 	if (error)
 		goto fail;
 
@@ -92,37 +88,61 @@ fail:
 	while (1) {}
 }
 
-/// Create the idle task
-///
-/// The idle task is the first task created, and also the primordial task that all other
-/// kernel threads and user processes are cloned from.`
-struct process *create_idle_task(void)
+#if defined(CONFIG_SHELL_IN_KERNEL)
+int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char **argv, const char **envp)
 {
-	int error = ENOMEM;
-	struct process *proc;
-	const char *argv[2] = { "idle", NULL }, *envp[1] = { NULL };
+	int error = 0;
+	struct string_array argv_buffer, envp_buffer;
 
-	proc = new_proc(0, SU_UID);
-	if (!proc)
-		goto fail;
-
-	proc->map = memory_map_alloc();
-	if (!proc->map)
-		goto fail;
-
-	proc->fd_table = alloc_fd_table();
-	if (!proc->fd_table)
-		goto fail;
+	string_array_copy(&argv_buffer, argv, FROM_KERNEL);
+	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
 
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
 	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE | SEG_FIXED, NULL, 0);
 	if (error < 0)
+		return error;
+
+	// Add the heap and stack segments
+	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) &__kernel_end, CONFIG_USER_STACK_SIZE);
+	if (error < 0)
+		return error;
+
+	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
+	exec_initialize_kernel_stack_with_args(proc, (char *) proc->map->stack_end, entry, &argv_buffer, &envp_buffer);
+}
+#endif
+
+/// Create the idle thread
+///
+/// The idle thread is the first task created, and also the primordial task that all other
+/// kernel threads and user processes are cloned from.`
+struct process *create_idle_thread(void)
+{
+	int error = ENOMEM;
+	struct process *proc;
+	const char *argv[2] = { "[idle]", NULL }, *envp[1] = { NULL };
+
+	if (primordial_process) {
+		panic("attempted to create a second primordial process\n");
+	}
+
+	proc = new_proc(0, SU_UID);
+	if (!proc)
 		goto fail;
 
-	alloc_kernel_stack(proc, idle_task, argv, envp);
+	extern struct memory_map *kernel_memory_map;
+	proc->map = kernel_memory_map;
+
+	proc->fd_table = alloc_fd_table();
+	if (!proc->fd_table)
+		goto fail;
 
 	primordial_process = proc;
+
+	error = alloc_kernel_stack(proc, idle_task, argv, envp);
+	if (error < 0)
+		goto fail;
 
 	return proc;
 
@@ -138,12 +158,11 @@ fail:
 /// A kernel thread uses the same address space and file table as the kernel
 /// but has its own stack and takes a starting address to execute.
 /// Currently the only kernel thread is the idle task.
-struct process *create_kernel_thread(const char *name, int (*task_start)())
+struct process *clone_kernel_thread(int (*thread_start)(), const char *const argv[], const char *const envp[])
 {
 	int error = ENOMEM;
 	struct process *proc;
 	struct clone_args args;
-	const char *argv[2] = { name, NULL }, *envp[1] = { NULL };
 
 	args.flags = CLONE_THREAD | CLONE_VM | CLONE_FS | CLONE_FILES;
 	args.entry = NULL;
@@ -154,7 +173,9 @@ struct process *create_kernel_thread(const char *name, int (*task_start)())
 	if (error < 0)
 		goto fail;
 
-	alloc_kernel_stack(proc, task_start, argv, envp);
+	error = alloc_kernel_stack(proc, thread_start, argv, envp);
+	if (error < 0)
+		goto fail;
 
 	return proc;
 
@@ -165,17 +186,23 @@ fail:
 	return NULL;
 }
 
-void alloc_kernel_stack(struct process *proc, int (*task_start)(), const char *const argv[], const char *const envp[])
+int alloc_kernel_stack(struct process *proc, int (*thread_start)(), const char *const argv[], const char *const envp[])
 {
 	char *stack;
-	struct string_array argv_buffer, envp_buffer;
 
-	string_array_copy(&argv_buffer, argv, FROM_KERNEL);
-	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
-
-	stack = kzalloc(PAGE_SIZE);
+	// Allocate a new stack, which doesn't have to be mapped, because the kernel map has all of memory mapped 1:1
+	stack = (char *) page_alloc_contiguous(PAGE_SIZE);
 	proc->map->sbrk = (uintptr_t) stack;
-	exec_initialize_kernel_stack_with_args(proc, (uintptr_t) stack + PAGE_SIZE, task_start, &argv_buffer, &envp_buffer);
+	proc->map->stack_end = (uintptr_t) stack + PAGE_SIZE;
+
+	struct string_array argv_array, envp_array;
+
+	string_array_copy(&argv_array, argv, FROM_KERNEL);
+	string_array_copy(&envp_array, envp, FROM_KERNEL);
+
+	exec_initialize_kernel_stack_with_args(proc, proc->map->stack_end, thread_start, &argv_array, &envp_array);
+
+	return 0;
 }
 
 int idle_task(void)

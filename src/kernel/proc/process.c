@@ -28,6 +28,10 @@ int init_proc()
 	for (short i = 0; i < PROCESS_MAX; i++) {
 		table[i].pid = 0;
 	}
+
+	extern struct process *primordial_process;
+	primordial_process = NULL;
+
 	return 0;
 }
 
