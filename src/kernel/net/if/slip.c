@@ -8,6 +8,7 @@
 #include <kernel/net/if.h>
 #include <kernel/net/packet.h>
 #include <kernel/net/protocol.h>
+#include <kernel/utils/iovec.h>
 
 
 #define SLIP_DEVICES		1

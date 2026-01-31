@@ -11,6 +11,7 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>
 #include <kernel/fs/bufcache.h>
+#include <kernel/utils/iovec.h>
 
 #include "minix.h"
 #include "bitmaps.h"

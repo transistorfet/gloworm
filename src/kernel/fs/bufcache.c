@@ -7,6 +7,7 @@
 #include <kernel/mm/kmalloc.h>
 #include <kernel/fs/bufcache.h>
 #include <kernel/utils/queue.h>
+#include <kernel/utils/iovec.h>
 
 
 #define BC_BLOCK_SIZE		1024

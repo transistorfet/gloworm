@@ -70,9 +70,10 @@ void mmu_table_free_inner(mmu_descriptor_t *table, uint8_t bits)
 			case MMU_DT_PAGE_DESCRIPTOR:
 				// TODO how do you know if it's a WINDOW or an actual page?
 				if (bits == PAGE_ADDR_BITS) {
-					page_free_single((page_t *) MMU_TABLE_ADDRESS(table[i]));
+					//printk("%x: %d\n", MMU_TABLE_ADDRESS(table[i]), page_get_ref_single(MMU_TABLE_ADDRESS(table[i])));
+					page_free_single(MMU_TABLE_ADDRESS(table[i]));
 				} else {
-					page_free_contiguous((page_t *) MMU_TABLE_ADDRESS(table[i]), 1 << bits);
+					page_free_contiguous(MMU_TABLE_ADDRESS(table[i]), 1 << bits);
 				}
 				break;
 			case MMU_DT_TABLE_SHORT:
@@ -83,7 +84,8 @@ void mmu_table_free_inner(mmu_descriptor_t *table, uint8_t bits)
 				break;
 		}
 	}
-	page_free_single((page_t *) table);
+	//printk("%x: %d\n", table, page_get_ref_single(table));
+	page_free_single((physical_address_t) table);
 }
 
 void mmu_table_free(mmu_descriptor_t *root_table)
@@ -129,7 +131,7 @@ static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virt
 				result->table = table;
 				return 0;
 			}
-		} else if (bits <= PAGE_ADDR_BITS || request_covers_whole_chunk) {
+		} else if (bits <= PAGE_ADDR_BITS || (request_covers_whole_chunk && !(flags & GET_TABLE_RETURN_ANY_SIZE))) {
 			result->table = table;
 			result->bits = bits;
 			return 0;
@@ -217,7 +219,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 			case MMU_FLAG_UNMAP: {
 				if (!(flags & MMU_FLAG_WINDOW)) {
 					// TODO this was causing the crashing problems, because a page was being freed and reused causing corruption (on a user stack I think)
-					page_free_single((page_t *) MMU_TABLE_ADDRESS(result.table[i]));
+					page_free_single(MMU_TABLE_ADDRESS(result.table[i]));
 					printk("problematic free page %x\n", MMU_TABLE_ADDRESS(result.table[i]));
 				}
 				physical_addr = 0;
@@ -313,9 +315,9 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		src_result.table[i] |= additional_status;
 		if (MMU_TABLE_ADDRESS(src_result.table[i]) != 0) {
 			if (src_result.bits == PAGE_ADDR_BITS) {
-				page_make_ref_single((page_t *) MMU_TABLE_ADDRESS(src_result.table[i]));
+				page_make_ref_single(MMU_TABLE_ADDRESS(src_result.table[i]));
 			} else {
-				page_make_ref_contiguous((page_t *) MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
+				page_make_ref_contiguous(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
 			}
 		}
 		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(dest_result.table[i]), MMU_TABLE_STATUS(dest_result.table[i]), dest_result.table, i);
@@ -328,13 +330,14 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 	return 0;
 }
 
-page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
+physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, int allow_large_page)
 {
 	int error;
 	uint32_t entry;
 	struct get_table_result result;
 
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
+	//GET_TABLE_RETURN_ANY_SIZE
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, allow_large_page ? GET_TABLE_RETURN_ANY_SIZE : 0, &result);
 	if (error < 0) {
 		return NULL;
 	}
@@ -342,9 +345,9 @@ page_t *mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
 	entry = MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
 	if (entry && result.bits != PAGE_ADDR_BITS) {
 		// Early termination entry, so calculate the offset into the chunk
-		return (page_t *) (entry + (virtual_addr & ((1 << result.bits) - 1) & ~(PAGE_SIZE - 1)));
+		return entry + (virtual_addr & ((1 << result.bits) - 1) & ~(PAGE_SIZE - 1));
 	} else {
-		return (page_t *) entry;
+		return entry;
 	}
 }
 
@@ -394,9 +397,9 @@ int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virt
 
 		return !(mmu_sr & 0xEC00);
 	} else {
-		page_t *page;
+		physical_address_t page;
 
-		page = mmu_table_get_page(root_table, virtual_addr & ~(PAGE_SIZE - 1));
+		page = mmu_table_get_page(root_table, virtual_addr & ~(PAGE_SIZE - 1), 1);
 		return page != NULL;
 	}
 }

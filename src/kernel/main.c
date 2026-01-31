@@ -150,7 +150,6 @@ int main()
 	init_time();
 	init_timer_list();
 	init_interrupts();
-	init_syscall();
 	init_proc();
 	init_scheduler();
 

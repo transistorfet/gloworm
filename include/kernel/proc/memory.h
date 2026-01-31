@@ -47,7 +47,7 @@ struct memory_region;
 struct memory_segment;
 
 struct memory_ops {
-	page_t *(*load_page_at)(struct memory_segment *segment, virtual_address_t vaddr);
+	physical_address_t (*load_page_at)(struct memory_segment *segment, virtual_address_t vaddr);
 };
 
 #if !defined(CONFIG_MMU)

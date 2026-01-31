@@ -7,6 +7,7 @@
 #include <kernel/net/socket.h>
 #include <kernel/net/protocol.h>
 #include <kernel/utils/queue.h>
+#include <kernel/utils/iovec.h>
 
 #define PROTOCOLS_MAX		4
 

@@ -71,7 +71,7 @@ int init_page_block(struct page_block *block, void *addr, int size)
 /// It doesn't record the length of the allocation, so when freeing pages, the
 /// allocating code must keep track of the size and deallocate each page
 /// separately
-page_t *page_block_alloc_contiguous(struct page_block *block, size_t size)
+physical_address_t page_block_alloc_contiguous(struct page_block *block, size_t size)
 {
 	int contiguous_pages = size >> PAGE_ADDR_BITS;
 	uint32_t bit, start_bit, end_bit;
@@ -107,7 +107,7 @@ page_t *page_block_alloc_contiguous(struct page_block *block, size_t size)
 				bitmap[BIT_INDEX(bit)] |= BIT_MASK(bit);
 			}
 
-			return &block->base[start_bit];
+			return (physical_address_t) &block->base[start_bit];
 		}
 	}
 
@@ -116,7 +116,7 @@ page_t *page_block_alloc_contiguous(struct page_block *block, size_t size)
 //#endif
 
 /// Allocate a single page and return a pointer, or NULL if out of memory
-page_t *page_block_alloc_single(struct page_block *block)
+physical_address_t page_block_alloc_single(struct page_block *block)
 {
 	uint32_t bit;
 	bitmap_t *bitmap = block->bitmap;
@@ -132,14 +132,14 @@ page_t *page_block_alloc_single(struct page_block *block)
 			#if defined(CONFIG_MMU)
 			block->page_descriptors[bit].refcount = 1;
 			#endif
-			return &block->base[bit];
+			return (physical_address_t) &block->base[bit];
 		}
 	}
 	return NULL;
 }
 
 /// Free a single page of memory, given the address of the page (as returned by alloc)
-void page_block_free_single(struct page_block *block, page_t *ptr)
+void page_block_free_single(struct page_block *block, physical_address_t ptr)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
@@ -154,7 +154,7 @@ void page_block_free_single(struct page_block *block, page_t *ptr)
 	block->bitmap[index] &= ~(BIT_MASK(page_number));
 }
 
-void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t size)
+void page_block_free_contiguous(struct page_block *block, physical_address_t ptr, size_t size)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
@@ -172,7 +172,7 @@ void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t si
 }
 
 #if defined(CONFIG_MMU)
-page_t *page_block_make_ref_single(struct page_block *block, page_t *ptr)
+physical_address_t page_block_make_ref_single(struct page_block *block, physical_address_t ptr)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
@@ -180,7 +180,7 @@ page_t *page_block_make_ref_single(struct page_block *block, page_t *ptr)
 	return ptr;
 }
 
-page_t *page_block_make_ref_contiguous(struct page_block *block, page_t *ptr, size_t size)
+physical_address_t page_block_make_ref_contiguous(struct page_block *block, physical_address_t ptr, size_t size)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
@@ -188,6 +188,13 @@ page_t *page_block_make_ref_contiguous(struct page_block *block, page_t *ptr, si
 		block->page_descriptors[page_number].refcount++;
 	}
 	return ptr;
+}
+
+int page_block_get_ref_single(struct page_block *block, physical_address_t ptr)
+{
+	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
+
+	return block->page_descriptors[page_number].refcount;
 }
 #endif
 

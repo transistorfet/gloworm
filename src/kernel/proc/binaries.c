@@ -73,16 +73,6 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 	proc->map = map;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	#if defined(CONFIG_MMU)
-	// TODO I want to remove this, but right now it causes a fault because current_proc is not set, and with the
-	// stack unpopulated, it will not be able to know it should create a new page
-	// a nofault mode might help here
-	page_t *page = mmu_table_get_page(map->root_table, map->stack_end - PAGE_SIZE);
-	if (!page) {
-		page = page_alloc_single();
-		mmu_table_set_page(map->root_table, map->stack_end - PAGE_SIZE, (uintptr_t) page, MMU_FLAG_WRITE);
-	}
-	#endif
 	exec_initialize_user_stack_with_args(proc, map->stack_end, entry, argv, envp);
 
 	return error;

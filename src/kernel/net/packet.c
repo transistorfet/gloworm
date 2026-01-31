@@ -6,6 +6,7 @@
 #include <kernel/net/if.h>
 #include <kernel/net/packet.h>
 #include <kernel/utils/queue.h>
+#include <kernel/utils/iovec.h>
 
 
 struct packet *packet_alloc(struct if_device *ifdev, struct protocol *proto, size_t capacity)

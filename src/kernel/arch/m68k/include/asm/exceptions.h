@@ -3,6 +3,8 @@
 #define _ASM_M68K_EXCEPTIONS_H
 
 #include <stdint.h>
+#include <stddef.h>
+#include <kernel/printk.h>
 
 #define SSW_FAULT_STAGE_C	0x8000
 #define SSW_FAULT_STAGE_B	0x4000
@@ -60,6 +62,33 @@ struct exception_frame {
 	};
 	#endif
 };
+
+static inline size_t exception_frame_size(struct exception_frame *frame)
+{
+	size_t size = 0;
+
+	switch (frame->format) {
+		case 0x1:
+			break;
+		case 0x2:
+			size += sizeof(frame->format2);
+			break;
+		case 0x9:
+			size += sizeof(frame->format9);
+			break;
+		case 0xa:
+			size += sizeof(frame->formata);
+			break;
+		case 0xb:
+			size += sizeof(frame->formatb);
+			break;
+		default:
+			log_error("unrecognized exception format: %x\n", frame->format);
+			break;
+	}
+
+	return size + 8;
+}
 
 #endif
 

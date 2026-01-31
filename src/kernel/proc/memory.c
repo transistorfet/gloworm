@@ -62,10 +62,10 @@ void memory_region_free(struct memory_region *region)
 
 
 #if defined(CONFIG_MMU)
-page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
 {
 	int error;
-	page_t *page;
+	physical_address_t page;
 	offset_t file_offset;
 	struct iovec_iter iter;
 
@@ -73,7 +73,7 @@ page_t *file_memory_ops_load_page_at(struct memory_segment *segment, virtual_add
 	if (!page) {
 		return NULL;
 	}
-	memset(page, 0, PAGE_SIZE);
+	zero_page(page);
 
 	file_offset = rounddown(vaddr - segment->start, PAGE_SIZE) + rounddown(segment->offset, PAGE_SIZE);
 	//printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
@@ -99,9 +99,9 @@ struct memory_ops file_memory_ops = {
 };
 
 
-page_t *anonymous_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
 {
-	page_t *page;
+	physical_address_t page;
 
 	page = page_alloc_single();
 	if (!page) {
@@ -115,16 +115,16 @@ struct memory_ops anonymous_memory_ops = {
 	.load_page_at	= anonymous_memory_ops_load_page_at,
 };
 
-static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtual_address_t page_address, page_t *existing_page)
+static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtual_address_t page_address, physical_address_t existing_page)
 {
 	int error;
-	page_t *page_copy;
+	physical_address_t page_copy;
 
 	page_copy = page_alloc_single();
 	if (!page_copy) {
 		return ENOMEM;
 	}
-	memcpy(page_copy, existing_page, PAGE_SIZE);
+	memcpy((void *) page_copy, (void *) existing_page, PAGE_SIZE);
 
 	//log_debug("copying page for %x (originally %x) to %x\n", page_address, existing_page, page_copy);
 	error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) page_copy, MMU_FLAG_WRITE);
@@ -132,7 +132,7 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtu
 		return error;
 	}
 
-	page_free_single(existing_page);
+	page_free_single((physical_address_t) existing_page);
 	return 0;
 }
 
@@ -141,7 +141,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 {
 	int error;
 	uintptr_t page_address;
-	page_t *existing_page, *new_page;
+	physical_address_t existing_page, new_page;
 	struct memory_segment *segment;
 
 	segment = memory_map_find(map, vaddr);
@@ -151,7 +151,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 
 	if (segment->ops && segment->ops->load_page_at) {
 		page_address = rounddown(vaddr, PAGE_SIZE);
-		existing_page = mmu_table_get_page(map->root_table, page_address);
+		existing_page = mmu_table_get_page(map->root_table, page_address, 0);
 		if (existing_page) {
 			if (write_error && (segment->flags & SEG_WRITE)) {
 				return memory_map_convert_copy_on_write(map, page_address, existing_page);
@@ -172,7 +172,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
 			if (error < 0) {
 				log_error("error setting newly loaded page: %d\n", error);
-				page_free_single((page_t *) new_page);
+				page_free_single((physical_address_t) new_page);
 				return error;
 			}
 		}

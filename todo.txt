@@ -1,4 +1,10 @@
 
+- try with 4k pages, that failed during init last time I tried it
+
+- fix issue with setting user stack to more than 16k, where it allocates an early termination page/large page, and then can't be converted with
+  copy-on write.  Either make it possible to copy on write large pages (and load large pages) or else force them to be small pages again
+
+- why is `printk` and `printk_direct` backwards in meaning, with the direct version using the buffered putchar and vice versa
 - the main areas to fix re: fetching pages for copying, are the exec calls, and the context.c stack manipulation
 
 - should you actually have an iter mode specifically for other user processes besides the current one, that always uses the no-fault method of

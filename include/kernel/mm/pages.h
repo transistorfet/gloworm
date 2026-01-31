@@ -6,6 +6,7 @@
 #include <string.h>
 #include <kconfig.h>
 #include <kernel/utils/queue.h>
+#include <asm/addresses.h>
 
 #if defined(CONFIG_PAGE_SIZE_256)
 #define PAGE_ADDR_BITS	8
@@ -70,18 +71,19 @@ struct page_block {
 
 int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size, struct page_descriptor *descriptors);
 int init_page_block(struct page_block *block, void *addr, int size);
-page_t *page_block_alloc_contiguous(struct page_block *block, size_t size);
-page_t *page_block_alloc_single(struct page_block *block);
-void page_block_free_single(struct page_block *block, page_t *ptr);
-void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t size);
+physical_address_t page_block_alloc_contiguous(struct page_block *block, size_t size);
+physical_address_t page_block_alloc_single(struct page_block *block);
+void page_block_free_single(struct page_block *block, physical_address_t ptr);
+void page_block_free_contiguous(struct page_block *block, physical_address_t ptr, size_t size);
 #if defined(CONFIG_MMU)
-page_t *page_block_make_ref_single(struct page_block *block, page_t *ptr);
-page_t *page_block_make_ref_contiguous(struct page_block *block, page_t *ptr, size_t size);
+physical_address_t page_block_make_ref_single(struct page_block *block, physical_address_t ptr);
+physical_address_t page_block_make_ref_contiguous(struct page_block *block, physical_address_t ptr, size_t size);
+int page_block_get_ref_single(struct page_block *block, physical_address_t ptr);
 #endif
 
-static inline void zero_page(page_t *ptr)
+static inline void zero_page(physical_address_t ptr)
 {
-	memset(ptr, 0, PAGE_SIZE);
+	memset((void *) ptr, 0, PAGE_SIZE);
 }
 
 extern struct page_block pages;
@@ -93,6 +95,7 @@ extern struct page_block pages;
 #if defined(CONFIG_MMU)
 #define page_make_ref_single(page)				page_block_make_ref_single(&pages, page)
 #define page_make_ref_contiguous(page, size)			page_block_make_ref_contiguous(&pages, page, size)
+#define page_get_ref_single(page)				page_block_get_ref_single(&pages, page)
 #endif
 
 #endif

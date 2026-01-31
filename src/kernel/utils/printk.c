@@ -4,6 +4,9 @@
 #include <asm/irqs.h>
 #include <kernel/printk.h>
 
+#define DIRECT		0
+#define BUFFERED	1
+
 
 #define PRINTK_BUFFER	512
 
@@ -32,7 +35,7 @@ int printk_direct(const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	ret = vprintk(1, fmt, args);
+	ret = vprintk(DIRECT, fmt, args);
 	va_end(args);
 
 	return ret;
@@ -44,7 +47,8 @@ int printk(const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	ret = vprintk(0, fmt, args);
+	// TODO this has been set to direct because otherwise the buffer fills up, and everything slows to a crawl
+	ret = vprintk(DIRECT, fmt, args);
 	va_end(args);
 
 	return ret;

@@ -33,13 +33,6 @@
 
 #include <asm/syscall_table.h>
 
-extern void enter_syscall(void);
-
-void init_syscall(void)
-{
-	arch_set_irq_handler(IRQ_TRAP1, enter_syscall);
-}
-
 extern struct process *current_proc;
 extern struct syscall_record *current_syscall;
 

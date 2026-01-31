@@ -22,14 +22,12 @@
 
 #define INTERRUPT_MAX		128
 
-typedef void (*m68k_irq_handler_t)();
-
 extern void enter_exception(void);
 
 void enter_trace(struct exception_frame frame);
 static void page_fault_handler(struct exception_frame *frame);
 
-static m68k_irq_handler_t vector_table[INTERRUPT_MAX];
+static bare_irq_handler_t vector_table[INTERRUPT_MAX];
 
 void arch_init_irqs(void)
 {
@@ -62,14 +60,14 @@ void arch_init_irqs(void)
 		vector_table[i] = enter_irq;
 	}
 
-	vector_table[IRQ_TRACE] = (m68k_irq_handler_t) enter_trace;
+	vector_table[IRQ_TRACE] = (bare_irq_handler_t) enter_trace;
 
 	// Load the VBR register with the address of our vector table
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
 }
 
 // TODO actually this isn't needed...
-void arch_set_irq_handler(irq_num_t irq, m68k_irq_handler_t handler)
+void arch_set_irq_handler(irq_num_t irq, bare_irq_handler_t handler)
 {
 	vector_table[(short) irq] = handler;
 }
@@ -98,22 +96,33 @@ void user_error(struct exception_frame *frame)
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
+	mmu_table_print(current_proc->map->root_table);
 
 	#if defined(CONFIG_MMU)
 
-	char *stack = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame & ~(PAGE_SIZE - 1));
-	stack += (uintptr_t) frame & (PAGE_SIZE - 1);
-	printk("Stack: %x (phys: %x)\n", frame, stack);
-	printk_dump((uint16_t *) stack, 128);
+	// After an exception, the `frame` is always pointing to the global kernel stack
+	printk("Exception Frame: %x\n", frame);
+	printk_dump((uint16_t *) frame, 128);
 
-	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1));
+	// The kernel stack is available through the process struct's task info
+	char *ksp = arch_get_kernel_stackp(current_proc);
+	printk("Process Kernel Stack (Context): %x\n", ksp);
+	printk_dump((uint16_t *) ksp, 128);
+
+	char *usp = arch_get_user_stackp(current_proc);
+	if (usp) {
+		printk("User Kernel Stack: %x\n", usp);
+		printk_dump((uint16_t *) usp, 128);
+	}
+
+	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1), 1);
 	code += (uintptr_t) frame->pc & (PAGE_SIZE - 1);
 	printk("\nCode: %x (phys: %x)\n", frame->pc, code);
 	printk_dump((uint16_t *) code, 48);
 
 	#else
 
-	print_stack(frame, frame->pc);
+	print_stack(frame, (void *) frame->pc);
 
 	#endif
 
@@ -192,10 +201,7 @@ static void page_fault_handler(struct exception_frame *frame)
 				: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw & 0x7)
 			);
 		}
-		log_error("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
-		//log_info("mmu sr: %x\n", mmu_sr);
-		//log_info("pc: %x\n", frame->pc);
-		//log_info("ssw: %x\n", ssw);
+		log_info("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
 
 		if (ff && df) {
 			log_error("the infamous ff+df cycle fault\n");
@@ -203,7 +209,7 @@ static void page_fault_handler(struct exception_frame *frame)
 			// An instruction fault has occurred, and if there's already a page mapped to that address,
 			// it will be returned when we RTE.  It's being recorded in a Program Space function codes, and
 			// was previously only recorded in the Data Space function codes
-			page_t *existing_page = mmu_table_get_page(current_proc->map->root_table, fault_addr & ~(PAGE_SIZE - 1));
+			physical_address_t existing_page = mmu_table_get_page(current_proc->map->root_table, fault_addr & ~(PAGE_SIZE - 1), 0);
 			if (existing_page) {
 				return;
 			}
@@ -240,7 +246,8 @@ static void page_fault_handler(struct exception_frame *frame)
 	}
 
 fail:
-	log_error("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
+	log_error("fatal bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
+	memory_map_print_segments(current_proc->map);
 	#endif
 
 	user_error(frame);

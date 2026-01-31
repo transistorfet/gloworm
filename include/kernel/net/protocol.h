@@ -9,7 +9,6 @@
 
 #include <kernel/net/if.h>
 #include <kernel/net/packet.h>
-#include <kernel/utils/iovec.h>
 
 
 #define PACKET_DELIVERED	1
@@ -19,6 +18,7 @@
 struct socket;
 struct protocol;
 struct endpoint;
+struct iovec_iter;
 
 struct protocol_ops {
 	int (*init)();

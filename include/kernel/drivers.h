@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <sys/types.h>
 
-#include <kernel/utils/iovec.h>
+struct iovec_iter;
 
 #define DEVMAJOR_TTY68681	1
 #define DEVMAJOR_TTY		2

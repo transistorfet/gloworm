@@ -86,7 +86,7 @@ int arch_release_task_info(struct process *proc)
 	#if defined(CONFIG_M68K_USER_MODE)
 
 	if (proc->task_info.kernel_stack_start) {
-		page_free_contiguous((page_t *) proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
+		page_free_contiguous((physical_address_t) proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 	}
 
 	#endif
@@ -183,7 +183,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 	// Get the user stack pointer's physical address
 	usp = arch_get_user_stackp(proc);
 	#if defined(CONFIG_MMU)
-	phys_usp = (char *) mmu_table_get_page(proc->map->root_table, ((uintptr_t) usp) & ~(PAGE_SIZE - 1));
+	phys_usp = (char *) mmu_table_get_page(proc->map->root_table, ((uintptr_t) usp) & ~(PAGE_SIZE - 1), 1);
 	phys_usp += (((uintptr_t) usp) & (PAGE_SIZE - 1));
 	#else
 	phys_usp = usp;

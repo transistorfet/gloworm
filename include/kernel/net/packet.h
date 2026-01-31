@@ -3,7 +3,7 @@
 #define _KERNEL_NET_PACKET_H
 
 #include <stdint.h>
-#include <kernel/utils/iovec.h>
+#include <stddef.h>
 #include <kernel/utils/queue.h>
 
 #define PACKET_CUSTOM_DATA	32
@@ -11,6 +11,7 @@
 struct socket;
 struct protocol;
 struct if_device;
+struct iovec_iter;
 
 struct packet {
 	struct queue_node node;

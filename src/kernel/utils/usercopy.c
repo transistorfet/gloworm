@@ -18,7 +18,7 @@ static int fetch_page(struct memory_map *map, virtual_address_t page_virt_addr, 
 	int error;
 	char *page;
 
-	page = (char *) mmu_table_get_page(map->root_table, page_virt_addr);
+	page = (char *) mmu_table_get_page(map->root_table, page_virt_addr, 0);
 	if (!page) {
 		// TODO this doesn't return the page.  I can look it up after and fault a second
 		// time, but this just seems a bit messy now.  Should I make load page optionally
@@ -34,7 +34,7 @@ static int fetch_page(struct memory_map *map, virtual_address_t page_virt_addr, 
 			return error;
 		}
 
-		page = (char *) mmu_table_get_page(map->root_table, page_virt_addr);
+		page = (char *) mmu_table_get_page(map->root_table, page_virt_addr, 0);
 		if (!page) {
 			return ENOENT;
 		}
