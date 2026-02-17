@@ -35,7 +35,10 @@ struct iovec_iter {
 	size_t offset;
 	size_t length;
 
-	union {
+	// TODO remove one of these to fix the serial fault
+	int csegs;
+	int nsegs;
+
 		/// A buffer in user memory, with length `nbytes`
 		struct {
 			char __user *buf;
@@ -53,7 +56,6 @@ struct iovec_iter {
 			struct iovec *segs;
 			int nsegs;
 		} iovec;
-	};
 };
 
 

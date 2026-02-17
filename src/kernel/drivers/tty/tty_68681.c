@@ -87,6 +87,7 @@ void tty_68681_reset_leds(uint8_t bits);
 #define CMD_RESET_RX			0x20
 #define CMD_RESET_TX			0x30
 #define CMD_RESET_ERROR			0x40
+#define CMD_RESET_BREAK			0x50
 #define CMD_ENABLE_TX_RX		0x05
 #define CMD_ENABLE_RX			0x01
 #define CMD_DISABLE_RX			0x02
@@ -148,6 +149,7 @@ struct channel_ports {
 	volatile uint8_t *send;
 	volatile uint8_t *recv;
 	char ctsbit;
+	//char padding[3];
 };
 
 const struct channel_ports channel_a_ports = {
@@ -199,14 +201,13 @@ static inline void config_serial_channel(struct serial_channel *channel)
 	NOP();
 	*channel->ports->command = CMD_RESET_TX;
 	NOP();
+	*channel->ports->command = CMD_RESET_RX;
+	NOP();
 
 	// Configure serial port
 	*channel->ports->port_config = MR1A_MODE_A_REG_1_CONFIG;
 	*channel->ports->port_config = MR2A_MODE_A_REG_2_CONFIG;
 	*channel->ports->clock_config = CSRA_CLK_SELECT_REG_A_CONFIG;
-
-	// Enable the serial port
-	*channel->ports->command = CMD_ENABLE_TX_RX;
 }
 
 static inline int tty_68681_getchar_buffered(struct serial_channel *channel)
@@ -217,7 +218,6 @@ static inline int tty_68681_getchar_buffered(struct serial_channel *channel)
 	// TODO maybe this should return some kind of error, like -1
 	while (_buf_is_empty(&channel->rx)) {
 		asm volatile("");
-		//tty_68681_putchar_buffered('^');
 	}
 	unsigned char ch = _buf_get_char(&channel->rx);
 
@@ -273,7 +273,6 @@ static void tty_68681_process_input(void *_unused)
 			channels[i].rx_ready = 0;
 			resume_blocked_procs(VFS_POLL_READ, NULL, DEVNUM(DEVMAJOR_TTY68681, i));
 
-			//request_bh_run(BH_TTY);
 			request_bh_run(channels[i].bh_num);
 
 			// TODO this isn't needed now, since the assert in getchar handles this, but once we have the tty subsystem this might be needed
@@ -293,26 +292,47 @@ static void tty_68681_process_input(void *_unused)
 
 static inline void handle_channel_io(register char isr, register devminor_t minor)
 {
+	uint8_t byte;
+	int count = 0;
+
 	// The ISR bits for channel A and B are the same but separated by 4 bits in the same register
 	if (minor == CH_B)
 		isr >>= 4;
 
 	if (isr & ISR_S_RX_READY_FULL) {
-		register volatile uint8_t status;
-		while (1) {
+		uint8_t status;
+		for (count = 0; count < 100; count++) {
 			status = *channels[minor].ports->status;
 			if (!(status & SR_RX_READY))
 				break;
-			if (status & (SR_FRAMING_ERROR | SR_PARITY_ERROR | SR_OVERRUN_ERROR))
+			if (status & (SR_RECEIVED_BREAK | SR_FRAMING_ERROR | SR_PARITY_ERROR | SR_OVERRUN_ERROR)) {
 				channels[minor].error = 1;
+				*channels[minor].ports->command = CMD_RESET_ERROR;
+				if (status & SR_RECEIVED_BREAK) {
+					*channels[minor].ports->command = CMD_RESET_BREAK;
+				}
+				byte = *channels[minor].ports->recv;
+			} else {
+				// TODO this is kinda bad, but I want to see if the buf full condition is a problem
+				byte = *channels[minor].ports->recv;
 
-			if (_buf_is_full(&channels[minor].rx))
-				break;
-			_buf_put_char(&channels[minor].rx, *channels[minor].ports->recv);
+				if (_buf_is_full(&channels[minor].rx)) {
+					*OUT_SET_ADDR = 0x10;
+					break;
+				}
+				_buf_put_char(&channels[minor].rx, byte);
+			}
 		}
 
-		if (_buf_free_space(&channels[minor].rx) < 10)
+		if (count >= 100) {
+			*OUT_SET_ADDR = 0x20;
+			//printk("failed reading\n");
+		}
+
+		if (_buf_free_space(&channels[minor].rx) < 10) {
+			*OUT_SET_ADDR = 0x40;
 			DEASSERT_CTS(&channels[minor]);
+		}
 
 		channels[minor].rx_ready = 1;
 		request_bh_run(BH_TTY68681);
@@ -440,6 +460,27 @@ void tty_68681_tx_safe_mode()
 
 void tty_68681_normal_mode()
 {
+	// Reset everything
+	*CRA_WR_ADDR = CMD_RESET_TX;
+	NOP();
+	*CRA_WR_ADDR = CMD_RESET_RX;
+	NOP();
+	*CRA_WR_ADDR = CMD_RESET_ERROR;
+	NOP();
+	*CRA_WR_ADDR = CMD_RESET_BREAK;
+	NOP();
+
+	*CRB_WR_ADDR = CMD_RESET_TX;
+	NOP();
+	*CRB_WR_ADDR = CMD_RESET_RX;
+	NOP();
+	*CRB_WR_ADDR = CMD_RESET_ERROR;
+	NOP();
+	*CRB_WR_ADDR = CMD_RESET_BREAK;
+	NOP();
+
+	inline_delay(20);
+
 	// Configure baud rate set and clock source
 	*ACR_WR_ADDR = ACR_AUX_CONTROL_REG_CONFIG;
 
@@ -467,6 +508,7 @@ void tty_68681_normal_mode()
 	// This slight delay prevents garbled output being sent during the welcome message
 	inline_delay(10);
 
+	*CRA_WR_ADDR = CMD_ENABLE_RX;
 	ASSERT_CTS(&channels[CH_A]);
 	ASSERT_CTS(&channels[CH_B]);
 }

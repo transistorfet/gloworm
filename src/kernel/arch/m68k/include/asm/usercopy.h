@@ -22,12 +22,17 @@ extern struct process *current_proc;
 
 static inline uint8_t get_user_uint8(const void __user *src)
 {
-	uintptr_t result;
+	uint8_t result;
 
 	// TODO this is really a problem for performance to have this instruction before every byte copy
 	// can we make a "start iter operation" function which sets this up, and then the subsequent calls are single byte only?
 	asm volatile("movec.l	%0, %%sfc\n" : : "d" (M68K_FC_USER_DATA) :);
 
+        //asm volatile(
+        //      "moves.b        (%1), %%d0\n"
+        //      "move.b         %%d0, (%0)\n"
+        //      : : "a" (&result), "a" (src) : "d0"
+        //);
 	asm volatile(
 		"moves.b	(%1), %0\n"
 		: "=d" (result) : "a" (src) :
