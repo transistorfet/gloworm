@@ -1,22 +1,24 @@
 
-- try with 4k pages, that failed during init last time I tried it
+* when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
+  when registering the driver, or it should be conditionally called in dev_write()
+* try with 4k pages, that failed during init last time I tried it
 
-- fix issue with setting user stack to more than 16k, where it allocates an early termination page/large page, and then can't be converted with
+* fix issue with setting user stack to more than 16k, where it allocates an early termination page/large page, and then can't be converted with
   copy-on write.  Either make it possible to copy on write large pages (and load large pages) or else force them to be small pages again
 
-- why is `printk` and `printk_direct` backwards in meaning, with the direct version using the buffered putchar and vice versa
-- the main areas to fix re: fetching pages for copying, are the exec calls, and the context.c stack manipulation
+* why is `printk` and `printk_direct` backwards in meaning, with the direct version using the buffered putchar and vice versa
+* the main areas to fix re: fetching pages for copying, are the exec calls, and the context.c stack manipulation
 
-- should you actually have an iter mode specifically for other user processes besides the current one, that always uses the no-fault method of
+* should you actually have an iter mode specifically for other user processes besides the current one, that always uses the no-fault method of
   reading data from pages, and also make usercopy functions specifically for that case, so when you actually want to force it to use the manual
   method, you can.  The thinking here is that sometimes you might know that the current process's state is invalid, and even though
   proc->map === current_proc->map, the MMU register is not set, or you cannot service an exception or something???
-- should you add a mode to iter to copy to a specific user process's memory, now that you have functions that can do that? or should always use
+* should you add a mode to iter to copy to a specific user process's memory, now that you have functions that can do that? or should always use
   the user_map functions when selecting the user_buf option?
-- make everything that uses iters check for errors
-- make everything that uses usercopy functions check for errors
+* make everything that uses iters check for errors
+* make everything that uses usercopy functions check for errors
 
-- figure out what's causing ps to not print cmds, likely some kind of corruption (caused by a subtle bug introduced by the recent MMU changes)
+* figure out what's causing ps to not print cmds, likely some kind of corruption (caused by a subtle bug introduced by the recent MMU changes)
 
 * make it so that it's easy to run just one test
 * the ringbuffer implementation has an off by one error I think (or it has no way to avoid one, which would suck)

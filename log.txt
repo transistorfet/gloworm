@@ -3690,3 +3690,821 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - size and alignment don't seem to have an effect, but maybe the placement of data within a section does?  Could it be reading code
   as if it were data, because it has a wrong address somewhere?
 
+- I tried going back to the commit where I got demand paging working, and specifically moving the num_segs field inside iovec, which
+  is inside iovec_iter, plus the cur_segs field was the minimal change to get the input to hang.  I couldn't go farther back without
+  a conflict with iovec.h
+
+- I tried the previous commit, which required saving strarray.h/.c which wasn't in the history of the earlier commits, but that one
+  change to iovec was enough to cause the problem!!
+- commit 45175277d03e60a77baee3e52f4a150b3bafbd6a is not running, the init process crashes on boot
+- commit b26bea29b3a37b5bad426eb88adaa2522ffafe7a has the problem with that change
+
+- ok, so removing the union in the iovec_iter still fails with cur_segs in the struct, but works with cur_segs removed.  This is
+  with an additional nsegs in iovec for padding, in all cases
+- it's not even related to the size of the iter struct, because the unionified version is bigger, but still works or doesn't work
+  based on one field
+- this is bullshit
+
+
+2026-01-31:
+
+- looking through the git logs to see if I can find mention of this tty bug in the past, but I can't find anything related to "tty"
+  or "serial" or "uart", but I'm certain I've had a case somewhere in the past where I've seen the status byte be incorrect for some
+  reason, and I'm *pretty* sure it wasn't hardware related
+- I should put the scope on the serial port just to confirm that, but it will take a bit to set up
+- I'd like to also try printing addresses, since my best hunch at the moment is that there's an improper deref or address somewhere
+  that's looking at the kernel code segment, which is causing this somehow.  I have no idea how that would relate to the tty status
+  byte being incorrect, but I don't have much else to go on atm
+
+- I added print statements to get/put uint8/uintptr, and it's not printing any addresses outside of the 20xxxx range, but it's also
+  working now instead of breaking, so those additional prints are enough to throw off whatever's causing the bug
+- it seems that any print statements in those 4 functions causes it to work instead of break
+- this kind of makes sense though, if these functions are not *causing* the problem, but instead are making some data be present
+  at a certain address which then causes the actual bug to read a different value?
+- hmm... a print statement in the copy_uint8_out_of_iter() function that prints the address does *not* make it work.  It's still
+  failing (currently, it's not inputting anything).  None of the addresses printed are suspicious, but again, the problem might not
+  be caused here.  I would kind of expect that the same print in get_user_uint8 would not cause the problem
+- a single simple print in get_user_uint8 does still cause the problem
+- hmm... putting more than just the address in the print, making the format string "get_uint8: %x\n" makes the problem go away...
+  but that should only change the data segment
+
+- I don't believe it...  And I'm not convinced it's the cause of the problem, but it's certainly suspicious...
+- I looked at the objdump of the rodata section, since it seemed like adding printk format data was breaking/fixing the code, and
+  there's not much in the rodata section.  It's mostly the serial/tty_68681 channel info structs.  The addresses looked right for
+  one channel, but the other channel didn't look right.  It's not aligned to 4 bytes, but to 2 bytes
+- the broken version has this:
+    ```
+    Contents of section .rodata:
+     10de3e 00000000 00000000 00000000 00000000  ................
+     10de4e 00000000 00000000 00000000 00000000  ................
+     10de5e 00700011 00700013 00700013 00700015  .p...p...p...p..
+     10de6e 00700017 00700017 02000070 00010070  .p...p.....p...p
+     10de7e 00030070 00030070 00050070 00070070  ...p...p...p...p
+     10de8e 00070100 52525344 5a                 ....RRSDZ
+    ```
+- I added a 3 char array to the end of the struct since there's a single byte field at the end which would otherwise need to be
+  aligned.  That shifted the addresses for channel B to be long word aligned
+    ```
+    Contents of section .rodata:
+     10de3e 00000000 00000000 00000000 00000000  ................
+     10de4e 00000000 00000000 00000000 00000000  ................
+     10de5e 00700011 00700013 00700013 00700015  .p...p...p...p..
+     10de6e 00700017 00700017 02000000 00700001  .p...p.......p..
+     10de7e 00700003 00700003 00700005 00700007  .p...p...p...p..
+     10de8e 00700007 01000000 52525344 5a        .p......RRSDZ
+    ```
+- I only now noticed that it's actually channel B that was correct, and channel A that was misaligned, which makes even more sense,
+  although I don't know why the compiler decided to put channel A second when it appears in the correct order in the source file...
+
+- that said, and like I said, I'm not convinced.  Adding a longer format string previously made the problem go away despite this
+  code coming before where the format string would appear
+
+- I added the extra format string in there, and the problem seems to be occurring, when it didn't before...
+- ok, so I removed the padding, and added in the format string, and then compiled, and it wasn't working... when it was previously
+  working like this.  I then did a make clean, and make again, and then that binary worked, problem is not occurring, and the tty
+  registers struct is word aligned instead of longword aligned, so I don't think it's related, but also, why did it require a
+  full recompile?
+- sometimes an incremental compile won't produce the same broken/fixed result
+- ok this is so bizzare, I have the code in a broken state, with a print in get_user_uint8 that only prints the address.  I compile
+  it, and it doesn't work.  I modify the print to print `get_uint8:` and then the address, and incrementally compile.  It still
+  doesn't work.  If I modify tty to have the padding, and incrementally recompile, then it works.  If I removed the padding and
+  incrementally recompile, then it still works (because the extra format string is there).  If I remove the extra format string, and
+  recompile (without padding), then it doesn't work again.
+- changing the format string recompiles a lot of files, but changing the tty doesn't recompile much, and it's the second one that
+  tends to cause the difference, even though the first one also includes the same files recompiled in the second one
+- but yeah, working vs not-working code has this serial struct aligned different, so it's not the common problem here
+- that makes sense too because with the tty-extra-iter-field-vs-not binaries, a working version vs broken version is identical in
+  size, but different in offsets only
+
+- ok, so I have the padding in, no printk statement in get_user_uint8, and it's working, and now I've removed the iovec_iter field
+  to see if it breaks again, and no, it's still working...  How can I break it again with the padding in the tty struct
+- I thought maybe putting that old two instruction code into get_user_uint8 would make it break, so I did that, and it actually is
+  using the uintptr_t value still in get_user_uint8, so that two instruction code is printing garbage instead of printing the
+  correct output, since user mode printing is going through that function
+- I wasn't able to get it to break input again though, even with the tty padding removed
+- what gives... I can't reproduce the problem anymore, with and of the old code...
+- a full clean and recompile has it broken again
+
+- I've added a new set of binaries to `investigations/tty-read-double/incremental-compile-vs-clean-compile`, where the only
+  difference is that the working version and the broken version had the same code, but the working version had a working
+  configuration that was compiled, and then modified to the broken configuration and only incrementally compiled, which still
+  produced a working binary.  And then I did a clean and full recompile, and then the broken image was produced, which has the
+  broken behaviour
+- the two binaries are actually wildly different, all throughout them
+- the differences start in the _kernel_start code, the entry point, where the addresses to the BSS section are different by 16
+  bytes, since they're supposed to be aligned to 16 bytes according to the linker script.  So some kind of data is different?
+- the `__bss_end` label and the `boot_args` labels are both at different addresses
+- the working version is 16 bytes further than the broken version (0x112418 for the working version 0x112408 for the broken one)
+- analyzing the .rodata/.rodata.str1.1/.data sections, dumped by objdump from the elf files, they are nearly identical, but all the
+  addresses are shifted by 16, so the code itself is a different size between the two versions, and the only data that's different
+  is the addresses at the end of the .data section, where they addresses (some of them) are 16 bytes further
+- the addresses are fairly sequential (not as a rule), and the first few are identical, with the first (and earliest) address that's
+  different between them being 0x106f5a, which is 0x106f4a in the broken one.  It occurs at data segment address 0x10ebd8.
+- so the code size is different after that point, which I'm pretty sure from memory is in the tty code
+- so that address 0x106f5a, corresponds to the tty_68681_init function.  The earliest point of identical addresses is <drumroll>
+  tty_68681_write.  So the incremental compile, even though it did recompile the tty 68681 code, somehow still ended up with the
+  wrong code?  Is this related to the built-in.o file not replacing the original code?
+- the working version of tty_68681_write has a `subql #4,%sp` instruction at the start (allocating a local variable), and the broken
+  code doesn't have that, and the rest of it is different from there, mostly in small ways related to offsets, but some different
+  instructions too
+- the broken code in tty.o, built-in.o, and the binary, are all 198 bytes long, and the working code is 212 bytes long
+- adding 7 nops, which should increase the size by the same amount, doesn't affect the problem (it's broken whether the nops are at
+  the start, end, middle, in a function after, etc)
+
+- changing the write function in the tty_68681_driver struct to NULL makes it jump to the firmware during boot, which is maybe a bug
+  that should be fixed, or at least a check that refuses to add a driver with a NULL write?
+- replacing the write function in the driver struct with a nop version that just returns the length seems to work (I can't see
+  what's written, but it's giving bus errors as if a program is loaded and running when I type commands, when previously without
+  that one change, it was reading in no input
+- putting the nop as the read function reads nothing, but I guess that's expected...
+- I added a putchar, or alternatively a printk to the nop write function, that just prints a ! to show it's being called, and it
+  works with that.  I had to move it a bit downward, below the putchar for that version to work, so it's below putchar, above
+  tty_68681_process_input(), and it's working, the problem is not occurring
+- I then put the old tty_68681_write pointer back into the driver struct, and left the nop function in the code, and it's working
+  like that as well, so it's the existance of this function which is somehow fixing it?
+- removing it and it breaks again
+- no matter where I put this nop function in the file, it ends up being put between tty_68681_write, and tty_68681_set_leds.
+- if I remove the printk, it goes back to not working (when it's not added to the driver struct either way)
+- I moved it back to the top, and replaced the putchar with printk, and it's back to not working, but at the same time, the function
+  is being put between the seek and process_input functions in 68681
+- ok, going back a bit, I have the nop function, not being used but compiled into the code, which is between the write and set_leds
+  functions, and the input is working.  Then I moved it to the end, and made sure it was at the end of 68681, between
+  console_putchar_buffered and devfs_release, and it's still working
+- if I try to put it anywhere near the top, it always ends up in the same spot between write and set_leds
+
+- I have the write_nop at the end and it's not working, just turned the computer on
+- full recompile and it's working again
+- removed the write_nop and incrementally compiled, and it's not working
+- readded it and incrementally compiled and it's still not working
+- I've saved the two versions of the kernel source tree in investigations/junk/incremental-compile-not-always-producing-same-results
+- dumping the built-in.o files seem to show them having the same size for tty_68681_write, and they both have the write_nop
+  function, as well as the kernel itself having both
+- the two versions of the load scripts are identical... and loading the supposedly broken one now works... so there's something
+  strange going on here, as if it is actually a hardware problem, or perhaps a hardware initialization problem?
+
+- I loaded a kernel that doesn't have write_nop in the binary, and the tty input is broken.  I then loaded the supposedly broken
+  incremental compiled version (literally the saved one in the investigations dir) and it's still broken.  I then reset and loaded
+  the exact same kernel a second time, and it worked the second time
+- the rom on this k30 card doesn't have a move or compare command, so I'm not sure if it's identical.  I guess I can use the dump
+  command though.  But I wonder if it's running it twice or loading it twice that causes it to get fixed in between
+- I dumped the supposedly broken but actually working kernel, then loaded and dumped the truely broken kernel, and then loaded the
+  supposedly broken kernel to dump it, but it was working, and now when I try it again, it seems to work
+- power cycle and try again
+- I'm only dumping the start of the kernel anyways, so I doubt this will do anything.  The monitor wasn't happy dumping 8000 hex
+  words, so I'm dumping 0x4000 words instead
+- at least for that, the truely broken version is definitely really different; offsets are 0x20 less than the working version, but
+  the identical supposedly broken images loaded separately, where one was working and the other wasn't, are identical (at least the
+  part that I compared).  I would think that either the stacks are different, or memory elsewhere is different
+- well... this is interesting.  It seems like it's always broken if I reset and boot again without reloading.  It's the reloading
+  that fixes it...  I need to dump the latter part of the image
+- there's definitely some data that's different, right at the end, which I think is where the data section is located...
+
+    ```
+    3776c3776
+    < 10EBE0: 0101 0010 6F4A 0010 67D0 0010 6812 0010 
+    ---
+    > 10EBE0: 0001 0010 6F4A 0010 67D0 0010 6812 0010 
+    3826,3828c3826,3828
+    < 10EF00: 0010 960C 2781 E494 000E A58E 0000 0048 
+    < 10EF10: 7C55 81C1 0000 0000 0010 EBE2 0010 EBA4 
+    < 10EF20: 0010 EB84 0010 EB64 0000 0000 0001 000F 
+    ---
+    > 10EF00: 0010 960C 41C6 7EA6 0008 AE1F 0000 0010 
+    > 10EF10: 7C55 8189 0000 0000 0010 EBE2 0010 EBA4 
+    > 10EF20: 0010 EB84 0010 EB64 0000 0000 0000 000F 
+    4052,4057c4052,4057
+    < 10FD20: 0000 0000 0000 FFFF FFFF 0020 5CDC 0020 
+    < 10FD30: 5500 0012 3200 0000 0004 0000 0004 0000 
+    < 10FD40: 0004 0000 0000 0000 0003 0000 0004 0000 
+    < 10FD50: 0004 0000 0000 0000 0000 0000 0000 0000 
+    < 10FD60: 0000 0000 0007 0000 0006 0020 B980 0000 
+    < 10FD70: 0000 0020 BA98 0020 BA20 0000 0000 0000 
+    ---
+    > 10FD20: 0000 0000 0000 FFFF FFFF 0020 9DDC 0020 
+    > 10FD30: 9600 0012 1850 0000 0004 0000 0007 0000 
+    > 10FD40: 0007 0000 0000 0000 0003 0000 0007 0000 
+    > 10FD50: 0003 0000 0000 0000 0000 0000 0000 0000 
+    > 10FD60: 0000 0000 0000 0000 0000 0000 0000 0000 
+    > 10FD70: 0000 0000 0000 0000 0000 0000 0000 0000 
+    4060,4061c4060,4061
+    < 10FDA0: 0000 0000 0000 0000 0000 0000 0000 0020 
+    < 10FDB0: 6D0E 0000 0002 0010 0000 0020 7CB4 0000 
+    ---
+    > 10FDA0: 0000 0000 0000 0000 0000 0000 0000 0000 
+    > 10FDB0: 0000 0000 0000 0000 0000 0000 0000 0000 
+    4072,4073c4072,4073
+    < 10FE60: 0000 0000 0000 0000 0000 0000 0000 0020 
+    < 10FE70: 6D0E 0000 2000 0010 0000 0020 7CB4 0000 
+    ---
+    > 10FE60: 0000 0000 0000 0000 0000 0000 0000 0000 
+    > 10FE70: 0000 0000 0000 0000 0000 0000 0000 0000 
+    4091,4093c4091,4093
+    < 10FF90: 0000 0000 0000 0000 0000 0000 0000 0000 
+    < 10FFA0: 0000 0000 0000 0000 0000 0000 0012 0000 
+    < 10FFB0: 0000 0000 0012 31A4 0000 0000 0000 0000 
+    ---
+    > 10FF90: 0000 0000 0000 0000 0000 0000 0000 7C55 
+    > 10FFA0: 8186 0000 0000 0000 0000 0000 0012 0000 
+    > 10FFB0: 0000 0000 0012 5C88 0000 0000 0000 0000
+    ```
+- the first diff is just some flags
+- 10ef08 is actually the start of the BSS section, so most of these differences are bss data
+- then a random seed, some time data, the driver table looks identical, and then the data after the NULL doesn't have a symbol, but
+  maybe it's just unused buffer space, so the value isn't important?
+- the rest of the changes after that, there's no symbols with 0x10fxxx addresses, even though the bss doesn't end until 0x112424
+- I looked through memory for FD\d\d and found one thing that looked like an address.  It is actually the init_proc() function
+  that's writing to 0x10FD42 to zero that memory.  It's an entry in the process table (the init loop was unrolled)
+- I can't seem to find address-like things in the code anywhere else
+
+- so if there's no data section changes that seems to account for the difference, and if the bss section is properly zero'd out on
+  boot, which I should verify, then the only other comparible difference is the stack segment, *possibly* some allocated pages (but
+  I kind of doubt it), or it truely is a hardware-related issue such as an initialization issue of the serial port, or crosstalk
+  or something
+- after a power cycle, loading the supposedly broken kernel, it didn't work.  I didn't try booting again before loading the same
+  image over serial, which worked the second time
+
+    ```
+    $ diff stack-dump-from-broken.txt stack-dump-from-working.txt
+    1777c1777
+    < 11EF00: 0020 6200 0011 F190 0011 155C 0000 3143 
+    ---
+    > 11EF00: 0020 5E00 0011 F190 0011 155C 0000 3143 
+    1792c1792
+    < 11EFF0: 0000 000A 0020 BAFC 0010 CFC0 0011 F210 
+    ---
+    > 11EFF0: 0000 000A 0020 B6FC 0010 CFC0 0011 F210 
+    1794c1794
+    < 11F010: 633D 3120 6164 6472 3D32 3042 4146 4320 
+    ---
+    > 11F010: 633D 3120 6164 6472 3D32 3042 3646 4320 
+    1819,1820c1819,1820
+    < 11F1A0: 0000 0000 0000 0000 0000 0000 0020 BAFC 
+    < 11F1B0: 0020 4E00 0020 BA00 0000 0001 0000 0077 
+    ---
+    > 11F1A0: 0000 0000 0000 0000 0000 0000 0020 B6FC 
+    > 11F1B0: 0020 4E00 0020 B600 0000 0001 0000 0077 
+    1822,1825c1822,1825
+    < 11F1D0: 0012 3200 0010 5528 0020 3500 0020 BA00 
+    < 11F1E0: 0000 0100 0000 0001 0011 F1F6 0020 BAFC 
+    < 11F1F0: 0020 57E8 0010 0020 5700 0800 0011 F27C 
+    < 11F200: 0010 2E6E 0020 3500 0020 BA00 0020 4E00 
+    ---
+    > 11F1D0: 0012 3200 0010 5528 0020 3500 0020 B600 
+    > 11F1E0: 0000 0100 0000 0001 0011 F1F6 0020 B6FC 
+    > 11F1F0: 0020 57D8 0010 0020 5700 0800 0011 F27C 
+    > 11F200: 0010 2E6E 0020 3500 0020 B600 0020 4E00 
+    1827,1828c1827,1828
+    < 11F220: 0000 0100 0020 BAFC 0010 CFC0 0010 4DE2 
+    < 11F230: 0012 3200 0020 BAFC 0000 0001 0000 0004 
+    ---
+    > 11F220: 0000 0100 0020 B6FC 0010 CFC0 0010 4DE2 
+    > 11F230: 0012 3200 0020 B6FC 0000 0001 0000 0004 
+    1831,1833c1831,1833
+    < 11F260: 0000 0000 0011 F31C 0020 BAFC 0011 FBCC 
+    < 11F270: 0012 3200 0020 BAFC 0011 FFCC 0010 4976 
+    < 11F280: 0000 0040 0000 0000 0020 BAFC 0000 0001 
+    ---
+    > 11F260: 0000 0000 0011 F31C 0020 B6FC 0011 FBCC 
+    > 11F270: 0012 3200 0020 B6FC 0011 FFCC 0010 4976 
+    > 11F280: 0000 0040 0000 0000 0020 B6FC 0000 0001 
+    1836c1836
+    < 11F2B0: 0020 BAE8 0011 F31C 0011 F7C0 0000 0014 
+    ---
+    > 11F2B0: 0020 B6E8 0011 F31C 0011 F7C0 0000 0014 
+    1839,1841c1839,1841
+    < 11F2E0: 0020 4E00 0020 7B08 0020 BAD8 0000 0000 
+    < 11F2F0: 0010 FA84 0010 2A1A 0010 FA84 0020 BADC 
+    < 11F300: 0020 7B08 0012 3200 0020 BA00 0011 F31C 
+    ---
+    > 11F2E0: 0020 4E00 0020 7708 0020 B6D8 0000 0000 
+    > 11F2F0: 0010 FA84 0010 2A1A 0010 FA84 0020 B6DC 
+    > 11F300: 0020 7708 0012 3200 0020 B600 0011 F31C 
+    1844c1844
+    < 11F330: 0020 BA00 0000 0100 0012 2AA8 0012 1850 
+    ---
+    > 11F330: 0020 B600 0000 0100 0012 2AA8 0012 1850 
+    1846c1846
+    < 11F350: 0010 FA84 0020 BB00 0020 7B08 0011 F7B4 
+    ---
+    > 11F350: 0010 FA84 0020 B700 0020 7708 0011 F7B4 
+    1848c1848
+    < 11F370: 0020 61B0 0000 0000 0020 7B08 0011 16BC 
+    ---
+    > 11F370: 0020 61B0 0000 0000 0020 7708 0011 16BC 
+    2001c2001
+    < 11FD00: 0010 D894 0011 FDB7 0020 7988 0011 FDB7 
+    ---
+    > 11FD00: 0010 D894 0011 FDB7 0020 7588 0011 FDB7 
+    2006c2006
+    < 11FD50: 0020 7988 0000 0000 0011 FF8C 0010 CF74 
+    ---
+    > 11FD50: 0020 7588 0000 0000 0011 FF8C 0010 CF74 
+    2008c2008
+    < 11FD70: 0020 B8FC 0010 CFC0 0011 FF8C 6275 7320 
+    ---
+    > 11FD70: 0020 B4FC 0010 CFC0 0011 FF8C 6275 7320 
+    2010c2010
+    < 11FD90: 6164 6472 3D32 3042 3846 4320 7373 773D 
+    ---
+    > 11FD90: 6164 6472 3D32 3042 3446 4320 7373 773D 
+    2012c2012
+    < 11FDB0: 643D 3320 7063 3D32 3037 3938 380A 0000 
+    ---
+    > 11FDB0: 643D 3320 7063 3D32 3037 3538 380A 0000 
+    2030,2047c2030,2047
+    < 11FED0: 0000 0000 0000 0000 0000 0000 0000 2711 
+    < 11FEE0: 0000 0001 0000 0002 0020 B9A4 0000 0000 
+    < 11FEF0: 0000 0000 0011 09A8 0011 09A8 0000 0000 
+    < 11FF00: 0000 0000 0011 FFC8 0000 0000 0010 FA84 
+    < 11FF10: 0010 3A10 0011 0514 0010 3B82 0010 FAC8 
+    < 11FF20: 0020 4DE0 0000 0018 0010 FA84 0000 0001 
+    < 11FF30: 0011 074C 0010 3BFA 0010 FA84 0000 0001 
+    < 11FF40: 0000 0001 0010 3864 0020 4DE0 0010 6618 
+    < 11FF50: 0000 0001 0000 0000 0020 B92C 0020 B924 
+    < 11FF60: 0020 B9A4 0000 0000 0000 0000 0011 16AC 
+    < 11FF70: 0020 9500 0020 9640 0000 0000 0010 945A 
+    < 11FF80: 0000 0000 0000 004A 0011 FF9C 0010 6B7C 
+    < 11FF90: 0010 6A8E 0011 09A8 0000 0000 0000 0000 
+    < 11FFA0: 0000 0000 0000 0000 0000 0000 0000 0000 
+    < 11FFB0: 0000 0000 0000 0000 0000 0000 0000 0000 
+    < 11FFC0: 0000 0000 0000 FFE1 0010 4976 0000 0040 
+    < 11FFD0: 0000 0000 0000 0000 0011 09A8 0011 09A8 
+    < 11FFE0: 2000 0010 471A 0100 0010 DE24 0010 DF84 
+    ---
+    > 11FED0: 0000 0000 0000 0000 0000 2711 0000 0001 
+    > 11FEE0: 0000 0002 0000 0001 0000 0002 0000 0000 
+    > 11FEF0: 0011 09A8 0011 09A8 0000 0000 0000 0100 
+    > 11FF00: 0011 074C 0011 FFC8 0010 4976 0000 0040 
+    > 11FF10: 0000 004C 0000 004B 0070 0005 0010 6AFA 
+    > 11FF20: 0000 0000 0000 0000 0000 0000 0000 0000 
+    > 11FF30: 0000 0001 0000 0002 0010 6BC2 0000 0000 
+    > 11FF40: 0000 0000 0000 0000 0000 0000 0000 0001 
+    > 11FF50: 0011 FFA0 0011 FF9F 0000 0000 0000 0100 
+    > 11FF60: 0000 0000 0010 6062 0000 0000 0000 0000 
+    > 11FF70: 0011 FFA0 0000 0002 0000 0003 0000 0003 
+    > 11FF80: 0000 0000 0000 0000 0010 EF38 0000 0000 
+    > 11FF90: 0000 0000 0011 11DD 0010 3AE2 0000 0000 
+    > 11FFA0: 0010 68D0 0000 0002 0000 0000 0000 0201 
+    > 11FFB0: 0000 0002 0000 0000 0000 0101 0000 0001 
+    > 11FFC0: 0000 0004 0010 EF30 0000 0000 0010 1BE8 
+    > 11FFD0: 0000 0000 0000 0000 0000 0000 0000 0000 
+    > 11FFE0: 0000 0000 0010 471E 0010 DE24 0010 DF84 
+    ```
+- the diff is less than I thought it would be, and the majority of the differences are related to specific page addresses, namely
+  0x20B600 vs 0x20BA00, and 0x20B700 vs 0x20BB00, but the chunk near the end is probably the most different.  It's offset by a long
+  word, and some of the things that are addresses in one are NULL in the other, and such.
+- there's a buffer on the stack starting at address 11FD70 which is a bus error message.  It's the last one before printing the
+  prompt, so most of the stack is fairly recent, or left over data from previous deep calls.  It's the last part of the stack
+  mainly, that part that has all the differences, which is actually where the kernel stack pointer was probably pointing to when the
+  reset button was pressed, just before dumping the stack data
+- the addresses at the top of the working stack where that last diff block is, has addresses for handle_serial_irq, tty_68681_read,
+  tty_process_input, resume_blocked_procs, and main() near the top, among others
+- a quickish power cycle, and reloading that same kernel, was not enough to cause the problem.  It worked first time loading
+- I'm also not so sure the 0x207B00 vs 0x207700 difference is meaningful, since this last run is working, and it's using 0x207B00 at
+  stack address 0x11F370
+
+- I put a scope on the headers for the serial, and I'm only reading one characters.  I haven't connected the logic analyzer to pins
+  on the back to inspect the serial controller accesses from the cpu.  It's a pain in the ass to hook up.  It might be a lot of
+  board space, but it'd be nice to have some inspection headers.  A backplane hookup won't solve this because it's an onboard
+  peripheral
+- also, tried to get the X56 programmer (TL866) in wine, but it won't be even start, and it wasn't detected in windows for some
+  reason
+- after installing the updated guest additions (since I had to remove virtualbox and reinstalling through apt-get), the usb was
+  detected, so I can program a new rom now, but I'll test it first
+- oh I also changed the cable, not sure if the one it came with just doesn't work.  It doesn't fit smoothly into the socket like my
+  other usb-b cables do
+
+
+2026-02-01:
+
+- it's a hardware problem, isn't it...
+- I hooked up the logic analyzer to the serial controller, IOSEL, WR, DTACK, A1, A2, A3, A4, and the "truely broken kernel" is
+  working fine... unable to reproduce problem
+- I disconnected IOSEL, WR, and DTACK, but it seemed to still be working.  I then disconnected all except one address line, and
+  after booting, I was able to get it to not input anything.  Reconnecting the address lines and it still seems to be broken, which
+  is good in this case because it's reproducing the problem
+- I kind of need IOSEL to distinguish what's the serial port access and what's another address being read, but hooking it up, it
+  seems to still be reproducing the problem (I'm sure it's a dtack problem if it's hardware, because it's always a dtack problem)
+
+- *sigh* I don't entirely trust the logic analyzer's data values, but it seems to be returning 0x56 when the status byte is read,
+  and it's in that "hang" situation, where no input is received, nothing is printed, but it's actually reading in the status byte
+  repeatedly.  But that doesn't make sense because that would mean the receive buffer is full but the ready bit is not set, and the
+  code seems to be reading in 0xE1 instead
+- that said, the issues is much less consistent with the analyzer probes connected.  It seems to work fine sometimes when it would
+  otherwise fail, and resetting and booting again (without loading again) will often get it to break, with the same image
+
+
+20226-02-02:
+
+- So, it's doing all sorts of weird things, and the program doesn't make sense relative to the logic analyzer, and I'm not sure
+  which one is wrong because I don't trust the analyzer's wires
+- currently, I'm back to the behaviour where it reads in multiple characters instead of just one, but when I look at the logic
+  traces, it just doesn't make sense what's going on.  It seems to be writing to address 0x2 (the command port) with byte 0x80,
+  which is not a valid command
+- it also seems like the status byte often is 0x02, which doesn't seem valid either, since the FFULL flag (0x02) shouldn't be set
+  unless the RxRDY bit (0x01) is set too
+- I've removed the short extension card from the system board and moved the flash card and system board to the first two slots, with
+  the extension on the k30 in slot 9, so there's plenty of space on the board to probe signals.  It seems to work too, OS booted
+- next time I order boards, I should get a full length extension
+
+- I checked the DSACK1 signal as well, and it's DSACK1=H, DSACK0=L.  I was thinking maybe the port size might be wrong, and it's
+  making it read in a different part of the 32-bit data bus, but that doesn't seem to be the case.
+- the value printed as the status byte is often 0x01 or 0x0D
+
+- after redoing all the wires, and only connecting the data bus wires, untangling them though, it's reading different numbers...
+  Some are the printing out of the status byte, which I need in order to corroborate the signals, but I'm not seeing any 0x80s for
+  example
+- the < and > characters that surround the status byte are 0x3C and 0x3E in ascii
+
+- took a trace with nothing going on.  There's some blips on D29 and D30 when the serial interrupt is running, but otherwise not
+  much going on, which leads me to think those are broken
+
+- the accessed to register 0x2 are now 0x04 which is the enable tx command, so that makes sense.  It's followed by a access to 0x3
+  which is therefore transmitting a character
+- i don't know what is the writing and what is reading in the character.  It seems to act all like writing.  It also seems to not
+  service irqs a bunch of times in a row, just exiting and allowing it to re-enter.  Is the buffer full???
+- a write to the LEDs regs would be easier to detect than a print statement
+
+- I think I know what's wrong.  I've been wrong in the past about that, so I could be wrong now, but I was looking through a trace
+  where I only received a character, technically echoing it, but not printing inside the ISR, but also writing to the leds register
+  with a bit indicating the fault.  And it seems like it reads in the status byte, goes to read in a character, but can't because
+  the buffer is full!  I thought I had checked that before, but it's hard to see with print statements
+- an inline debugger would help here of course, much better than print statements.  I should look into how I can get a debugger
+  working on this platform...
+
+
+2026-02-03:
+
+- the thing that's bugging me about this is that previously, I don't think I was hitting the "failed reading" message, which I
+  recently added when it overruns the new loop limit.  It might have been the same problem as when <E1> was the status byte, but I
+  can't be sure, and it may just be an artifact of the code thinking there's an infinite number of characters to read.  It still
+  comes back to the status byte being wrong
+- maybe I should put the status bytes into another buffer which can be printed outside of the ISR to confirm they are what they
+  seem?
+
+- it really is returning status 0xE1 continuously, and nothing seems to clear it, when both CMD_RESET_ERROR and reading the byte
+  should clear it, but it doesn't.  It's always E1
+- I had a probe on the serial line, and it definitely transmits a clear character when pressed, but it's not broadcasting a break
+  continuiously.  After the character is sent, it pulls the line high
+- the only alternative thing I could try would be put the probes on the serial chip instead of the CPU to see if the value is
+  different, and maybe also put the serial probe on the chip as well, to make sure it's seeing the same thing
+
+2026-02-06:
+
+- i was just about to go to bed, and knew i should have left it til tomorrow, but i tried putting a resistor across the dsack0
+  signal and it didn't seem to change the fact that nothing was being input. I wasn't sure if it was actually connected across
+  the pins of the resistor network, so I tried the resistor across the cpu pins and now it won't boot. I tried swapping the cpu
+  and that didn't change anything. Tried a few other things, but couldn't get it working at all. I've given up for today at least,
+  but feeling just blank, empty, spent.
+
+
+2026-02-07:
+
+- mentioned this problem in the discord and TechAV said he had a similar problem, that turned out to be the CPU, CPLD, and SRAM chip
+  all getting fried at once.  He said the CPLD verified correctly, but when he erased it, it wouldn't reprogram or verify after
+  that.
+- I had tried a verify only and that was ok, but I'll try an erase at some point
+- I've tried looking at the halt signal, and also the reset.  The halt is 3.3V or so when reset button is not pressed, because of
+  the LED, but when it's pressed, it's above 1V still, which is odd.  The reset signal is the same.  Both are fed by different
+  inverters in the same 74x05.  It's possible that chip was what got fried, since it shouldn't be like that, although when the CPU
+  is out, it seems to get pulled down just fine.  I've been too scared to put a jumper on it though to see if it just needs a bit
+  more pulldown power.  When the reset button is pressed, it draws about 250mA more than after.
+- The current draw is sorta normal around 0.88 on startup, but 0.75 after a reset, and 0.72 without the CPU.  I definitely think
+  it's not resetting correctly
+- I suppose it could be the 74x05 and the CPU at the same time
+- when I have the analyzer on AS, DS, and A2-A5, there's a blimp when it first powers on.  I think it doesn't change when the reset
+  is pressed.  The blip is weird though.  It doesn't really seem like a normal cycle.  Way too long.  If it didn't reset on boot,
+  maybe it's just wonky in a normal way?
+
+
+2026-02-08:
+
+- Coming back to this again today.  I see I actually had the ground pins of the analyzer disconnected previously, so the previous
+  readings were invalid, but hooking it up today only makes some of the spikes less frequent.  It's still not working of course
+- the AS/DS signals start low, I powered it on while capturing, they went high and then low again (AS/DS/DSACKx/A2-A5 all low in
+  sync).  And then a few microseconds later, the A2-A5 signals go high and then low again
+- I then pressed reset a 3 times while still capturing, there's a bunch of weird activity on DSACKx which doesn't make sense, and
+  AS/DS don't change state at all during that time.  Not positive it's not interference of some kind (I also do have a very long
+  ground wire).  There's some random blips on the address lines, and all while AS/DS remain low, and then all signals go high.  I
+  think that might have been the moment I pressed reset
+
+- I improved the ground wire, but now I'm getting a bunch of weird signals.  The AS/DS signals are changing a bunch, but not what
+  I'd expect relative to each other, and the DSACK signals are hardly changing at all.  The DSACKs are generated by the CPLD
+- it has the weird flurry of signals both when turning on, and less so when turning off
+- I'm looking at that reset again, and the sysreset from the backplane goes through a different 74x05 gate on the same chip that
+  directly pulls down on the CPU reset, and that also can't pull it down below 1.2V or so, same as the others, so definitely
+  something wrong there.  I worry if I put a jumper on there, I'll short something
+
+- I think I'll try erasing and reprogramming the CPLD because that will at least confirm if that's working or not
+- well that worked fine.  It did draw about 1.25A while erased, which is a bit much, but it programmed it and verified it after
+  explicitly erasing it, so I think it's fine.  I can rule that one out (probably)
+
+- back to the reset (not the halt, but reset).  I had the CPU in, and it would be 5V.  When pressing the reset button, it would pull
+  down to 1.2V or so
+- I removed the CPU and it rides at 5V.  When I press the reset button, it pulls down to 0.  When I put a 1K ohm resistor into the
+  reset pin, and connect it to ground, the steady state is about 2.2V, which doesn't quite make sense given it has a 10K pullup,
+  which did show as 9.7k on the multimeter, so I'm pretty sure it's ok.  I would have expected the 1k to pull down to about 0.5, as
+  a voltage divider with the 10k
+- if I put a jumper into the reset pin in the socket, and jump it to ground, it only pulls down to like 2V or so.  It's about the
+  same as with the resistor.  It doesn't seem to produce much current, which is also a bit odd.  I tried putting the scope probe
+  into the ground pin I was using to jump to, and it's definitely grounded.  I also tried putting the scope pin onto the uart
+  header, in case the wire I was using to ground the probe was a problem, and that didn't change anything
+- if I put the jumper from the reset pin to the uart ground pin, it jumps around a bunch and causes the status LED to come on, which
+  is the weird part.  I wonder if it's shorting somehow
+- the STERM pin is pulled high by only a resistor, and has no other gates going into it, so I should be able to jump that to ground,
+  right?
+- OMG what!?  Ok, so I had STERM with a jumper and scope probe on it, and tried touching the uart ground, which pulled it to ground
+  but it was very noisy, same as the reset signal.  If I touch it to a ground in the CPU socket, it only goes down to like 3 or 4V.
+  If I touch it to the ground of the nearest bypass cap, it goes solidly to ground!  It's as if the ground pins on the board are not
+  actually pulling to ground!!!  Do I have a fried trace on the board?
+- I wasn't using the same ground pin either, so it's not like it's just one pin.  I don't see any damage on the board
+- I'm getting 11K of resistance between any of the PGA socket pins and other grounds around the board, and 20K of resistance to 5V
+- even though there's ground planes everywhere, there's only one trace on the inner layer of the board that connects all the ground
+  pins on the socket, which are all the inner-most pins of the socket.  So those pins are all connected to each other, and they're
+  all measuring 0.4 ohms between them (which is probably from the multimeter leads, which is to say, they're probably actually near
+  0).  The inner and top and bottom layers hold all those ground pins tightly together.  But that ground pour in the middle is
+  only connected to ground through one trace that goes on the inner layer to a bypass cap near the socket (C16).  I didn't connect
+  more grounds to it because I was worried about making a ground loop, so it's only connected in one place, and that's the spot
+  that's reading 11K between C16's ground and any pin in the center ground.  The other layers' pours don't fit between the pins of
+  the socket itself
+
+- I soldered a bodge wire in and it's booting fine, loaded the OS, no problems (except for the one I was originally trying to figure
+  out).  So it was definitely that trace that fried.  The bodge I put it went from one of the capacitors on the bottom side of the
+  board to the capacitor used by the crystal of the serial port controller, which was the closest through-hole trace to the CPU.  It
+  goes up through the address pins and over, so it's less likely to interfere with clip on leads when debugging
+
+- so now I'm back to the serial issue, and I put all the leads back on, and it wouldn't boot at all.  I panicked for a brief second,
+  but unclipping the dsack0 lead got it working fine again, so definitely something there
+- if I clip it on either the CPU or on the 68681, it won't boot.  Which seems a bit weird.  That's different than how it was before.
+  It was working sometimes or flakily before when I did the same
+
+- I was once again playing around with a resistor on the DSACK0 signal and now I can't get the OS to boot.  The monitor will run,
+  and it can load the whole image in (seemingly) but when it booted, it would lock up when after the 3rd bus error for copy on
+  write.  It was possibly accessing the CF card at that point.  The CF card's LED was left on and the status LED was on which I
+  think means a VME bus access was in progress.  It was also taking like 1.88A which is way more than usual, but in line with
+  accessing the VME bus
+- now it won't even boot past the mem0 line, which the thing that comes after that is the ata0/ata1 log lines, and then it mounts
+  the minix filesystem.  So something very wrong here
+- this was definitely working before dinner and booted fine.  And I don't think the DSACK line connects to the bus at all, so it's
+  unlikely that the CF card is broken.  The CPLD might have an issue after re-writing the program to it, but like I say, it was
+  working fine before, and I haven't changed the CPLD logic since.  All I did was connect probes, and then a 1k resistor to DSACK0
+
+- Ok, ran it again after being off for a while.  It once again went to 4 bus errors after "begin multitasking", and it's hanging
+  here with the OP6 LED lit, and the status LED lit, drawing 1.85A.  The CF card's "disk act" was not lit this time.  It seemed to
+  be stuck on a read.  I only caught the upper part of the data bus, and not the address bus, but it had 0xE0 on the bus.  Probably
+  not significant
+- without reloading the kernel, just booting again, it's now stuck after the mem0 log line, but before the ata0 log line, drawing
+  2.03A, status LED on, OP6 off.
+
+- I had taken the probes off, and tried again, and it was still doing this.  I left it off for a few minutes, and turned it back on
+  and now it's booted and the serial is working
+- I pressed the reset button, and then booted again without loading and it hanged after the slip0 log line, but before the bus error
+  or begin multitasking log.  The status LED is lit
+
+- I swapped the CPU again, and then it wouldn't even boot.  I tried yet another CPU and that wouldn't boot either.  Like no serial
+  output except the NUL when turing it on and off.  I put the original CPU back in and that wouldn't boot either!  I think I pressed
+  it in really hard, and then also put it in a slot without the riser, and it wouldn't start on power up, but then a reset got it
+  starting the firmware, and printing the welcome message.  Something's really wrong with this thing.  Maybe there's another fried
+  trace somewhere?  Or something got damaged other than the CPU
+- ok, that time I tried one of the new CPUS, pushed really hard when inserting, and it started on first power up
+- I loaded the OS and it booted first try, serial worked.  Reset button, boot, and it started up again, serial didn't work, but it
+  booted fully.  So maybe that other CPU is a bit fried on the DSACK line, and the board is no longer strong enough to overcome it?
+
+- reading the logs for retroverse, searching for "clock", I see a lot of stuff that's similar to what I experienced here.  Issues
+  with serial not reading correctly (although no explicit mention of 0xE1), and it hanging when accessing the CF Card.  It could be
+  related to the clock speed, and also the DSACK pullups.  When trying to fix the CPU clock speed at 25MHz, I added the 2.2k
+  pullups.  I wonder if those are too much for the DSACKs?
+
+- Something to try tomorrow, try changing the CPLD logic to reduce the clock speed and see if that affects the serial working or not
+
+
+2026-02-09:
+
+- actually it seems to be the riser board that's causing the problems.  It was working fine before, but I tried booting with it
+  after yesterday getting it to work without it and a new cpu at the same time.  It did the same thing, where it hung when mounting
+  the minixfs partition.  I tried different slots, but it still seems to just not want to boot with it.  There's no visible damage,
+  but it was working entirely fine until I shorted that pin.  It could still be other damage on the k30 board that becomes more
+  marginal when using the riser, but yeah, I guess I can't use the riser anymore
+- I also tested with 1k in parallel for DSACK0 without the riser, and while I did get a bit of garbled text at one point, it seemed
+  to work after a reset.  It booted the OS but still had the serial port issue, so I'm not sure a 1K pullup is going to do much for
+  that particular problem
+- I'm starting to wonder if that messed up clock signal is actually partly responsible, since it's very very dirty, at least at
+  50MHzCPLD/25MHzCPU.  I'm very curious now if lowering the clock will make everything work
+
+- Tom Storey mentioned needing to go down to 560 ohms once to get respectable rise times, and TechAV mentioned using 1K ohm pull ups
+  on his 68030 board.  He also mentioned that the 68882 FPU drives the DSACK high for one clock cycle instead of letting it float
+  high, which might actually be a good idea on the CPLD, because the 68681 seems to have respectable rise times, but the CPLD isn't
+  doing that
+
+- I was looking at the clock signal again, and it's really not that great.  The schmitt trigger hex inverters I'm using are can
+  switch at between 7 and 13ns transition time, which is 142 to 76MHz.  A 50MHz signal is switching twice at 100MHz per switch,
+  which is right in that zone.  The signal on the scope looks rounded as such, even though it's coming out of a couple gates.  I
+  need to use a faster version, perhaps an AHC or AHCT, which is a *bit* faster, or go to a PLL like the ICS501, even though it's
+  kind of a specialty chip, but maybe I can make the clock itself semi-modular (ie. so a mezzanine board can be attached with an
+  alternate clock)
+- one thing that was peaked my interest looking at the timing of the datasheet was that it's dependent on voltage, so higher
+  voltages make it go faster.  I did turn the voltage up and down when testing for crosstalk, so it might be a bit lower now than it
+  was before, which might affect the quality of the clock?
+
+- I was going to try dividing the cpu clock by more, down to 12.5MHz to see if that changes things, but I can't get the virtual
+  machine with ATMISP working, so even though I've got it compiling again (after needing to clean before building), I can't load it
+  into the CPLD, even though I had this working a couple days ago.  No idea what could be wrong, but I also don't want to reboot my
+  computer because I have a lot of stuff open
+
+
+2026-02-10:
+
+- I loaded the same previously build image of the bus logic into the CPLD, and loaded the OS, and everything worked as expected.
+  Then I changed the CPU clock to 12.5 MHz, rebuilt it, programmed it into the CPLD, and loaded the OS, and it had a fatal error
+  when accessing the CF Card (not the first time it was accessed, but just before begin multitasking, which I think is the first
+  time a bus error occurs that would trigger a page copy
+- it seems to be the F line emulator (ie. it tried to execute an instruction opcode that started with 0xFxxx), at address 0x105A84
+  but there's no F opcode there of course.  It's the same image that was working before.  It must have read in the wrong value due
+  to a clock trip-up.  I wonder if the logic generated is different due to tools changing since I last built it
+- the logic is definitely different between the new build with 25MHz clock, and the old one
+- Aha!  Changed back to 25MHz, rebuild the logic and loaded it with ATMISP, and it's also breaking in nearly the same way, but a
+  couple log lines earlier, so it's something to do with changes somewhere.  I'm assuming it's yosys because the fitter is the same,
+  and the atf15xx_yosys toolchain only had a couple minor tweaks different with it, but yosys was probably updated with an apt-get
+  at some point
+- I'm glad I saved the old logic jed
+
+- TechAV once again had a great thought.  I explained the issue and they asked if the bus pulls high, which the VME backplane does.
+  That might be the source of the F opcode, if the wrong address was put on the bus, or timing issues meant there was nothing on the
+  bus when it was read.  Although that said, I would have expected it to not be reading code from the VMEBus, only data, so maybe
+  that's not relevant... hmmm...
+- I loaded the monitor with those special `a` and `v` commands.  The `v` command runs successfully.  It accesses 0xFF80_0020, and
+  prints `5` as the output, which I think is reading a register on the CF card.  But `a` causes the same 0x2C exception (exception
+  11, which is F-line)
+
+
+2026-02-11:
+
+- this is so bizzare!  I guess the `a` command wasn't working properly before
+- Oh ok, I guess the analyzer hooked up to the vmebus is causing interference with the normal bus cycles.  It was flickering the
+  status LED and taking a long time to fetch the full data, and when I tried booting the OS, it would fail during boot, but
+  disconnecting the 60mm VME riser which had the analyzer pins connected to it seems to have everything working as expected again
+- so I downloaded yosys, 0.33, 0.47, and 0.55, and used the Dockerfile inside it to build an image.  I then used another Dockerfile
+  to make an image based on them with wine installed inside of them, and then started a container with:
+    `docker run -it -v /media/work/retroverse:/retroverse yosys-wine bash`
+- building an image with 0.33 seems to work fine, but I suspect 0.47 doesn't work, and 0.55  was the one that's broken
+
+- backing up a bit, I found that I had the old build files (edif, fit, jed) for the previously working build of the bus logic, which
+  had a note that it used yosys 0.33 to build.  That's the one that was working from June 2025.  But the latest version I have
+  installed is 0.55, and even though the verilog, hoglet67/atf15xx_yosys, and the fitter are all the same, the yosys version must be
+  causing the difference here
+- I put the analyzer on it and took a trace, and when it tries to access the VME bus, it can do it a number of times, but at some
+  point gets tripped up and the CPU's AS goes low, the VBR0 and VBGIN0 of the VME bus seem to work as expected, but VAS doesn't go
+  low for like 8ms.  It's just sitting there.  Eventually it goes low, and a cycle completes, and then the next cycle does the same
+  thing.  There's one point where the VAS signal flickers on and off a bunch of times before the cycle stays on and the VDTACK
+  signal asserts and the cycle completes.  It's definitely something with the logic
+- It might be the case that something is marginal how I have the logic, and the slight difference in build output from yosys, with
+  some optimizations, is causing a race condition or something.  Maybe a missing synchro or the need to make something clocked
+  instead of combinatorial.  Clocking the logic more might fix it but also make it slower
+
+- interestingly enough, with 0.47, it boots but then fails after the 5th bus error (or 4th log after begin multitasking), with an
+  F-line exception, which is the same spot where I was getting a failure when the CPU wasn't booting due to the 60mm riser... so the
+  logic error might have been present in the old 0.33 version, but some optimizations means the race condition that occurs is less
+  likely to occur on the older version compared to the newer one
+
+- getting back to the original problem for a sec, since I have the 0.33 version of yosys running, I tried changing the clock speed
+  for the CPU down to 12.5 (divide by 4 instead of divide by 2) and then tried running the kernel.  I can't seem to get the serial
+  problem to occur.  I tried booting the same image a couple of times.  This is a kernel build which previously was always going
+  into the 0xE1 problem on boot, usually first thing.  So a slower clock definitely seems to fix it.  That seems to imply it is
+  actually a hardware problem, and not a software problem (or a logic problem), which makes sense given I couldn't find anything
+  software-wise that could be causing this behaviour from the 68681.  But besides a possible logic race condition, I'm not sure if
+  there's anything else that could be responsible such as the poor clock signal or crosstalk
+
+- man, either having the riser in an empty slot with no board in it, or having any logic analyzer channels connected to the VME
+  backplane seem to prevent the OS from loading and booting correctly.  It doesn't seem to matter which pins.  I thought it was
+  working before, so I do kind of wonder if there's some damage, either on the riser, or on the k30 board.  It will be interesting
+  to see if the U3Pro32 I ordered has the same thing, given they have grounded fly leads (assuming I can ground them well enough)
+
+
+2026-02-12:
+
+- well... of course it seems to work now.  All of that effort to try different versions of yosys, and I guess all I needed to do was
+  press the system reset button instead of the CPU reset.  It boots the OS fine after that with no errors.  I guess it was the CF
+  card that was in a weird state, and when the CPU card tried to read from it, it would lock up.
+
+- So where that leaves me is: the serial problem I originally had happens reliably at 25MHz CPU speed.  It seems to go away entirely
+  at 12.5MHz
+
+- I tried adding some logic to dsack to drive it high, but it wasn't working at all.  But from looking at the analyzer traces, I
+  think it might be better to prevent a chip select going low until the CPLD is ready for the next one, so that another CPU cycle
+  doesn't start too early.  That might be causing invalid numbers on the bus as I'm seeing with this serial problem
+
+- I tried adding a condition to not start the next cycle's addressing until the dsack is gone, but now it doesn't work reliably,
+  especially VME accesses.  It's very fragile, the bus logic
+
+
+2026-02-13:
+
+- thorpej mentioned using CY62158 memory chips, which are 1M x 8bit.  I thought they were cheaper than the Alliance ones, but I just
+  checked and that was for the 3.3V chips, which are only about $5.  The 5V chips are ~$10.  They have multiple memory chips, with
+  the others being AS7C4098A and IS61C3216.  I think those latter ones are twice the speed of the 8Mbit ones, but I'm not sure I
+  need the speed, at least at the moment.  That said, 50MHz is 20ns, so maybe if I wanted to push the CPU up to that speed, I'd need
+  to go for faster SRAM
+
+
+2026-02-14:
+
+- I was trying to get a better shot on the scope of when the clock seems to drop out, but I didn't manage to catch anything that
+  looked like it.  The scope shots look a lot better when I'm using a short ground, so maybe clock distortion isn't as big of a
+  deal.  It at least looks square, even though there's almost a volt of overshoot on the clock low part of the signal, which could
+  possibly be causing false ticks, even though it doesn't seem too likely.
+- I think it would be a bit too difficult to rework a series resistor in there, and while it should help a bit with ringing, I'm not
+  sure the risk is worth it.  I'll maybe see once I get the iron out though
+- I'm thinking of possibly replacing that DSACK pullup resistor pack to 1K instead of 2.2K, since the only reference I have to this
+  problem occurring previously mentions going from 10K to 2.2K as the fix, but I don't have much else to go on here.  The traces I'm
+  getting seem perfectly fine
+- It's possible there's some kind of timing issue, given reducing the CPU clock fixes the problem, but I'm not sure if that's
+  because the div by 4 means there's longer for signals to stabilize, or because the combo logic has more time to propogate, or
+  because there's some unsynchro'd signals still
+- I seem to have had a yosys 0.55 logic build on the board and it wasn't booting the OS, and so went back to a 0.37 build which is
+  not quite identical to the 0.33 build, but seems to work fine as well.  I had thought the problem with 0.55 went away when I fully
+  power cycled the system, but maybe I was confused and had a docker container open for 0.37 that I had built the logic for thinking
+  it was using 0.55
+- also, tried the riser in slot next to CF card again (sysboard in slot 1, CF in slot 2, riser in slot 3, CPU in slot 9), and it
+  won't boot with it inserted still (failed to create init task -1, stopping)
+- I seem to have a lot of "return -1" in the code, so not sure where that exactly came from, although there's hardly any in the proc
+  or mem code besides init functions, and a bunch in the file system code, so I would guess it came from the file system code, and
+  maybe is some bad data loaded from the CF card?  It's not giving error -14 which it was doing when failing to read from the CF
+  card earlier, when I had the logic wrong, so it's probably getting data back, but it might well be the wrong data as sometimes
+  happened when running the `a` command from the monitor
+
+- tried putting an unconnected jumper onto pins 4 and 12 of row B of one of the slots, and it hung when accessing the ATA card.
+  Same thing when I just had pin 4 connected.  Oh actually, maybe that's preventing the BGIN signal from propogating, with the
+  special self-switching DIN41612 connectors I'm using here...
+- also I forgot to sysreset after the first error
+- it boots fine when it's in after the CPU card, so yeah that was the problem there
+- put the unconnected wires into DTACK and AS on the backplane in slot 4 and no problem booting
+- riser in slot 11 works fine
+- it almost booted with the riser on the CPU card.  It got to just after the ntpdate timeout, but now it won't even get past the ATA
+  stuff at the start, even after a full power cycle and/or system reset
+
+- one thing I was looking at last night was possibly serial controller timing issues.  The 68681 has some requirements for how long
+  the chip select line is held for, but it notes that it's not required for proper functioning, but instead for assuring that DTACK
+  will be asserted.  If it's not held for at least that time, then DTACK might not be asserted.  I'm pretty sure that's not my
+  problem here according to the traces I've seen
+- I can't seem to get a lead connected to the DSACK0 line of the card to the new U3Pro32 analyzer I have without it refusing to
+  boot, so I can't correlate the DSACK to the other signals.  This was even with the fly lead's ground connected
+- but I did try looking at the IOSEL and RAMSEL signals, and there's no discrepency between on states between them.  A possible
+  cause of the behaviour I'm seeing is that another device is selected at the same time, and the data is getting corrupted, but that
+  doesn't seem to be the case, at least not with the RAM
+
+- I have the scope on DSACK0 again, and I noticed there was a weird glitch where the DSACK held above 1.8V for an extended period
+  after it should have dropped, but not sure if that was just a slight bump as I was capturing the first touch rather than holding
+  it.  I didn't have any hands free to press the button
+- the rise time of the DSACK I'm seeing is often 60 to 100ns, which might be too slow
+- I have nothing else to go on than just this hunch that it's related to the DSACK.  I think I'll try replacing the pull ups just to
+  see.  I hate when it's easier to modify the board than figure out exactly what's wrong, and see a truely glitchy thing happen that
+  I could possibly trace to the logic
+
+- I feel like I should try debugging the logic a bit more before soldering the board, so I rebuilt the logic with 0.49, which
+  produces the problem.  Building an image for 0.43 which I can try after, and 0.37 did seem to work
+- well, this is very interesting.  I have probes on AS, ROMSEL, RAMSEL, and IOSEL, and I don't believe it should be accessing ROMSEL
+  at all because I'm running the monitor from RAM, and then accessing the ATA device, but when the `a` command is running, it does
+  actually briefly assert ROMSEL while AS is high.  Sometimes that overlaps with RAMSEL, but often it's the moment that RAMSEL goes
+  high, ROMSEL goes low for a clock cycle or so
+- yosys 0.43 seems to produce a binary that has ATA 14 error when accessing the CF card
+- built an image with 0.37 and it definitely doesn't do that thing with ROMSEL
+- the address decode is the only place where romsel is set (in an assign), and it's conditional on cpu_as, but looking at the top
+  level module, it's actually getting cpu_as_fifo[0], so the synchronized AS.  cpu_as goes high before cpu_as_fifo, but doesn't go
+  low until after cpu_as_fifo goes high.  Should all the address decodes be conditional on both being low?
+- that did seem to fix it... it still has one access to ROMSEL, but RAMSEL is not low during that AS cycle, so it might be a legit
+  ROM access?  Not sure what it could be doing though
+- definitely won't boot the kernel though, bus error at address=2F0A2F11, pc=103476.  Odd, that's during memory_map_print_segments.
+  The first fault is addr=1F7C0C0D ssw=715 mmusr=0 pid=2440 pc=105A14, which is ata_read_sector, so that makes sense
+- it should actually be accessing ff800004, and the dump of the code matches the disassembly, so it's not a mistaken in transfering
+  the image over serial
+- according to the SSW, it's not an instruction fault, but a data fault, during a write, for what I think is a byte operation, in
+  address space 5 (which is probably supervisor data).  It's weird because it should be writing the sector count to the ata register
+
+- I'm going to try the same mod in yosys 0.37 and see if it does the same thing
+- it does indeed do the same thing, how weird
+- 0.33 is causing an ata error 14 now, with the extra `cpu_as_fifo[0] | cpu_as`
+
+- I think it might have to do with the fact that only the request_* signals are inputs to the other modules, rather than each of
+  them selectively including the cpu_as input
+- what I have should be the same logically as I had before, but with an extra input into the address decode module, so not sure why
+  it still doesn't work...
+
+
+2026-02-15:
+
+- adding cpu_as to the request_rom signal worked, although it did leave the "in-use" led lit on the CF card after reading.  It
+  didn't seem to have issues reading the ATA though
+- adding cpu_as to the request_ram signal did not work, causing it to not detect the ATA.  Looking at the code, there's a clocked
+  process for controlling the ram DS signals, so that might be why
+
+- I finally just replaced the pullups with 1k resistors, and it didn't fix the problem.  It's still hanging when typing characters
+  in, and still has the same error leds, which is to have OP5 lit, but not 4 or 6.  That corresponds to "failed to read" where it
+  loops 100 times trying to get the latest character, and not buffer full, since it will not put invalid characters into the buffer
+  anymore
+- ok, so it's not a pullup issue.  Is it worth it to install the old pullups?  Maybe with these ones it won't be so sensitive to the
+  analyzer probes?
+- well, I tried putting the oscilloscope probe on it, and then the input started working, and now I've power cycled it and tried
+  again, and it still seems to be working.  I can't seem to make it fail again.  The probe is not on
+- looking at the timings though, the DSACK0 peaks are much higher, getting almost to 5V before the next cycle starts.  It maybe
+  takes 20ns or less to get above 2.2V instead of taking 60ns or so with the 2.2k pullups
+
