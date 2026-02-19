@@ -19,7 +19,7 @@
 #define SSW_RW_READ		SSW_READ_WRITE
 #define SSW_RW_WRITE		0
 
-struct exception_frame {
+struct __attribute__((packed)) exception_frame {
 	uint16_t status;
 	uint32_t pc;
 

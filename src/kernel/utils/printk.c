@@ -41,14 +41,13 @@ int printk_direct(const char *fmt, ...)
 	return ret;
 }
 
-int printk(const char *fmt, ...)
+int printk_buffered(const char *fmt, ...)
 {
 	int ret;
 	va_list args;
 
 	va_start(args, fmt);
-	// TODO this has been set to direct because otherwise the buffer fills up, and everything slows to a crawl
-	ret = vprintk(DIRECT, fmt, args);
+	ret = vprintk(BUFFERED, fmt, args);
 	va_end(args);
 
 	return ret;
