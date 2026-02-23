@@ -4522,3 +4522,486 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   image I was using worked fine and I couldn't restart it to make it break.  I tried other images I had saved, and two of the images
   still do the double character thing, but two or three of them work, and both the with the field and without seem to work
 
+
+2026-02-18:
+
+- I tried swapping the serial controller back and it definitely did the 0xE1 thing, and putting the working chip in and it worked
+  fine
+- I then cleaned up and committed what I had, and then unstashed my previous changes, which were the minimum changes that broke it
+  earlier, and I was getting the double character thing again, so that explains why some images were still doing that.  It's a
+  separate problem
+- I cleaned up and stashed the changes again, and it seems to work reliably without the changes, breaks with then
+- I tried undoing the tty_68681 changes only, and it was still giving double characters/command not found
+- Undoing everything pretty much (it was already mostly commented out), while only having the two extra fields in iovec, and with
+  the int nsegs (duplicate) removed from the iovec union in inovec_iter, and that still gave double characters
+- then I think I removed one of the two extra fields in iovec_iter, and it worked fine
+- So then I readded the extra field causing the trouble, and added the machine alignment args to gcc, and that also worked, albeit
+  with the permissions flags wrong due to alginment issues previously caused by adding those flags.  So either this particular issue
+  is an alignment issue, or it's hidden by the alignment change?
+- alignment flags with one or two fields in the iovec struct works, so at least those changes that would sometimes cancel eachother
+  out seem to not being cancelling, with the machine alignment args (-malign-int -malign-strict
+
+- I swapped the CPU back in, the original one, and it seems to be working, so it might have only been the serial controller that was
+  broken, and the other CPU that wasn't working as well, was just a bit more marginal on DSACK or something, such that the broken
+  serial controller was less functional?
+
+
+2026-02-19:
+
+- it's specifically the -malign-int that fixes the problem, not the -malign-strict
+- it turns out there's a lot of differences between these two, one with align-int, and the other without.  Most of the addresses
+  seem aligned before and after, but they're like 0x20 to 0x30 bytes different.  The working version has the lower addresses, as if
+  it packed it better or moved some data around between them, which is odd.  I would have thought alignment would add padding that
+  would make the aligned version use more memory
+- I didn't see a difference between the .rodata sections where the tty addresses are.  I have a feeling the alignment difference
+  that makes or breaks this is actually on the stack (just a hunch)
+- the broken version has an extra addl/subl in tty_write when calculating the address of rdev in struct device?  That seems weird.
+  It's possible the problem is actually in tty and not tty68681
+- I'm not seeing any addresses that are really misaligned, and the structs in tty and tty68681 seem to not have an odd number of
+  bytes across their fields
+
+- I found some misaligned data in the .data section.  May or may not be related since a lot of stuff is changed between these
+  builds, but yeah, 10ecb8 vs 10ec88, which is `proc_files`
+- it seems like adding __attribute__ ((aligned (4))) to struct tty_device will fix the problem, but adding it to the tty_68681
+  structs won't change anything
+- ok so this is so far pretty definitively a problem, but I still don't know if it's actually here, but elsewhere and affected by
+  here.  The struct tty_device has two fields at the top, one of which is a device number, and one which is a pid number.  I guess
+  when I had originally made this, the pids were 16-bits, but I think I changed that at some point to be 32-bits, and so now the
+  everything in that struct is off by 2.  Adding a padding byte instead of the alignment tag also fixes the problem
+- adding the padding to the end of struct tty_device also seems to fix the problem, but adding it to struct serial_channel in
+  tty_68681 doesn't fix the problem
+- according to the symbols table, there's virtually nothing in memory that comes after the tty_device's `devices` list
+- there's another devices struct that I was getting confused by, in slip, which also is misaligned, but adding padding there doesn't
+  change anything.  It only seems to be the tty struct
+
+- actually, padding at the end kind of makes sense too because it's an array of 2 elements, so the second element will be misaligned
+  if the struct is not the right size, which might be where the effect is coming from?
+- trying 3 elements doesn't fix the problem, and changing the buffer size rather than adding padding fixes it, but I don't think
+  either of those things tells me much
+- what about putting the odd one out `rdev` field to the bottom instead of the top?  that doesn't fix the problem?  That doesn't
+  really make sense to me
+- changing the tty devices to 1 instead of 2 fixes the problem, without padding... that also doesn't make much sense
+- iiinteresting... I changed the #define size of the array of tty_device to 1 so that it would only process one tty in the loops,
+  like tty_process_input, but still kept the array size at 2, so that it had the same size in memory, and that's working!  which
+  means the problem is not with the struct in the data segment.  It's with calling tty_process_input on the second array that's
+  somehow messing it up?
+- only having the process_input loop do one iteration (without any other changes) makes it work...
+- changing the rdev to 0 in dev_read in the tty_process_input function makes it segfault with a weird address, 60700000 which seems
+  weird, but also maybe related?
+- maybe not, I tried adding the padding that should fix things, and it's still got a segfault on 607E0000 (slightly different) so
+  this might not be related
+- I modified things enough to put the tty_68681_getchar_buffered function call directly into the tty_process_input function instead
+  of going through tty_68681_read, which involves the iovec_iter, and that worked fine!!! so it's likely something related to the
+  iovec_iter that's a problem?  Maybe that inline assembly instruction actually was the problem all along, but it's an alignment
+  issue due to the instruction used?  Well no, because it was using memcpy_into_iter instead of copy_uint8_into_iter, and both are
+  broken
+
+
+2026-02-20:
+
+- Ok, I've found another way of making the bug happen while using all the strict flags in gcc, which had previously fixed the
+  problem.  I had narrowed things down to adding an attribute onto struct tty_device, but that was while using the iovec_iter
+  functions to transfer the character.
+- Replacing the call to dev_read->tty_68681_read, which expects an iovec, I made a duplicate function called tty_68681_getchar,
+  which did the same thing but took an old style buffer, and if I replace the iter_init+dev_read in tty_read_input with the getchar,
+  it has the bug all the time, no matter whether the alignment attribute is on struct tty_device, or all the alignment args.  It
+  seems to always have double characters or delayed reading of a character
+- the problem is indirect, obviously.  Changing the function that tty_read_input calls is what has an affect on whether the bug
+  occurs or not.
+
+
+2026-02-21:
+
+- I'm playing around with various versions that work and don't work, trying to compare differences, and honestly it doesn't make a
+  heck of a lot of sense
+- in 2026-02-21-iter-vs-getchar I have two broken and two working versions:
+    broken -> with tty_68681_getchar instead of using the iovec iter through dev_read
+    working -> using dev_read, and with `__attribute__ ((aligned (4)))` on struct tty_device
+    alsobroken -> using dev_read, without alignment
+    alsoworking -> using tty_68681_getchar, but with the loop removed, and returning the char as int instead
+
+- I still can't conclusively prove that more or less code is changing things, since some of the addresses are less than, and some
+  are more than, without any correlation to working vs not working
+- going through old images to find the ones that are still broken after changing the serial controller:
+    - 2026-01-25-tty-extra-iter-field-vs-not is still broken
+    - 2026-01-25-tty-char-volatile-or-not is still broken
+    - 2026-01-28-gcc-15-vs-gcc-14 is still broken
+    - 2026-01-31-incremental-compile-vs-clean-compile is working
+    - 2026-02-19-align-int-vs-not is still broken
+- so it seems like they're all still broken except for that incremental compile one.  I thought more of these were working again the
+  last time I tested them, which is a bit unnerving if that's not the case.  Either I didn't test them properly and had mistaken a
+  broken one for working, or there's some inconsistent behaviour of some kind
+
+- I tried changing tiny things about the tty_process_input and tty_68681_getchar functions to get it from broken to working, and I
+  had changed everything to make it like it was when working, removing the loop from getchar, removing the size arg from the
+  function, returning the value as the int returned, even added the `ch = error;` line after the function in tty_process_input, and
+  none of those things worked.  It wasn't using that last `&ch` argument at all, but just having it there was causing it to always
+  break.  Removing that arg made it start working
+- the arg was actually still present in the def, but the decl and call had it removed.  Removing it from the def and adding it back
+  to the decl also causes the problem.  So it seems to be having that arg in the function call that breaks it
+- changing the arg passed in (the one that isn't used) to be "test" or NULL both work.  The problem doesn't occur.  It's so far only
+  occurring with `&ch` passed in
+- changing it to `(char *) &error` also fixed it, so it's only that char???
+- I changed `char ch` to be `int ch`.  I had to also cast it when passing it to write.  It works but prints NULL instead of the char
+  when echoing, which is to be expected given I'm not properly adjusting the address or casting
+- I have the broken code back in place, with `char ch` and `&ch` passed into the read function, but I have dev_write() call
+  commented out and replaced with printk().  It's not printing the character properly either, but the commands are running as if
+  it's reading it in correctly... So it's something to do with the interaction of the echo dev_write() call and passing ch into
+  getchar?
+- I switched back to using the iter for reading the input char, but with the echoing dev_write call replaced with printk, and it
+  works fine, so it's somehow the interaction between those two calls?
+- I made it set ch to '!' before echoing it, and I'm not sure if it worked or not because the check for '\n' happens right after
+  that call, so it never detected the newline
+- changing it to use a completely different char variable for echoing, and making it const, the problem is still happening... that's
+  very odd since it's a different memory location being manipulated
+- in tty_68681_write, I replaced the copy_uint8_out_of_iter() call with memcpy_out_of_iter() and it's now working
+- the really weird thing is that despite changing that function fixing things now, it was previously breaking/getting fixed by
+  removing the &ch argument from getchar.  Why would not passing in an extra argument cause it to work if the problem was in writing
+  the character later on...
+- I replaced the copy_uint8_out_of_iter() call in tty_68681_write with a direct kernel buffer print rather than the switch statement
+  that can copy out of user buffers, and it's printing garbage when printing the command output, but otherwise seems to work
+- I've copied the switch statement from copy_uint8_out_of_iter into the write function, and it's not printing anything except bus
+  errors now, but it seems like it's running commands given the bus errors
+- I have no idea why this isn't printing anything out...
+- I changed the default switch to print a message, and it's always hitting that, so it's not actually switching properly? wtf
+- THIS MAKES NO FUCKING SENSE
+- the consts are definitely 1 and 2, and the iter->type is definitely 1 or 2 depending on the call, but it's always running the
+  default branch of the switch
+- ho lee shiit.  I think I see the problem, and I'm... kind of embarassed?  I don't think this problem applies to the original
+  function.  Only to me erroneously copying it into tty_68681_write.  I forgot the breaks given it's not returning.  The real
+  copy_uint8_out_of_iter() uses returns instead
+
+- alright, so for real now, replaced copy_uint8_out_of_iter() with the same code but directly inserted into tty_68681_write, and it
+  seems to be working correctly...
+- these two versions are nearly identical, but there are some small differences:
+    - the broken version pushes one more register onto the stack when it enters the function, %a5, and because of that, the offset
+      to fetch something on the stack is a bit different
+        Broken
+        ```
+        106c92:	48e7 383c      	moveml %d2-%d4/%a2-%a5,%sp@-
+        106c96:	246f 0028      	moveal %sp@(40),%a2
+        106c9a:	4280           	clrl %d0
+        106c9c:	102f 0023      	moveb %sp@(35),%d0
+        ```
+        Working
+        ```
+        106c92:	48e7 3838      	moveml %d2-%d4/%a2-%a4,%sp@-
+        106c96:	246f 0024      	moveal %sp@(36),%a2
+        106c9a:	4280           	clrl %d0
+        106c9c:	102f 001f      	moveb %sp@(31),%d0
+        ```
+
+    - there's a jump to a different location than expected
+        Broken
+        ```
+        106d02:	508f           	addql #8,%sp
+        106d04:	50c0           	st %d0
+        106d06:	601a           	bras 106d22 <tty_68681_write+0x90>
+        ```
+        Working
+        ```
+        106d02:	508f           	addql #8,%sp
+        106d04:	70ff           	moveq #-1,%d0
+        106d06:	60d8           	bras 106ce0 <tty_68681_write+0x4e>
+        ```
+
+- From the broken image, I went in and searched for `508F50C0601A` and switched it to `508F50C060D8` to change the location of that
+  branch, and interestingly enough, the code works the same, no catastrophic failure, but it's still doing the double character
+  thing, so that's not causing the problem, it would seem
+
+- the diff of the two versions is just this.  I think this is the smallest diff I've found that breaks or doesn't, and it seems the
+  only thing that isn't that jump instruction is the extra reg on the stack?
+      2c2
+      < kernel.broken.elf:     file format elf32-m68k
+      ---
+      > kernel.working.elf:     file format elf32-m68k
+      9213,9214c9213,9214
+      <       48e7 383c       moveml %d2-%d4/%a2-%a5,%sp@-
+      <       246f 0028       moveal %sp@(40),%a2
+      ---
+      >       48e7 3838       moveml %d2-%d4/%a2-%a4,%sp@-
+      >       246f 0024       moveal %sp@(36),%a2
+      9216c9216
+      <       102f 0023       moveb %sp@(35),%d0
+      ---
+      >       102f 001f       moveb %sp@(31),%d0
+      9237c9237
+      <       4cdf 3c1c       moveml %sp@+,%d2-%d4/%a2-%a5
+      ---
+      >       4cdf 1c1c       moveml %sp@+,%d2-%d4/%a2-%a4
+      9250,9251c9250,9251
+      <       50c0            st %d0
+      <       601a            bras <tty_68681_write+0x90>
+      ---
+      >       70ff            moveq #-1,%d0
+      >       60d8            bras <tty_68681_write+0x4e>
+
+- I'm pretty sure the `st` and `moveq` instructions are identical, but I'll test that next.  Modified load script with both the
+  alternate jump, and the moveq inserted, and the problem is still happening, otherwise seems the same
+- I carefully modified it further to remove %a5 from the movem instruction, and insert %d0 instead.  The diff shows no %a5 being
+  used, so I believe that's a compiler mistake that doesn't clean up after some optimization, so it shouldn't make a difference that
+  it's not saved, but there needs to be something on the stack to make it get the right arguments without changing the two
+  instructions with stack-relative offsets
+- I'm still getting double chars on that one, so is the stack offset the thing causing this?
+- what if I add a value onto the stack, and adjust the offsets?  That seemed to not print anything now?  But otherwise it seemed to
+  work in that I'm getting bus errors when commands run
+- ok, undid the offset and movem changes, and then went back and adjusted them to match the working binary.  That seems to work
+- both versions seem to not use %a4 and %a5!?  That's very odd that the code generated is so wrong, but what if I try removing %a4
+  as well as %a5, since removing %a5 got it to go from breaking to working
+- it still works, where it doesn't save %a4 or %a5 and has those adjusted offsets.  Since the regs aren't used, I have a feeling it
+  might be the offsets that are causing it somehow, or the extra value on the stack, since removing 1 or 2 values from the stack
+  made it start working
+- changing it to save %a5 instead of %a4, but otherwise keep the offsets that worked, and it still works
+
+- Aha!  I thought, if the problem is an extra thing on the stack, then using the working code, but adding something that will add an
+  extra value onto the stack should make it break.  I used the version of tty_68681_write which has the contents of copy_uint8
+  pasted into it, and confirmed it was working, and then added a `volatile int test = 0;` to the top, and now it's broken.
+- looking at the diff of the dumps is really weird.  The version that's breaking now has a lot of changes different, just with that
+  added `int`.  It changed the movem to no longer save %a4 on the stack in the movem, but the offsets for getting the arguments are
+  still larger by 4, like the broken version that uses `copy_uint8_out_of_iter`, so it's definitely using an extra stack value, but
+  lots of other instructions are different too
+- I tried printing the stack in that function, and it causes it to break when it should otherwise work just having the extra print
+  in there.  I'm still not sure if it's getting the right value, but it seems to either print 0x11FF58, or 0x11FF54, depending,
+  which is where the kernel stack should be, and seems a bit weird that it would be different sometimes, but also doesn't seem
+  anywhere near where there should be other used data (no overflow)
+- the same print code moved to tty_process_input is printing 0xFF88 which doesn't make sense, so I'm not sure my assembly is working
+- I guess it was just a matter of adding the size to the instruction, so I guess it was sometimes interpreting it as a word
+  operation?
+- anyways, it's print 0x11FF88 which at first I thought was wrong, because it's a bigger number, but I forgot that that's expected.
+  0x11FF54 is higher on the stack
+- the problem is not happening with the print in the parent function, and no weird stuff in that 68681 function, but that at least
+  tells me that the problem might be around that area
+- there's no symbols around that area, but that doesn't mean there couldn't be a calculated offset that ends up in that area
+- I tried putting some values onto the stack just before begin multitasking to see if there was a high water mark on the stack, but
+  it seems to be using most of the stack between then and the input, so I don't think this is related to just overflowing the stack
+  into something else
+
+- it seems that the printk of the stack before the call to echo the char with dev_write makes it work, but moving the printk to be
+  at the top, outside the loop in tty_process_input, it breaks again
+- I tried disabling the networking, and it's still breaking under the same conditions, so I'm going to assume it's unrelated.  It
+  will make it faster to load and test to have it disabled
+- hmm... if I put the stack printing before the ISIG processing block, it breaks, but if I put it after that if statement, it works,
+  so is it related to that
+
+- if that block is in, it has the problem. If it's commented out, it works
+- replacing the accesses to VINTR and VSTOP with numbers didn't make it work.  Removing everything except the outer if also didn't
+  fix it
+- removing the ISIG from `tty->tio.c_lflag & ISIG` seemed to fix it
+- but adding the other if statements back after that seemed to break it again, so it's not just that...
+- I restored most of that block piece by piece until it broke again, and it wasn't until putting `tty->tio.c_flag` in (without the
+  ISIG) to get it breaking again
+- changing the struct termios struct to use int instead of short for the flags fixed it.  Also adding alignment to that struct fixed
+  it
+- mother. fucker.  The difference between having a ref to c_cc vs c_lflag is that an extra thing is put on the stack in
+  tty_process_input.  Also adding the `volatile int test = 0` line to the top breaks it.  Even commenting out the whole block, which
+  worked previously, but adding the unused var and it still breaks!
+- with the added var, the printing of the stack doesn't fix anything
+- adding 4, 3, 2, or 0 volatile vars will fix the problem, but 1 of them will make it double char
+
+- adding 1 only to the bottom half runner in bh.c, which calls tty_process_input, causes the problem.  Adding 2 of them fixes it
+  again, just like if that variable is in tty_process_input, so it's definitely a stack issue.  It's like its overwriting the stack,
+  or otherwise saving/restoring the kernel stack incorrectly.  That or it's related to the MMU code reusing that area erroneously.
+- I tried a bunch of things, and settled on moving the kernel_stack pointer to kernel_stack_backup before writing any new value to
+  it, and setting it to 0 when copying the value out of it into %sp.  I'm printing both pointers in the tty_process_input function,
+  and it's always printing as 0, 0 for both.  There's no obvious sign of failure due to the stack pointer being 0 when it shouldn't
+  be, and the backup is never not 0, which means it never overwrites a valid stack value.  Maybe it's still doing that since this
+  print isn't catching every instance, but it's at least not happening on the most recent two entries into interrupt handler code
+- I think that is likely to mean the problem is not with the stack pointer being invalid, at least not due to this.  That kind of
+  points more to it being a memory addressing problem of some kind
+
+
+2026-02-22:
+
+- I'm trying to think how possibly could this behaviour occur.  I could imagine a whole bunch of memory issues with invalid pointers
+  or indexing the wrong type to get the wrong memory location, but I don't suspect there are other processes running between these
+  characters being read in, so it's likely there's a more limited set of possible causes
+- it seems to happen in the tty code specifically, while the bottom half is running.  It might possibly be related to interrupts,
+  but either way, it's as if the stack is being corrupted while these functions are being called, such that it can erroneously loop
+- I put a single character printk into the loop of tty_process_input, and when I press one character, it's printing it 2 or 3 times,
+  so it's definitely looping there, but I need to know in more locations and relative to each other
+- I have ones in the serial irq handler, one on entry into tty_process_input, and another for each character ready by
+  tty_process_input, and I press a char, and get irq -> bottom half -> entry -> char -> char, and then the character is echoed, so
+  it's only entering the bottom half once, and looping twice
+- I pressed enter (which sends two chars), and got some unexpected results.  It has two irq entries into handle_io_channel, then
+  bottom half -> entering tty bottom half -> char, then there's a newline, which I think is the enter character that I pressed, and
+  then bh -> tty bh entry -> char -> char -> char -> (echos `l` a second time) -> then bh again -> tty entry -> char
+- what if it's the ring buffer getting corrupted, and when it goes to run the bottom half, there's more characters available than
+  there should be?  I need to better test the irq vs the bh
+- so I'm printng a '.' to the tty68681 buffer whenever it has found the status byte to say there's one char available.  When I press
+  the first char, it prints 1 dot.  When I press a second char, it prints 3 dots.  That said, I don't know how accurate this is
+  given it's using the buffered writer
+- I switched to direct printing with tty_68681_putchar_direct, and it's still printing 1 and then 3 and then 1 and then 3, so once
+  again (as was the case last time I was debugging at this point) it seems to be getting too many chars in this loop
+- Ok, an `>` when entering the irq, a `x` if it was an error char, and a `.` if it put it into the buffer: same behaviour, 1 entry
+  then 1 dot, 1 entry then 3 dots, etc, so it's not multiple irqs
+- what if one of the other functions being called in the irq code is causing this, so I've disabled the ring buffer code that
+  inserts the char, and commented out the TTY68681 bottom half running
+- Aha!  Progress!  It's obviously not echoing or reading in chars, but I'm only getting 1 irq entry, 1 dot, each time I press a char
+- I'll reenable the bottom half, even though a decent amount of stuff runs from that.  I'm sure it will cause the problem again
+- Hmm... It doesn't.  That's odd.  I guess that's not entirely conclusive that it's not the bottom half involved
+- disabled bottom half again, and re-enabled ring buffer.  Hmm... now it's happening, so it seems pretty certainly related to the
+  ring buffer
+- it seems like the only changes to ring buffer have been related to the addition of the iter functions, and nothing specifically
+  related to the other functions.  I suppose I could comment out those ones to see if they're indirectly corrupting something
+- that didn't seem to change anything.  It's still printing everything as expected, which is a bit odd to be honest, since I thought
+  some user-requested calls to write are going through iter, which would have to copy to the ring buffer...
+- I removed the volatiles from the fields and now it's working, but that doesn't make sense.  I'm not at all satisfied with this
+  solution.  This seems sketch, like it's related to a compiler bug
+
+- so it goes away when I remove the volatile keywords from the struct ringbuffer fields...  I have a feeling I had come across this
+  problem before, years ago possibly, and added those volatiles to fix it back then.  I could imagine that adding them would fix
+  such a problem, but I absolutely can't fathom why removing them might also fix this problem, unless it was actually a compiler bug
+  of some kind
+- Perfect!  It didn't fix it.  Adding an extra volatile var to tty_process_input caused it to break again, so it was just shifting
+  the problem again.  Removing the volatiles must have changed the stack slightly so that the problem only occurs again once it's
+  back to the special size where the fault occurs
+- with the network stuff removed, there seems to only be the two serial channel buffers initialized?  That doesn't seem right.
+  There's 4 buffers, so maybe it's not printing the first two because it's not initialized yet?
+- I swapped rx and tx buffer inits for channel A, and it's still only printing two, which seems odd... threw a printk in, and it's
+  printing that it completed preinit
+- oh it's because the channel A ports wasn't initialized until after.  I printed the buffer addresses in preinit and they look ok
+  a.rx 0x10DAC6, a.tx 0x10DCCC, b.rx 0x10DEE2, b.tx 0x10E0E8
+
+- actually, the bottom half was still running, because the rx_ready flag was set, and the timer interrupt would have triggered it.
+  I could tell because it was still echoing the letter entered.  I'll try disabling that, so the 68681 bottom half should still run,
+  but it shouldn't schedule the tty_read_input (tty bottom half)
+- and indeed that works, only one char entered.  It's also not printing the e and c debug chars, so really I should have noticed it
+  earlier that it was still running that.  So it's adding it to the ring buffer, but not running the bottom half.  But this is so
+  weird because the bottom half shouldn't run until after the interrupt is exiting, and by that point, the irq should have been
+  serviced, so how could it have been looping 3 times within the handle_io function?
+- also something I was thinking about was that irqs might still be happening while the bottom halves are running, which might be how
+  the stack gets corrupted.  The kernel_stack_backup value is only checked/printed when a character is pressed, but the irq is
+  entered multiple times for what should be quick events
+- I put a check on the serial irq entry to set an LED if the kernel stack or kernel stack backup are not zero, but it's not setting
+  the LED so I guess that's ok.  So that's unlikely to be the source of the corruption
+
+- So back to debugging the bottom half and irq handler.  I have the 68681 bottom half enabled, but it's not triggering the tty
+  bottom half, and I'm printing out the in/out numbers for the rx ring buffer using printk_buffered, and it's showing the correct in
+  nummbers.  The out numbers aren't going down because the other bottom half is disabled
+- I have the start of the bottom half for the tty enabled, including the loop and the reading of one char, and the results I'm
+  seeing are a bit weird.  It's looping twice for each character entered.  I guess that's not *that* weird because it will read in
+  one character, loop, and then try to read a second character to find there's none available, and exit.  The `c` debug chars are
+  printed before calling dev_read().  There's only one dot printed
+- without knowing why the stack size/contents triggers the problem, it's hard to know if it's still happening or not when it doesn't
+  get triggered.  Is it not happening or has it just not been triggered because of some other code running?
+- maybe, since the stack is almost always the same depth, and it seems to be after it calls the tty_68681_read function or write
+  function, maybe I can print the stack location there, and use that to gauge whether to add or remove volatile vars to make it
+  break again?
+- in tty_68681_read, it's printing 0x11FF54 on entry
+- adding the `continue` after the read, to cut off the rest of the loop, it's now printing 0x11FF60, so adding 3 more long words to
+  the stack should get it to the breaking point?
+- either the thing that causes the problem isn't running, or this crude approximation isn't correct.  I tried one less and one more
+  than 3 and none of those are causing the problem.  How about uncommenting more code
+- most of the function is uncommented, except for the ISIG block, but there's also a volatile var, and it's printing 0x11FF54, and
+  also has the problem occurring, so I've tried to commenting out most of the big block at the bottom except for the echo, and now
+  it's printing 0x11FF58 and it's not double-charring, so adding a var might make it fail?
+- aha! there, adding one it's now printing 0x11FF54, and double charring with the three dots, so I think I can use the stack val
+- ok, so I've commented out the write call.  It should still print our stack value, which is still 0x11FF54, but the problem is not
+  occurring.  But I can't accept that it's "just the write" causing this.  Maybe without the write, the 0x11FF54 indicator is no
+  longer accurate?
+- what if I uncomment the write, and comment out the actual putchar in the write function?  It's still printing the debug stuff
+  despite none of the user text showing, and it's still actually putting the chars in the buffer, and it's printing the stack as
+  0x11FF54 (which I can't trust because it's in the read and not the write which has now been modified), but it's not doing the
+  double char thing, and it's showing bus errors as if it's CoWing when I type commands, so the problem is not occurring
+- I moved the stack print to the write, and tried it with the putchar enabled and disabled.  The problem occurs with it enabled.  It
+  was printing 0x11FF58 outside of input (printing normal user text), but 0x11FF54 after a chars was input, when the problem
+  occurred.  When putchar was disabled, it's printing 0x11FF5C and 0x11FF58, so maybe disabling putchar with an extra volatile var
+  will cause the problem?  I'll put the var in the tty_process_input function instead of the write, just to be sure
+- So now it's printing 0x11FF5C outside of input, and 0x11FF54 inside of it, which is a bit odd that it's different like that, but
+  either way, the problem is not happening like this
+- what if I move the var to the write function?  Ok, it's now 0x11FF58 and 0x11FF54 when it gets an input, so it should be the same,
+  but it's not breaking (this is with tty_68681_putchar_buffered commented out).  So is it putchar that's causing the problem?
+- the problem is occurring, but it's a bit different, and the stack values aren't the expected values because I didn't remove the
+  var.  It's 0x11FF54 and 0x11FF50, and it has double chars, but doesn't print 3 dots, only 2 dots.  The first two chars inputted
+  after an enter result in double chars, and then it's back to single chars from there
+- I commented out the volatile var, and now it's behaving as before, where first char is 1 dot, second is 3 dots, alternating from
+  there.  So it seems the problem occurs in two conditions and behaves a bit differently, depending very explicitly on the stack
+  size
+
+- there's not all the much in tty_68681_putchar_buffered.  The busy loop isn't triggered since I added an LED set op which isn't
+  triggered, although now that I look at it, with that LOCK/UNLOCK, shouldn't the busy loop be outside the lock?
+- with the _buf_put_char disabled, but the busy loop, locking, and enable transmitter command enabled, it's still got the problem
+- hmmm... I moved the lock to after the busy loop and the problem went away.  This doesn't make sense...
+- put it back to the way it was, and now I have buf put char and enable transmitter disabled, so it's just the busy loop and the
+  locking left, and busy loop within the lock.  Problem is gone, and stack sizes look correct although that's no guarantee
+- I tried 0, 1, 2, and 3 vars added to the putchar_buffered function, with the enable transmitter and putchar disabled, and the
+  problem is not occurring
+- with just the enable transmitter command commented out, it seems to be working
+- with just the busy loop commented out, it's working (enable transmitter command is still there)
+- and with the lock moved to after the busy loop (but everything else enabled), it's working
+- that leads me to think it's not this, but elsewhere
+- this function is a static inline, so what if I change that?  Seems to still be broken, so now I can inspect that function
+- The enable transmitter command is the 3 asteriked instructions.  With them it fails, without it works, but it's not only that
+  different that causes it to work/not work, so I don't know that it's these that are causing the problem
+    ```
+    106594:       3540 0208       movew %d0,%a2@(520)
+   *106598:       206a 040c       moveal %a2@(1036),%a0
+   *10659c:       2068 000c       moveal %a0@(12),%a0
+   *1065a0:       10bc 0004       moveb #4,%a0@
+    1065a4:       46ef 000e       movew %sp@(14),%sr
+    ```
+- I put in `*channel->ports->command = 0;` instead, which should be a no-op, and the problem is occurring now.  It's one instruction
+  byte fewer than the other instruction that was causing this.  Neither the working nor broken versions seem to be differing in how
+  much of the stack they use, so maybe once it's here, it's about the code size?
+- the offsets look ridiculously big, of course, but that's because there's two 512 ring buffers in the struct being indexed
+- what if I move the ports to before the ring buffer...  Still same behaviour
+- tried moving the ring buffers to the end of the struct, added a byte of padding, none of that has fixed the problem, so not
+  related to that struct or its layout I guess
+- I compared the code bytes in memory after the problem occurs between the source, from 0x106500 to 0x1066F0, and there's no
+  difference.  It's only a small chunk, so that's not definitive proof, but yeah
+- bit of a hail mary but what if I remove the tx enable command from putchar, and put it into getchar below as a dummy 0 write?
+  the problem doesn't occur, so it's not just a matter of the code size pushing it into breaking
+
+- interesting... I changed the location of the stack by changing it in _start, and I tried also changing the location of kmem and
+  pages, to be various places in the upper part of the 0x200000 addresses, and I got the same double characters behaviour in every
+  case, so it would seem that it's not some interaction between pages memory/address or the stack location being modified by
+  addresses outside of the code executing.  It does seem to be dependent on the stack size relative to other things on the stack,
+  and there might be some interaction with global data somehow, or modified code.
+
+- I stopped updating this for a while, I changed course and tried to get tracing working, which was easier than I thought.  It's
+  still doing the problem with tracing enabled.  I can print everything, and see that it is indeed going through that serial loop 3
+  times instead of 1.  I've copied the trace into a file and annotated it by hand, and then I added a comparison into the trace
+  handler which checks for the status read instruction, and prints out the values of the regs at that point.  (The actual trace is
+  just the first part, and I manually added the instructions in)
+    ```
+    Trace pc=106316 sp=11FFA4 (pc)=2069       moveal %a1@(8),%a0
+    Trace pc=10631A sp=11FFA4 (pc)=1010       moveb %a0@,%d0
+    Trace pc=10631C sp=11FFA4 (pc)=0800       btst #0,%d0
+    a0=700003 d0=1
+    Trace pc=106320 sp=11FFA4 (pc)=675C       beqs 10637e <handle_serial_irq+0xb6>
+    Trace pc=106322 sp=11FFA4 (pc)=0C00       cmpib #15,%d0
+    ...
+    Trace pc=106316 sp=11FFA4 (pc)=2069       moveal %a1@(8),%a0
+    Trace pc=10631A sp=11FFA4 (pc)=1010       moveb %a0@,%d0
+    Trace pc=10631C sp=11FFA4 (pc)=0800       btst #0,%d0
+    a0=700003 d0=1                                                                 
+    Trace pc=106320 sp=11FFA4 (pc)=675C       beqs 10637e <handle_serial_irq+0xb6>
+    Trace pc=106322 sp=11FFA4 (pc)=0C00       cmpib #15,%d0
+    ...
+    Trace pc=106316 sp=11FFA4 (pc)=2069       moveal %a1@(8),%a0
+    Trace pc=10631A sp=11FFA4 (pc)=1010       moveb %a0@,%d0
+    Trace pc=10631C sp=11FFA4 (pc)=0800       btst #0,%d0
+    a0=700003 d0=1                                                                 
+    Trace pc=106320 sp=11FFA4 (pc)=675C       beqs 10637e <handle_serial_irq+0xb6>
+    Trace pc=106322 sp=11FFA4 (pc)=0C00       cmpib #15,%d0
+    ...
+    Trace pc=106316 sp=11FFA4 (pc)=2069       moveal %a1@(8),%a0
+    Trace pc=10631A sp=11FFA4 (pc)=1010       moveb %a0@,%d0
+    Trace pc=10631C sp=11FFA4 (pc)=0800       btst #0,%d0
+    a0=700003 d0=0                                                                 
+    Trace pc=106320 sp=11FFA4 (pc)=675C       beqs 10637e <handle_serial_irq+0xb6>
+    Trace pc=10637E sp=11FFA4 (pc)=2F0E       movel %fp,%sp@-
+    ```
+- It really is reading in 1 as the status byte.  There are no instructions here that woulda account for this weird behaviour.  It's
+  really reading in the wrong byte, or the ...  or the read byte is not getting executed?  But it is I think... (looks)
+- I have to go to bed, so I can't check what the value it's reading in from that register is, but it's definitely reading from
+  address 0x700007, which is the receive byte address... so it honestly seems like the serial port is malfunctioning.... or there's
+  an electrical problem
+
+
+2026-02-23:
+
+- after talking about it with Helena, I mentioned that the slower speed seemed to fix it but I hadn't tested it since I replaced the
+  serial controller.  She suggested I try it again, and I just did, and it works at 12.5MHz and not at 25MHz... So it's definitely a
+  timing issue?  By why does a very specific stack size and such has this to happen?
+

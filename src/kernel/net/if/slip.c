@@ -38,6 +38,7 @@ struct slip_if_device {
 	struct if_device ifdev;
 
 	device_t rdev;
+	uint16_t _padding;
 
 	short rx_read;
 	short rx_write;
@@ -48,7 +49,7 @@ struct slip_if_device {
 	unsigned char tx_buffer[SLIP_MTU_MAX];
 };
 
-static struct slip_if_device devices[SLIP_DEVICES];
+static struct slip_if_device slip_devices[SLIP_DEVICES];
 
 static void slip_if_process_input(void *_unused);
 static void slip_if_write_data(struct slip_if_device *ifdev);
@@ -56,15 +57,15 @@ static void slip_if_read_data(struct slip_if_device *ifdev);
 
 int slip_if_init()
 {
-	memset(devices, '\0', sizeof(struct slip_if_device) * SLIP_DEVICES);
-	devices[0].ifdev.ops = &slip_if_ops;
-	devices[0].ifdev.name = "slip0";
-	devices[0].ifdev.mtu = SLIP_MTU_MAX;
-	devices[0].rdev = DEVNUM(DEVMAJOR_TTY68681, 1);
+	memset(slip_devices, '\0', sizeof(struct slip_if_device) * SLIP_DEVICES);
+	slip_devices[0].ifdev.ops = &slip_if_ops;
+	slip_devices[0].ifdev.name = "slip0";
+	slip_devices[0].ifdev.mtu = SLIP_MTU_MAX;
+	slip_devices[0].rdev = DEVNUM(DEVMAJOR_TTY68681, 1);
 
 	register_bh(BH_SLIP, slip_if_process_input, NULL);
 	for (short i = 0; i < SLIP_DEVICES; i++) {
-		net_if_register_device((struct if_device *) &devices[i]);
+		net_if_register_device((struct if_device *) &slip_devices[i]);
 	}
 	return 0;
 }
@@ -198,7 +199,7 @@ static void slip_if_write_data(struct slip_if_device *ifdev)
 			iovec_iter_init_kernel_buf(&iter, (char *) &ifdev->tx_buffer[ifdev->tx_read], ifdev->tx_write - ifdev->tx_read);
 			written = dev_write(ifdev->rdev, 0, &iter);
 			if (written < 0) {
-				//devices[i].error = read;
+				//slip_devices[i].error = read;
 				return;
 			}
 			ifdev->tx_read += written;
@@ -219,7 +220,7 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 	iovec_iter_init_kernel_buf(&iter, (char *) &ifdev->rx_buffer[ifdev->rx_write], SLIP_MTU_MAX - ifdev->rx_write);
 	read = dev_read(ifdev->rdev, 0, &iter);
 	if (read < 0) {
-		//devices[i].error = read;
+		//slip_devices[i].error = read;
 		return;
 	}
 	ifdev->rx_write += read;
@@ -249,8 +250,8 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 static void slip_if_process_input(void *_unused)
 {
 	for (short i = 0; i < SLIP_DEVICES; i++) {
-		slip_if_read_data(&devices[i]);
-		slip_if_write_data(&devices[i]);
+		slip_if_read_data(&slip_devices[i]);
+		slip_if_write_data(&slip_devices[i]);
 	}
 }
 

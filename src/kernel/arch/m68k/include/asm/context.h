@@ -11,6 +11,16 @@
 #include <asm/mmu.h>
 #endif
 
+
+struct syscall_registers {
+	uint32_t d0;
+	uint32_t d1;
+	uint32_t a0;
+	uint32_t a1;
+	uint32_t d2;
+	uint32_t d3;
+};
+
 /// The registers stored on the stack as part of a saved context
 struct context_registers {
 	// Full Context
