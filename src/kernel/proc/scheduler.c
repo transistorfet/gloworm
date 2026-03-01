@@ -14,6 +14,7 @@
 
 // Info for Current Running Process (accessed by syscall interface)
 void *kernel_stack;
+void *kernel_stack_backup;
 int need_reschedule;
 int kernel_reentries;
 struct process *idle_proc;

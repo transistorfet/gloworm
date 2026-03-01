@@ -96,9 +96,9 @@ void user_error(struct exception_frame *frame)
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
-	mmu_table_print(current_proc->map->root_table);
 
 	#if defined(CONFIG_MMU)
+	mmu_table_print(current_proc->map->root_table);
 
 	// After an exception, the `frame` is always pointing to the global kernel stack
 	printk("Exception Frame: %x\n", frame);
@@ -166,9 +166,13 @@ void handle_exception(struct exception_frame *frame)
 	}
 }
 
-__attribute__((interrupt)) void enter_trace(struct exception_frame frame)
+void handle_trace(struct exception_frame *frame, struct syscall_registers *regs)
 {
-	log_trace("Trace %x (%x)\n", frame.pc, frame.pc);
+	printk_direct("Trace pc=%x sp=%x (pc)=%04x\n", frame->pc, frame, *((uint16_t *) frame->pc));
+
+	if (frame->pc == 0x106328 || frame->pc == 0x106372) {
+		printk_direct("a0=%x d0=%x\n", regs->a0, regs->d0);
+	}
 }
 
 static void page_fault_handler(struct exception_frame *frame)

@@ -5005,3 +5005,47 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   serial controller.  She suggested I try it again, and I just did, and it works at 12.5MHz and not at 25MHz... So it's definitely a
   timing issue?  By why does a very specific stack size and such has this to happen?
 
+
+2026-02-24:
+
+- Aha!  I tried compiling it without MMU support, and it did work initially, but now that I know the stack thing that relates to it,
+  and I still had the prints for the stack position, it was printing out 0x11FF5C, which means it should need 1 extra int on the
+  stack to make the problem come back, and sure enough, adding an volatile var to tty_68681_write made the problem reoccur!  So it's
+  not dependent on the MMU code, and I might actually be able to trigger it in the emulator, if I could get it working again.  It's
+  been in pieces for like 2.5 years, in the middle of a refactor that I pretty much abandoned
+- It also really seems to be stack related, even though I'm not sure how that might work.  Is it like an uninitialized variable on
+  the stack that causes issues?  There's not much that explains why specifically the IRQ is affected though.  THIS IS SO WEIRD
+
+
+2026-02-28:
+
+- I finally got the emulator working (moa).  I had to recompile without 68030 support, and was able to confirm that it's still doing
+  the wrong thing on the retroverse k30p with MC68010 enabled instead of MC68030.  In order to get the emulator working, I had to
+  fix a bug in the decode for the EXTBL instruction, which was decoding to a LEA instruction incorrectly.  I also had to change the
+  memory map addresses of course, since the k30 is different from the k30p.  I had to change the ATA memory map stuff since there's
+  a slight difference in addresses between the onboard ATA in the k30 and the COMET card in retroverse.  I ended up recompiling the
+  kernel with a different CONFIG_ATA_BASE address (0x600021).  I came across a problem with DIVUL where it was being interpreted as
+  DIVS instead, and I haven't completely fixed the problem but I'm also working off an older commit because of the broken state it's
+  currently in.  I was building on top of 9be996d2a1c8fed9f049109c97794601f176708b from March 2023.  Once I got it starting to boot,
+  I ran into trouble with the disk image, because I was using the partition image that the build system generates rather than the
+  whole disk image that includes the offset (1MB) and the partition table, but was able to grab the first 1MB from the raw disk
+  image I've previously saved.  And then once the `init` process was created successfully, it was failing with an illegal
+  instruction when restoring the context.  This was a MOVEC instruction that wasn't even decoded correctly in objdump, but which
+  copied the USP register because the CONFIG_M68K_USER_MODE was still enabled.  I only had the VBR MOVEC instruction implemented,
+  but the USP, SFC, and DFC registers are also supported on MC68010, so I added those to the emulator as well.  At that point it was
+  finally booting and running the kernel again!
+- so what happened?  It worked correctly.  I know it breaks (when recompiled with the alternate ATA address) on retroverse, and the
+  same image (with the address changed) boots but does not have double chars when running in the emulator!
+- I also tried pulling out the k30-SBC board last night, and couldn't get it working, so gave up, but took another look at it and
+  read my notes previously, in computie's log.txt, and saw that connecting it to the monitor stand's USB port didn't work, but
+  another USB got it working, so it was running fine after that
+- I tried uploading the same image (with computie ATA) and... it worked fine!  No double characters!  I tried the same image just
+  now (with COMET ATA) to retroverse and it's definitely got the double characters!  So it's positively a hardware problem on
+  retroverse's k30p!  CONFIRMED!
+
+- So where does that leave me?  Well it's likely something with the buslogic, or possibly something else like board damage from a
+  previous short, but it's definitely not a software problem.  I'm a bit torn on direction.  I have the problem replicated well at
+  the moment, but I also want to clean up what I have.  I could commit the mess that I have at the moment, and come back to it
+  another time, or push through and try to figure out what the root cause it, but that will likely require a bunch of work with the
+  analyzer and hooking up probes, and playing with verilog.
+

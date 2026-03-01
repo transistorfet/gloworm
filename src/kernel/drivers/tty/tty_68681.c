@@ -127,10 +127,6 @@ void tty_68681_reset_leds(uint8_t bits);
 #define ISR_CH_A_RX_READY_FULL		0x02
 #define ISR_CH_A_TX_READY		0x01
 
-#define ISR_S_BREAK_CHANGE		0x04
-#define ISR_S_RX_READY_FULL		0x02
-#define ISR_S_TX_READY			0x01
-
 
 #define TTY_INT_VECTOR			64
 
@@ -148,8 +144,9 @@ struct channel_ports {
 	volatile uint8_t *command;
 	volatile uint8_t *send;
 	volatile uint8_t *recv;
-	char ctsbit;
-	//char padding[3];
+	uint8_t ctsbit;
+	uint8_t tx_flag;
+	uint8_t rx_flag;
 };
 
 const struct channel_ports channel_a_ports = {
@@ -160,6 +157,8 @@ const struct channel_ports channel_a_ports = {
 	TBA_WR_ADDR,
 	RBA_RD_ADDR,
 	0x01,
+	ISR_CH_A_TX_READY,
+	ISR_CH_A_RX_READY_FULL,
 };
 
 const struct channel_ports channel_b_ports = {
@@ -170,6 +169,8 @@ const struct channel_ports channel_b_ports = {
 	TBB_WR_ADDR,
 	RBB_RD_ADDR,
 	0x02,
+	ISR_CH_B_TX_READY,
+	ISR_CH_B_RX_READY_FULL,
 };
 
 
@@ -179,14 +180,14 @@ struct serial_channel {
 	const struct channel_ports *ports;
 	int opens;
 	int open_mode;
-	char error;
-	char rx_ready;
-	char bh_num;
+	uint8_t error;
+	uint8_t rx_ready;
+	uint8_t bh_num;
 };
 
-static char tick = 0;
-static char handle_timer = 0;
-static struct serial_channel channels[2];
+char tick = 0;
+char handle_timer = 0;
+struct serial_channel channels[2];
 
 static inline void config_serial_channel(struct serial_channel *channel)
 {
@@ -196,7 +197,7 @@ static inline void config_serial_channel(struct serial_channel *channel)
 	channel->rx_ready = 0;
 	channel->bh_num = BH_TTY;
 
-	// Reset channel A serial port
+	// Reset channel serial port
 	*channel->ports->command = CMD_RESET_MR;
 	NOP();
 	*channel->ports->command = CMD_RESET_TX;
@@ -210,25 +211,6 @@ static inline void config_serial_channel(struct serial_channel *channel)
 	*channel->ports->clock_config = CSRA_CLK_SELECT_REG_A_CONFIG;
 }
 
-static inline int tty_68681_getchar_buffered(struct serial_channel *channel)
-{
-	short saved_status;
-	LOCK(saved_status);
-
-	// TODO maybe this should return some kind of error, like -1
-	while (_buf_is_empty(&channel->rx)) {
-		asm volatile("");
-	}
-	unsigned char ch = _buf_get_char(&channel->rx);
-
-	if (_buf_free_space(&channel->rx) > 100)
-		ASSERT_CTS(channel);
-
-	UNLOCK(saved_status);
-	return ch;
-}
-
-
 static inline int tty_68681_putchar_direct(struct serial_channel *channel, int ch)
 {
 	short saved_status;
@@ -236,20 +218,25 @@ static inline int tty_68681_putchar_direct(struct serial_channel *channel, int c
 
 	*channel->ports->command = CMD_ENABLE_TX;
 	while (!(*channel->ports->status & SR_TX_READY)) { }
-	*channel->ports->send = (unsigned char) ch;
+	*channel->ports->send = (uint8_t) ch;
 
 	UNLOCK(saved_status);
 	return ch;
 }
 
-static inline int tty_68681_putchar_buffered(struct serial_channel *channel, int ch)
+int tty_68681_putchar_buffered(struct serial_channel *channel, int ch)
 {
+	int i;
 	short saved_status;
 	LOCK(saved_status);
 
 	// TODO this timelimit is because of an issue on boot where it will lock up before interrupts are enabled because the buffer is full
-	for (int i = 0; _buf_is_full(&channel->tx) && i < 10000; i++) {
+	for (i = 0; _buf_is_full(&channel->tx) && i < 10000; i++) {
 		asm volatile("");
+	}
+	if (i == 10000) {
+		*OUT_SET_ADDR = 0x20;
+		return -1;
 	}
 
 	_buf_put_char(&channel->tx, ch);
@@ -260,6 +247,26 @@ static inline int tty_68681_putchar_buffered(struct serial_channel *channel, int
 	UNLOCK(saved_status);
 	return ch;
 }
+
+int tty_68681_getchar_buffered(struct serial_channel *channel)
+{
+	short saved_status;
+	LOCK(saved_status);
+
+	// TODO maybe this should return some kind of error, like -1
+	while (_buf_is_empty(&channel->rx)) {
+		asm volatile("");
+		//tty_68681_putchar_buffered(channel, '^');
+	}
+	uint8_t ch = _buf_get_char(&channel->rx);
+
+	if (_buf_free_space(&channel->rx) > 100)
+		ASSERT_CTS(channel);
+
+	UNLOCK(saved_status);
+	return ch;
+}
+
 
 static void tty_68681_process_input(void *_unused)
 {
@@ -290,16 +297,17 @@ static void tty_68681_process_input(void *_unused)
 	}
 }
 
-static inline void handle_channel_io(register char isr, register devminor_t minor)
+static void handle_channel_io(uint8_t isr, devminor_t minor)
 {
 	uint8_t byte;
 	int count = 0;
 
 	// The ISR bits for channel A and B are the same but separated by 4 bits in the same register
-	if (minor == CH_B)
-		isr >>= 4;
-
-	if (isr & ISR_S_RX_READY_FULL) {
+	//if (minor == CH_B)
+	//	isr >>= 4;
+	if (isr & channels[minor].ports->rx_flag) {
+TRACE_ON();
+//tty_68681_putchar_direct(&channels[minor], '>');
 		uint8_t status;
 		for (count = 0; count < 100; count++) {
 			status = *channels[minor].ports->status;
@@ -312,7 +320,9 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 					*channels[minor].ports->command = CMD_RESET_BREAK;
 				}
 				byte = *channels[minor].ports->recv;
+//tty_68681_putchar_direct(&channels[minor], 'x');
 			} else {
+//tty_68681_putchar_direct(&channels[minor], '.');
 				// TODO this is kinda bad, but I want to see if the buf full condition is a problem
 				byte = *channels[minor].ports->recv;
 
@@ -336,13 +346,14 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 
 		channels[minor].rx_ready = 1;
 		request_bh_run(BH_TTY68681);
+TRACE_OFF();
 	}
 
 
-	if (isr & ISR_S_TX_READY) {
-		int ch = _buf_get_char(&channels[minor].tx);
+	if (isr & channels[minor].ports->tx_flag) {
+		int8_t ch = _buf_get_char(&channels[minor].tx);
 		if (ch != -1) {
-			*channels[minor].ports->send = (unsigned char) ch;
+			*channels[minor].ports->send = (uint8_t) ch;
 		} else {
 			// Disable the channel A transmitter if empty
 			if (*channels[minor].ports->status & SR_TX_EMPTY)
@@ -358,7 +369,7 @@ void handle_serial_irq()
 	// TODO this is for debugging to tell me when the handler exits
 	*OUT_SET_ADDR = 0x08;
 
-	register char isr = *ISR_RD_ADDR;
+	uint8_t isr = *ISR_RD_ADDR;
 
 	for (short i = 0; i < 2; i++)
 		handle_channel_io(isr, i);
@@ -366,7 +377,7 @@ void handle_serial_irq()
 
 	if (isr & ISR_TIMER_CHANGE) {
 		// Clear the interrupt bit by reading the stop address
-		volatile register char reset = *STOP_RD_ADDR;
+		volatile uint8_t reset = *STOP_RD_ADDR;
 		reset;	// make the compiler happy
 
 		if (tick) {
@@ -492,13 +503,13 @@ void tty_68681_normal_mode()
 	*CTUR_WR_ADDR = 0x20;
 	*CTLR_WR_ADDR = 0x00;
 
-	// Enable interrupts
-	*IVR_WR_ADDR = TTY_INT_VECTOR;
-	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
-
 	// Register the interrupt handler with the kernel for the irq number we configured the device for above
 	request_irq(TTY_INT_VECTOR, handle_serial_irq, 0);
 	enable_irq(TTY_INT_VECTOR);
+
+	// Enable interrupts
+	*IVR_WR_ADDR = TTY_INT_VECTOR;
+	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
 
 	// Flash LEDs briefly at boot
 	*OPCR_WR_ADDR = 0x00;
@@ -578,10 +589,9 @@ int tty_68681_close(devminor_t minor)
 	return 0;
 }
 
-int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int tty_68681_getchar(devminor_t minor)
 {
-	size_t size = iovec_iter_length(iter);
-	size_t remain = size;
+	int i;
 	struct serial_channel *channel = from_minor_dev(minor);
 
 	if (!channel)
@@ -590,17 +600,47 @@ int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	if (channel->error)
 		return EIO;
 
-	for (; remain > 0; remain--) {
+//printk("t ");
+	//for (i = 0; i < size; i++) {
+		if (_buf_is_empty(&channel->rx)) {
+			return 0;
+		}
+		i = tty_68681_getchar_buffered(channel);
+	//}
+	return i;
+}
+
+static int stack;
+int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+{
+	int i;
+	size_t size = iovec_iter_length(iter);
+	struct serial_channel *channel = from_minor_dev(minor);
+	uint8_t byte;
+
+	if (!channel)
+		return ENODEV;
+
+	if (channel->error)
+		return EIO;
+//asm volatile("movel	%%sp,%0\n" : "=r" (stack) : :);
+//printk("%x\n", stack);
+//printk("t ");
+	for (i = 0; i < size; i++) {
 		if (_buf_is_empty(&channel->rx)) {
 			// Suspend the process only if we haven't read any data yet
-			if (size == remain && !(channel->open_mode & O_NONBLOCK)) {
+			if (i == 0 && !(channel->open_mode & O_NONBLOCK)) {
+//printk("S ");
 				suspend_current_syscall(VFS_POLL_READ);
 			}
-			return size - remain;
+			return i;
 		}
-		copy_uint8_into_iter(iter, tty_68681_getchar_buffered(channel));
+		byte = tty_68681_getchar_buffered(channel);
+//printk("%d ", byte);
+		copy_uint8_into_iter(iter, byte);
+		//memcpy_into_iter(iter, (char *) &byte, 1);
 	}
-	return size;
+	return i;
 }
 
 int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
@@ -609,6 +649,10 @@ int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
+volatile int test3 = 0;
+
+asm volatile("movel	%%sp,%0\n" : "=r" (stack) : :);
+printk("%x\n", stack);
 	if (!channel)
 		return ENODEV;
 
@@ -621,7 +665,45 @@ int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	}
 
 	for (; remain > 0; remain--) {
-		tty_68681_putchar_buffered(channel, copy_uint8_out_of_iter(iter));
+		//uint8_t byte = copy_uint8_out_of_iter(iter);
+		uint8_t byte;
+		//memcpy_out_of_iter(iter, &byte, 1);
+
+/*
+		if (iter->type == ITER_USER_BUF) {
+
+				byte = get_user_uint8(&iter->user_buf.buf[iter->offset++]);
+		} else if (iter->type == ITER_KERNEL_BUF) {
+
+				byte = iter->kernel_buf.buf[iter->offset++];
+		} else {
+
+printk("%d %d %d\n", ITER_USER_BUF, ITER_KERNEL_BUF, iter->type);
+				return -1;
+		}
+*/
+
+/*
+		switch (iter->type) {
+			case ITER_USER_BUF: {
+				byte = get_user_uint8(&iter->user_buf.buf[iter->offset++]);
+				//char ch;
+				//memcpy_from_user(&ch, &iter->user_buf.buf[iter->offset++], 1);
+				//return ch;
+				break;
+			}
+			case ITER_KERNEL_BUF: {
+				byte = iter->kernel_buf.buf[iter->offset++];
+				break;
+			}
+			default: {
+				log_error("attempting to write into an invalid iovec iter: %d\n", iter->type);
+				return -1;
+			}
+		}
+*/
+		byte = copy_uint8_out_of_iter(iter);
+		tty_68681_putchar_buffered(channel, byte);
 	}
 	return size;
 }

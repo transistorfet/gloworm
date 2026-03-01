@@ -104,10 +104,12 @@ int ata_detect()
 				ATA_DELAY(100);
 				return 1;
 			} else {
+				log_error("ata: data not ready\n");
 				return 0;
 			}
 		}
 	}
+	log_error("ata: timeout waiting for identify command\n");
 	return 0;
 }
 
@@ -262,7 +264,7 @@ int ata_init()
 
 	// TODO this doesn't work very well
 	if (!ata_detect()) {
-		log_info("ATA device not detected\n");
+		log_info("ata: no device detected\n");
 		return 0;
 	}
 

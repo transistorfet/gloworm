@@ -54,7 +54,7 @@ void memory_region_free(struct memory_region *region)
 		return;
 
 	if (--region->refcount == 0) {
-		page_free_contiguous(region->mem_start, region->mem_length);
+		page_free_contiguous((uintptr_t) region->mem_start, region->mem_length);
 		kmfree(region);
 	}
 }

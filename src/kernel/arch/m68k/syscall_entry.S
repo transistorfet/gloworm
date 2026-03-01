@@ -5,6 +5,7 @@
 	.global enter_syscall
 	.global enter_irq
 	.global enter_exception
+	.global enter_trace
 	.global create_context
 	.global drop_context
 	.global restore_context
@@ -18,11 +19,14 @@
 	.global	syscall_table
 	.global kernel_reentries
 	.global kernel_stack
+	.global kernel_stack_backup
 	.global current_proc
 	.global previous_proc
 	.global current_syscall
 	.global do_syscall
 	.global do_irq
+	.global handle_exception
+	.global handle_trace
 	.global need_reschedule
 	.global schedule
 	.global bh_requested
@@ -57,9 +61,9 @@ create_context:
 	// Push flags
 	#if defined(CONFIG_M68K_USER_MODE)
 	cmp.l	#0, %d0
-	beq.w	10f
+	beq.s	10f
 	move.w	#0x2000, -(%a0)
-	bra.w	11f
+	bra.s	11f
     10:
 	move.w	#0x0000, -(%a0)
     11:
@@ -161,7 +165,7 @@ drop_context:
 	// Increment the number of times we've entered the kernel, and skip the stack switch if we're already inside
 	add.l	#1, kernel_reentries
 	cmp.l	#1, kernel_reentries
-	beq.w	101f
+	beq.s	101f
 
 	// We're already on the kernel stack, so just save the scratch registers
 	movem.l	%d0-%d1/%a0-%a1, -(%sp)
@@ -169,7 +173,7 @@ drop_context:
 	// Load a pointer to the exception frame into %a1
 	lea.l	(%sp, 16), %a1
 
-	bra.w	102f
+	bra.s	102f
 
     101:	// Entering from user-mode
 
@@ -194,6 +198,7 @@ drop_context:
 	// Switch to the internal kernel stack
 	move.l	%sp, (%a0, PROC_SP_OFFSET)
 	movea.l	kernel_stack, %sp
+	move.l	#0, kernel_stack
 
 	// Save the current proc, and compare it against the proc when restoring to know if the full context switch should occur
 	move.l	%a0, previous_proc
@@ -209,13 +214,13 @@ drop_context:
 restore_context:
 	// If we returning into the kernel, instead of a user process, then skip the next few checks
 	cmp.l	#1, kernel_reentries
-	bne.w	204f
+	bne.s	204f
 
     202:
 
 	// Check if there are any back half handlers to be run
 	cmp.l	#0, bh_requested
-	beq.w	203f
+	beq.s	203f
 
 	// Enable interrupts while running the back half handlers
 	and.w	#0xF8FF, %sr
@@ -226,7 +231,7 @@ restore_context:
 
 	// Check if there was a request to schedule a different process
 	cmp.l	#0, need_reschedule
-	beq.w	204f
+	beq.s	204f
 
 	// Enable interrupts while running the scheduler, this might also re-run the syscall that the returning process was blocked on
 	and.w	#0xF8FF, %sr
@@ -234,13 +239,13 @@ restore_context:
 	or.w	#0x0700, %sr
 
 	// After a process has been scheduled and a syscall restarted, it might need to be suspended right away again, so loop over the checks
-	bra.w	202b
+	bra.s	202b
 
     204:	// Now we'll actually return, and do a context switch if necessary
 
 	// Decrement the number of times we've entered the kernel, and if this is the last time, then switch to the user stack
 	sub.l	#1, kernel_reentries
-	beq.w	205f
+	beq.s	205f
 
 	// We'll stay on the kernel stack after returning, so just pop off the saved scratch register values and return
 	movem.l	(%sp)+, %d0-%d1/%a0-%a1
@@ -254,15 +259,20 @@ restore_context:
 
 	///// A0 = CURRENT_PROC, A1 = PREVIOUS_PROC /////
 
+move.l	%a0, -(%sp)
+movea.l	kernel_stack, %a0
+move.l	%a0, kernel_stack_backup
+movea.l	(%sp)+, %a0
+
 	// Save the kernel stack before the switch
 	move.l  %sp, kernel_stack
 
 	// Skip if no previous process
 	cmpa.l  #0, %a1
-	beq.w   207f
+	beq.s   207f
 	// Skip the extended context switch if the proc hasn't changed
 	cmpa.l  %a0, %a1
-	beq.w   207f
+	beq.s   207f
 
 	// Switch to the previous process's stack
 	movea.l  (%a1, PROC_SP_OFFSET), %sp
@@ -270,7 +280,7 @@ restore_context:
 	// Save the extended context of the previously running process, not including the system call registers
 	move.l  (%sp)+, %d1
 	cmp.l   #FULL_CONTEXT_SIZE, %d1
-	beq.l   206f
+	beq.s   206f
 	SAVE_EXTRA_REGISTERS
     206:
 	move.l  #FULL_CONTEXT_SIZE, -(%sp)     // push a new context size
@@ -422,6 +432,26 @@ enter_exception:
 
 	// Jump to the syscall interrupt return
 	bra.w	restore_context
+
+/**
+ * CPU Trace Entry Point
+ */
+enter_trace:
+	SAVE_SYSCALL_REGISTERS
+
+	// Save the exception frame on the stack
+	move.l	%sp, %a0
+	move.l	%a0, -(%sp)
+	add.l	#24, %a0
+	move.l	%a0, -(%sp)
+
+	bsr.w	handle_trace
+
+	// Pop the irq number off the stack
+	adda.l	#8, %sp
+
+	RESTORE_SYSCALL_REGISTERS
+	rte
 
 
 _user_exit:
