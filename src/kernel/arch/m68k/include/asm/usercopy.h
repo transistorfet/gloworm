@@ -20,19 +20,20 @@
 
 extern struct process *current_proc;
 
+
 static inline uint8_t get_user_uint8(const void __user *src)
 {
-	uint8_t result;
+	uint8_t result = 0;
 
 	// TODO this is really a problem for performance to have this instruction before every byte copy
 	// can we make a "start iter operation" function which sets this up, and then the subsequent calls are single byte only?
 	asm volatile("movec.l	%0, %%sfc\n" : : "d" (M68K_FC_USER_DATA) :);
 
-        //asm volatile(
-        //      "moves.b        (%1), %%d0\n"
-        //      "move.b         %%d0, (%0)\n"
-        //      : : "a" (&result), "a" (src) : "d0"
-        //);
+	//asm volatile(
+	//	"moves.b	(%1), %%d0\n"
+	//	"move.b		%%d0, (%0)\n"
+	//	: : "a" (&result), "a" (src) : "d0"
+	//);
 	asm volatile(
 		"moves.b	(%1), %0\n"
 		: "=d" (result) : "a" (src) :
@@ -51,6 +52,7 @@ static inline void put_user_uint8(void __user *dest, uint8_t value)
 		: : "d" (value), "a" (dest) :
 	);
 }
+
 
 static inline uintptr_t get_user_uintptr(const void __user *src)
 {
@@ -74,7 +76,6 @@ static inline void put_user_uintptr(void __user *dest, uintptr_t value)
 		: : "d" (value), "a" (dest) :
 	);
 }
-
 static inline int memcpy_from_user(void *dest, const void __user *src, int n)
 {
 	int bytes;
@@ -145,42 +146,6 @@ static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 	return bytes;
 }
 
-static inline int memcpy_from_user_map(struct memory_map *map, void *dest, const void __user *src, int n)
-{
-	if (map == current_proc->map) {
-		return memcpy_from_user(dest, src, n);
-	} else {
-		return generic_memcpy_from_user_map(map, dest, (virtual_address_t) src, n);
-	}
-}
-
-static inline int memcpy_to_user_map(struct memory_map *map, void __user *dest, const void *src, int n)
-{
-	if (map == current_proc->map) {
-		return memcpy_to_user(dest, src, n);
-	} else {
-		return generic_memcpy_to_user_map(map, (virtual_address_t) dest, src, n);
-	}
-}
-
-static inline int strncpy_from_user_map(struct memory_map *map, char *dest, const char __user *src, int max)
-{
-	if (map == current_proc->map) {
-		return strncpy_from_user(dest, src, max);
-	} else {
-		return generic_strncpy_from_user_map(map, dest, (virtual_address_t) src, max);
-	}
-}
-
-static inline int strncpy_to_user_map(struct memory_map *map, char __user *dest, const char *src, int max)
-{
-	if (map == current_proc->map) {
-		return strncpy_to_user(dest, src, max);
-	} else {
-		return generic_strncpy_to_user_map(map, (virtual_address_t) dest, src, max);
-	}
-}
-
 #else // CONFIG_MMU
 
 static inline uint8_t get_user_uint8(const void __user *src)
@@ -237,26 +202,6 @@ static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 		dest[max - 1] = '\0';
 	}
 	return size;
-}
-
-static inline int memcpy_from_user_map(struct memory_map *map, void *dest, const void __user *src, int n)
-{
-	return memcpy_from_user(dest, src, max);
-}
-
-static inline int memcpy_to_user_map(struct memory_map *map, void __user *dest, const void *src, int n)
-{
-	return memcpy_to_user(dest, src, max);
-}
-
-static inline int strncpy_from_user_map(struct memory_map *map, char *dest, const char __user *src, int max)
-{
-	return strncpy_from_user(dest, src, max);
-}
-
-static inline int strncpy_to_user_map(struct memory_map *map, char __user *dest, const char *src, int max)
-{
-	return strncpy_to_user(dest, src, max);
 }
 
 #endif // CONFIG_MMU

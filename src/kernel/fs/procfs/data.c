@@ -5,6 +5,7 @@
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/usercopy.h>
+#include <kernel/utils/iovec.h>
 
 #include "data.h"
 
@@ -17,12 +18,20 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
 	char *argstr;
+	struct kvec kvec[10];
+	struct iovec_iter iter;
+
 	for (const char *const *arg = proc->map->argv; ; arg++) {
 		argstr = (char *) get_user_uintptr(&arg);
 		if (!argstr) {
 			break;
 		}
-		int result = strncpy_from_user_map(proc->map, &buffer[i], argstr, max - i);
+		int result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, max - i, 0);
+		if (result < 0) {
+			return result;
+		}
+		iovec_iter_init_kvec(&iter, kvec, result);
+		result = kvec_strncpy_out_of_iter(kvec, result, 0, &buffer[i], max - i);
 		if (result < 0) {
 			return result;
 		}
@@ -44,14 +53,24 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 	#if defined(CONFIG_MMU)
 	int result;
 	uintptr_t arg;
+	struct kvec kvec[10];
 	char cmd_buffer[32];
-	result = memcpy_from_user_map(proc->map, &arg, &proc->map->argv[0], sizeof(uintptr_t));
-	if (result < 0)
-		return result;
-	result = strncpy_from_user_map(proc->map, cmd_buffer, (const char *) arg, 32);
-	if (result < 0)
-		return result;
-	cmd = cmd_buffer;
+
+	if (proc->map->argv) {
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) proc->map->argv, sizeof(uintptr_t), 0);
+		if (result < 0)
+			return result;
+		result = kvec_memcpy_out_of_iter(kvec, result, 0, &arg, sizeof(uintptr_t));
+
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, 32, 0);
+		if (result < 0)
+			return result;
+		result = kvec_strncpy_out_of_iter(kvec, result, 0, cmd_buffer, 32);
+		cmd = cmd_buffer;
+	} else {
+		cmd_buffer[0] = '\0';
+		cmd = cmd_buffer;
+	}
 	#else
 	cmd = proc->map->argv[0];
 	#endif

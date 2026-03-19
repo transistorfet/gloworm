@@ -75,7 +75,7 @@ int string_array_copy_to_iter(struct string_array *array, virtual_address_t vadd
 	int result;
 	// TODO should this insert it into the end of the iter, or should it put it at the start and rely on it being set up to actually be the end?
 
-	if (iovec_iter_length(iter) < array->used) {
+	if (iovec_iter_remaining(iter) < array->used) {
 		return -1;
 	}
 

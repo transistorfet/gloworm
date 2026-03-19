@@ -5049,3 +5049,10 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   another time, or push through and try to figure out what the root cause it, but that will likely require a bunch of work with the
   analyzer and hooking up probes, and playing with verilog.
 
+
+2026-03-12:
+
+- I've been puttering along with this but also not getting much time to work on it.  I've mostly been trying to get the user
+  copy/iter stuff working and improving the interface to it, while the CPU is still running at 12.5MHz to avoid that double serial
+  problem.  At some point I'll get back to investigating that, but not until I get the MMU changes merged
+

@@ -326,7 +326,7 @@ int tcp_endpoint_send(struct endpoint *ep, struct iovec_iter *iter)
 		return ENOTCONN;
 	}
 
-	if (tep->state != TS_ESTABLISHED || _buf_free_space(tep->tx) < iovec_iter_length(iter)) {
+	if (tep->state != TS_ESTABLISHED || _buf_free_space(tep->tx) < iovec_iter_remaining(iter)) {
 		return EWOULDBLOCK;
 	}
 

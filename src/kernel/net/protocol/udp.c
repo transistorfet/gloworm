@@ -147,7 +147,7 @@ static struct packet *udp_create_packet(struct protocol *proto, const struct ipv
 {
 	struct packet *pack;
 
-	pack = packet_alloc(NULL, proto, iovec_iter_length(iter) + 100);
+	pack = packet_alloc(NULL, proto, iovec_iter_remaining(iter) + 100);
 
 	if (udp_encode_packet(pack, src, dest, iter)) {
 		packet_free(pack);
@@ -162,7 +162,7 @@ static int udp_encode_packet(struct packet *pack, const struct ipv4_address *src
 	size_t length;
 	struct udp_header *hdr;
 
-	length = iovec_iter_length(iter);
+	length = iovec_iter_remaining(iter);
 	error = ipv4_encode_header(pack, src, dest, sizeof(struct udp_header) + length);
 	if (error) {
 		return error;
@@ -290,7 +290,7 @@ int udp_endpoint_send_to(struct endpoint *ep, struct iovec_iter *iter, const str
 		dest = UDP_ENDPOINT(ep)->dest;
 	}
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	pack = udp_create_packet(ep->proto, &UDP_ENDPOINT(ep)->src, &dest, iter);
 	net_if_send_packet(ep->ifdev, pack);
 	return nbytes;
@@ -310,7 +310,7 @@ int udp_endpoint_recv_from(struct endpoint *ep, struct iovec_iter *iter, struct 
 
 	_queue_remove(&uep->recv_queue, &pack->node);
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	if (pack->length - pack->data_offset < nbytes) {
 		nbytes = pack->length - pack->data_offset;
 	}

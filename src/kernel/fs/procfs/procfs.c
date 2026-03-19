@@ -181,7 +181,7 @@ int procfs_read(struct vfile *file, struct iovec_iter *iter)
 		limit = entry->func(proc, buffer, MAX_BUFFER);
 	}
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	if (file->position + nbytes >= limit) {
 		nbytes = limit - file->position;
 	}

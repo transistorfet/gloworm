@@ -71,7 +71,7 @@ int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
 	if (minor >= num_devices)
 		return ENXIO;
-	size_t size = iovec_iter_length(iter);
+	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
 	if (offset > geo->size)
@@ -86,7 +86,7 @@ int mem_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
 	if (minor >= num_devices)
 		return ENXIO;
-	size_t size = iovec_iter_length(iter);
+	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
 	if (offset > geo->size)

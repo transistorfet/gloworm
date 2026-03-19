@@ -147,6 +147,8 @@ int memory_map_resize(struct memory_segment *segment, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size);
 int memory_map_move_sbrk(struct memory_map *map, int diff);
 
+int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int pages, virtual_address_t start, size_t length, int write_flag);
+
 void memory_map_print_segments(struct memory_map *map);
 
 

@@ -20,7 +20,7 @@ int printk_direct(const char *fmt, ...)
 	return ret;
 }
 
-int printk(const char *fmt, ...)
+int printk_buffered(const char *fmt, ...)
 {
 	int ret;
 	va_list args;

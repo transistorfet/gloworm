@@ -148,7 +148,7 @@ static inline short _buf_get_iter(struct ringbuffer *cb, struct iovec_iter *iter
 	size_t size;
 	short chunk1, chunk2;
 
-	size = iovec_iter_length(iter);
+	size = iovec_iter_remaining(iter);
 
 	// Calculate the maximum readable chunk from the current out pointer to either
 	// the in pointer, or if the in pointer is less than the out pointer, then to
@@ -185,7 +185,7 @@ static inline short _buf_put_iter(struct ringbuffer *cb, struct iovec_iter *iter
 	size_t size;
 	short chunk1, chunk2;
 
-	size = iovec_iter_length(iter);
+	size = iovec_iter_remaining(iter);
 
 	// Calculate the maximum writable chunk from the current in pointer to either
 	// the out pointer, or if the out pointer is less than the in pointer, then to

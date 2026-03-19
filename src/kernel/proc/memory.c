@@ -54,7 +54,7 @@ void memory_region_free(struct memory_region *region)
 		return;
 
 	if (--region->refcount == 0) {
-		page_free_contiguous(region->mem_start, region->mem_length);
+		page_free_contiguous((uintptr_t) region->mem_start, region->mem_length);
 		kmfree(region);
 	}
 }
@@ -652,6 +652,42 @@ fail:
 		memory_region_free(region);
 	#endif
 	return error;
+}
+
+int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
+{
+	int i;
+	int error;
+	char *page;
+	size_t page_size;
+	size_t page_offset;
+	virtual_address_t page_start;
+
+	page_start = rounddown(start, PAGE_SIZE);
+	page_offset = start - page_start;
+	page_size = PAGE_SIZE - page_offset;
+	for (i = 0; i < max_segs && length > 0; i++, length -= page_size) {
+		// TODO this should be modified to allow for large pages
+		page = (char *) mmu_table_get_page(map->root_table, page_start, 0);
+		if (!page) {
+			error = memory_map_load_page_at(map, page_start, write_flag);
+			if (error < 0) {
+				return error;
+			}
+
+			page = (char *) mmu_table_get_page(map->root_table, page_start, 0);
+			if (!page) {
+				return ENOENT;
+			}
+		}
+
+		kvec[i].buf = page + page_offset;
+		kvec[i].bytes = page_size;
+		page_start += page_size;
+		page_offset = 0;
+		page_size = length > PAGE_SIZE ? PAGE_SIZE : length;
+	}
+	return i;
 }
 
 void memory_map_print_segments(struct memory_map *map)

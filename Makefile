@@ -46,7 +46,7 @@ $(src-root)/include/generated/%.h: $(src-root)/.%
 #	cat $(kconfig-file) | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $(config-h)
 
 PHONY += decend
-decend: $(config-h)
+decend: $(config-h) $(config-tests-h)
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src
 
 src/%: $(config-h)

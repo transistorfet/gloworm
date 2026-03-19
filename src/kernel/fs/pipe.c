@@ -120,7 +120,7 @@ int pipe_read(struct vfile *file, struct iovec_iter *iter)
 		return 0;
 	}
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	if (nbytes > vnode->size - file->position) {
 		nbytes = vnode->size - file->position;
 	}
@@ -151,7 +151,7 @@ int pipe_write(struct vfile *file, struct iovec_iter *iter)
 
 	// TODO you need to detect a broken pipe and raise SIGPIPE
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	if (nbytes > PIPE_BUFFER_MAX - file->position) {
 		// TODO this will work for now, but any write operation that's larger than the buffer size wont ever complete
 		// Trying to write more bytes than are available in the buffer, so block until the reader has caught up

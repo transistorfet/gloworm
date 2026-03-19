@@ -307,7 +307,7 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 	size_t nbytes;
 	size_t wbytes = 0;
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	if (nbytes > file->vnode->size - file->position)
 		nbytes = file->vnode->size - file->position;
 
@@ -353,7 +353,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 	size_t nbytes;
 	size_t wbytes = 0;
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	znum = file->position >> MINIX_V1_LOG_ZONE_SIZE;
 	zpos = file->position & (MINIX_V1_ZONE_SIZE - 1);
 

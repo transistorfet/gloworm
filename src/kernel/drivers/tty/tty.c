@@ -224,7 +224,7 @@ int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 		return error;
 	}
 
-	size = iovec_iter_length(iter);
+	size = iovec_iter_remaining(iter);
 	if (!(devices[minor].tio.c_lflag & ICANON)) {
 		if (devices[minor].buf_read < devices[minor].buf_write) {
 			size_t max = devices[minor].buf_write - devices[minor].buf_read;

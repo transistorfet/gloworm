@@ -580,7 +580,7 @@ int tty_68681_close(devminor_t minor)
 
 int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
-	size_t size = iovec_iter_length(iter);
+	size_t size = iovec_iter_remaining(iter);
 	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
@@ -605,7 +605,7 @@ int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 
 int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
-	size_t size = iovec_iter_length(iter);
+	size_t size = iovec_iter_remaining(iter);
 	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
