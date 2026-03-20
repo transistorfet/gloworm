@@ -25,7 +25,6 @@
 
 typedef enum {
 	ITER_USER_BUF = 1,
-	ITER_KERNEL_BUF = 2,
 	ITER_KVEC = 3,
 } iovec_iter_type_t;
 
@@ -57,12 +56,6 @@ struct iovec_iter {
 			size_t nbytes;
 		} user_buf;
 
-		/// A buffer in kernel memory, with length `nbytes`
-		struct {
-			char *buf;
-			size_t nbytes;
-		} kernel_buf;
-
 		/// A sequence of iovec buffers, with total number of segments `nsegs`
 		struct {
 			struct iovec *segs;
@@ -75,18 +68,13 @@ struct iovec_iter {
 	};
 };
 
-struct kvec_iter {
-	struct kvec kvec[1];
-	struct iovec_iter iter;
-};
-
 
 int kvec_memcpy_into_iter(struct kvec *kvec, int num_segs, int seg_offset, const void *src, size_t nbytes);
 int kvec_memcpy_out_of_iter(struct kvec *kvec, int num_segs, int seg_offset, void *dest, size_t nbytes);
 int kvec_strncpy_into_iter(struct kvec *kvec, int num_segs, int seg_offset, const char *src, size_t max);
 int kvec_strncpy_out_of_iter(struct kvec *kvec, int num_segs, int seg_offset, char *dest, size_t max);
-
 size_t kvec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence);
+
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes);
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes);
 
@@ -103,16 +91,18 @@ static inline void iovec_iter_init_user_buf(struct iovec_iter *iter, char __user
 	iter->user_buf.nbytes = nbytes;
 }
 
-static inline void iovec_iter_init_kernel_buf(struct iovec_iter *iter, char *buf, size_t nbytes)
+static inline void iovec_iter_init_simple_kvec(struct iovec_iter *iter, struct kvec *segs, char *buf, size_t nbytes)
 {
-	iter->type = ITER_KERNEL_BUF;
+	segs->buf = buf;
+	segs->bytes = nbytes;
+
+	iter->type = ITER_KVEC;
 	iter->seg_start = 0;
 	iter->seg_offset = 0;
 	iter->num_segs = 1;
 	iter->cur_seg = 0;
+	iter->kvec.segs = segs;
 	iter->length = nbytes;
-	iter->kernel_buf.buf = buf;
-	iter->kernel_buf.nbytes = nbytes;
 }
 
 static inline void iovec_iter_init_kvec(struct iovec_iter *iter, struct kvec *segs, size_t num_segs)
@@ -185,10 +175,6 @@ static inline int copy_uint8_into_iter(struct iovec_iter *iter, uint8_t byte)
 			put_user_uint8(&iter->user_buf.buf[iter->seg_offset++], byte);
 			break;
 		}
-		case ITER_KERNEL_BUF: {
-			iter->kernel_buf.buf[iter->seg_offset++] = byte;
-			break;
-		}
 		case ITER_KVEC: {
 			if (iter->cur_seg > iter->num_segs) {
 				return 0;
@@ -215,9 +201,6 @@ static inline uint8_t copy_uint8_out_of_iter(struct iovec_iter *iter)
 	switch (iter->type) {
 		case ITER_USER_BUF: {
 			return get_user_uint8(&iter->user_buf.buf[iter->seg_offset++]);
-		}
-		case ITER_KERNEL_BUF: {
-			return iter->kernel_buf.buf[iter->seg_offset++];
 		}
 		case ITER_KVEC: {
 			if (iter->cur_seg > iter->num_segs) {

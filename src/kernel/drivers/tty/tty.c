@@ -92,6 +92,7 @@ static inline void tty_read_input(device_t minor)
 {
 	char ch;
 	int error;
+	struct kvec kvec;
 	struct iovec_iter iter;
 	struct tty_device *tty = &devices[minor];
 
@@ -103,7 +104,7 @@ static inline void tty_read_input(device_t minor)
 			return;
 		}
 
-		iovec_iter_init_kernel_buf(&iter, &ch, 1);
+		iovec_iter_init_simple_kvec(&iter, &kvec, &ch, 1);
 		error = dev_read(tty->rdev, 0, &iter);
 		if (error <= 0) {
 			tty->error = error;
@@ -135,10 +136,10 @@ static inline void tty_read_input(device_t minor)
 				if ((tty->tio.c_lflag & ECHOE)) {
 					if (tty->buffer[tty->buf_write] == '\t') {
 						// TODO proper handling of this might require window dimensions and cursor position tracking
-						iovec_iter_init_kernel_buf(&iter, "\x08\x08\x08\x08\x08\x08\x08\x08", 8);
+						iovec_iter_init_simple_kvec(&iter, &kvec, "\x08\x08\x08\x08\x08\x08\x08\x08", 8);
 						dev_write(tty->rdev, 0, &iter);
 					} else {
-						iovec_iter_init_kernel_buf(&iter, "\x08 \x08", 3);
+						iovec_iter_init_simple_kvec(&iter, &kvec, "\x08 \x08", 3);
 						dev_write(tty->rdev, 0, &iter);
 					}
 				}
@@ -148,7 +149,7 @@ static inline void tty_read_input(device_t minor)
 		} else {
 			tty->buffer[tty->buf_write++] = ch;
 			if ((tty->tio.c_lflag & ECHO)) {
-				iovec_iter_init_kernel_buf(&iter, &ch, 1);
+				iovec_iter_init_simple_kvec(&iter, &kvec, &ch, 1);
 				dev_write(tty->rdev, 0, &iter);
 			}
 			if (ch == '\n') {

@@ -136,10 +136,11 @@ static inline struct buf *_find_free_entry()
 
 static inline int _read_entry(struct buf *entry)
 {
+	struct kvec kvec;
 	struct iovec_iter iter;
 
 	//printk("READING %x: %x <- %x x %x\n", entry->dev, entry->block, (entry->num * BC_BLOCK_SIZE), BC_BLOCK_SIZE);
-	iovec_iter_init_kernel_buf(&iter, entry->block, BC_BLOCK_SIZE);
+	iovec_iter_init_simple_kvec(&iter, &kvec, entry->block, BC_BLOCK_SIZE);
 	int size = dev_read(entry->dev, (entry->num * BC_BLOCK_SIZE), &iter);
 	if (size != BC_BLOCK_SIZE) {
 		return -1;
@@ -149,13 +150,14 @@ static inline int _read_entry(struct buf *entry)
 
 static inline int _write_entry(struct buf *entry)
 {
+	struct kvec kvec;
 	struct iovec_iter iter;
 
 	if (!(entry->flags & BCF_DIRTY)) {
 		return 0;
 	}
 	//printk("WRITING %x: %x <- %x x %x\n", entry->dev, (entry->num * BC_BLOCK_SIZE), entry->block, BC_BLOCK_SIZE);
-	iovec_iter_init_kernel_buf(&iter, entry->block, BC_BLOCK_SIZE);
+	iovec_iter_init_simple_kvec(&iter, &kvec, entry->block, BC_BLOCK_SIZE);
 	int size = dev_write(entry->dev, (entry->num * BC_BLOCK_SIZE), &iter);
 	if (size != BC_BLOCK_SIZE) {
 		return -1;

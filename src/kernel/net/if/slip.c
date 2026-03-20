@@ -186,6 +186,7 @@ static void slip_decode_packet(struct slip_if_device *ifdev, short length)
 static void slip_if_write_data(struct slip_if_device *ifdev)
 {
 	int written;
+	struct kvec kvec;
 	struct iovec_iter iter;
 
 	do {
@@ -196,7 +197,7 @@ static void slip_if_write_data(struct slip_if_device *ifdev)
 		}
 
 		if (ifdev->tx_read < ifdev->tx_write) {
-			iovec_iter_init_kernel_buf(&iter, (char *) &ifdev->tx_buffer[ifdev->tx_read], ifdev->tx_write - ifdev->tx_read);
+			iovec_iter_init_simple_kvec(&iter, &kvec, (char *) &ifdev->tx_buffer[ifdev->tx_read], ifdev->tx_write - ifdev->tx_read);
 			written = dev_write(ifdev->rdev, 0, &iter);
 			if (written < 0) {
 				//slip_devices[i].error = read;
@@ -215,9 +216,10 @@ static void slip_if_write_data(struct slip_if_device *ifdev)
 static void slip_if_read_data(struct slip_if_device *ifdev)
 {
 	int read;
+	struct kvec kvec;
 	struct iovec_iter iter;
 
-	iovec_iter_init_kernel_buf(&iter, (char *) &ifdev->rx_buffer[ifdev->rx_write], SLIP_MTU_MAX - ifdev->rx_write);
+	iovec_iter_init_simple_kvec(&iter, &kvec, (char *) &ifdev->rx_buffer[ifdev->rx_write], SLIP_MTU_MAX - ifdev->rx_write);
 	read = dev_read(ifdev->rdev, 0, &iter);
 	if (read < 0) {
 		//slip_devices[i].error = read;

@@ -82,6 +82,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
 	size_t mem_size;
 	int error = ENOMEM;
+	struct kvec kvec;
 	struct iovec_iter iter;
 	uintptr_t user_mem_start;
 
@@ -121,7 +122,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 	// so we set the pointer to NULL again to avoid a double-free
 	object = NULL;
 
-	iovec_iter_init_kernel_buf(&iter, (void *) user_mem_start, mem_size);
+	iovec_iter_init_simple_kvec(&iter, &kvec, (void *) user_mem_start, mem_size);
 	error = vfs_read(file, &iter);
 	if (error <= 0) {
 		goto fail;
@@ -152,13 +153,14 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	size_t mem_size;
 	size_t segment_size;
 	int error = ENOMEM;
+	struct kvec kvec;
 	struct iovec_iter iter;
 	uintptr_t user_mem_start;
 	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
 	Elf32_Ehdr header;
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
 
-	iovec_iter_init_kernel_buf(&iter, (char *) &header, sizeof(Elf32_Ehdr));
+	iovec_iter_init_simple_kvec(&iter, &kvec, (char *) &header, sizeof(Elf32_Ehdr));
 	if (!(error = vfs_read(file, &iter)))
 		return error;
 
@@ -174,7 +176,7 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	num_ph = header.e_phnum <= PROG_HEADER_MAX ? header.e_phnum : PROG_HEADER_MAX;
 	if (!(error = vfs_seek(file, header.e_phoff, SEEK_SET)))
 		return error;
-	iovec_iter_init_kernel_buf(&iter, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
+	iovec_iter_init_simple_kvec(&iter, &kvec, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
 	if (!(error = vfs_read(file, &iter)))
 		return error;
 
@@ -240,7 +242,7 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
 				goto fail;
 			}
-			iovec_iter_init_kernel_buf(&iter, (char *) file_segment_start, prog_headers[i].p_filesz);
+			iovec_iter_init_simple_kvec(&iter, &kvec, (char *) file_segment_start, prog_headers[i].p_filesz);
 			if ((error = vfs_read(file, &iter)) < 0) {
 				goto fail;
 			}

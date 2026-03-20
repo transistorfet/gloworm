@@ -140,11 +140,6 @@ int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 			iter->seg_offset += bytes;
 			return bytes;
 		}
-		case ITER_KERNEL_BUF: {
-			memcpy(&iter->kernel_buf.buf[iter->seg_offset], buf, bytes);
-			iter->seg_offset += bytes;
-			return bytes;
-		}
 		case ITER_KVEC: {
 			bytes = kvec_memcpy_into_iter(&iter->kvec.segs[iter->cur_seg], iter->num_segs - iter->cur_seg, iter->seg_offset, buf, bytes);
 			if (bytes > 0) {
@@ -167,11 +162,6 @@ int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes)
 	switch (iter->type) {
 		case ITER_USER_BUF: {
 			memcpy_from_user(buf, &iter->user_buf.buf[iter->seg_offset], bytes);
-			iter->seg_offset += bytes;
-			return bytes;
-		}
-		case ITER_KERNEL_BUF: {
-			memcpy(buf, &iter->kernel_buf.buf[iter->seg_offset], bytes);
 			iter->seg_offset += bytes;
 			return bytes;
 		}

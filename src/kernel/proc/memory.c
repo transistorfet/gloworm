@@ -65,8 +65,9 @@ void memory_region_free(struct memory_region *region)
 physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
 {
 	int error;
-	physical_address_t page;
+	struct kvec kvec;
 	offset_t file_offset;
+	physical_address_t page;
 	struct iovec_iter iter;
 
 	page = page_alloc_single();
@@ -82,7 +83,7 @@ physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, 
 		return NULL;
 	}
 
-	iovec_iter_init_kernel_buf(&iter, (char *) page, PAGE_SIZE);
+	iovec_iter_init_simple_kvec(&iter, &kvec, (char *) page, PAGE_SIZE);
 	error = vfs_read(segment->file, &iter);
 	if (error < 0) {
 		return NULL;
