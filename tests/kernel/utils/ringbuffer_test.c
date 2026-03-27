@@ -61,10 +61,11 @@ int main()
 	printf("In: %d\n", buffer.in);
 	printf("Out: %d\n", buffer.out);
 
+	struct kvec kvec;
 	struct iovec_iter iter;
 	char array[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 
-	iovec_iter_init_kernel_buf(&iter, array, 10);
+	iovec_iter_init_simple_kvec(&iter, &kvec, array, 10);
 	_buf_put_iter(&buffer, &iter);
 	printf("Used: %d\n", _buf_used_space(&buffer));
 	//assert(_buf_used_space(&buffer) == 10);
@@ -72,7 +73,7 @@ int main()
 	struct iovec_iter iter2;
 	char array2[10];
 
-	iovec_iter_init_kernel_buf(&iter2, array2, 10);
+	iovec_iter_init_simple_kvec(&iter2, &kvec, array2, 10);
 	_buf_get_iter(&buffer, &iter);
 	printf("%d\n", _buf_used_space(&buffer));
 	//assert(_buf_used_space(&buffer) == 0);

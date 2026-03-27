@@ -48,6 +48,7 @@ int string_array_copy(struct string_array *array, const char __user *const src_w
 		}
 		used += result + 1;
 	}
+	array->strings[i] = 0;
 	array->used = roundup(used, sizeof(uintptr_t));
 	return len;
 }

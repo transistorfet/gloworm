@@ -47,7 +47,7 @@ int packet_append_iovec(struct packet *pack, struct iovec_iter *iter)
 {
 	size_t nbytes;
 
-	nbytes = iovec_iter_length(iter);
+	nbytes = iovec_iter_remaining(iter);
 	if (pack->length + nbytes > pack->capacity) {
 		return ENOMEM;
 	}

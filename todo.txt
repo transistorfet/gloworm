@@ -1,61 +1,12 @@
 
-* fix context functions to use proper map/kvec funcs for stack manipulation
-* in order to fix the exec_kernel_thread function, you need to support large mmu pages (or don't try to use the load_pages function)
-* can you make the kvec functions usable without an iter struct
-* make it easier to initialize and use a kvec/iter with load pages
 * try to remove as many user_copy functions as possible, to be replaced with kvec+iter
-
-* when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
-  when registering the driver, or it should be conditionally called in dev_write()
-* try with 4k pages, that failed during init last time I tried it
-
-* fix issue with setting user stack to more than 16k, where it allocates an early termination page/large page, and then can't be converted with
-  copy-on write.  Either make it possible to copy on write large pages (and load large pages) or else force them to be small pages again
-
-* the main areas to fix re: fetching pages for copying, are the exec calls, and the context.c stack manipulation
-
-* should you actually have an iter mode specifically for other user processes besides the current one, that always uses the no-fault method of
-  reading data from pages, and also make usercopy functions specifically for that case, so when you actually want to force it to use the manual
-  method, you can.  The thinking here is that sometimes you might know that the current process's state is invalid, and even though
-  proc->map === current_proc->map, the MMU register is not set, or you cannot service an exception or something???
-* should you add a mode to iter to copy to a specific user process's memory, now that you have functions that can do that? or should always use
-  the user_map functions when selecting the user_buf option?
+* replace user_buf with iovec iter type?
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors
 
-* figure out what's causing ps to not print cmds, likely some kind of corruption (caused by a subtle bug introduced by the recent MMU changes)
-
-* make it so that it's easy to run just one test
-* the ringbuffer implementation has an off by one error I think (or it has no way to avoid one, which would suck)
-* I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
-* make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
-
-* make the exception handler actually kill the process when it needs to die, instead of causing infinite exceptions
-* use the PVALID instruction to validate user addresses before dereferencing them
-
+* fix issue with setting user stack to more than 16k, where it allocates an early termination page/large page, and then can't be converted with
+  copy-on write.  Either make it possible to copy on write large pages (and load large pages) or else force them to be small pages again
 * make sure a SEG_FIXED segment doesn't have its memory freed
-
-* make it kill processes with SIGSEGV instead of SIGKILL when a segfault or bus error occurs
-* you need a way to align data on an architectural-specific amount
-* confirm that signalling a process that's not the current process will properly switch to that process
-
-* it's time to fix the size in the load scripts
-
-* should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
-  doing so will avoid unnecessarily using iovec
-* fix the _buf_get_iovec/_buf_put_iovec functions, which haven't been tested yet and are probably buggy
-
-
-* where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
-* should reset_proc() free the memory map as well?
-
-* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
-* move memory.c to mm/
-* fix the _user_exit problem properly
-* cleanup init.c to reduce the duplication
-* should you make the page fault/exception numbers configurable like irqs?
-* replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
-* test with CONFIG_MMU=n to make sure nothing broke
 
 * when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
   unfreed in the middle of the segment
@@ -64,15 +15,44 @@
   changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
   the case of the heap and stack
 
+* convert bufcache/disk blocks to use pages
+
+* use the PVALID instruction to validate user addresses before dereferencing them
 * the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
   arch/m68k?
-
 * there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
   memory without duplicating them
 
-* convert bufcache/disk blocks to use pages
+* make the exception handler actually kill the process when it needs to die, instead of causing infinite exceptions
+* make it kill processes with SIGSEGV instead of SIGKILL when a segfault or bus error occurs
+* you need a way to align data on an architectural-specific amount
+* confirm that signalling a process that's not the current process will properly switch to that process
+
+* where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
+* should reset_proc() free the memory map as well?
+* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
+* move memory.c to mm/
+* fix the _user_exit problem properly
+* cleanup init.c to reduce the duplication
+* should you make the page fault/exception numbers configurable like irqs?
+
+* try with 4k pages, that failed during init last time I tried it
+* replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
+* test with CONFIG_MMU=n to make sure nothing broke
+* test with CONFIG_USER_MODE=n to make sure nothing broke
 
 ---
+
+* it's time to fix the size in the load scripts
+
+* when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
+  when registering the driver, or it should be conditionally called in dev_write()
+* should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
+  doing so will avoid unnecessarily using iovec
+
+* make it so that it's easy to run just one test
+* I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
+* make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
 
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 

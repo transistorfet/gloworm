@@ -8,6 +8,7 @@
 #include <kconfig.h>
 #include <kernel/printk.h>
 #include <kernel/utils/usercopy.h>
+#include <asm/addresses.h>
 
 #ifndef SEEK_SET
 #define SEEK_SET	0	// Seek relative to the beginning of file
@@ -69,14 +70,15 @@ struct iovec_iter {
 };
 
 
-int kvec_memcpy_into_iter(struct kvec *kvec, int num_segs, int seg_offset, const void *src, size_t nbytes);
-int kvec_memcpy_out_of_iter(struct kvec *kvec, int num_segs, int seg_offset, void *dest, size_t nbytes);
-int kvec_strncpy_into_iter(struct kvec *kvec, int num_segs, int seg_offset, const char *src, size_t max);
-int kvec_strncpy_out_of_iter(struct kvec *kvec, int num_segs, int seg_offset, char *dest, size_t max);
-size_t kvec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence);
+int memcpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const void *src, size_t nbytes);
+int memcpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, void *dest, size_t nbytes);
+int strncpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const char *src, size_t max);
+int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *dest, size_t max);
 
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes);
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes);
+size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence);
+size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, int size);
 
 
 static inline void iovec_iter_init_user_buf(struct iovec_iter *iter, char __user *buf, size_t nbytes)
@@ -125,47 +127,6 @@ static inline void iovec_iter_init_kvec(struct iovec_iter *iter, struct kvec *se
 static inline size_t iovec_iter_remaining(struct iovec_iter *iter)
 {
 	return iter->length - iter->seg_start - iter->seg_offset;
-}
-
-/// Change the read/write position of an iterator
-static inline size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence)
-{
-	switch (whence) {
-		case SEEK_SET:
-			break;
-		case SEEK_CUR:
-			offset = iter->seg_start + iter->seg_offset + offset;
-			break;
-		case SEEK_END:
-			offset = iter->length + offset;
-			break;
-		default:
-			return EINVAL;
-	}
-
-	if (offset > iter->length)
-		offset = iter->length;
-
-	if (iter->type == ITER_KVEC) {
-		if (offset >= iter->seg_start + iter->seg_offset) {
-			// Advance the position forward
-			while (iter->cur_seg < iter->num_segs - 1 && offset >= iter->seg_start + iter->kvec.segs[iter->cur_seg].bytes) {
-				iter->seg_start += iter->kvec.segs[iter->cur_seg].bytes;
-				iter->cur_seg += 1;
-			}
-		} else {
-			// Rewind the position backwards
-			while (iter->cur_seg > 0 && offset < iter->seg_start) {
-				iter->seg_start -= iter->kvec.segs[iter->cur_seg].bytes;
-				iter->cur_seg -= 1;
-			}
-		}
-		iter->seg_offset = offset - iter->seg_start;
-	} else {
-		iter->seg_offset = offset;
-	}
-
-	return iter->seg_start + iter->seg_offset;
 }
 
 static inline int copy_uint8_into_iter(struct iovec_iter *iter, uint8_t byte)
@@ -222,6 +183,11 @@ static inline uint8_t copy_uint8_out_of_iter(struct iovec_iter *iter)
 	}
 }
 
+#if defined(CONFIG_MMU)
+
+struct memory_map;
+extern int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag);
+
 static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
 {
 	int result;
@@ -233,29 +199,15 @@ static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iove
 	return 0;
 }
 
-static inline size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, int size)
+#else
+
+static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
 {
-	int error;
-	int cur_seg;
-	size_t seg_start;
-	offset_t seg_offset;
-
-	error = iovec_iter_seek(iter, -size, SEEK_CUR);
-	if (error < 0) {
-		return iter->seg_start + iter->seg_offset;
-	}
-
-	cur_seg = iter->cur_seg;
-	seg_start = iter->seg_start;
-	seg_offset = iter->seg_offset;
-
-	memcpy_into_iter(iter, value, size);
-
-	iter->cur_seg = cur_seg;
-	iter->seg_start = seg_start;
-	iter->seg_offset = seg_offset;
-	return iter->seg_start + iter->seg_offset;
+	iovec_iter_init_simple_kvec(iter, kvec, (char *) start, length);
+	return 0;
 }
+
+#endif	// CONFIG_MMU
 
 #endif
 

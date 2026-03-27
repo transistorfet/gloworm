@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/param.h>
 
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
@@ -17,62 +18,102 @@ static inline size_t get_proc_size(struct process *proc);
 int get_data_cmdline(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
-	char *argstr;
-	struct kvec kvec[10];
-	struct iovec_iter iter;
+	int result;
+	int length;
 
 	for (const char *const *arg = proc->map->argv; ; arg++) {
-		argstr = (char *) get_user_uintptr(&arg);
+		#if defined(CONFIG_MMU)
+
+		char *argstr;
+		struct kvec kvec[10];
+
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, sizeof(uintptr_t), 0);
+		if (result < 0) {
+			return result;
+		}
+		result = memcpy_out_of_kvec(kvec, result, 0, &argstr, sizeof(uintptr_t));
+		if (result < 0) {
+			return result;
+		}
+
 		if (!argstr) {
 			break;
 		}
-		int result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, max - i, 0);
+
+		// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
+		length = roundup((uintptr_t) argstr, PAGE_SIZE) - (uintptr_t) argstr;
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, length, 0);
 		if (result < 0) {
 			return result;
 		}
-		iovec_iter_init_kvec(&iter, kvec, result);
-		result = kvec_strncpy_out_of_iter(kvec, result, 0, &buffer[i], max - i);
+		result = strncpy_out_of_kvec(kvec, result, 0, &buffer[i], max - i);
 		if (result < 0) {
 			return result;
 		}
-		i += result + 1;
-		buffer[i - 1] = ' ';
+
+		#else
+
+		if (!arg) {
+			break;
+		}
+
+		strncpy(&buffer[i], (const char *) arg, max - i);
+		result = strnlen(&buffer[i], max - i);
+
+		#endif
+
+		i += result;
+		buffer[i] = ' ';
 		if (i > max) {
 			break;
 		}
 	}
-	buffer[i - 1] = '\0';
+	buffer[i] = '\0';
 	return i;
 }
 
 
 int get_data_stat(struct process *proc, char *buffer, int max)
 {
-	char *cmd;
+	const char *cmd;
 
 	#if defined(CONFIG_MMU)
+
 	int result;
+	int length;
 	uintptr_t arg;
 	struct kvec kvec[10];
 	char cmd_buffer[32];
 
 	if (proc->map->argv) {
 		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) proc->map->argv, sizeof(uintptr_t), 0);
-		if (result < 0)
+		if (result < 0) {
 			return result;
-		result = kvec_memcpy_out_of_iter(kvec, result, 0, &arg, sizeof(uintptr_t));
+		}
+		result = memcpy_out_of_kvec(kvec, result, 0, &arg, sizeof(uintptr_t));
+		if (result < 0) {
+			return result;
+		}
 
-		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, 32, 0);
-		if (result < 0)
+		// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
+		length = roundup(arg, PAGE_SIZE) - arg;
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, length, 0);
+		if (result < 0) {
 			return result;
-		result = kvec_strncpy_out_of_iter(kvec, result, 0, cmd_buffer, 32);
+		}
+		result = strncpy_out_of_kvec(kvec, result, 0, cmd_buffer, 32);
+		if (result < 0) {
+			return result;
+		}
 		cmd = cmd_buffer;
 	} else {
 		cmd_buffer[0] = '\0';
 		cmd = cmd_buffer;
 	}
 	#else
+
 	cmd = proc->map->argv[0];
+
 	#endif
 
 	return snprintf(buffer, max,

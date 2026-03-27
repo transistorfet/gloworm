@@ -152,7 +152,8 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 
 	if (segment->ops && segment->ops->load_page_at) {
 		page_address = rounddown(vaddr, PAGE_SIZE);
-		existing_page = mmu_table_get_page(map->root_table, page_address, 0);
+		// TODO should you add support for large pages?
+		existing_page = mmu_table_get_page(map->root_table, page_address, NULL);
 		if (existing_page) {
 			if (write_error && (segment->flags & SEG_WRITE)) {
 				return memory_map_convert_copy_on_write(map, page_address, existing_page);
@@ -655,6 +656,7 @@ fail:
 	return error;
 }
 
+#if defined(CONFIG_MMU)
 int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
 {
 	int i;
@@ -666,30 +668,35 @@ int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, i
 
 	page_start = rounddown(start, PAGE_SIZE);
 	page_offset = start - page_start;
-	page_size = PAGE_SIZE - page_offset;
-	for (i = 0; i < max_segs && length > 0; i++, length -= page_size) {
-		// TODO this should be modified to allow for large pages
-		page = (char *) mmu_table_get_page(map->root_table, page_start, 0);
+	for (i = 0; i < max_segs; i++) {
+		page = (char *) mmu_table_get_page(map->root_table, page_start, &page_size);
 		if (!page) {
 			error = memory_map_load_page_at(map, page_start, write_flag);
 			if (error < 0) {
 				return error;
 			}
 
-			page = (char *) mmu_table_get_page(map->root_table, page_start, 0);
+			page = (char *) mmu_table_get_page(map->root_table, page_start, &page_size);
 			if (!page) {
 				return ENOENT;
 			}
 		}
 
 		kvec[i].buf = page + page_offset;
-		kvec[i].bytes = page_size;
+		if (length > page_size - page_offset) {
+			kvec[i].bytes = page_size - page_offset;
+			length -= page_size - page_offset;
+		} else {
+			kvec[i].bytes = length;
+			return i + 1;
+		}
 		page_start += page_size;
 		page_offset = 0;
-		page_size = length > PAGE_SIZE ? PAGE_SIZE : length;
 	}
-	return i;
+	// If we ran out of kvec entries before we reached the length, then return an error
+	return ENOMEM;
 }
+#endif
 
 void memory_map_print_segments(struct memory_map *map)
 {

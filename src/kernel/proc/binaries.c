@@ -153,14 +153,14 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	size_t mem_size;
 	size_t segment_size;
 	int error = ENOMEM;
-	struct kvec kvec;
+	struct kvec kvec[100];
 	struct iovec_iter iter;
 	uintptr_t user_mem_start;
 	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
 	Elf32_Ehdr header;
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
 
-	iovec_iter_init_simple_kvec(&iter, &kvec, (char *) &header, sizeof(Elf32_Ehdr));
+	iovec_iter_init_simple_kvec(&iter, kvec, (char *) &header, sizeof(Elf32_Ehdr));
 	if (!(error = vfs_read(file, &iter)))
 		return error;
 
@@ -176,9 +176,13 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	num_ph = header.e_phnum <= PROG_HEADER_MAX ? header.e_phnum : PROG_HEADER_MAX;
 	if (!(error = vfs_seek(file, header.e_phoff, SEEK_SET)))
 		return error;
-	iovec_iter_init_simple_kvec(&iter, &kvec, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
+	iovec_iter_init_simple_kvec(&iter, kvec, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
 	if (!(error = vfs_read(file, &iter)))
 		return error;
+
+	//#if defined(CONFIG_MMU)
+	int preload = 1;
+	//#endif
 
 	// Calculate the total size of memory to allocate (not including the stack)
 	mem_size = 0;
@@ -237,18 +241,6 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 			memory_segment_start = file_segment_start & ~(PAGE_SIZE - 1);
 			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
-			// TODO if we're going to not pre-load the binary data and rely on page faults, then these #ifs are needed
-			//#if !defined(CONFIG_MMU)
-			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
-				goto fail;
-			}
-			iovec_iter_init_simple_kvec(&iter, &kvec, (char *) file_segment_start, prog_headers[i].p_filesz);
-			if ((error = vfs_read(file, &iter)) < 0) {
-				goto fail;
-			}
-			memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
-			//#endif
-
 			int flags = SEG_FIXED;
 			if (prog_headers[i].p_flags & PF_R) {
 				flags |= SEG_READ;
@@ -268,7 +260,28 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 				goto fail;
 			}
 
+			// TODO if we're going to not pre-load the binary data and rely on page faults, then these #ifs are needed
+			if (preload) {
+				error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET);
+				if (error < 0) {
+					goto fail;
+				}
 
+				#if !defined(CONFIG_MMU)
+				error = iovec_iter_load_pages_iter(map, &iter, kvec, 100, file_segment_start, prog_headers[i].p_filesz, 1);
+				if (error < 0) {
+					goto fail;
+				}
+				#else
+				iovec_iter_init_simple_kvec(&iter, kvec, (char *) file_segment_start, prog_headers[i].p_filesz);
+				#endif
+
+				error = vfs_read(file, &iter);
+				if (error < 0) {
+					goto fail;
+				}
+				memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
+			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
 			memory_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 

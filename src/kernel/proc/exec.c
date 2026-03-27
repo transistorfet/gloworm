@@ -59,20 +59,14 @@ static virtual_address_t copy_exec_args(struct memory_map *map, virtual_address_
 int exec_initialize_kernel_stack_with_args(struct process *proc, virtual_address_t stack_pointer, void *entry, struct string_array *argv, struct string_array *envp)
 {
 	int result;
-	struct kvec kvec[10];
+	struct kvec kvec[4];
 	struct iovec_iter iter;
-	virtual_address_t buffered_size = PAGE_SIZE;
+	virtual_address_t buffered_size = PAGE_SIZE * 2;
 
-	//result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, stack_pointer - buffered_size, buffered_size, 1);
-	//if (result < 0) {
-	//	return result;
-	//}
-	result = 1;
-	kvec[0].buf = (char *) (stack_pointer - buffered_size);
-	kvec[0].bytes = buffered_size;
-	iovec_iter_init_kvec(&iter, kvec, result);
-
-	//iovec_iter_init_kernel_buf(&iter, (char *) stack_pointer - buffered_size, buffered_size);
+	result = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 4, stack_pointer - buffered_size, buffered_size, 1);
+	if (result < 0) {
+		return result;
+	}
 
 	iovec_iter_seek(&iter, 0, SEEK_END);
 

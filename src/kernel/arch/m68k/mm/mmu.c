@@ -330,16 +330,20 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 	return 0;
 }
 
-physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, int allow_large_page)
+physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, size_t *page_size)
 {
 	int error;
 	uint32_t entry;
 	struct get_table_result result;
 
 	//GET_TABLE_RETURN_ANY_SIZE
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, allow_large_page ? GET_TABLE_RETURN_ANY_SIZE : 0, &result);
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, page_size ? GET_TABLE_RETURN_ANY_SIZE : 0, &result);
 	if (error < 0) {
 		return NULL;
+	}
+
+	if (page_size) {
+		*page_size = 1 << result.bits;
 	}
 
 	entry = MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
@@ -397,10 +401,11 @@ int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virt
 
 		return !(mmu_sr & 0xEC00);
 	} else {
-		physical_address_t page;
+		int error;
+		struct get_table_result result;
 
-		page = mmu_table_get_page(root_table, virtual_addr & ~(PAGE_SIZE - 1), 1);
-		return page != NULL;
+		error = get_table(root_table, virtual_addr & ~(PAGE_SIZE - 1), PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
+		return error >= 0;
 	}
 }
 

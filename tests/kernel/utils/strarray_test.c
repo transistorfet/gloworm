@@ -27,9 +27,11 @@ int main(void)
 	for (int i = 0; i < BUFFER_MAX; i++) {
 		buffer[i] = 0xff;
 	}
+
+	struct kvec kvec;
 	struct iovec_iter iter;
 
-	iovec_iter_init_kernel_buf(&iter, buffer, BUFFER_MAX);
+	iovec_iter_init_simple_kvec(&iter, &kvec, buffer, BUFFER_MAX);
 	string_array_copy_to_iter(&array, (uintptr_t) buffer, &iter);
 	printk_dump_bytes((uint8_t *) buffer, BUFFER_MAX);
 

@@ -93,10 +93,10 @@ extern struct process *current_proc;
 
 void user_error(struct exception_frame *frame)
 {
+	size_t page_size;
+
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
-	memory_map_print_segments(current_proc->map);
-	mmu_table_print(current_proc->map->root_table);
 
 	#if defined(CONFIG_MMU)
 
@@ -111,12 +111,12 @@ void user_error(struct exception_frame *frame)
 
 	char *usp = arch_get_user_stackp(current_proc);
 	if (usp) {
-		printk("User Kernel Stack: %x\n", usp);
+		printk("User Stack: %x\n", usp);
 		printk_dump((uint16_t *) usp, 128);
 	}
 
-	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1), 1);
-	code += (uintptr_t) frame->pc & (PAGE_SIZE - 1);
+	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1), &page_size);
+	code += (uintptr_t) frame->pc & (page_size - 1);
 	printk("\nCode: %x (phys: %x)\n", frame->pc, code);
 	printk_dump((uint16_t *) code, 48);
 
@@ -209,7 +209,8 @@ static void page_fault_handler(struct exception_frame *frame)
 			// An instruction fault has occurred, and if there's already a page mapped to that address,
 			// it will be returned when we RTE.  It's being recorded in a Program Space function codes, and
 			// was previously only recorded in the Data Space function codes
-			physical_address_t existing_page = mmu_table_get_page(current_proc->map->root_table, fault_addr & ~(PAGE_SIZE - 1), 0);
+			// TODO should you add support for large pages?
+			physical_address_t existing_page = mmu_table_get_page(current_proc->map->root_table, fault_addr & ~(PAGE_SIZE - 1), NULL);
 			if (existing_page) {
 				return;
 			}

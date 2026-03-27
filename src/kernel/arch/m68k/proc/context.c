@@ -8,6 +8,7 @@
 #include <kernel/proc/fork.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/iovec.h>
 
 
 struct sigcontext {
@@ -96,9 +97,19 @@ int arch_release_task_info(struct process *proc)
 
 int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 {
-	//PUSH_STACK(stack_pointer, void *) = _user_exit;
-	user_sp = ((char *) user_sp) - sizeof(void *);
-	*((void **) user_sp) = _user_exit;
+	int error;
+	size_t iter_size;
+	struct kvec kvec[3];
+	struct iovec_iter iter;
+
+	iter_size = sizeof(void *);
+	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (user_sp - iter_size), iter_size, 1);
+	if (error < 0) {
+		return error;
+	}
+	iovec_iter_seek(&iter, 0, SEEK_END);
+	iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
+	user_sp -= iovec_iter_remaining(&iter);
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
@@ -117,9 +128,19 @@ int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 
 int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 {
-	//PUSH_STACK(stack_pointer, void *) = _user_exit;
-	user_sp = ((char *) user_sp) - sizeof(void *);
-	*((void **) user_sp) = _user_exit;
+	int error;
+	size_t iter_size;
+	struct kvec kvec[3];
+	struct iovec_iter iter;
+
+	iter_size = sizeof(void *);
+	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (user_sp - iter_size), iter_size, 1);
+	if (error < 0) {
+		return error;
+	}
+	iovec_iter_seek(&iter, 0, SEEK_END);
+	iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
+	user_sp -= iovec_iter_remaining(&iter);
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
@@ -157,8 +178,11 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 
 int arch_add_signal_context(struct process *proc, int signum)
 {
-	char *phys_usp;
+	int error;
 	void *ksp, *usp;
+	size_t iter_size;
+	struct kvec kvec[3];
+	struct iovec_iter iter;
 	sigrestorer_t restorer;
 	struct sigcontext *context;
 
@@ -180,24 +204,17 @@ int arch_add_signal_context(struct process *proc, int signum)
 	context->prev_mask = proc->signals.blocked;
 	proc->signals.blocked |= proc->signals.actions[signum - 1].sa_mask;
 
-	// Get the user stack pointer's physical address
-	usp = arch_get_user_stackp(proc);
-	#if defined(CONFIG_MMU)
-	phys_usp = (char *) mmu_table_get_page(proc->map->root_table, ((uintptr_t) usp) & ~(PAGE_SIZE - 1), 1);
-	phys_usp += (((uintptr_t) usp) & (PAGE_SIZE - 1));
-	#else
-	phys_usp = usp;
-	#endif
-
 	// Push to the user stack the signum argument, and the return address that will call sigreturn()
-	//PUSH_STACK(usp, int) = signum;
-	//PUSH_STACK(usp, void *) = restorer;
-	phys_usp -= sizeof(int);
-	usp -= sizeof(int);
-	*((uintptr_t *) phys_usp) = (uintptr_t) signum;
-	phys_usp -= sizeof(void *);
-	usp -= sizeof(void *);
-	*((uintptr_t *) phys_usp) = (uintptr_t) restorer;
+	iter_size = 0x20;
+	usp = arch_get_user_stackp(proc);
+	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (usp - iter_size), iter_size, 1);
+	if (error < 0) {
+		return error;
+	}
+	iovec_iter_seek(&iter, 0, SEEK_END);
+	iovec_iter_push_back(&iter, &signum, sizeof(void *));
+	iovec_iter_push_back(&iter, &restorer, sizeof(void *));
+	usp -= iovec_iter_remaining(&iter);
 
 	// Push a fresh context onto the kernel stack
 	// NOTE the user stack is not updated directly, but is instead added to the new context
