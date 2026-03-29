@@ -116,24 +116,32 @@ struct memory_ops anonymous_memory_ops = {
 	.load_page_at	= anonymous_memory_ops_load_page_at,
 };
 
-static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtual_address_t page_address, physical_address_t existing_page)
+static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtual_address_t page_address, physical_address_t existing_page, size_t page_size)
 {
 	int error;
 	physical_address_t page_copy;
 
-	page_copy = page_alloc_single();
+	if (page_size == PAGE_SIZE) {
+		page_copy = page_alloc_single();
+	} else {
+		page_copy = page_alloc_contiguous(page_size);
+	}
 	if (!page_copy) {
 		return ENOMEM;
 	}
-	memcpy((void *) page_copy, (void *) existing_page, PAGE_SIZE);
+	memcpy((void *) page_copy, (void *) existing_page, page_size);
 
 	//log_debug("copying page for %x (originally %x) to %x\n", page_address, existing_page, page_copy);
-	error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) page_copy, MMU_FLAG_WRITE);
+	error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) page_copy, page_size, MMU_FLAG_WRITE);
 	if (error < 0) {
 		return error;
 	}
 
-	page_free_single((physical_address_t) existing_page);
+	if (page_size == PAGE_SIZE) {
+		page_free_single((physical_address_t) existing_page);
+	} else {
+		page_free_contiguous((physical_address_t) existing_page, page_size);
+	}
 	return 0;
 }
 
@@ -142,6 +150,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 {
 	int error;
 	uintptr_t page_address;
+	size_t page_size = PAGE_SIZE;
 	physical_address_t existing_page, new_page;
 	struct memory_segment *segment;
 
@@ -153,10 +162,10 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 	if (segment->ops && segment->ops->load_page_at) {
 		page_address = rounddown(vaddr, PAGE_SIZE);
 		// TODO should you add support for large pages?
-		existing_page = mmu_table_get_page(map->root_table, page_address, NULL);
+		existing_page = mmu_table_get_page(map->root_table, page_address, &page_size);
 		if (existing_page) {
 			if (write_error && (segment->flags & SEG_WRITE)) {
-				return memory_map_convert_copy_on_write(map, page_address, existing_page);
+				return memory_map_convert_copy_on_write(map, page_address, existing_page, page_size);
 			} else {
 				log_error("attempting to read in data space a page that already exists\n");
 				return EEXIST;
@@ -171,7 +180,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 				return ENOMEM;
 			}
 			//log_debug("loading new page for %x -> %x\n", vaddr, new_page);
-			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
+			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, PAGE_SIZE, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
 			if (error < 0) {
 				log_error("error setting newly loaded page: %d\n", error);
 				page_free_single((physical_address_t) new_page);

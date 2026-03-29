@@ -110,6 +110,7 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 		cmd_buffer[0] = '\0';
 		cmd = cmd_buffer;
 	}
+
 	#else
 
 	cmd = proc->map->argv[0];

@@ -5088,3 +5088,45 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I hackishly just rounded up the value, hoping that the arguments are not so long that they take up two pages of the stack instead
   of just the last page
 
+
+2026-03-28:
+
+- revisiting the 32k stack size, and it seems to be swapping back and forth between two pages, which are in pid 1 and pid 3.
+  Neither process is advanced.  They're both stuck at the same code address.  I previously noted there were some large pages in the
+  memory map, when I previously came across this problem, but that's not the case now, so it's not the cause.  All pages are 256
+- oh maybe that is actually the case.  I was printing the memory map after the process was created, but at that point the stack
+  isn't populated yet.  Printing it later shows many more entries, including a 14-bit page at the end for addresses 0x208000 to
+  0x20BFFF (when the segment is 0x204200 to 0x20C200).  There are 256 byte pages for 0x20C000 and 0x20C100 though, and it's swapping
+  out the last page, 0x20C100, so this doesn't really make sense
+- actually maybe that's a table and not an early termination page descriptor...  It's not clear from the way it's printed
+- Oh, there's a write protect bit set on the table, it seems.  There doesn't seem to be one set on the other tables.  I kind of
+  wouldn't have expected that to be an issue, but maybe it is?
+- that table is created without setting the write protect bit, so it must be set afterwards...  This bug might apply not only to the
+  stack, but to anything where a segment beyond 16k is alloctated
+- it definitely is during mmu_table_copy that the table's write protect bit is set, but it seems to be get_table where it's
+  returning the table instead of pages because the segment length is long enough to include it all, and there's no check to see if
+  it's a table or descriptor...
+- I don't know what the solution here should be... It should be possible to make large pages I think
+- it's this check that's passing: (bits <= PAGE_ADDR_BITS || (request_covers_whole_chunk && !(flags & GET_TABLE_RETURN_ANY_SIZE)))
+  and that returns the table (ie. request_covers_whole_chunk is true which is how it returns), and then entries i=2 and i=3 are set,
+  but i=3 on src table already has a subtable, which is ignored
+- the problem is that the table entry is already set as a table entry, which then gets the WP bit set on it, but this is wrong...
+  An easy way to fix it would be force everything to be a page, but if I want to support large pages, I need a better solution.  I
+  feel like there's actually a bug here, as in it's not just an uncovered case, but this code is actually behaving incorrectly in
+  other ways too.  That's just a hunch though
+- I'm not passing in GET_TABLE_RETURN_ANY_SIZE so I don't think it should be returning early, but it is?!?  That's the bug, isn't
+  it?
+- only mmu_table_get_page seems to ever set GET_TABLE_RETURN_ANY_SIZE, but it's checking !GET_TABLE_RETURN_ANY_SIZE... it's like the
+  logic here is backwards, and/or I'm missing a GET_TABLE_RETURN_ANY_SIZE in a get_table call
+
+
+2026-03-29:
+
+- well I found the problem with the stack size and GET_TABLE_RETURN_ANY_SIZE.  It's finding and returning an empty entry, but then
+  it loops on that table and finds another table in the element after the one that get_table returned with, which is why the return
+  conditions in get_table weren't affecting the results
+- I'm not sure how I want to resolve this.  It might be harder to get large pages working, so maybe I should force small pages? But
+  then it would still be able to error out if the two tables aren't fully populated, since I'm not passing
+  GET_TABLE_CREATE_IF_NEEDED to the source table, but even if I pass that in, it would trip up if the mapping function added a large
+  page somewhere, and that was copied in the copy function
+

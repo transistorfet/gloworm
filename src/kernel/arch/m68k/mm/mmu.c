@@ -131,7 +131,7 @@ static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virt
 				result->table = table;
 				return 0;
 			}
-		} else if (bits <= PAGE_ADDR_BITS || (request_covers_whole_chunk && !(flags & GET_TABLE_RETURN_ANY_SIZE))) {
+		} else if (MMU_DT(table[i]) == MMU_DT_INVALID && (bits <= PAGE_ADDR_BITS || (request_covers_whole_chunk && (flags & GET_TABLE_RETURN_ANY_SIZE)))) {
 			result->table = table;
 			result->bits = bits;
 			return 0;
@@ -188,7 +188,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
 		if (i + 1 >= MMU_TABLE_SIZE) {
-			error = get_table(root_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED, &result);
+			error = get_table(root_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED | GET_TABLE_RETURN_ANY_SIZE, &result);
 			if (error < 0) {
 				return error;
 			}
@@ -218,9 +218,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 		switch (flags & MMU_FLAG_TYPE) {
 			case MMU_FLAG_UNMAP: {
 				if (!(flags & MMU_FLAG_WINDOW)) {
-					// TODO this was causing the crashing problems, because a page was being freed and reused causing corruption (on a user stack I think)
 					page_free_single(MMU_TABLE_ADDRESS(result.table[i]));
-					printk("problematic free page %x\n", MMU_TABLE_ADDRESS(result.table[i]));
 				}
 				physical_addr = 0;
 				break;
@@ -292,7 +290,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
 		if (i + 1 >= MMU_TABLE_SIZE) {
-			error = get_table(src_table, virtual_addr, length, 0, &src_result);
+			error = get_table(src_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED, &src_result);
 			if (error < 0) {
 				return error;
 			}
@@ -308,6 +306,8 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		}
 
 		i = TABLE_INDEX(virtual_addr, src_result.bits);
+
+		//printk("setting i=%d on src %x:%d dest %x:%d\n", i, src_result.table[i], src_result.bits, dest_result.table[i], dest_result.bits);
 
 		// Set the descriptor in the current table, and force the write protect flag on, so we'll
 		// get an exception when trying to write to the new page
@@ -336,7 +336,6 @@ physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t vi
 	uint32_t entry;
 	struct get_table_result result;
 
-	//GET_TABLE_RETURN_ANY_SIZE
 	error = get_table(root_table, virtual_addr, PAGE_SIZE, page_size ? GET_TABLE_RETURN_ANY_SIZE : 0, &result);
 	if (error < 0) {
 		return NULL;
@@ -355,20 +354,20 @@ physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t vi
 	}
 }
 
-int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, int flags)
+int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, size_t page_size, int flags)
 {
 	int i;
 	int error;
 	int status;
 	struct get_table_result result;
 
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_CREATE_IF_NEEDED, &result);
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_CREATE_IF_NEEDED | GET_TABLE_RETURN_ANY_SIZE, &result);
 	if (error < 0) {
 		return error;
 	}
 
-	if (result.bits != PAGE_ADDR_BITS) {
-		printk("ERROR: there's something odd in mmu_table_set_page(), I expected only a single page, but got a higher level granule\n");
+	if (1 << result.bits != page_size) {
+		log_info("attempted to mmu_table_set_page on the wrong granuale size, expected %d but got %d\n", page_size, result.bits);
 		return EFAULT;
 	}
 

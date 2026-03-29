@@ -103,12 +103,22 @@ int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 	struct iovec_iter iter;
 
 	iter_size = sizeof(void *);
+
 	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (user_sp - iter_size), iter_size, 1);
 	if (error < 0) {
-		return error;
+		goto fail;
 	}
-	iovec_iter_seek(&iter, 0, SEEK_END);
-	iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
+
+	error = iovec_iter_seek(&iter, 0, SEEK_END);
+	if (error < 0) {
+		goto fail;
+	}
+
+	error = iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
+	if (error < 0) {
+		goto fail;
+	}
+
 	user_sp -= iovec_iter_remaining(&iter);
 
 	#if defined(CONFIG_M68K_USER_MODE)
@@ -124,6 +134,9 @@ int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 1);
 
 	return 0;
+
+fail:
+	return error;
 }
 
 int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
@@ -134,12 +147,22 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 	struct iovec_iter iter;
 
 	iter_size = sizeof(void *);
+
 	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (user_sp - iter_size), iter_size, 1);
 	if (error < 0) {
-		return error;
+		goto fail;
 	}
-	iovec_iter_seek(&iter, 0, SEEK_END);
-	iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
+
+	error = iovec_iter_seek(&iter, 0, SEEK_END);
+	if (error < 0) {
+		goto fail;
+	}
+
+	error = iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
+	if (error < 0) {
+		goto fail;
+	}
+
 	user_sp -= iovec_iter_remaining(&iter);
 
 	#if defined(CONFIG_M68K_USER_MODE)
@@ -155,6 +178,9 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0);
 
 	return 0;
+
+fail:
+	return error;
 }
 
 int arch_clone_task_info(struct process *parent_proc, struct process *proc, char *user_sp)
@@ -194,7 +220,8 @@ int arch_add_signal_context(struct process *proc, int signum)
 		restorer = _user_sigreturn;
 		#else
 		log_error("attempted to call a signal handler with no restorer\n");
-		return EINVAL;
+		error = EINVAL;
+		goto fail;
 		#endif
 	}
 
@@ -207,13 +234,27 @@ int arch_add_signal_context(struct process *proc, int signum)
 	// Push to the user stack the signum argument, and the return address that will call sigreturn()
 	iter_size = 0x20;
 	usp = arch_get_user_stackp(proc);
+
 	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (usp - iter_size), iter_size, 1);
 	if (error < 0) {
-		return error;
+		goto fail;
 	}
-	iovec_iter_seek(&iter, 0, SEEK_END);
-	iovec_iter_push_back(&iter, &signum, sizeof(void *));
-	iovec_iter_push_back(&iter, &restorer, sizeof(void *));
+
+	error = iovec_iter_seek(&iter, 0, SEEK_END);
+	if (error < 0) {
+		goto fail;
+	}
+
+	error = iovec_iter_push_back(&iter, &signum, sizeof(void *));
+	if (error < 0) {
+		goto fail;
+	}
+
+	error = iovec_iter_push_back(&iter, &restorer, sizeof(void *));
+	if (error < 0) {
+		goto fail;
+	}
+
 	usp -= iovec_iter_remaining(&iter);
 
 	// Push a fresh context onto the kernel stack
@@ -222,6 +263,9 @@ int arch_add_signal_context(struct process *proc, int signum)
 	arch_set_kernel_stackp(proc, ksp);
 
 	return 0;
+
+fail:
+	return error;
 }
 
 int arch_remove_signal_context(struct process *proc)

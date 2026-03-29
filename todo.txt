@@ -1,40 +1,30 @@
 
-* try to remove as many user_copy functions as possible, to be replaced with kvec+iter
-* replace user_buf with iovec iter type?
-* make everything that uses iters check for errors
-* make everything that uses usercopy functions check for errors
+* fix the _user_exit problem properly
 
-* fix issue with setting user stack to more than 16k, where it allocates an early termination page/large page, and then can't be converted with
-  copy-on write.  Either make it possible to copy on write large pages (and load large pages) or else force them to be small pages again
-* make sure a SEG_FIXED segment doesn't have its memory freed
-
-* when growing the heap, we don't ensure that we only grow by PAGE_SIZE increments, so it's possible that a page could remain
-  unfreed in the middle of the segment
-* maybe make memory_map_mmap grow/shrink/join memory regions or is that too complex, and splitting is good enough?
-* should you change the memory resize code to use mmap/unmap instead of resizing?  That would make it easier to add the MMU table
-  changes, although... now that I think about it maybe I don't need to remap them, since they'd be pointing to anonymous memory in
-  the case of the heap and stack
-
-* convert bufcache/disk blocks to use pages
-
-* use the PVALID instruction to validate user addresses before dereferencing them
-* the arch specific stuff is the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack? should that be moved to
-  arch/m68k?
-* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
-  memory without duplicating them
-
+* should you make the page fault/exception numbers configurable like irqs?
 * make the exception handler actually kill the process when it needs to die, instead of causing infinite exceptions
 * make it kill processes with SIGSEGV instead of SIGKILL when a segfault or bus error occurs
 * you need a way to align data on an architectural-specific amount
 * confirm that signalling a process that's not the current process will properly switch to that process
 
+* convert bufcache/disk blocks to use pages
+* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
+  memory without duplicating them
+
+* try to remove as many user_copy functions as possible, to be replaced with kvec+iter
+* replace user_buf with iovec iter type?
+* make everything that uses iters check for errors
+* make everything that uses usercopy functions check for errors
+* cleanup init.c to reduce the duplication
+
+* move memory.c to mm/
+
+* use the PVALID instruction to validate user addresses before dereferencing them
+* support large pages when MMU mapping and swapping
+
 * where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
 * should reset_proc() free the memory map as well?
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
-* move memory.c to mm/
-* fix the _user_exit problem properly
-* cleanup init.c to reduce the duplication
-* should you make the page fault/exception numbers configurable like irqs?
 
 * try with 4k pages, that failed during init last time I tried it
 * replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
@@ -53,6 +43,8 @@
 * make it so that it's easy to run just one test
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
+
+* should you move the assumptions made in memory_map_move_sbrk and memory_map_insert_heap_stack that the stack grows downward into arch/m68k?
 
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 
