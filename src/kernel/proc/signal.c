@@ -148,8 +148,9 @@ static inline void run_signal_default_action(struct process *proc, int signum, s
 	}
 
 	// Since we don't execute the signal handler cleanup for a default action, we cancel the syscall here instead
-	if (!(current_proc->signals.actions[signum - 1].sa_flags & SA_RESTART))
-		cancel_syscall(current_proc);
+	if (!(proc->signals.actions[signum - 1].sa_flags & SA_RESTART)) {
+		cancel_syscall(proc);
+	}
 }
 
 static inline sigset_t signal_to_map(int signum)

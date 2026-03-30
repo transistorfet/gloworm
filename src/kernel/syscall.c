@@ -739,23 +739,57 @@ mode_t do_umask(mode_t mask)
 int do_select(int nfds, fd_set __user *readfds, fd_set __user *writefds, fd_set __user *exceptfds, struct timeval __user *timeout)
 {
 	int error;
-	fd_set kernel_readfds, kernel_writefds, kernel_exceptfds;
 
 	if (nfds <= 0 || nfds > OPEN_MAX) {
 		return EINVAL;
 	}
 
-	memcpy_from_user(&kernel_readfds, &readfds, sizeof(fd_set));
-	memcpy_from_user(&kernel_writefds, &writefds, sizeof(fd_set));
-	memcpy_from_user(&kernel_exceptfds, &exceptfds, sizeof(fd_set));
+	extern int enter_select(struct process *proc, int max, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
+	#if defined(CONFIG_MMU)
+
+	fd_set *ptr_readfds, *ptr_writefds, *ptr_exceptfds;
+	fd_set kernel_readfds, kernel_writefds, kernel_exceptfds;
+
+	if (readfds) {
+		memcpy_from_user(&kernel_readfds, readfds, sizeof(fd_set));
+		ptr_readfds = &kernel_readfds;
+	} else {
+		ptr_readfds = NULL;
+	}
+
+	if (writefds) {
+		memcpy_from_user(&kernel_writefds, writefds, sizeof(fd_set));
+		ptr_writefds = &kernel_writefds;
+	} else {
+		ptr_writefds = NULL;
+	}
+
+	if (exceptfds) {
+		memcpy_from_user(&kernel_exceptfds, exceptfds, sizeof(fd_set));
+		ptr_exceptfds = &kernel_exceptfds;
+	} else {
+		ptr_exceptfds = NULL;
+	}
 
 	COPY_USER_STRUCT(struct timeval, timeout);
-	extern int enter_select(struct process *proc, int max, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+	error = enter_select(current_proc, nfds, ptr_readfds, ptr_writefds, ptr_exceptfds, timeout);
+
+	if (readfds) {
+		memcpy_to_user(readfds, &kernel_readfds, sizeof(fd_set));
+	}
+	if (writefds) {
+		memcpy_to_user(writefds, &kernel_writefds, sizeof(fd_set));
+	}
+	if (exceptfds) {
+		memcpy_to_user(exceptfds, &kernel_exceptfds, sizeof(fd_set));
+	}
+
+	#else
+
 	error = enter_select(current_proc, nfds, readfds, writefds, exceptfds, timeout);
 
-	memcpy_to_user(&readfds, &kernel_readfds, sizeof(fd_set));
-	memcpy_to_user(&writefds, &kernel_writefds, sizeof(fd_set));
-	memcpy_to_user(&exceptfds, &kernel_exceptfds, sizeof(fd_set));
+	#endif
 
 	return error;
 }

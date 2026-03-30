@@ -24,19 +24,20 @@ struct connection {
 
 struct connection *clients[MAX_CONNECTIONS];
 
-int run_server();
+void handle_signal(int signum);
+int run_server(void);
 
 int main(int argc, char **argv)
 {
-	/*
 	int pid;
 
-	pid = fork();
-	if (pid < 0)
-		return pid;
-	if (pid > 0)
-		return 0;
-	*/
+	if (argc >= 2 && !strcmp(argv[1], "-d")) {
+		pid = fork();
+		if (pid < 0)
+			return pid;
+		if (pid > 0)
+			return 0;
+	}
 
 	run_server();
 	return 0;
@@ -49,7 +50,7 @@ int create_listener()
 	struct sigaction act;
 	struct sockaddr_in addr;
 
-	act.sa_handler = NULL;
+	act.sa_handler = handle_signal;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
 	sigaction(SIGINT, &act, NULL);
@@ -78,6 +79,12 @@ int create_listener()
 	}
 
 	return listenfd;
+}
+
+void handle_signal(int signum)
+{
+	printf("Received signal %d\n", signum);
+	return;
 }
 
 struct connection *create_connection(int sockfd)
@@ -213,7 +220,7 @@ int read_loop(int listenfd)
 	}
 }
 
-int run_server()
+int run_server(void)
 {
 	int listenfd;
 

@@ -89,6 +89,7 @@ int MAIN(command_ns)(int argc, char **argv)
 
 void handle_signal(int signum)
 {
+	printf("Received Ctrl-C\n");
 	return;
 }
 

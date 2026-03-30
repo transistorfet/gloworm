@@ -66,12 +66,6 @@ void arch_init_irqs(void)
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
 }
 
-// TODO actually this isn't needed...
-void arch_set_irq_handler(irq_num_t irq, bare_irq_handler_t handler)
-{
-	vector_table[(short) irq] = handler;
-}
-
 void print_stack(void *stack, void *code)
 {
 	// Dump stack
@@ -91,7 +85,7 @@ void print_stack(void *stack, void *code)
 
 extern struct process *current_proc;
 
-void user_error(struct exception_frame *frame)
+void user_error(struct exception_frame *frame, int signal)
 {
 	size_t page_size;
 
@@ -135,7 +129,7 @@ void fatal_error(struct exception_frame *frame)
 
 	console_prepare_for_panic();
 
-	log_fatal("\n\nFatal Error at %x (status: %x, vector: %x). Halting...\n", frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
+	log_fatal("\n\nFatal Error at %x while pid %d running (status: %x, vector: %x). Halting...\n", frame->pc, current_proc->pid, frame->status, (frame->vector & 0xFFF) >> 2);
 
 	print_stack(frame, (void *) frame->pc);
 
@@ -153,15 +147,21 @@ void fatal_error(struct exception_frame *frame)
 
 void handle_exception(struct exception_frame *frame)
 {
-	if (((frame->vector & 0xFFF) >> 2) == IRQ_BUS_ERROR) {
-		page_fault_handler(frame);
-	} else {
-		extern int kernel_reentries;
-		if (kernel_reentries <= 1) {
-			user_error(frame);
-		} else {
-			fatal_error(frame);
-			asm volatile("stop #0x2700\n");
+	// Exception occurred inside a user program
+	switch ((frame->vector & 0xFFF) >> 2) {
+		case IRQ_BUS_ERROR:
+			page_fault_handler(frame);
+			break;
+
+		default: {
+			extern int kernel_reentries;
+			if (kernel_reentries <= 1) {
+				user_error(frame, SIGABRT);
+			} else {
+				fatal_error(frame);
+				asm volatile("stop #0x2700\n");
+			}
+			break;
 		}
 	}
 }
@@ -251,6 +251,12 @@ fail:
 	memory_map_print_segments(current_proc->map);
 	#endif
 
-	user_error(frame);
+	extern int kernel_reentries;
+	if (kernel_reentries <= 1) {
+		user_error(frame, SIGSEGV);
+	} else {
+		fatal_error(frame);
+		asm volatile("stop #0x2700\n");
+	}
 }
 

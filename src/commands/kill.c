@@ -21,6 +21,7 @@ int MAIN(command_kill)(int argc, char **argv, char **envp)
 	if (argv[i][0] == '-') {
 		signal = strtol(&argv[i][1], &endptr, 10);
 		i += 1;
+		printf("sending signal %d\n", signal);
 	}
 
 	pid = strtol(argv[i], &endptr, 10);
