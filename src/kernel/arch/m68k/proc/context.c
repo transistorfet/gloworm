@@ -271,6 +271,7 @@ fail:
 int arch_remove_signal_context(struct process *proc)
 {
 	void *ksp;
+	int signum;
 	struct sigcontext *context;
 
 	// Drop the handler context
@@ -278,11 +279,12 @@ int arch_remove_signal_context(struct process *proc)
 
 	// Use the sigcontext on the process's kernel stack to restore the previous signal state
 	context = (struct sigcontext *) ksp;
+	signum = context->signum;
 	proc->signals.blocked = context->prev_mask;
 	ksp = (((struct sigcontext *) ksp) + 1);
 	arch_set_kernel_stackp(proc, ksp);
 
-	return 0;
+	return signum;
 }
 
 void arch_extended_switch_context(struct process *previous_proc, struct process *next_proc)

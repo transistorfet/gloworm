@@ -18,8 +18,6 @@
 
 #if defined(CONFIG_MMU)
 
-extern struct process *current_proc;
-
 
 static inline uint8_t get_user_uint8(const void __user *src)
 {

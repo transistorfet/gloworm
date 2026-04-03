@@ -14,7 +14,7 @@
 
 
 // Process Table and Queues
-#define PROCESS_MAX	6
+#define PROCESS_MAX	10
 static pid_t next_pid;
 static struct process table[PROCESS_MAX];
 
@@ -109,6 +109,11 @@ int reset_proc(struct process *proc)
 		proc->fd_table = fd_table;
 	}
 
+	if (proc->map) {
+		memory_map_free(proc->map);
+		proc->map = NULL;
+	}
+
 	if (previous_proc == proc) {
 		previous_proc = NULL;
 	}
@@ -130,6 +135,7 @@ void close_proc(struct process *proc)
 	}
 	if (proc->map) {
 		memory_map_free(proc->map);
+		proc->map = NULL;
 	}
 
 	// Reassign any child procs' parent to be 1 (init), since we can't be sure this proc's

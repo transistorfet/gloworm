@@ -91,6 +91,7 @@ void user_error(struct exception_frame *frame, int signal)
 
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
+	memory_map_print_segments(current_proc->map);
 
 	#if defined(CONFIG_MMU)
 
@@ -103,10 +104,11 @@ void user_error(struct exception_frame *frame, int signal)
 	printk("Process Kernel Stack (Context): %x\n", ksp);
 	printk_dump((uint16_t *) ksp, 128);
 
-	char *usp = arch_get_user_stackp(current_proc);
-	if (usp) {
-		printk("User Stack: %x\n", usp);
-		printk_dump((uint16_t *) usp, 128);
+	virtual_address_t usp = (virtual_address_t) arch_get_user_stackp(current_proc);
+	char *page = (char *) mmu_table_get_page(current_proc->map->root_table, usp & ~(PAGE_SIZE - 1), NULL);
+	printk("User Stack: %x (page %x)\n", usp, page);
+	if (usp && page) {
+		printk_dump((uint16_t *) &page[usp & (PAGE_SIZE - 1)], 128);
 	}
 
 	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1), &page_size);

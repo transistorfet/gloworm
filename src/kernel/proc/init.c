@@ -110,7 +110,7 @@ int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char
 		return error;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_kernel_stack_with_args(proc, (char *) proc->map->stack_end, entry, &argv_buffer, &envp_buffer);
+	exec_initialize_stack_with_args(proc, (char *) proc->map->stack_end, entry, &argv_buffer, &envp_buffer);
 }
 #endif
 
@@ -201,7 +201,7 @@ int alloc_kernel_stack(struct process *proc, int (*thread_start)(), const char *
 	string_array_copy(&argv_array, argv, FROM_KERNEL);
 	string_array_copy(&envp_array, envp, FROM_KERNEL);
 
-	exec_initialize_kernel_stack_with_args(proc, proc->map->stack_end, thread_start, &argv_array, &envp_array);
+	exec_initialize_stack_with_args(proc, proc->map->stack_end, thread_start, &argv_array, &envp_array);
 
 	return 0;
 }

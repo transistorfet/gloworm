@@ -140,7 +140,7 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 	#endif
 
 	proc->map = new_map;
- 
+
 	char *stack_pointer = NULL;
 	// TODO this needs to move to a common location, but the reason it can't (hasn't been) moved is because it needs the stack pointer?
 	// because it's adjusting both the user and kernel stacks, due to the fact that enabling user mode uses two stacks instead of one

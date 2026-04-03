@@ -135,6 +135,7 @@ int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *d
 
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 {
+	int error;
 	int bytes;
 
 	bytes = (nbytes < iter->length - iter->seg_start - iter->seg_offset) ? nbytes : iter->length - iter->seg_start - iter->seg_offset;
@@ -147,7 +148,10 @@ int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 		case ITER_KVEC: {
 			bytes = memcpy_into_kvec(&iter->kvec.segs[iter->cur_seg], iter->num_segs - iter->cur_seg, iter->seg_offset, buf, bytes);
 			if (bytes > 0) {
-				iovec_iter_seek(iter, bytes, SEEK_CUR);
+				error = iovec_iter_seek(iter, bytes, SEEK_CUR);
+				if (error < 0) {
+					return error;
+				}
 			}
 			return bytes;
 		}
@@ -160,6 +164,7 @@ int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes)
 {
+	int error;
 	int bytes;
 
 	bytes = (nbytes < iter->length - iter->seg_start - iter->seg_offset) ? nbytes : iter->length - iter->seg_start - iter->seg_offset;
@@ -172,7 +177,10 @@ int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes)
 		case ITER_KVEC: {
 			bytes = memcpy_out_of_kvec(&iter->kvec.segs[iter->cur_seg], iter->num_segs - iter->cur_seg, iter->seg_offset, buf, bytes);
 			if (bytes > 0) {
-				iovec_iter_seek(iter, bytes, SEEK_CUR);
+				error = iovec_iter_seek(iter, bytes, SEEK_CUR);
+				if (error < 0) {
+					return error;
+				}
 			}
 			return bytes;
 		}

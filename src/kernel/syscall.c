@@ -50,7 +50,7 @@ void tty_68681_reset_leds(uint8_t bits);
 void syscall_entry(void)
 {
 	#if defined(CONFIG_TTY_68681)
-	tty_68681_set_leds(0x04);
+	tty_68681_set_leds(0x01);
 	#endif
 }
 
@@ -62,7 +62,7 @@ void syscall_entry(void)
 void syscall_exit(void)
 {
 	#if defined(CONFIG_TTY_68681)
-	tty_68681_reset_leds(0x04);
+	tty_68681_reset_leds(0x01);
 	#endif
 }
 

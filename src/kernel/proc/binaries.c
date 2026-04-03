@@ -42,9 +42,6 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 		return EISDIR;
 	}
 
-	// Reset the fd table and signal handlers for the executing proc
-	reset_proc(proc);
-
 	// Allocate the process memory and initialize the memory maps
 	map = memory_map_alloc();
 	if (!map)
@@ -68,12 +65,14 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 		return error;
 	}
 
+	// Reset the fd table and signal handlers for the executing proc
+	reset_proc(proc);
+
 	// Swap the existing memory map for the newly created one
-	memory_map_free(proc->map);
 	proc->map = map;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_user_stack_with_args(proc, map->stack_end, entry, argv, envp);
+	exec_initialize_stack_with_args(proc, map->stack_end, entry, argv, envp);
 
 	return error;
 }
@@ -181,6 +180,8 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 		return error;
 
 	//#if defined(CONFIG_MMU)
+	//int preload = 0;
+	//#else
 	int preload = 1;
 	//#endif
 
@@ -200,6 +201,8 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 				mem_size = prog_headers[i].p_vaddr;
 			segment_size = (prog_headers[i].p_vaddr & (PAGE_SIZE - 1)) + prog_headers[i].p_memsz;
 			mem_size += roundup(segment_size, PAGE_SIZE);
+		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
+			preload = 1;
 		}
 	}
 	if (mem_size == 0)
@@ -241,7 +244,11 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 			memory_segment_start = file_segment_start & ~(PAGE_SIZE - 1);
 			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
+			//#if defined(CONFIG_MMU)
+			//int flags = preload ? SEG_POPULATE : 0;
+			//#else
 			int flags = SEG_FIXED;
+			//#endif
 			if (prog_headers[i].p_flags & PF_R) {
 				flags |= SEG_READ;
 			}
@@ -267,7 +274,7 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 					goto fail;
 				}
 
-				#if !defined(CONFIG_MMU)
+				#if defined(CONFIG_MMU)
 				error = iovec_iter_load_pages_iter(map, &iter, kvec, 100, file_segment_start, prog_headers[i].p_filesz, 1);
 				if (error < 0) {
 					goto fail;

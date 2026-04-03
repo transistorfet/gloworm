@@ -259,13 +259,13 @@ void memory_map_free(struct memory_map *map)
 		return;
 	}
 
-	#if defined(CONFIG_MMU)
-	if (map->root_table) {
-		mmu_table_free(map->root_table);
-	}
-	#endif
-
 	if (--map->refcount == 0) {
+		#if defined(CONFIG_MMU)
+		if (map->root_table) {
+			mmu_table_free(map->root_table);
+		}
+		#endif
+
 		for (cur = _queue_head(&map->segments); cur; cur = next) {
 			next = _queue_next(&cur->node);
 			memory_segment_free(cur);
@@ -712,9 +712,15 @@ void memory_map_print_segments(struct memory_map *map)
 	struct memory_segment *cur;
 
 	if (map) {
-		for (cur = _queue_head(&map->segments); cur; cur = _queue_next(&cur->node)) {
-			printk("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
+		if (_queue_head(&map->segments)) {
+			for (cur = _queue_head(&map->segments); cur; cur = _queue_next(&cur->node)) {
+				printk("%x to %x: flags=%x\n", cur->start, cur->end, cur->flags);
+			}
+		} else {
+			printk("<map has no segments>\n");
 		}
+	} else {
+		printk("<map is NULL>\n");
 	}
 }
 

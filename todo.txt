@@ -1,38 +1,36 @@
 
+* add a proper rounddown macro and offset macro somewhere
 * you need a way to align data on an architectural-specific amount
 
-* threadtest is getting into an infinite error loop
 * confirm that signalling a process that's not the current process will properly switch to that process (still a problem interrupting syscalls it seems)
-* fix the _user_exit problem properly
+* threadtest is getting into an infinite error loop
+* fix the _user_exit problem properly (check when using no-usermode)
 
-* where should arch_extended_switch_context() go.  Currently it's in exec_initialize_user_stack_with_args()
-* should reset_proc() free the memory map as well?
-* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
-
-* try to remove as many user_copy functions as possible, to be replaced with kvec+iter
-* replace user_buf with iovec iter type?
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors
 * cleanup init.c to reduce the duplication
+* try to reduce the code size as much as possible
 
+* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
+* use the PVALID instruction to validate user addresses before dereferencing them
+* support large pages when MMU mapping and swapping
 * convert kmalloc to use pages
-* convert bufcache/disk blocks to use pages
-* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
-  memory without duplicating them
 
 * move memory.c to mm/
 
-* use the PVALID instruction to validate user addresses before dereferencing them
-* support large pages when MMU mapping and swapping
-
 * try with 4k pages, that failed during init last time I tried it
-* replace the MMU_WINDOW flag with UNALLOCATED in memory_map_mmp
 * test with CONFIG_MMU=n to make sure nothing broke
 * test with CONFIG_USER_MODE=n to make sure nothing broke
 
 ---
 
+* convert bufcache/disk blocks to use pages
+* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
+  memory without duplicating them
+
 * I think there's a bug where if you start the httpd server (at least in daemon mode), and then kill it and run it again, it will fail with error -43, address in use
+* replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
+
 * it's time to fix the size in the load scripts
 
 * when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
