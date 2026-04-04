@@ -5130,3 +5130,55 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   GET_TABLE_CREATE_IF_NEEDED to the source table, but even if I pass that in, it would trip up if the mapping function added a large
   page somewhere, and that was copied in the copy function
 
+
+2026-04-03:
+
+- I keep uncovering bugs.  I was almost ready to commit the signals fix, which was to re-set the return value during the signal
+  cleanup function, which required getting the signal number from the stack in order to compare the process's signal config, and I
+  found a bunch of issues in the httpd demo
+- pressing enter while it was running caused the syscall LED to flag repeatedly, until Ctrl-C was pressed, which then cause a crash
+  if I tried also printing out the syscall (it was trying to run syscall 52, which is the `select` syscall
+- I then tried changing the page size to 4k, since I had to rebuild the userland programs, and every process crashes during boot,
+  starting with pid 3 (sh).  It doesn't even have a bus error, which seems odd.  I know it using fewer pages, so fewer page faults,
+  but I still think it should have at least one page fault
+- I had a bad sleep last night and am having trouble focusing.  I don't know where to even start looking
+- oh the last run, it errored on pid 1 first instead (when I enabled the 0x40000 process starting address instead of the SEG_FIXED
+  segment) and it fails with an 11 (F-line emulator), and then pid 2 (idle) crashes with 14 (format error), which implies some
+  memory is not right, copied to the wrong location or something?
+
+- it looks like the user stack is full of zeros or at least invalid data which then causes the rts at the end of the fork syscall
+  stub in the user process, which has happened before, and it was caused by corruption to the user stack
+- one possible explanation for that might be that it's not copy-on-write write protecting the pages, possibly due to changes I made
+  recently to the get_table function.  I have no evidence yet of that though
+
+- I re-enabled the non-FIXED program segments that instead use preallocated data, and it now errors on pid 1 at `_start`, so right
+  away, even though the memory looks correct, it matches the init.elf binary, and the MMU table correctly points to the real memory
+  page that contains that data, and the write protect bit is set for that segment, flags look right.  This is before any fork
+  occurs.  It's only init.c which created the two first processes...
+
+- actually, the address with the fault, the 11 f-line emulator fault, is executing 0x40160, which *is* in the table, but if the
+  table is not set correctly... then address 0x40160 is an address in rom, which is filled with 0xFF (empty)
+
+
+2026-04-04:
+
+- back to this, and while the CPR register is set correctly, I'm not seeing the `mmu: tcr` lines that should print at the beginning.
+  Is the MMU not enabled for some reason?  That would certainly explain why it's executing the wrong location in memory despite the
+  tables being set up and definitely being in user mode when the exception occurs
+- Oh!  yeah it failed during mmu init and didn't stop.  The problem happens before it enables the MMU, when it's setting up the
+  tables for the kernel space.  I didn't notice the error message until now.  It's the I/O space that has the problem
+
+- So yeah, the problem was that it was mapping too much.  It would find the table, and keep mapping until length was less than zero
+  or you reached the end of the current table, but if the remaining length is less than the current table's entry length, it would
+  still end up mapping instead of decending into a new table to map at a smaller granuale size
+- I added an extra condition to the table lookup where if the length is less than the current granule size, it will also do another
+  table lookup/create, and that seemed to fix the mapping issue
+- it's now mapping correctly, from the looks of it
+- after that, I had a fatal error when setting TCR which turned out to just be that the order in which the table sizes are used was
+  backwards, so I was setting TCR to 0x82C0_00AA, where 00AA is TIA, TIB, TIC, TID, but the address resolution will stop when it
+  finds the first 0, so it should actually be AA00 instead
+- after fixing that problem, it would boot to the shell, but then interrupts would stop and it would hang
+
+- I'm not sure what's causing the hanging issue now... It boots fine with 256 byte pages, but 4K pages won't run programs for some
+  reason.  I'm not getting a fatal error, and the timer LED flicker has stopped, so I'm not sure where in memory it's executing
+

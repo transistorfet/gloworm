@@ -265,11 +265,11 @@ void schedule()
 
 	// Switch the current process
 	current_proc = next;
-	UNLOCK(saved_status);
 
 	if (current_proc != previous_proc) {
 		arch_extended_switch_context(previous_proc, current_proc);
 	}
+	UNLOCK(saved_status);
 
 	// Restart the new process's the last system call
 	if (current_proc->state == PS_RESUMING) {

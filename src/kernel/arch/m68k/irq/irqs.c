@@ -95,6 +95,13 @@ void user_error(struct exception_frame *frame, int signal)
 
 	#if defined(CONFIG_MMU)
 
+	#if defined(CONFIG_LOG_LEVEL_DEBUG)
+	struct mmu_root_pointer root_pointer;
+	MMU_MOVE_FROM_CRP(root_pointer);
+	log_debug("mmu: root pointer is %x\n", root_pointer.table);
+	mmu_table_print(current_proc->map->root_table);
+	#endif
+
 	// After an exception, the `frame` is always pointing to the global kernel stack
 	printk("Exception Frame: %x\n", frame);
 	printk_dump((uint16_t *) frame, 128);

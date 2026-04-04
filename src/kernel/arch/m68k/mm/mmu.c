@@ -34,7 +34,7 @@ int init_mmu(mmu_descriptor_t *supervisor_table)
 	MMU_MOVE_TO_CRP(root_pointer);
 
 	for (short i = 0; i < MMU_TABLE_LEVELS; i++) {
-		tcr = (tcr << 4) | MMU_TABLE_ADDR_BITS;
+		tcr = (tcr >> 4) | (MMU_TABLE_ADDR_BITS << 12);
 	}
 
 	tcr =	tcr |
@@ -176,8 +176,8 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 	int i;
 	int error;
 	uint16_t status;
-	struct get_table_result result;
 	physical_address_t physical_addr;
+	struct get_table_result result = { NULL, 0 };
 
 	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
 	// once in memory_map_mmap() before the map is altered
@@ -187,7 +187,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
-		if (i + 1 >= MMU_TABLE_SIZE) {
+		if (i + 1 >= MMU_TABLE_SIZE || (result.table && length < 1 << result.bits)) {
 			error = get_table(root_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED | GET_TABLE_RETURN_ANY_SIZE, &result);
 			if (error < 0) {
 				return error;
@@ -251,7 +251,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 
 		// Set the descriptor in the current table
 		result.table[i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
-		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(result.table[i]), MMU_TABLE_STATUS(result.table[i]), result.table, i);
+		//printk("%08x: %08x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(result.table[i]), MMU_TABLE_STATUS(result.table[i]), result.table, i);
 
 		// Advance to the next address
 		length -= 1 << result.bits;
@@ -307,7 +307,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 
 		i = TABLE_INDEX(virtual_addr, src_result.bits);
 
-		//printk("setting i=%d on src %x:%d dest %x:%d\n", i, src_result.table[i], src_result.bits, dest_result.table[i], dest_result.bits);
+		//printk("setting i=%d on src %x:%d dest %x:%d with flags %x\n", i, src_result.table[i], src_result.bits, dest_result.table[i], dest_result.bits, additional_status);
 
 		// Set the descriptor in the current table, and force the write protect flag on, so we'll
 		// get an exception when trying to write to the new page
@@ -419,7 +419,7 @@ static int mmu_table_print_inner(mmu_descriptor_t *table, uint8_t bits, uintptr_
 			mmu_table_print_inner((mmu_descriptor_t *) MMU_TABLE_ADDRESS(table[i]), bits - MMU_TABLE_ADDR_BITS, virtual_addr);
 		} else {
 			if (table[i]) {
-				printk("%x: %x to %x (%x) [table: %x, i: %d, bits: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(table[i]), MMU_TABLE_ADDRESS(table[i]) + (1 << bits) - 1, MMU_TABLE_STATUS(table[i]), table, i, bits);
+				printk("%08x: %08x to %08x (%x) [table: %x, i: %d, bits: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(table[i]), MMU_TABLE_ADDRESS(table[i]) + (1 << bits) - 1, MMU_TABLE_STATUS(table[i]), table, i, bits);
 			}
 		}
 		virtual_addr += (1 << bits);

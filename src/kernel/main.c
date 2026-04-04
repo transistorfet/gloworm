@@ -137,6 +137,7 @@ void parse_boot_args()
 
 int main()
 {
+	int error;
 	tty_68681_preinit();
 
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
@@ -145,7 +146,9 @@ int main()
 	init_kernel_heap(CONFIG_KMEM_START, CONFIG_KMEM_END);
 	// TODO fix these addresses to be configurable
 	init_pages(0x200000, 0x100000);
-	arch_init_mm();
+	error = arch_init_mm();
+	if (error < 0)
+		goto fail;
 
 	init_time();
 	init_timer_list();
@@ -218,5 +221,9 @@ int main()
 
 	log_debug("begin multitasking...\n");
 	begin_multitasking();
+
+fail:
+	printk("error while initializing kernel: %d\n", error);
+	panic("halting after failure to initialize\n");
 }
 
