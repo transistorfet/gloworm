@@ -175,9 +175,13 @@ void handle_exception(struct exception_frame *frame)
 	}
 }
 
-__attribute__((interrupt)) void enter_trace(struct exception_frame frame)
+void handle_trace(struct exception_frame *frame, struct syscall_registers *regs)
 {
-	log_trace("Trace %x (%x)\n", frame.pc, frame.pc);
+	printk_direct("Trace pc=%x sp=%x (pc)=%04x\n", frame->pc, frame, *((uint16_t *) frame->pc));
+
+	if (frame->pc == 0x106328 || frame->pc == 0x106372) {
+		printk_direct("a0=%x d0=%x\n", regs->a0, regs->d0);
+	}
 }
 
 static void page_fault_handler(struct exception_frame *frame)
