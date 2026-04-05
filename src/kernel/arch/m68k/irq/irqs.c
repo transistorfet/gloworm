@@ -12,6 +12,7 @@
 #include <kernel/arch/context.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/math.h>
 
 #include <asm/context.h>
 #include <asm/exceptions.h>
@@ -112,13 +113,13 @@ void user_error(struct exception_frame *frame, int signal)
 	printk_dump((uint16_t *) ksp, 128);
 
 	virtual_address_t usp = (virtual_address_t) arch_get_user_stackp(current_proc);
-	char *page = (char *) mmu_table_get_page(current_proc->map->root_table, usp & ~(PAGE_SIZE - 1), NULL);
+	char *page = (char *) mmu_table_get_page(current_proc->map->root_table, rounddown(usp, PAGE_SIZE), NULL);
 	printk("User Stack: %x (page %x)\n", usp, page);
 	if (usp && page) {
-		printk_dump((uint16_t *) &page[usp & (PAGE_SIZE - 1)], 128);
+		printk_dump((uint16_t *) &page[alignment_offset(usp, PAGE_SIZE)], 128);
 	}
 
-	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) frame->pc & ~(PAGE_SIZE - 1), &page_size);
+	char *code = (char *) mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) rounddown(frame->pc, PAGE_SIZE), &page_size);
 	code += (uintptr_t) frame->pc & (page_size - 1);
 	printk("\nCode: %x (phys: %x)\n", frame->pc, code);
 	printk_dump((uint16_t *) code, 48);
@@ -223,7 +224,7 @@ static void page_fault_handler(struct exception_frame *frame)
 			// it will be returned when we RTE.  It's being recorded in a Program Space function codes, and
 			// was previously only recorded in the Data Space function codes
 			// TODO should you add support for large pages?
-			physical_address_t existing_page = mmu_table_get_page(current_proc->map->root_table, fault_addr & ~(PAGE_SIZE - 1), NULL);
+			physical_address_t existing_page = mmu_table_get_page(current_proc->map->root_table, rounddown(fault_addr, PAGE_SIZE), NULL);
 			if (existing_page) {
 				return;
 			}

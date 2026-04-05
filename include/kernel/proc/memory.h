@@ -16,8 +16,6 @@
 #include <asm/mmu.h>
 #endif
 
-#define rounddown(value, size)	((value) & ~((size) - 1))
-
 #define KERNEL_STACK_SIZE	CONFIG_KERNEL_STACK_SIZE * PAGE_SIZE
 
 #define SEG_TYPE		0x000F		// Mask for type of mapping

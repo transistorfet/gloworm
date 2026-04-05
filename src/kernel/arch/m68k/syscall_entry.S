@@ -60,13 +60,7 @@ create_context:
 
 	// Push flags
 	#if defined(CONFIG_M68K_USER_MODE)
-	cmp.l	#0, %d0
-	beq.s	10f
-	move.w	#0x2000, -(%a0)
-	bra.s	11f
-    10:
-	move.w	#0x0000, -(%a0)
-    11:
+	move.w	%d0, -(%a0)
 	#else
 	move.w	#0x2000, -(%a0)
 	#endif

@@ -63,6 +63,14 @@
 
 typedef short lock_state_t;
 
+#define SAVE_STATUS(saved) {				\
+	asm("move.w	%%sr, %0\n" : "=dm" ((saved)));	\
+}
+
+#define RESTORE_STATUS(saved) {					\
+	asm("move.w	%0, %%sr\n" : : "dm" ((saved)) :);	\
+}
+
 #define LOCK(saved) {					\
 	asm("move.w	%%sr, %0\n" : "=dm" ((saved)));	\
 	DISABLE_INTS();					\

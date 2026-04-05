@@ -1,7 +1,4 @@
 
-* add a proper rounddown macro and offset macro somewhere
-* you need a way to align data on an architectural-specific amount
-
 * confirm that signalling a process that's not the current process will properly switch to that process (still a problem interrupting syscalls it seems)
 * threadtest is getting into an infinite error loop
 * fix the _user_exit problem properly (check when using no-usermode)
@@ -13,6 +10,7 @@
 
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 * use the PVALID instruction to validate user addresses before dereferencing them
+
 * support large pages when MMU mapping and swapping
 * convert kmalloc to use pages
 

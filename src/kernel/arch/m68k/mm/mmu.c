@@ -348,7 +348,7 @@ physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t vi
 	entry = MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
 	if (entry && result.bits != PAGE_ADDR_BITS) {
 		// Early termination entry, so calculate the offset into the chunk
-		return entry + (virtual_addr & ((1 << result.bits) - 1) & ~(PAGE_SIZE - 1));
+		return entry + (virtual_addr & rounddown((1 << result.bits) - 1, PAGE_SIZE));
 	} else {
 		return entry;
 	}
@@ -403,7 +403,7 @@ int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virt
 		int error;
 		struct get_table_result result;
 
-		error = get_table(root_table, virtual_addr & ~(PAGE_SIZE - 1), PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
+		error = get_table(root_table, rounddown(virtual_addr, PAGE_SIZE), PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
 		return error >= 0;
 	}
 }

@@ -5182,3 +5182,7 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I'm not sure what's causing the hanging issue now... It boots fine with 256 byte pages, but 4K pages won't run programs for some
   reason.  I'm not getting a fatal error, and the timer LED flicker has stopped, so I'm not sure where in memory it's executing
 
+- I added a TRACE_ON() but that of course was printing a bunch of serial handler stuff, so I tried turning tracing off conditionally
+  in the interrupt handler.  Now I'm getting the bottom halves running repeatedly, which might again be because of the tracing
+  printing to the screen, so I might still not be getting a proper signal here
+

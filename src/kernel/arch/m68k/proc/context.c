@@ -131,7 +131,7 @@ int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
 
 	#endif
 
-	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 1);
+	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0x2000);
 
 	return 0;
 
@@ -175,7 +175,7 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 
 	#endif
 
-	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0);
+	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0x0000);
 
 	return 0;
 
@@ -259,7 +259,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 
 	// Push a fresh context onto the kernel stack
 	// NOTE the user stack is not updated directly, but is instead added to the new context
-	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp, 0);
+	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp, 0x0000);
 	arch_set_kernel_stackp(proc, ksp);
 
 	return 0;

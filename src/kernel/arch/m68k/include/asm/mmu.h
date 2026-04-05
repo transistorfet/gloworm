@@ -7,6 +7,7 @@
 
 #include <asm/addresses.h>
 #include <kernel/mm/pages.h>
+#include <kernel/utils/math.h>
 
 
 #define MMU_MOVE_TO_TCR(value)		\
@@ -87,8 +88,8 @@ struct mmu_root_pointer {
 #define MMU_TABLE_LEVELS_SHORT		((32 - PAGE_ADDR_BITS) / MMU_TABLE_ADDR_BITS_SHORT)
 #define MMU_TABLE_INITIAL_SHIFT_SHORT	((32 - PAGE_ADDR_BITS) % MMU_TABLE_ADDR_BITS_SHORT)
 
-#define MMU_TABLE_ADDRESS_SHORT(desc)			(((uint32_t) (desc)) & ~(PAGE_SIZE - 1))
-#define MMU_TABLE_STATUS_SHORT(desc)			(((uint32_t) (desc)) & (PAGE_SIZE - 1))
+#define MMU_TABLE_ADDRESS_SHORT(desc)			(rounddown(((uint32_t) (desc)), PAGE_SIZE))
+#define MMU_TABLE_STATUS_SHORT(desc)			(alignment_offset(((uint32_t) (desc)), PAGE_SIZE))
 #define MMU_TABLE_DESCRIPTOR_SHORT(address, status)	((uint32_t) (((uint32_t) (address)) | ((uint32_t) (status))))
 
 typedef uint32_t mmu_descriptor_short_t;
@@ -102,7 +103,7 @@ typedef mmu_descriptor_short_t mmu_table_short_t[MMU_TABLE_SIZE_SHORT];
 #define MMU_TABLE_LEVELS_LONG		((32 - PAGE_ADDR_BITS) / MMU_TABLE_ADDR_BITS_LONG)
 #define MMU_TABLE_INITIAL_SHIFT_LONG	((32 - PAGE_ADDR_BITS) % MMU_TABLE_ADDR_BITS_SHORT)
 
-#define MMU_TABLE_ADDRESS_LONG(desc)			((uint32_t) (((uint32_t) (desc)) & ~(PAGE_SIZE - 1)))
+#define MMU_TABLE_ADDRESS_LONG(desc)			((uint32_t) (rounddown(((uint32_t) (desc)), PAGE_SIZE)))
 #define MMU_TABLE_STATUS_LONG(desc)			(((uint32_t) (((uint32_t) (desc)) >> 32)) & 0xffff)
 #define MMU_TABLE_DESCRIPTOR_LONG(address, status)	((uint64_t) ((((uint64_t) (status)) << 32) | ((uint64_t) (address))))
 

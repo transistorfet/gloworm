@@ -13,6 +13,7 @@
 #include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/math.h>
 #include <kernel/utils/iovec.h>
 
 
@@ -329,12 +330,12 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	struct memory_segment *segment;
 
 	// Check that the length is a multiple of the page size, or raise an error
-	if (length & (PAGE_SIZE - 1)) {
+	if (alignment_offset(length, PAGE_SIZE)) {
 		return EINVAL;
 	}
 
 	// Check that the virtual address given is aligned to a page, and raise an error if it's not
-	if (start & (PAGE_SIZE - 1)) {
+	if (alignment_offset(start, PAGE_SIZE)) {
 		return EINVAL;
 	}
 
@@ -587,7 +588,7 @@ int memory_map_move_sbrk(struct memory_map *map, int diff)
 	}
 
 	// Require an alignment to page size bytes
-	if ((diff > 0 ? diff : -diff) & (PAGE_SIZE - 1)) {
+	if (alignment_offset((diff > 0 ? diff : -diff), PAGE_SIZE)) {
 		return ENOMEM;
 	}
 
