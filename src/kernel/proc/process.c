@@ -121,8 +121,10 @@ int reset_proc(struct process *proc)
 	return 0;
 }
 
-void close_proc(struct process *proc)
+int close_proc(struct process *proc)
 {
+	short orphans = 0;
+
 	// Set the previous process to NULL so that we skip over attempting to
 	// save the context during restore_context
 	if (proc == previous_proc) {
@@ -141,11 +143,15 @@ void close_proc(struct process *proc)
 	// Reassign any child procs' parent to be 1 (init), since we can't be sure this proc's
 	// parent is waiting, and the zombie proc wont get recycled
 	for (short i = 0; i < PROCESS_MAX; i++) {
-		if (table[i].pid && table[i].parent == proc->pid)
+		if (table[i].pid && table[i].parent == proc->pid) {
+			orphans += 1;
 			table[i].parent = 1;
+		}
 	}
 
 	arch_release_task_info(proc);
+
+	return orphans;
 }
 
 

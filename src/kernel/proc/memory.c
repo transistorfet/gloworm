@@ -151,9 +151,9 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 {
 	int error;
 	uintptr_t page_address;
-	size_t page_size = PAGE_SIZE;
-	physical_address_t existing_page, new_page;
+	physical_address_t new_page;
 	struct memory_segment *segment;
+	struct get_page_result result;
 
 	segment = memory_map_find(map, vaddr);
 	if (!segment) {
@@ -163,10 +163,10 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 	if (segment->ops && segment->ops->load_page_at) {
 		page_address = rounddown(vaddr, PAGE_SIZE);
 		// TODO should you add support for large pages?
-		existing_page = mmu_table_get_page(map->root_table, page_address, &page_size);
-		if (existing_page) {
+		error = mmu_table_get_page(map->root_table, page_address, &result);
+		if (!error) {
 			if (write_error && (segment->flags & SEG_WRITE)) {
-				return memory_map_convert_copy_on_write(map, page_address, existing_page, page_size);
+				return memory_map_convert_copy_on_write(map, page_address, result.phys, result.size);
 			} else {
 				log_error("attempting to read in data space a page that already exists\n");
 				return EEXIST;
@@ -671,37 +671,38 @@ int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, i
 {
 	int i;
 	int error;
-	char *page;
-	size_t page_size;
-	size_t page_offset;
+	size_t page_offset, page_remaining;
+	struct get_page_result page;
 	virtual_address_t page_start;
 
 	page_start = rounddown(start, PAGE_SIZE);
-	page_offset = start - page_start;
 	for (i = 0; i < max_segs; i++) {
-		page = (char *) mmu_table_get_page(map->root_table, page_start, &page_size);
-		if (!page) {
+		error = mmu_table_get_page(map->root_table, page_start, &page);
+		if (error < 0) {
 			error = memory_map_load_page_at(map, page_start, write_flag);
 			if (error < 0) {
 				return error;
 			}
 
-			page = (char *) mmu_table_get_page(map->root_table, page_start, &page_size);
-			if (!page) {
+			error = mmu_table_get_page(map->root_table, page_start, &page);
+			if (error < 0) {
 				return ENOENT;
 			}
 		}
 
-		kvec[i].buf = page + page_offset;
-		if (length > page_size - page_offset) {
-			kvec[i].bytes = page_size - page_offset;
-			length -= page_size - page_offset;
+		page_offset = alignment_offset(start, page.size);
+		page_remaining = page.size - page_offset;
+		kvec[i].buf = (char *) page.phys + page_offset;
+		if (length > page_remaining) {
+			kvec[i].bytes = page_remaining;
+			length -= page_remaining;
 		} else {
 			kvec[i].bytes = length;
 			return i + 1;
 		}
-		page_start += page_size;
-		page_offset = 0;
+		page_start = page_start + page.size;
+		// Reset the start address so that the page_offset will be 0 except for the first iteration
+		start = 0;
 	}
 	// If we ran out of kvec entries before we reached the length, then return an error
 	return ENOMEM;

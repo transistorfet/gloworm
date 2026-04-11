@@ -147,12 +147,20 @@ typedef mmu_table_short_t mmu_table_t;
 //#define MMU_FLAG_PRIVATE	0x00
 //#define MMU_FLAG_SHARED	0x80
 
+#define GET_TABLE_CREATE_IF_NEEDED		0x01
+#define GET_TABLE_RETURN_ANY_SIZE		0x02
+
+struct get_page_result {
+	physical_address_t phys;
+	size_t size;
+};
+
 int init_mmu(mmu_descriptor_t *supervisor_table);
 mmu_descriptor_t *mmu_table_alloc(void);
 void mmu_table_free(mmu_descriptor_t *root);
 int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, ssize_t length, int flags);
 int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, ssize_t length, int flags);
-physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, size_t *page_size);
+int mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, struct get_page_result *result);
 int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, size_t page_size, int flags);
 int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virtual_addr);
 int mmu_table_print(mmu_descriptor_t *root);

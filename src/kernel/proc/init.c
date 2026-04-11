@@ -148,8 +148,6 @@ struct process *create_idle_thread(void)
 	return proc;
 
 fail:
-	if (proc)
-		exit_proc(proc, -1);
 	panic("failed to create primordial process, %d; stopping\n", error);
 	while (1) {}
 }
@@ -189,6 +187,7 @@ fail:
 
 int alloc_kernel_stack(struct process *proc, int (*thread_start)(), const char *const argv[], const char *const envp[])
 {
+	int error;
 	char *stack;
 
 	// Allocate a new stack, which doesn't have to be mapped, because the kernel map has all of memory mapped 1:1
@@ -201,7 +200,10 @@ int alloc_kernel_stack(struct process *proc, int (*thread_start)(), const char *
 	string_array_copy(&argv_array, argv, FROM_KERNEL);
 	string_array_copy(&envp_array, envp, FROM_KERNEL);
 
-	exec_initialize_stack_with_args(proc, proc->map->stack_end, thread_start, &argv_array, &envp_array);
+	error = exec_initialize_stack_with_args(proc, proc->map->stack_end, thread_start, &argv_array, &envp_array);
+	if (error < 0) {
+		return error;
+	}
 
 	return 0;
 }

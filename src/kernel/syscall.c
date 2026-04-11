@@ -82,7 +82,6 @@ void do_syscall(void)
 void do_exit(int exitcode)
 {
 	exit_proc(current_proc, exitcode);
-	resume_waiting_parent(current_proc);
 }
 
 pid_t do_fork(void)
@@ -146,7 +145,6 @@ int do_exec(const char __user *path, const char __user *const argv[], const char
 		// An error occurred past the point of no return.  The memory maps have been irrepairably damaged, so kill the process
 		log_error("Process terminated\n");
 		exit_proc(current_proc, -1);
-		resume_waiting_parent(current_proc);
 		return error;
 	} else if (error) {
 		return error;

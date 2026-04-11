@@ -21,51 +21,53 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 	int result;
 	int length;
 
-	for (const char *const *arg = proc->map->argv; ; arg++) {
-		#if defined(CONFIG_MMU)
+	if (proc->map && proc->map->argv) {
+		for (const char *const *arg = proc->map->argv; ; arg++) {
+			#if defined(CONFIG_MMU)
 
-		char *argstr;
-		struct kvec kvec[10];
+			char *argstr;
+			struct kvec kvec[10];
 
-		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, sizeof(uintptr_t), 0);
-		if (result < 0) {
-			return result;
-		}
-		result = memcpy_out_of_kvec(kvec, result, 0, &argstr, sizeof(uintptr_t));
-		if (result < 0) {
-			return result;
-		}
+			result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, sizeof(uintptr_t), 0);
+			if (result < 0) {
+				return result;
+			}
+			result = memcpy_out_of_kvec(kvec, result, 0, &argstr, sizeof(uintptr_t));
+			if (result < 0) {
+				return result;
+			}
 
-		if (!argstr) {
-			break;
-		}
+			if (!argstr) {
+				break;
+			}
 
-		// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
-		length = roundup((uintptr_t) argstr, PAGE_SIZE) - (uintptr_t) argstr;
-		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, length, 0);
-		if (result < 0) {
-			return result;
-		}
-		result = strncpy_out_of_kvec(kvec, result, 0, &buffer[i], max - i);
-		if (result < 0) {
-			return result;
-		}
+			// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
+			length = roundup((uintptr_t) argstr, PAGE_SIZE) - (uintptr_t) argstr;
+			result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, length, 0);
+			if (result < 0) {
+				return result;
+			}
+			result = strncpy_out_of_kvec(kvec, result, 0, &buffer[i], max - i);
+			if (result < 0) {
+				return result;
+			}
 
-		#else
+			#else
 
-		if (!arg) {
-			break;
-		}
+			if (!arg) {
+				break;
+			}
 
-		strncpy(&buffer[i], (const char *) arg, max - i);
-		result = strnlen(&buffer[i], max - i);
+			strncpy(&buffer[i], (const char *) arg, max - i);
+			result = strnlen(&buffer[i], max - i);
 
-		#endif
+			#endif
 
-		i += result;
-		buffer[i] = ' ';
-		if (i > max) {
-			break;
+			i += result;
+			buffer[i] = ' ';
+			if (i > max) {
+				break;
+			}
 		}
 	}
 	buffer[i] = '\0';
@@ -78,14 +80,17 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 	const char *cmd;
 
 	#if defined(CONFIG_MMU)
-
 	int result;
 	int length;
 	uintptr_t arg;
 	struct kvec kvec[10];
 	char cmd_buffer[32];
+	#endif
 
-	if (proc->map->argv) {
+	if (proc->map && proc->map->argv) {
+
+		#if defined(CONFIG_MMU)
+
 		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) proc->map->argv, sizeof(uintptr_t), 0);
 		if (result < 0) {
 			return result;
@@ -106,16 +111,16 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 			return result;
 		}
 		cmd = cmd_buffer;
+
+		#else
+
+		cmd = proc->map->argv[0];
+
+		#endif
+
 	} else {
-		cmd_buffer[0] = '\0';
-		cmd = cmd_buffer;
+		cmd = "<defunct>";
 	}
-
-	#else
-
-	cmd = proc->map->argv[0];
-
-	#endif
 
 	return snprintf(buffer, max,
 		"%d %s %c %d %d %d %d %ld %ld\n",
@@ -133,25 +138,30 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 
 int get_data_statm(struct process *proc, char *buffer, int max)
 {
-	return snprintf(buffer, max,
-		"%ld %lx %lx %lx %lx %lx %lx\n",
-		get_proc_size(proc),
-		(uintptr_t) proc->map->code_start,
-		proc->map->data_start - proc->map->code_start,
-		(uintptr_t) proc->map->data_start,
-		proc->map->sbrk - proc->map->data_start,
-		(uintptr_t) proc->map->sbrk,
-		proc->map->stack_end
-	);
-
+	if (proc->map) {
+		return snprintf(buffer, max,
+			"%ld %lx %lx %lx %lx %lx %lx\n",
+			get_proc_size(proc),
+			(uintptr_t) proc->map->code_start,
+			proc->map->data_start - proc->map->code_start,
+			(uintptr_t) proc->map->data_start,
+			proc->map->sbrk - proc->map->data_start,
+			(uintptr_t) proc->map->sbrk,
+			proc->map->stack_end
+		);
+	} else {
+		return snprintf(buffer, max, "0 0 0 0 0 0 0\n");
+	}
 }
 
 int get_data_maps(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
 
-	for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
-		i += snprintf(&buffer[i], max - i, "%lx-%lx %x\n", cur->start, cur->end, cur->flags);
+	if (proc->map) {
+		for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+			i += snprintf(&buffer[i], max - i, "%lx-%lx %x\n", cur->start, cur->end, cur->flags);
+		}
 	}
 	return i;
 }
@@ -178,8 +188,10 @@ static inline size_t get_proc_size(struct process *proc)
 {
 	size_t size = 0;
 
-	for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
-		size += cur->end - cur->start;
+	if (proc->map) {
+		for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+			size += cur->end - cur->start;
+		}
 	}
 	return size;
 }

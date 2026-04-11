@@ -95,8 +95,8 @@ void mmu_table_free(mmu_descriptor_t *root_table)
 }
 
 
-#define GET_TABLE_CREATE_IF_NEEDED		0x01
-#define GET_TABLE_RETURN_ANY_SIZE		0x02
+//#define GET_TABLE_CREATE_IF_NEEDED		0x01
+//#define GET_TABLE_RETURN_ANY_SIZE		0x02
 
 struct get_table_result {
 	mmu_descriptor_t *table;
@@ -330,28 +330,32 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 	return 0;
 }
 
-physical_address_t mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, size_t *page_size)
+int mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, struct get_page_result *result)
 {
 	int error;
 	uint32_t entry;
-	struct get_table_result result;
+	struct get_table_result table_result;
 
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, page_size ? GET_TABLE_RETURN_ANY_SIZE : 0, &result);
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, result ? GET_TABLE_RETURN_ANY_SIZE : 0, &table_result);
 	if (error < 0) {
-		return NULL;
+		return error;
 	}
 
-	if (page_size) {
-		*page_size = 1 << result.bits;
-	}
+	if (result) {
+		result->size = 1 << table_result.bits;
 
-	entry = MMU_TABLE_ADDRESS(result.table[TABLE_INDEX(virtual_addr, result.bits)]);
-	if (entry && result.bits != PAGE_ADDR_BITS) {
-		// Early termination entry, so calculate the offset into the chunk
-		return entry + (virtual_addr & rounddown((1 << result.bits) - 1, PAGE_SIZE));
-	} else {
-		return entry;
+		entry = MMU_TABLE_ADDRESS(table_result.table[TABLE_INDEX(virtual_addr, table_result.bits)]);
+		if (!entry && virtual_addr > (1 << table_result.bits)) {
+			result->phys = NULL;
+			return ENOENT;
+		} else if (entry && table_result.bits != PAGE_ADDR_BITS) {
+			// Early termination entry, so calculate the offset into the chunk
+			result->phys = entry + (virtual_addr & rounddown((1 << table_result.bits) - 1, PAGE_SIZE));
+		} else {
+			result->phys = entry;
+		}
 	}
+	return 0;
 }
 
 int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, size_t page_size, int flags)

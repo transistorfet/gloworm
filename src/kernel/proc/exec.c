@@ -13,7 +13,7 @@
 #include <kernel/utils/strarray.h>
 
 
-static virtual_address_t copy_exec_args(struct memory_map *map, virtual_address_t address_offset, struct iovec_iter *iter, struct string_array *argv, struct string_array *envp)
+static int copy_exec_args(struct memory_map *map, virtual_address_t address_offset, struct iovec_iter *iter, struct string_array *argv, struct string_array *envp)
 {
 	int result;
 	offset_t position;
@@ -53,7 +53,7 @@ static virtual_address_t copy_exec_args(struct memory_map *map, virtual_address_
 		return result;
 
 	position = iovec_iter_seek(iter, 0, SEEK_CUR);
-	return address_offset + position;
+	return position;
 }
 
 int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stack_pointer, void *entry, struct string_array *argv, struct string_array *envp)
@@ -61,7 +61,7 @@ int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stac
 	int result;
 	struct kvec kvec[4];
 	struct iovec_iter iter;
-	virtual_address_t buffered_size = PAGE_SIZE * 2;
+	virtual_address_t buffered_size = PAGE_SIZE;
 
 	result = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 4, stack_pointer - buffered_size, buffered_size, 1);
 	if (result < 0) {
@@ -77,7 +77,11 @@ int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stac
 		arch_extended_switch_context(NULL, proc);
 	}
 
-	stack_pointer = copy_exec_args(proc->map, stack_pointer - buffered_size, &iter, argv, envp);
+	result = copy_exec_args(proc->map, stack_pointer - buffered_size, &iter, argv, envp);
+	if (result < 0) {
+		return result;
+	}
+	stack_pointer = stack_pointer - buffered_size + result;
 
 	arch_add_process_context(proc, (char *) stack_pointer, entry);
 	return 0;

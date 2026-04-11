@@ -5186,3 +5186,204 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   in the interrupt handler.  Now I'm getting the bottom halves running repeatedly, which might again be because of the tracing
   printing to the screen, so I might still not be getting a proper signal here
 
+
+- oh that was interesting, I ran daemontest, killed it, and then ran it again, and it's now hitting the same bus error.  Maybe I
+  broke it again with the added length check in mmu_table_map?
+
+
+2026-04-05:
+
+- I had trouble getting the same behaviour to happen with daemontest, but if I run threadtest first, which crashes back to the
+  shell, and then run daemontest, it seems to happen again
+  `bus error: i r fc=5 addr=218FBC ssw=B64D mmusr=202 pid=25 pc=10428E`
+- with print statements, I can't get it to occur again...  This seems very odd
+
+- back to the threadtest bug for a sec, what if I put a different function, maybe even the same entry point, onto the stack as the
+  return address.  If it's the return address causing the problem, then it should repeat the thread infinitely, while all normal
+  programs will still exit, since they will call exit()
+- it definitely did something different, but I think I used the push_back function incorrectly, and passed in the entry and not the
+  address of the entry
+- So the first time, with `entry`, it tried to access `2F2F0004`, which was actually the value on the top of the stack, which itself
+  seems wrong because it's the first longword in the page
+- changing it to `&entry` then put `000003F8` on the stack, which I should note is already on the stack at offset 8 into the page
+  (instead of offset 0).  Something definitely seems broken, but it doesn't make sense yet
+- hmm... always printing the seg num and offset in arch_add_process_context is showing it as 4 always, which is wrong, as if the
+  seek isn't working or something.  This definitely seems wrong
+- Oh!  It does seem to actually be running the thread twice, but since it popped the return address once, it then crashes on the
+  second run through, so yeah I'm pretty sure this problem is caused by the user exit.  That said, there also seems to be something
+  wrong with how the stack is being set up or something...
+
+- another look at the hanging when using 4k pages, and I was trying to get some indication of what's happening.  Setting the LEDs
+  when leaving a syscall shows them lit when it hangs, but that doesn't cover interrupts.  I then tried printing the idle thread's
+  stack but nothing printed when leaving a syscall, so I put in the schedule function, but there it's printing seemingly infinitely,
+  and the stack looks wrong (0x20C000 with mostly random looking data except for a 0000 0000 as the second long word on the stack)
+- I didn't let it run a long time, but maybe it's somehow/somewhy stuck in the scheduling loop?  That or the corrupt stack is the
+  problem.  I could see this having to do with either the fact it's a kernel thread and the memory map works differently, or how the
+  idle thread is created in the init.c code
+
+
+2026-04-06:
+
+- I don't know why putting something at the start of restore_context doesn't seem to get run... or maybe my condition here is wrong?
+  I guess that's it.  It just never actually returns to process 2?
+- I instantly know what's wrong after looking at the code that allocates the idle thread, more specifically alloc_kernel_stack which
+  allocates and initializes a stack for a kernel thread such as the idle thread.  It's creating a stack that's one page in size, but
+  the new exec_with_args function will try to make an iterator that's two pages in size.  I suspect that's failing somewhere in a
+  silent way which is causing it to build an incorrect stack... this is just a hunch at this point
+- ah yeah, since it's using load_pages, and that's looking at the map, but kernel threads are using the kernel memory map, which
+  maps everything linearly, it won't error out when you try to create an iterator for two pages, when only one page is allocated...
+  so the solution here is to either pass in the length, or know the length, because you otherwise can't just "check" the length
+  generically for user processes, user threads (which allocate their stack on the heap), and kernel threads
+
+- I spent too much time and effort convinced that was the problem, but increasing the stack size to two pages didn't fix the
+  problem.  Not surprising given the code works fine with 256 byte pages.  It only hangs with 4k pages
+- it definitely is a "wrong stack data" problem though.  Definitely the first return to the idle thread, pid 2, has 0x8BAB_0AEA as
+  the top value, and I assume I don't have bus error enabled in the CPLD, so it's likely jumping there and then hanging
+- it's definitely there after init, so it's not a corruption happening later.  It doesn't put the right value in the right spot
+  in the first place
+
+- Ah!  Part of the problem is that it's not checking and returning an error when exec_initialize_with_args() fails, so it doesn't
+  stop when it should.  Now it's failing right away.  There's an error in exec and building the stack
+- I had a bunch of things wrong there.  I was returning an error from copy_args but also returning an unsigned stack pointer value,
+  and not even checking for the error result (which couldn't have been determined anyways).  I've changed it to return an offset,
+  but I still don't like the function signature
+- the error is happening in load_pages though, which is a bit odd since it's supposed to be the kernel map
+- oh I was actually looking at memory_map_load_page_at instead of memory_map_load_pages_into_kvec, and the error came from there.
+  At first I thought it was just a matter of moving the segment ops check inside, but actually it's failing when trying to fetch a
+  given page for some reason.  I thought it was supposed to be the kernel memory map though, so I'm a bit confused why
+  mmu_table_get_page would fail
+- Oooooh! right, it's the large pages problem.  The segment from 0x0000_0000 to 0x0040_0000 has one large 22-bit page, and then from
+  there to 0x0070_0000 has a sub table with individual pages.  But that still doesn't make sense why 256 byte pages would work and
+  this doesn't...
+- Double Oh! it's actually finding the page correctly, but the page address is 0! so it can't distinguish that from an error.  That
+  also explains why 256 byte pages worked, because even with a large page, it probably had one with a different start address due to
+  the smaller space covered by each top level page.  So this is really just an exceptional case
+
+
+2026-04-07:
+
+- Ok, so of course it was a bit more involved than that.  It was finding the page mapped to a certain address, but that page address
+  was 0, so it was indistinguishable from an error.  I modified the mmu_table_get_page function to take a pointer to a special
+  result struct, with a phys and size field, and an error int is returned instead
+- there's only like 6 uses of get_page atm, most of which already took &page_size as an arg, so this is an improvement over what was
+  there before.  The one place where &page_size was passed as NULL was a just printing out data anyways, so changing it to always
+  return the size doesn't change the meaning
+- Once that was done, it now crashes on pid 4.  I had the logging message all wrong in init.c, where it was supposed to print out
+  the idle thread's stack just after creation, but it was using a non-sensical low number pointer.  Once I finally got that figured
+  out, the stack it prints has 0x400020 as the return address on the kernel stack (also note the format is incorrect as well).  So
+  that doesn't see quite right, since it's using the kernel memory map
+- that said, there's also a fatal error further down
+    ```
+    bus error: d r fc=1 addr=0 ssw=751 mmusr=402 pid=4 pc=1006B6
+    no seg
+    fatal bus error: d r fc=1 addr=0 ssw=751 mmusr=402 pid=4 pc=1006B6
+    217000 to 218000: flags=2051
+    218000 to 219000: flags=2032
+    21A000 to 21A000: flags=1033
+    21A000 to 21C000: flags=1134
+
+
+    Fatal Error at 1006B6 while pid 4 running (status: 2004, vector: 2). Halting...
+    Stack: 11F330
+    11F330: 2004 0010 06B6 B008 1EEE 0751 1081 4A01
+    11F340: 0000 0000 0000 0000 0010 06F0 0E11 1000
+    11F350: 0010 06BE 0010 06BC 0010 06BA 0011 F300
+    11F360: 1000 0DB0 0000 F73B 1000 1081 0011 F3EA
+    11F370: 0000 1000 0000 1000 0008 0000 0011 F390
+    11F380: 1000 1081 1000 1081 0010 06AC 0010 06F0
+    11F390: 0011 F3B4 0000 0000 0011 F3B4 0000 0000
+    11F3A0: 0000 0400 0000 0000 0000 0000 0021 888C
+
+
+    Code: 1006B6
+    1006B6: 0E11 1000 1081 4A01 670A 5280 0C80 0000
+    1006C6: 0400 66E0 4E75 4FEF F3E8 48E7 3022 4DEF
+    1006D6: 0010 4878 0400 42A7 2F0E 4EB9 0010 B704
+    ```
+
+- interestingly, that address is the moves instruction inside strncpy_from_user() function, so it's a page fault in kernel space
+  being treated as a fatal error?  Did I fix something?  "fix" which took away a "feature" (bug) which allowed page faults to occur
+  inside the kernel without causing a panic?
+- well more acturately, page faults can happen in the kernel, but currently if they fail inside the kernel, it calls fatal_error().
+  It doesn't have to though.  It could instead do something to indicate an error.  Or I'd have to look at what Linux does
+- I'm pretty sure Linux has versions of page_fault functions that are labelled _nofault, but I think there's also just some kind of
+  guard added before calling a func
+
+- Oh darn, this change does actually change the meaning of the get_page function because it was previously returning a NULL address
+  based on the table entry to indicate the page isn't mapped, which might explain why it's broken now.  It needs to more
+  intelligently figure out it the address should be 0, or if the page should be considered unmapped
+
+
+2026-04-08:
+
+- It was a mistake in converting the get_pages() calls to use a result pointer, where I had previously checked `if (existing_page)`
+  in load_page_at, which then does CoW if it exists, but I converted it to an `if (error < 0)` which is the opposite meaning.
+  Changing that fixed the weird fatal errors I was getting above
+- so now it's back to the 4k page issue, and I noticed that my debugging of the idle task stacks was incorrect.  I thought it had
+  address 0x400020 as the stack exception return address, but that's actually the context.  It's 0x0000_0040 as the context size,
+  and then 0x0020_2CDC as the last register value pushed.  The actual return address is only visible if I print more of the stack,
+  which is 0x103E7C, which seems correct even though I haven't double checked it
+
+- well, there's a bug when running ps, but it actually boots and can run ls when I use 4k pages now, after I changed the get_pages
+  function to return an error and explicitly check that if it's not a valid mapping for address 0, it will return an error, but not
+  if it's valid (previously it was always signalling an error, even if it was a vald mapping to address 0)
+
+- looking into the ps bug, which gets the wrong address to proc argv:
+    ```
+    setting new page 236000 for 22E000
+    free page 222000
+    CoW page set
+    PID     SIZE    STATE   PARENT  PGID    CMD
+    proc argv 20CFEC
+    FEC: 4A01 66EC 7000 241F 4E75 7001 60F8 70FF
+    FFC: 60F4 0000 598F 206F 0008 4297 2017 4A30
+    100C: 0800 6606 2017 588F 4E75 2017 5280 2E80
+    101C: 60EA 0000 2F0A 206F 0008 246F 000C 2248
+    102C: 2208 D2AF 0010 2001 9089 4A80 6E06 2008
+    103C: 245F 4E75 1012 6702 528A 12C0 60E8 0000
+    104C: 2F03 2F02 206F 000C 226F 0010 4280 4281
+    105C: 3008 3209 2408 4242 4842 84C1 3602 4843
+
+    proc argv[0] 4A0166EC
+    failed get_page at 4A016000
+    tried to get 4A016000
+    no seg
+    no page no load
+    Error reading /proc/2/stat (-2)
+    ```
+- it's getting the wrong value for the stack contents, and the stack dump I added shows the problem.  It's getting 0 as the address
+  rathen than the page at 20CFEC, and it's caused by load_pages_into_kvec using the wrong address for the page start, since it
+  assumes it's a PAGE_SIZE granule, but it's not.  It's much larger
+- get_pages does an adjustment of the address for the granule size, and that might even have been what caused my problems when
+  trying to support larger granule swapping, but it's definitely a problem here.  I can possibly adjust my uses of get_pages to use
+  the granule size result better, but it's also a gotcha, and should be fixed better
+
+
+2026-04-09:
+
+- I think I fixed the actual fatal exceptions I was having.  One, by changing load_pages_into_kvec to wait until receiving the
+  size to do all the calculations it needs, and two, by adding checks in procfs to not deref the map if it's NULL
+- I haven't fixed the actual cause of the error, which is having a dead zombie process open still
+- also I might not have fixed the issue with the get_page() function returning the adjusted page start and not the actual page
+  start address
+
+- So the problem with cleanup and that process that doesn't die but stays as a zombie.  It's the child process of threadtest (the
+  thread that's created), and it (pid 13)  correctly gets assigned parent pid 1 after pid 12 (it's true parent) exits, but it
+  doesn't actually get cleaned up.  This is because the init process is not unblocked/woken to run waitpid
+- Interestingly enough, the daemontest process was also still around.  I guess I had forgotten to kill it, or else the first kill
+  attempt didn't work for some reason (ah yes, I gave the wrong pid so it just didn't kil it).  After sending kill to the daemontest
+  process, it then reaped the threadtest's thread proc right after that.  So the problem is *just* that it didn't wake up the init
+  process after re-assigning parents
+
+
+2026-04-10:
+
+- I made close_proc return the number of orphans created by the closure, and then called resume_waiting_parents() from the scheduler
+  code, just so it's not interdependent.  Now the zombie processes is reaped after the parent exits and the zombie is gone by the
+  time I run ps afterwards
+- Oh that's interesting, I sent a signal number of 0 to ... an unspecified process?  (`kill -` was the command I ran).  And then It
+  segfaulted essentially.  Tried to access address 0
+- Ah ok, that made me think it was a kernel bug, but actually the exception occurs in user space, and is caused by passing the
+  non-existant pid argument to strtol, because it's missing an arg check.  Adding the arg check should be enough to fix the bug in
+  the command itself
+

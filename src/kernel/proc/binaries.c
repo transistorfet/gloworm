@@ -73,9 +73,12 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 	proc->map = map;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_stack_with_args(proc, map->stack_end, entry, argv, envp);
+	error = exec_initialize_stack_with_args(proc, map->stack_end, entry, argv, envp);
+	if (error < 0) {
+		return error;
+	}
 
-	return error;
+	return 0;
 }
 
 int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
