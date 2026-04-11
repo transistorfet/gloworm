@@ -147,9 +147,6 @@ typedef mmu_table_short_t mmu_table_t;
 //#define MMU_FLAG_PRIVATE	0x00
 //#define MMU_FLAG_SHARED	0x80
 
-#define GET_TABLE_CREATE_IF_NEEDED		0x01
-#define GET_TABLE_RETURN_ANY_SIZE		0x02
-
 struct get_page_result {
 	physical_address_t phys;
 	size_t size;

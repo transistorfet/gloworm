@@ -1004,17 +1004,14 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 	char addr_buffer[256];
 	if (addr_len) {
 		kernel_len = get_user_uintptr(addr_len);
-		if (kernel_len > 256)
-			kernel_len = 256;
-		addr_len = &kernel_len;
-	}
-	if (addr) {
-		addr = (struct sockaddr *) addr_buffer;
+		if (kernel_len > 256) {
+			return EINVAL;
+		}
 	}
 	#endif
 
 	iovec_iter_init_user_buf(&iter, (char *) buf, nbytes);
-	error = net_socket_recvfrom(file, &iter, flags, addr, addr_len);
+	error = net_socket_recvfrom(file, &iter, flags, addr ? (struct sockaddr *) addr_buffer : NULL, &kernel_len);
 	if (error < 0)
 		return error;
 

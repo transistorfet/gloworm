@@ -1,19 +1,20 @@
 
-* I don't think I've fixed the get_page() issue where the phys address is adjusted rather than passing back the actual page start.  Maybe I can change that now that I always pass the size back?
-* there's still a bug where there's a zombie process left over after threadtest runs (but for some reason only if daemontest ran and was killed with -2 and then threadtest run, and then ps will see the zombie)
+* it seems like sending a SIGINT signal to daemontest kills it without printing the special handler, so I don't think the custom handler is running?
+* confirm that signalling a process that's not the current process will properly switch to that process (still a problem interrupting syscalls it seems)
 
+* I don't think I've fixed the get_page() issue where the phys address is adjusted rather than passing back the actual page start.  Maybe I can change that now that I always pass the size back?
 * there's a problem with the load_pages_into_kvec function, where it will incorrectly round down the pointer value based on the PAGE_SIZE, even if it turns out to be a larger granule
   But while get_page will sort out the adjustment if it's a larger granule, it won't take an unaligned address.  This is probably an issue in load_page_at, where it could be interferring
   my attempts at supporting swapping large granules...
+
+* threadtest is getting into an infinite error loop, is it the _user_exit problem
+* I think the lack of error propogation during init might be harming you here
+
 * you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
 
-* I think the lack of error propogation during init might be harming you here
 * bug: a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
 * oh that was interesting, I ran daemontest, killed it, and then ran it again, and it's now hitting the same bus error.  Maybe I broke it again with the added length check in mmu_table_map?
   I can't seem to reproduce this...  I was able to get it to happen if I ran threadtest and the daemontest
-* it seems like sending a SIGINT signal to daemontest kills it without printing the special handler, so I don't think the custom handler is running?
-* confirm that signalling a process that's not the current process will properly switch to that process (still a problem interrupting syscalls it seems)
-* threadtest is getting into an infinite error loop, is it the _user_exit problem
 
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 

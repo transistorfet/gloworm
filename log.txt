@@ -5387,3 +5387,13 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   non-existant pid argument to strtol, because it's missing an arg check.  Adding the arg check should be enough to fix the bug in
   the command itself
 
+- found a new bug when running nettest while trying to test killing a custom handler process that isn't the currently running
+  process.  It seems like just running nettest causes the fault
+      ```
+      bus error: d w fc=1 addr=11FEC8 ssw=711 mmusr=402 pid=13 pc=100E4E
+      fatal bus error: d w fc=1 addr=11FEC8 ssw=711 mmusr=402 pid=13 pc=100E4E
+      Fatal Error at 100E4E while pid 13 running (status: 2704, vector: 2). Halting...
+      ```
+- the address of the fault points to memcpy_to_user, which is called from 0x101654, which is in do_recvfrom!  So an error there.
+  It's passing in a kernel space address in place of the user space address
+

@@ -95,8 +95,8 @@ void mmu_table_free(mmu_descriptor_t *root_table)
 }
 
 
-//#define GET_TABLE_CREATE_IF_NEEDED		0x01
-//#define GET_TABLE_RETURN_ANY_SIZE		0x02
+#define GET_TABLE_CREATE_IF_NEEDED		0x01
+#define GET_TABLE_RETURN_ANY_SIZE		0x02
 
 struct get_table_result {
 	mmu_descriptor_t *table;
