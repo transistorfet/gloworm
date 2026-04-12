@@ -5397,3 +5397,31 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - the address of the fault points to memcpy_to_user, which is called from 0x101654, which is in do_recvfrom!  So an error there.
   It's passing in a kernel space address in place of the user space address
 
+- looking into the _user_exit, function arg to clone, thread exit problem.  Looking at the user-side clone impl for uClinux, it
+  looks like there's a thread stub in the function, and that the actual clone syscall acts like fork, in that it returns twice to
+  the user process.  The stub expects the `fn` and `arg` arguments to be passed to it, but those can be pushed onto the user stack
+  itself, and with the new stack used by the child lightweight process/thread, it can't return without crashing, but it doesn't need
+  to because it jumps to the stub, calls the function, and then calls the exit syscall
+
+
+2026-04-11:
+
+- I had to move the stack copying code into context.c, which is where it should be anyways, really, since the way it copies the
+  stack is somewhat platform dependent.  I got it working such that the user stack passed into clone() has the `fn` and `arg`
+  arguments (I had forgotten to put them on the stack after adjusting the stack before the syscall, which took me a while to figure
+  out, but I got it in the end)
+- I realized when doing that that the kernel context function that was in context.c wasn't being used by anything, and while I had
+  probably intended for it to be, it seems that the old exec.c functions that used to be split, the kernel version didn't push a
+  kernel context... Maybe that was even a bug I came across where it wouldn't work correctly.  I've removed the function for now and
+  can come back to trying to support kernel threads later.  The only "kernel thread" I have is the idle thread, which runs as a
+  user process.  The fact that a kernel thread can't have a user stack is part of the problem, given the context switching assumes
+  it will always either return to the kernel or return to a user thread
+
+- I played around with the syscall macros a bit, since I noticed there was some stack use in the clone() stub after it returned from
+  the syscall.  I modified the stub to make it unlikely that it would use the stack, which would be a no no for threads, since they
+  share the same memory address and could inadvertently mess up its parent process.  I had it separately copying the syscall return
+  into errno, and also into a local variable.  I was able to get rid of the local by using errno as the intermediary, which works,
+  but might not be 100% correct, and it still can't seem to optimize as much as I feel like it should be able to.  I'm pretty
+  unimpressed with the gcc optimization for 68k, but I guess it doesn't get much attention these days, and changes to other parts of
+  gcc could regress it
+

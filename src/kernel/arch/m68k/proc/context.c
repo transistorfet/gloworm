@@ -16,6 +16,14 @@ struct sigcontext {
 	sigset_t prev_mask;
 };
 
+
+#if !defined(CONFIG_M68K_USER_MODE)
+static inline int clone_context(struct process *parent_proc, struct process *proc, char **child_user_sp);
+char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
+static inline int copy_stack(struct process *parent_proc, struct process *proc);
+#endif
+
+
 void *arch_get_user_stackp(struct process *proc)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
@@ -95,75 +103,10 @@ int arch_release_task_info(struct process *proc)
 	return 0;
 }
 
-int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry)
-{
-	int error;
-	size_t iter_size;
-	struct kvec kvec[3];
-	struct iovec_iter iter;
-
-	iter_size = sizeof(void *);
-
-	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (user_sp - iter_size), iter_size, 1);
-	if (error < 0) {
-		goto fail;
-	}
-
-	error = iovec_iter_seek(&iter, 0, SEEK_END);
-	if (error < 0) {
-		goto fail;
-	}
-
-	error = iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
-	if (error < 0) {
-		goto fail;
-	}
-
-	user_sp -= iovec_iter_remaining(&iter);
-
-	#if defined(CONFIG_M68K_USER_MODE)
-
-	proc->task_info.ksp = proc->task_info.kernel_stack_start + KERNEL_STACK_SIZE;
-
-	#else
-
-	proc->task_info.ksp = user_sp;
-
-	#endif
-
-	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0x2000);
-
-	return 0;
-
-fail:
-	return error;
-}
-
 int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 {
-	int error;
-	size_t iter_size;
-	struct kvec kvec[3];
-	struct iovec_iter iter;
-
-	iter_size = sizeof(void *);
-
-	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (user_sp - iter_size), iter_size, 1);
-	if (error < 0) {
-		goto fail;
-	}
-
-	error = iovec_iter_seek(&iter, 0, SEEK_END);
-	if (error < 0) {
-		goto fail;
-	}
-
-	error = iovec_iter_push_back(&iter, &_user_exit, sizeof(void *));
-	if (error < 0) {
-		goto fail;
-	}
-
-	user_sp -= iovec_iter_remaining(&iter);
+	// Leave a space on the stack for the return address, so that the stack arguments are where they're expected
+	user_sp -= sizeof(void *);
 
 	#if defined(CONFIG_M68K_USER_MODE)
 
@@ -171,6 +114,8 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 
 	#else
 
+	// Add the user exit stub to the stack in case the user program attempts to return
+	*user_sp = (char *) _user_exit;
 	proc->task_info.ksp = user_sp;
 
 	#endif
@@ -178,22 +123,43 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 	proc->task_info.ksp = create_context(proc->task_info.ksp, entry, user_sp, 0x0000);
 
 	return 0;
-
-fail:
-	return error;
 }
 
 int arch_clone_task_info(struct process *parent_proc, struct process *proc, char *user_sp)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
-	// TODO should the stack be allocated here too, so it's a decision made by the arch whether to have two stacks or one?
 	proc->task_info.ksp = proc->task_info.kernel_stack_start + (((char *) parent_proc->task_info.ksp) - parent_proc->task_info.kernel_stack_start);
 
 	memcpy((char *) proc->task_info.kernel_stack_start, (char *) parent_proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 
+	// If no user stack is provided, then we only need to copy the parent's user stack pointer, and
+	// the MMU's copy function, which enables copy-on-write, will clone the stack for us on demand
+	if (!user_sp) {
+		user_sp = arch_get_user_stackp(parent_proc);
+	}
+
 	arch_set_user_stackp(proc, user_sp);
 
 	#else
+
+	int error;
+
+	if (!user_sp) {
+		// If no user stack is provided, then we need to copy the parent's user stack
+		error = copy_stack(parent_proc, proc);
+		if (error < 0) {
+			return error;
+		}
+
+		user_sp = (char *) proc->map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
+		if (!user_sp) {
+			return EFAULT;
+		}
+	} else {
+		// If a user stack was provided, then we need to copy the context on the parent's user stack to this stack,
+		// so that we'll restore the context correctly the next time we switch to the child process
+		clone_context(parent_proc, proc, &user_sp);
+	}
 
 	proc->task_info.ksp = user_sp;
 
@@ -216,7 +182,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 	if (proc->signals.actions[signum - 1].sa_flags & SA_RESTORER) {
 		restorer = proc->signals.actions[signum - 1].sa_restorer;
 	} else {
-		#if !defined(CONFIG_MMU)
+		#if !defined(CONFIG_M68K_USER_MODE)
 		restorer = _user_sigreturn;
 		#else
 		log_error("attempted to call a signal handler with no restorer\n");
@@ -293,4 +259,74 @@ void arch_extended_switch_context(struct process *previous_proc, struct process 
 	mmu_table_switch(next_proc->map->root_table);
 	#endif
 }
+
+#if !defined(CONFIG_M68K_USER_MODE)
+// Copy the process context on the parent's stack to the user stack
+//
+// This is meant to be used when a thread is started, and an alternate stack is provided rather
+// than cloning the stack.  In order to correctly return to the child process (which only has a
+// single user/kernel stack), the context must be copied
+static inline int clone_context(struct process *parent_proc, struct process *proc, char **child_user_sp)
+{
+	size_t size;
+	char *parent_user_sp;
+	struct exception_frame *frame;
+
+	parent_user_sp = arch_get_user_stackp(parent_proc);
+	size = *((uint32_t *) parent_user_sp);
+	frame = (struct exception_frame *) &parent_user_sp[size];
+	size += exception_frame_size(frame);
+	*child_user_sp -= size;
+	memcpy(*child_user_sp, parent_user_sp, size);
+	return 0;
+}
+
+// Copy the parent's user stack to a new memory location to be used by the child process
+//
+// This is used during fork() when no alternate stack is provided
+static inline int copy_stack(struct process *parent_proc, struct process *proc)
+{
+	int error = 0;
+	uintptr_t heap_start;
+	uintptr_t stack_size;
+
+	heap_start = parent_proc->map->heap_start;
+	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
+
+	error = memory_map_unmap(proc->map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
+	if (error < 0)
+		return error;
+
+	error = memory_map_insert_heap_stack(proc->map, heap_start, stack_size);
+	if (error < 0)
+		return error;
+
+	error = memory_map_move_sbrk(proc->map, parent_proc->map->sbrk - parent_proc->map->heap_start);
+	if (error < 0)
+		return error;
+
+	memcpy((char *) proc->map->heap_start, (char *) parent_proc->map->heap_start, stack_size);
+
+	// Adjust the pointers to the command line arguments to point to the new stack
+	proc->map->argv = (const char *const *) adjust_string_array((char **) parent_proc->map->argv, (char *) parent_proc->map->heap_start, (char *) proc->map->heap_start);
+	proc->map->envp = (const char *const *) adjust_string_array((char **) parent_proc->map->envp, (char *) parent_proc->map->heap_start, (char *) proc->map->heap_start);
+
+	return 0;
+}
+
+char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start)
+{
+	short i;
+	char **dest;
+
+	dest = (char **) (((char *) source) - parent_stack_start + new_stack_start);
+
+	for (i = 0; source[i]; i++) {
+		dest[i] = source[i] - parent_stack_start + new_stack_start;
+	}
+	dest[i] = NULL;
+
+	return dest;
+}
+#endif
 

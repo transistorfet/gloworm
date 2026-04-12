@@ -13,7 +13,13 @@ int thread(void *arg);
 int main(int argc, char **argv)
 {
 	int pid;
-	char *stack = malloc(STACK_SIZE);
+	char *stack;
+
+	stack = malloc(STACK_SIZE);
+	if (!stack) {
+		printf("Error allocating stack: out of memory\n");
+		return -1;
+	}
 
 	pid = clone(thread, stack + STACK_SIZE, CLONE_VM, (void *) 0x55AA);
 	if (pid) {
@@ -21,7 +27,6 @@ int main(int argc, char **argv)
 		return 0;
 	} else {
 		printf("I am detached\n");
-
 	}
 
 	return 0;

@@ -8,9 +8,9 @@ struct process;
 
 struct clone_args {
 	int flags;
-	int (*entry)(void *);
 	void *stack;
-	void *arg;
+	// NOTE there is no entry point because that will be handled by the user process
+	//	The child process will see a return of 0 from the clone syscall
 };
 
 int clone_process(struct process *parent_proc, struct clone_args *args, struct process **proc);

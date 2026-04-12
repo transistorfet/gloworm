@@ -164,9 +164,7 @@ struct process *clone_kernel_thread(int (*thread_start)(), const char *const arg
 	struct clone_args args;
 
 	args.flags = CLONE_THREAD | CLONE_VM | CLONE_FS | CLONE_FILES;
-	args.entry = NULL;
 	args.stack = NULL;
-	args.arg = NULL;
 
 	error = clone_process(primordial_process, &args, &proc);
 	if (error < 0)

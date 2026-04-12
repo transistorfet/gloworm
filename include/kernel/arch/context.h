@@ -16,7 +16,6 @@ void arch_set_kernel_stackp(struct process *proc, void *ksp);
 
 int arch_init_task_info(struct process *proc);
 int arch_release_task_info(struct process *proc);
-int arch_add_kernel_context(struct process *proc, char *user_sp, void *entry);
 int arch_add_process_context(struct process *proc, char *user_sp, void *entry);
 int arch_clone_task_info(struct process *parent_proc, struct process *proc, char *user_sp);
 int arch_add_signal_context(struct process *proc, int signum);

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -27,14 +28,26 @@ int MAIN(command_nettest)()
 	return 0;
 }
 
+void handle_signal(int signum)
+{
+	printf("Received signal %d\n", signum);
+	return;
+}
+
 int serverloop()
 {
 	int i;
 	int error;
 	int sockfd;
 	socklen_t sa_len;
+	struct sigaction act;
 	char buffer[MAX_INPUT];
 	struct sockaddr_in addr;
+
+	act.sa_handler = handle_signal;
+	act.sa_flags = 0;
+	sigemptyset(&act.sa_mask);
+	sigaction(SIGINT, &act, NULL);
 
 	sockfd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0) {
@@ -66,6 +79,9 @@ int serverloop()
 	while (1) {
 		sa_len = sizeof(struct sockaddr_in);
 		i = recvfrom(sockfd, buffer, MAX_INPUT, 0, (struct sockaddr *) &addr, &sa_len);
+		if (i < 0) {
+			break;
+		}
 		buffer[i] = '\0';
 		printf("%s:%d >> %d: %s\n", inet_ntoa(addr.sin_addr), addr.sin_port, i, buffer);
 	}

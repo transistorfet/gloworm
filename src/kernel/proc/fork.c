@@ -15,15 +15,12 @@
 
 
 static inline int duplicate_memory_map(struct process *parent_proc, struct process *proc);
-#if !defined(CONFIG_MMU)
-char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
-static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map);
-#endif
 
 
 int clone_process(struct process *parent_proc, struct clone_args *args, struct process **result)
 {
 	int error;
+	char *user_sp = NULL;
 	struct process *proc;
 
 	proc = new_proc(0, parent_proc->uid);
@@ -38,17 +35,12 @@ int clone_process(struct process *parent_proc, struct clone_args *args, struct p
 
 	error = clone_process_memory(parent_proc, proc, args->flags);
 	if (error < 0) {
-		log_debug("failed to clone process %d from %d: %d\n", proc->pid, parent_proc->pid, error);
-		exit_proc(proc, error);
-		cleanup_proc(proc);
-		return error;
+		goto fail;
 	}
 
-	if (args->stack) {
-		// Put the argument onto the stack before initializing the context
-		args->stack -= sizeof(void *);
-		*((void **) args->stack) = args->arg;
-		arch_add_process_context(proc, args->stack, args->entry);
+	error = arch_clone_task_info(parent_proc, proc, args->stack);
+	if (error < 0) {
+		goto fail;
 	}
 
 	// Apply return value to the stack context of the cloned proc, and return to the parent with the new pid
@@ -56,6 +48,12 @@ int clone_process(struct process *parent_proc, struct clone_args *args, struct p
 
 	*result = proc;
 	return 0;
+
+fail:
+	log_debug("failed to clone process %d from %d: %d\n", proc->pid, parent_proc->pid, error);
+	exit_proc(proc, error);
+	cleanup_proc(proc);
+	return error;
 }
 
 int clone_process_memory(struct process *parent_proc, struct process *proc, int flags)
@@ -124,31 +122,12 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 			goto fail;
 	}
 
-	#if defined(CONFIG_MMU)
-
 	new_map->heap_start = parent_proc->map->heap_start;
 	new_map->sbrk = parent_proc->map->sbrk;
 	new_map->argv = parent_proc->map->argv;
 	new_map->envp = parent_proc->map->envp;
 
-	#else
-
-	error = copy_stack(parent_proc, proc, new_map);
-	if (error < 0)
-		goto fail;
-
-	#endif
-
 	proc->map = new_map;
-
-	char *stack_pointer = NULL;
-	// TODO this needs to move to a common location, but the reason it can't (hasn't been) moved is because it needs the stack pointer?
-	// because it's adjusting both the user and kernel stacks, due to the fact that enabling user mode uses two stacks instead of one
-	stack_pointer = (char *) new_map->stack_end - (parent_proc->map->stack_end - (uintptr_t) arch_get_user_stackp(parent_proc));
-	if (!stack_pointer) {
-		return EFAULT;
-	}
-	arch_clone_task_info(parent_proc, proc, stack_pointer);
 
 	return 0;
 
@@ -157,51 +136,4 @@ fail:
 		memory_map_free(new_map);
 	return error;
 }
-
-#if !defined(CONFIG_MMU)
-static inline int copy_stack(struct process *parent_proc, struct process *proc, struct memory_map *new_map)
-{
-	int error = 0;
-	uintptr_t heap_start;
-	uintptr_t stack_size;
-
-	heap_start = parent_proc->map->heap_start;
-	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
-
-	error = memory_map_unmap(new_map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
-	if (error < 0)
-		return error;
-
-	error = memory_map_insert_heap_stack(new_map, heap_start, stack_size);
-	if (error < 0)
-		return error;
-
-	error = memory_map_move_sbrk(new_map, parent_proc->map->sbrk - parent_proc->map->heap_start);
-	if (error < 0)
-		return error;
-
-	memcpy((char *) new_map->heap_start, (char *) parent_proc->map->heap_start, stack_size);
-
-	// Adjust the pointers to the command line arguments to point to the new stack
-	new_map->argv = (const char *const *) adjust_string_array((char **) parent_proc->map->argv, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
-	new_map->envp = (const char *const *) adjust_string_array((char **) parent_proc->map->envp, (char *) parent_proc->map->heap_start, (char *) new_map->heap_start);
-
-	return 0;
-}
-
-char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start)
-{
-	short i;
-	char **dest;
-
-	dest = (char **) (((char *) source) - parent_stack_start + new_stack_start);
-
-	for (i = 0; source[i]; i++) {
-		dest[i] = source[i] - parent_stack_start + new_stack_start;
-	}
-	dest[i] = NULL;
-
-	return dest;
-}
-#endif
 

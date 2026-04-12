@@ -90,13 +90,14 @@ void user_error(struct exception_frame *frame, int signal)
 {
 	int error;
 	char *code;
-	struct get_page_result page;
 
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
 
 	#if defined(CONFIG_MMU)
+
+	struct get_page_result page;
 
 	#if defined(CONFIG_LOG_LEVEL_DEBUG)
 	struct mmu_root_pointer root_pointer;

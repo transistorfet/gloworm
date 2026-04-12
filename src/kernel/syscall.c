@@ -88,12 +88,11 @@ pid_t do_fork(void)
 {
 	int error;
 	struct process *proc;
-	struct clone_args args;
 
-	args.entry = NULL;
-	args.stack = NULL;
-	args.flags = 0;
-	args.arg = NULL;
+	struct clone_args args = {
+		.stack = NULL,
+		.flags = 0,
+	};
 
 	error = clone_process(current_proc, &args, &proc);
 	if (error < 0) {
@@ -108,18 +107,16 @@ pid_t do_fork(void)
 /// NOTE: this syscall may have an alternate entry to save the full context on
 /// the stack before cloning it.  Because of that, this function uses the
 /// `current_syscall` struct to access the arguments.
-//	Actual Args: int (*fn)(void *), void *stack, int flags, void *arg
+//	Actual Args: void *stack, int flags
 pid_t do_clone(void)
 {
 	int error;
 	struct process *proc;
 	struct clone_args args;
 
-	// TODO these addresses need to be translated?
-	args.entry = (int (*)(void *)) current_syscall->arg1;
-	args.stack = (void *) current_syscall->arg2;
-	args.flags = current_syscall->arg3;
-	args.arg = (void *) current_syscall->arg4;
+	// TODO does the stack need to be translated?
+	args.stack = (void *) current_syscall->arg1;
+	args.flags = current_syscall->arg2;
 
 	error = clone_process(current_proc, &args, &proc);
 	if (error < 0) {
@@ -225,6 +222,9 @@ int do_brk(void __user *addr)
 {
 	int diff;
 
+	// Round up to the nearest page size
+	addr = (void *) roundup((uintptr_t) addr, PAGE_SIZE);
+
 	// TODO fix the address translation??  Maybe this isn't needed
 	diff = (uintptr_t) addr - current_proc->map->sbrk;
 	if (current_proc->map->heap_start + diff >= (uintptr_t) arch_get_user_stackp(current_proc)) {
@@ -237,6 +237,9 @@ int do_brk(void __user *addr)
 void *do_sbrk(intptr_t diff)
 {
 	if (diff) {
+		// Round up to the nearest page size
+		diff = roundup(diff, PAGE_SIZE);
+
 		if (current_proc->map->heap_start + diff >= (uintptr_t) arch_get_user_stackp(current_proc)) {
 			return NULL;
 		}
@@ -1001,6 +1004,7 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 	addr_len = (socklen_t *) get_user_uintptr(&opts[1]);
 
 	#if defined(CONFIG_MMU)
+
 	char addr_buffer[256];
 	if (addr_len) {
 		kernel_len = get_user_uintptr(addr_len);
@@ -1008,20 +1012,25 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 			return EINVAL;
 		}
 	}
-	#endif
 
 	iovec_iter_init_user_buf(&iter, (char *) buf, nbytes);
 	error = net_socket_recvfrom(file, &iter, flags, addr ? (struct sockaddr *) addr_buffer : NULL, &kernel_len);
 	if (error < 0)
 		return error;
 
-	#if defined(CONFIG_MMU)
 	if (addr) {
 		memcpy_to_user((char *) addr, addr_buffer, kernel_len);
 	}
 	if (addr_len) {
 		put_user_uintptr((socklen_t *) addr_len, kernel_len);
 	}
+
+	#else
+
+	error = net_socket_recvfrom(file, &iter, flags, addr, addr_len);
+	if (error < 0)
+		return error;
+
 	#endif
 	return error;
 }
