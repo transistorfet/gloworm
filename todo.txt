@@ -1,14 +1,9 @@
 
-* support large pages when MMU mapping and swapping
-* I don't think I've fixed the get_page() issue where the phys address is adjusted rather than passing back the actual page start.  Maybe I can change that now that I always pass the size back?
-* there's a problem with the load_pages_into_kvec function, where it will incorrectly round down the pointer value based on the PAGE_SIZE, even if it turns out to be a larger granule
-  But while get_page will sort out the adjustment if it's a larger granule, it won't take an unaligned address.  This is probably an issue in load_page_at, where it could be interferring
-  my attempts at supporting swapping large granules...
-
-* I think the lack of error propogation during init might be harming you here
+* don't forget to undo the ANONYMOUS -> ALLOCATED change in insert_stack_and_heap
 
 * bug: a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
 
+* I think the lack of error propogation during init might be harming you here
 * you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 
@@ -41,6 +36,7 @@
 * should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
   doing so will avoid unnecessarily using iovec
 
+* should you support large pages?
 * try to reduce the code size as much as possible
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors

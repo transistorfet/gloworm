@@ -176,11 +176,14 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 	int i;
 	int error;
 	uint16_t status;
+	int get_table_flags;
 	physical_address_t physical_addr;
 	struct get_table_result result = { NULL, 0 };
 
 	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
 	// once in memory_map_mmap() before the map is altered
+
+	get_table_flags = GET_TABLE_CREATE_IF_NEEDED | ((flags & MMU_FLAG_WINDOW) ? GET_TABLE_RETURN_ANY_SIZE : 0);
 
 	// Force a table update in the first iteration
 	i = MMU_TABLE_SIZE;
@@ -188,7 +191,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
 		if (i + 1 >= MMU_TABLE_SIZE || (result.table && length < 1 << result.bits)) {
-			error = get_table(root_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED | GET_TABLE_RETURN_ANY_SIZE, &result);
+			error = get_table(root_table, virtual_addr, length, get_table_flags, &result);
 			if (error < 0) {
 				return error;
 			}
@@ -301,6 +304,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 			}
 
 			if (src_result.bits != dest_result.bits) {
+				log_debug("mmu_table_copy: source page size (%d) doesn't match destination page size (%d)\n", 1 << src_result.bits, 1 << dest_result.bits);
 				return EFAULT;
 			}
 		}
@@ -336,24 +340,17 @@ int mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, str
 	uint32_t entry;
 	struct get_table_result table_result;
 
-	error = get_table(root_table, virtual_addr, PAGE_SIZE, result ? GET_TABLE_RETURN_ANY_SIZE : 0, &table_result);
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &table_result);
 	if (error < 0) {
 		return error;
 	}
 
-	if (result) {
+	entry = MMU_TABLE_ADDRESS(table_result.table[TABLE_INDEX(virtual_addr, table_result.bits)]);
+	if (!entry && virtual_addr > (1 << table_result.bits)) {
+		return ENOENT;
+	} else {
 		result->size = 1 << table_result.bits;
-
-		entry = MMU_TABLE_ADDRESS(table_result.table[TABLE_INDEX(virtual_addr, table_result.bits)]);
-		if (!entry && virtual_addr > (1 << table_result.bits)) {
-			result->phys = NULL;
-			return ENOENT;
-		} else if (entry && table_result.bits != PAGE_ADDR_BITS) {
-			// Early termination entry, so calculate the offset into the chunk
-			result->phys = entry + (virtual_addr & rounddown((1 << table_result.bits) - 1, PAGE_SIZE));
-		} else {
-			result->phys = entry;
-		}
+		result->phys = entry;
 	}
 	return 0;
 }

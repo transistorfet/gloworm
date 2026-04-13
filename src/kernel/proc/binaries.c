@@ -183,11 +183,11 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	if (!(error = vfs_read(file, &iter)))
 		return error;
 
-	//#if defined(CONFIG_MMU)
-	//int preload = 0;
-	//#else
+	#if defined(CONFIG_MMU)
+	int preload = 0;
+	#else
 	int preload = 1;
-	//#endif
+	#endif
 
 	// Calculate the total size of memory to allocate (not including the stack)
 	mem_size = 0;
@@ -217,15 +217,15 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	struct vfile *object = file;
 
 	// TODO this is temporary until you get page faults working
-	user_mem_start = (uintptr_t) page_alloc_contiguous(mem_size);
-	if (!user_mem_start) {
-		error = ENOMEM;
-		goto fail;
-	}
+	//user_mem_start = (uintptr_t) page_alloc_contiguous(mem_size);
+	//if (!user_mem_start) {
+	//	error = ENOMEM;
+	//	goto fail;
+	//}
 
 	// TODO this is wrong of course, but it's a placeholder for the time being
 	// it should come from the elf?
-	//user_mem_start = 0x40000;
+	user_mem_start = 0x40000;
 
 	#else
 
@@ -248,11 +248,11 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 			memory_segment_start = rounddown(file_segment_start, PAGE_SIZE);
 			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
-			//#if defined(CONFIG_MMU)
-			//int flags = preload ? SEG_POPULATE : 0;
-			//#else
+			#if defined(CONFIG_MMU)
+			int flags = preload ? SEG_POPULATE : 0;
+			#else
 			int flags = SEG_FIXED;
-			//#endif
+			#endif
 			if (prog_headers[i].p_flags & PF_R) {
 				flags |= SEG_READ;
 			}
@@ -271,7 +271,6 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 				goto fail;
 			}
 
-			// TODO if we're going to not pre-load the binary data and rely on page faults, then these #ifs are needed
 			if (preload) {
 				error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET);
 				if (error < 0) {

@@ -15,6 +15,7 @@ struct process;
 #define PFN_STAT	3
 #define PFN_STATM	4
 #define PFN_MAPS	5
+#define PFN_PAGEDUMP	6
 
 #define PFN_MOUNTS	100
 

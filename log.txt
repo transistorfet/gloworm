@@ -5425,3 +5425,26 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   unimpressed with the gcc optimization for 68k, but I guess it doesn't get much attention these days, and changes to other parts of
   gcc could regress it
 
+- I might have found another bug, but they're pretty few are far between now.  It's hard to get it to try to allocate large pages,
+  as it turns out, but I can both increase the stack size and change it to POPULATE instead of UNALLOCATED, and it will try to
+  allocate 3 14-bit pages in 256-byte page mode, and fails with an error -14
+- ah, it's hitting the error in mmu_table_copy where the bits requested of the source and destination don't match
+
+- for this large pages issue, if I add GET_TABLE_RETURN_ANY_SIZE to the get_table call in mmu_table_copy, it will get into an
+  infinite loop trying to swap out pages the same page over and over (which is likely because the parent table has the write protect
+  bit set when it shouldn't).  If I don't have that flag (which is how it was before finding this bug), it will hit the check to see
+  that the source and destination pages are the same bit size
+- So I think this is one of the main things preventing large pages.  I could possibly fix this, but to do so I have a strong feeling
+  I'll need to adjust the page allocator to optionally allocate contiguous chunks on a large page boundary
+- the alternative of course is to abandon large page support for now and make it force single page size when using the PREALLOCATED
+  flag when mapping segments
+
+- it sounds like linux's hugepage support is a later addition, and isn't always activated.  It says it's to try to reduce the number
+  of TLB entries, but it sounds like the 68030 actually makes an individual ATC entry for each page despite the contiguous chunk.
+  The large pages also need to be aligned to the nearest large page boundary, since it mentions n-bits of the address being ignored
+- this is making me think maybe I shouldn't support this now, since it would complicate a lot.  So all pages that could be swapped
+  out would be single pages, and only SEG_FIXED segments could map to large pages
+
+- it looks like changing just the mmu_table_map function to not pass in the GET_TABLE_RETURN_ANY_SIZE flag unless the
+  MMU_FLAG_WINDOW flag is passed in seems to have fixed the problem with some large pages being swapped in
+

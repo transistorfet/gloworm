@@ -193,6 +193,47 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 		return ENOENT;
 	}
 }
+
+int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
+{
+	int i;
+	int error;
+	size_t page_offset, page_remaining;
+	struct get_page_result page;
+	virtual_address_t page_start;
+
+	page_start = rounddown(start, PAGE_SIZE);
+	for (i = 0; i < max_segs; i++) {
+		error = mmu_table_get_page(map->root_table, page_start, &page);
+		if (error < 0) {
+			error = memory_map_load_page_at(map, page_start, write_flag);
+			if (error < 0) {
+				return error;
+			}
+
+			error = mmu_table_get_page(map->root_table, page_start, &page);
+			if (error < 0) {
+				return ENOENT;
+			}
+		}
+
+		page_offset = alignment_offset(start, page.size);
+		page_remaining = page.size - page_offset;
+		kvec[i].buf = (char *) page.phys + page_offset;
+		if (length > page_remaining) {
+			kvec[i].bytes = page_remaining;
+			length -= page_remaining;
+		} else {
+			kvec[i].bytes = length;
+			return i + 1;
+		}
+		page_start = page_start + page.size;
+		// Reset the start address so that the page_offset will be 0 except for the first iteration
+		start = 0;
+	}
+	// If we ran out of kvec entries before we reached the length, then return an error
+	return ENOMEM;
+}
 #endif
 
 struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int flags)
@@ -665,49 +706,6 @@ fail:
 	#endif
 	return error;
 }
-
-#if defined(CONFIG_MMU)
-int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
-{
-	int i;
-	int error;
-	size_t page_offset, page_remaining;
-	struct get_page_result page;
-	virtual_address_t page_start;
-
-	page_start = rounddown(start, PAGE_SIZE);
-	for (i = 0; i < max_segs; i++) {
-		error = mmu_table_get_page(map->root_table, page_start, &page);
-		if (error < 0) {
-			error = memory_map_load_page_at(map, page_start, write_flag);
-			if (error < 0) {
-				return error;
-			}
-
-			error = mmu_table_get_page(map->root_table, page_start, &page);
-			if (error < 0) {
-				return ENOENT;
-			}
-		}
-
-		page_offset = alignment_offset(start, page.size);
-		page_remaining = page.size - page_offset;
-		kvec[i].buf = (char *) page.phys + page_offset;
-		if (length > page_remaining) {
-			kvec[i].bytes = page_remaining;
-			length -= page_remaining;
-		} else {
-			kvec[i].bytes = length;
-			return i + 1;
-		}
-		page_start = page_start + page.size;
-		// Reset the start address so that the page_offset will be 0 except for the first iteration
-		start = 0;
-	}
-	// If we ran out of kvec entries before we reached the length, then return an error
-	return ENOMEM;
-}
-#endif
 
 void memory_map_print_segments(struct memory_map *map)
 {

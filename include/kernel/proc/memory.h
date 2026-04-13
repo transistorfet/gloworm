@@ -16,7 +16,7 @@
 #include <asm/mmu.h>
 #endif
 
-#define KERNEL_STACK_SIZE	CONFIG_KERNEL_STACK_SIZE * PAGE_SIZE
+#define KERNEL_STACK_SIZE	CONFIG_KERNEL_STACK_SIZE
 
 #define SEG_TYPE		0x000F		// Mask for type of mapping
 #define SEG_TYPE_INVALID	0x0000
@@ -126,6 +126,7 @@ struct memory_map {
 
 #if defined(CONFIG_MMU)
 int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag);
+int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int pages, virtual_address_t start, size_t length, int write_flag);
 #endif
 
 #if !defined(CONFIG_MMU)
@@ -144,8 +145,6 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 int memory_map_resize(struct memory_segment *segment, ssize_t diff);
 int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, size_t stack_size);
 int memory_map_move_sbrk(struct memory_map *map, int diff);
-
-int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int pages, virtual_address_t start, size_t length, int write_flag);
 
 void memory_map_print_segments(struct memory_map *map);
 

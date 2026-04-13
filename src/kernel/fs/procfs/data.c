@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/param.h>
 
+#include <kconfig.h>
 #include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/usercopy.h>
@@ -166,6 +167,15 @@ int get_data_maps(struct process *proc, char *buffer, int max)
 	return i;
 }
 
+#if defined(CONFIG_MMU)
+int get_data_pagedump(struct process *proc, char *buffer, int max)
+{
+	if (proc->map) {
+		mmu_table_print(proc->map->root_table);
+	}
+	return 0;
+}
+#endif
 
 static inline char get_proc_state(struct process *proc)
 {

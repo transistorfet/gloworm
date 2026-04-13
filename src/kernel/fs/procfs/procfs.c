@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <kconfig.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/nop.h>
 #include <kernel/fs/vfs.h>
@@ -62,6 +64,9 @@ struct procfs_dir_entry proc_files[] = {
 	{ PFN_STAT,	"stat", 	get_data_stat },
 	{ PFN_STATM,	"statm",	get_data_statm },
 	{ PFN_MAPS,	"maps",		get_data_maps },
+	#if defined(CONFIG_MMU)
+	{ PFN_PAGEDUMP,	"pagedump",	get_data_pagedump },
+	#endif
 	{ 0, NULL, NULL },
 };
 
