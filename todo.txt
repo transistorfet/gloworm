@@ -1,13 +1,11 @@
 
-* don't forget to undo the ANONYMOUS -> ALLOCATED change in insert_stack_and_heap
+* a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
+* convert kmalloc to use pages
 
-* bug: a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
-
+* fix warnings in each config
 * I think the lack of error propogation during init might be harming you here
 * you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
-
-* convert kmalloc to use pages
 
 * move memory.c to mm/
 
@@ -36,7 +34,6 @@
 * should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
   doing so will avoid unnecessarily using iovec
 
-* should you support large pages?
 * try to reduce the code size as much as possible
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors
@@ -44,6 +41,8 @@
 * make it so that it's easy to run just one test
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
+
+* should you support large pages?
 
 * re-add the ability to make a kernel thread, which isn't quite so trivial in that it only has one stack, not two like user processes, but that might also be a problem with
   returning from a context switch, and the kernel reentry counter only tracks being in the kernel?  Either way this needs a lot more thought.  I've removed the duplicate kernel

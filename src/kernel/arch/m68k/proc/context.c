@@ -19,6 +19,9 @@ struct sigcontext {
 
 #if !defined(CONFIG_M68K_USER_MODE)
 static inline int clone_context(struct process *parent_proc, struct process *proc, char **child_user_sp);
+#endif
+
+#if !defined(CONFIG_MMU)
 char **adjust_string_array(char **source, char *parent_stack_start, char *new_stack_start);
 static inline int copy_stack(struct process *parent_proc, struct process *proc);
 #endif
@@ -115,7 +118,7 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 	#else
 
 	// Add the user exit stub to the stack in case the user program attempts to return
-	*user_sp = (char *) _user_exit;
+	*((char **) user_sp) = (char *) _user_exit;
 	proc->task_info.ksp = user_sp;
 
 	#endif
@@ -128,9 +131,14 @@ int arch_add_process_context(struct process *proc, char *user_sp, void *entry)
 int arch_clone_task_info(struct process *parent_proc, struct process *proc, char *user_sp)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
+
+	// Clone the kernel stack, if there is one
+	memcpy((char *) proc->task_info.kernel_stack_start, (char *) parent_proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 	proc->task_info.ksp = proc->task_info.kernel_stack_start + (((char *) parent_proc->task_info.ksp) - parent_proc->task_info.kernel_stack_start);
 
-	memcpy((char *) proc->task_info.kernel_stack_start, (char *) parent_proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
+	#endif
+
+	#if defined(CONFIG_MMU)
 
 	// If no user stack is provided, then we only need to copy the parent's user stack pointer, and
 	// the MMU's copy function, which enables copy-on-write, will clone the stack for us on demand
@@ -142,9 +150,9 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 
 	#else
 
-	int error;
-
 	if (!user_sp) {
+		int error;
+
 		// If no user stack is provided, then we need to copy the parent's user stack
 		error = copy_stack(parent_proc, proc);
 		if (error < 0) {
@@ -156,10 +164,20 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 			return EFAULT;
 		}
 	} else {
+		#if !defined(CONFIG_M68K_USER_MODE)
 		// If a user stack was provided, then we need to copy the context on the parent's user stack to this stack,
 		// so that we'll restore the context correctly the next time we switch to the child process
 		clone_context(parent_proc, proc, &user_sp);
+		#endif
 	}
+
+	#endif
+
+	#if defined(CONFIG_M68K_USER_MODE)
+
+	arch_set_user_stackp(proc, user_sp);
+
+	#else
 
 	proc->task_info.ksp = user_sp;
 
@@ -275,12 +293,14 @@ static inline int clone_context(struct process *parent_proc, struct process *pro
 	parent_user_sp = arch_get_user_stackp(parent_proc);
 	size = *((uint32_t *) parent_user_sp);
 	frame = (struct exception_frame *) &parent_user_sp[size];
-	size += exception_frame_size(frame);
+	size += sizeof(int) + exception_frame_size(frame);
 	*child_user_sp -= size;
 	memcpy(*child_user_sp, parent_user_sp, size);
 	return 0;
 }
+#endif
 
+#if !defined(CONFIG_MMU)
 // Copy the parent's user stack to a new memory location to be used by the child process
 //
 // This is used during fork() when no alternate stack is provided

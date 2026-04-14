@@ -68,6 +68,7 @@ static inline size_t exception_frame_size(struct exception_frame *frame)
 	size_t size = 0;
 
 	switch (frame->format) {
+		case 0x0:
 		case 0x1:
 			break;
 		case 0x2:
