@@ -48,7 +48,7 @@ create_context:
 	movea.l	(4,%sp), %a0	// void *kernel_stack
 	movea.l	(8,%sp), %a1	// void *entry
 	move.l	(12,%sp), %d1	// void *user_stack
-	move.l	(16,%sp), %d0	// int is_kernel
+	move.l	(16,%sp), %d0	// int flags
 
 	#if !defined(CONFIG_MC68000)
 	// Push the 68010+ Format/Vector Word

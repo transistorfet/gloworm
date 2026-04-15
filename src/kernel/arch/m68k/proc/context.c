@@ -214,10 +214,15 @@ int arch_add_signal_context(struct process *proc, int signum)
 	context->signum = signum;
 	context->prev_mask = proc->signals.blocked;
 	proc->signals.blocked |= proc->signals.actions[signum - 1].sa_mask;
+	ksp = (char *) context;
+	#if !defined(CONFIG_M68K_USER_MODE)
+	// Save the stack pointer because when user mode is not enabled, the kernel and user stack will be the same
+	arch_set_kernel_stackp(proc, ksp);
+	#endif
 
 	// Push to the user stack the signum argument, and the return address that will call sigreturn()
-	iter_size = 0x20;
 	usp = arch_get_user_stackp(proc);
+	iter_size = 0x20;
 
 	error = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 3, (virtual_address_t) (usp - iter_size), iter_size, 1);
 	if (error < 0) {
@@ -241,9 +246,14 @@ int arch_add_signal_context(struct process *proc, int signum)
 
 	usp -= iovec_iter_remaining(&iter);
 
+	#if !defined(CONFIG_M68K_USER_MODE)
+	// When user mode is not enabled, there will only be one stack shared between kernel and user space
+	// so we can directly move the stack pointers
+	ksp = usp;
+	#endif
+
 	// Push a fresh context onto the kernel stack
-	// NOTE the user stack is not updated directly, but is instead added to the new context
-	ksp = create_context((void *) context, proc->signals.actions[signum - 1].sa_handler, usp, 0x0000);
+	ksp = create_context(ksp, proc->signals.actions[signum - 1].sa_handler, usp, 0x0000);
 	arch_set_kernel_stackp(proc, ksp);
 
 	return 0;
@@ -260,7 +270,18 @@ int arch_remove_signal_context(struct process *proc)
 
 	// Drop the handler context
 	ksp = drop_context(arch_get_kernel_stackp(proc));
+	arch_set_kernel_stackp(proc, ksp);
 
+	// When user-mode is enabled, the original value of USP will be restored from the context
+	// so we only need to adjust the user+kernel stack when non-user-mode is used.  As such,
+	// the order of these pops are important
+	#if !defined(CONFIG_M68K_USER_MODE)
+	char *usp = arch_get_user_stackp(proc);
+	usp += sizeof(void *);
+	arch_set_user_stackp(proc, usp);
+	#endif
+
+	ksp = arch_get_kernel_stackp(proc);
 	// Use the sigcontext on the process's kernel stack to restore the previous signal state
 	context = (struct sigcontext *) ksp;
 	signum = context->signum;

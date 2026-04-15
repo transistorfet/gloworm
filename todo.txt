@@ -1,4 +1,5 @@
 
+* fix the signal handler return, with no-mmu, no-usermode, net-enabled
 * a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
 * convert kmalloc to use pages
 
