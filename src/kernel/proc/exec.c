@@ -84,6 +84,7 @@ int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stac
 	stack_pointer = stack_pointer - buffered_size + result;
 
 	arch_add_process_context(proc, (char *) stack_pointer, entry);
+
 	return 0;
 }
 

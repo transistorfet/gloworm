@@ -455,34 +455,45 @@ fail:
 /// it will be deleted or shrunk accordingly to make room.
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 {
-	uintptr_t end, sub_start, sub_end;
+	uintptr_t end;
 	struct memory_segment *cur, *next, *new;
 
 	#if defined(CONFIG_MMU)
 	int error;
+	int sub_start, sub_end;
 	#endif
 
 	end = start + length;
 	for (cur = memory_map_iter_first(map); cur; cur = next) {
+		#if defined(CONFIG_MMU)
 		sub_start = sub_end = 0;
+		#endif
 		next = memory_map_iter_next(cur);
 		if (cur->start >= start && cur->start <= end) {
+			#if defined(CONFIG_MMU)
 			sub_start = cur->start;
+			#endif
 			if (cur->end >= start && cur->end <= end) {
 				// The segment is entirely within the unmap region so delete it entirely
 				_queue_remove(&map->segments, &cur->node);
 				memory_segment_free(cur);
+				#if defined(CONFIG_MMU)
 				sub_end = cur->end;
+				#endif
 			} else {
 				// The start will be unmapped but not the end, so move the segment start
 				cur->start = end;
+				#if defined(CONFIG_MMU)
 				sub_end = end;
+				#endif
 			}
 		} else if (cur->end >= start && cur->end <= end) {
 			// The end will be unmapped but not the start, so move the segment end
-			cur->end = start;
+			#if defined(CONFIG_MMU)
 			sub_start = start;
 			sub_end = cur->end;
+			#endif
+			cur->end = start;
 		} else if (start >= cur->start && start <= cur->end) {
 			//  The unmapped region is entirely within this segment, so we need to split it in two
 			new = memory_segment_alloc(end, cur->end, cur->flags);
@@ -492,6 +503,8 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 			#if defined(CONFIG_MMU)
 			new->ops = cur->ops;
 			new->file = MEMORY_OBJECT_MAKE_REF(cur->file);
+			sub_start = start;
+			sub_end = end;
 			#else
 			new->region = MEMORY_OBJECT_MAKE_REF(cur->region);
 			#endif
@@ -500,8 +513,6 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 
 			// Adjust the current segment to end at the start of the region to be unmapped
 			cur->end = start;
-			sub_start = start;
-			sub_end = end;
 		}
 
 		#if defined(CONFIG_MMU)

@@ -1,5 +1,4 @@
 
-* fix the signal handler return, with no-mmu, no-usermode, net-enabled
 * a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
 * convert kmalloc to use pages
 
@@ -13,19 +12,25 @@
 * check custom signal handlers in each config
 * try with 4k pages, that failed during init last time I tried it
 * test with CONFIG_MMU=n to make sure nothing broke
-* test with CONFIG_USER_MODE=n to make sure nothing broke, (pay particular attention to the _user_exit change)
+* test with CONFIG_USER_MODE=n to make sure nothing broke
 
 ---
 
+* try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
+* should you move memory.c into mm/ instead of proc/
+
+* should you remove the single page allocator and only use the contiguous verison?
+
 * make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
 * are there any static tables still used beside the table of processes?
+* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 
-* use the PVALID instruction to validate user addresses before dereferencing them
 * convert bufcache/disk blocks to use pages
 * there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
   memory without duplicating them
 
 * I think there's a bug where if you start the httpd server (at least in daemon mode), and then kill it and run it again, it will fail with error -43, address in use
+* the error -43 address in use error also corresponds to ps no longer working.  I haven't verified if it's all fs functions, or just procfs
 * replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
 
 * it's time to fix the size in the load scripts
@@ -43,24 +48,13 @@
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
 
-* should you support large pages?
-
-* re-add the ability to make a kernel thread, which isn't quite so trivial in that it only has one stack, not two like user processes, but that might also be a problem with
-  returning from a context switch, and the kernel reentry counter only tracks being in the kernel?  Either way this needs a lot more thought.  I've removed the duplicate kernel
-  thread/exec/context code that wasn't even being used
-
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 
 * figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
   it seems to only affect some things, namely when sh is compiled into the kernel
 * why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
 * send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
-* when sending threadtest, it fails to run but then also says it's run out of files (too many open files) so there's likely multiple
-  bugs triggered by a corrupt elf file or something
 * the process should wait until all output is flushed before it can exit
-
-* try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
-* should you move memory.c into mm/ instead of proc/
 
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
@@ -73,18 +67,16 @@
 
 ----
 
-* Is there anything arch-specific left to move over?
+* should you support large pages?
 
 * there's an issue with extra-y, and whether to add the prefix or not
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
 * add flags to kmalloc?
+* add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
 
-* make kmalloc use the page-based memory for alloc
-* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 * make kmalloc use multiple different allocators under the hood, including a bitmap-based allocator for small sized objects, like < 64 bytes
   then it uses a slab-like allocator with bitmaps for at least common sizes of 16, 24, 32, 48, 64
-* make a macro for alloc_contiguous vs alloc_single, such that if CONFIG_MMU then single otherwise contiguous
 
 * see if using memset more, instead of manual initialization reduces code size
 * see if changing queues, ringbuffer, etc to non-inline functions reduces code size
@@ -118,11 +110,10 @@
 
 Overview
 
-    * add virtual memory
-    * add new types of locks
     * add ext2 support
-    * support minixfs 2 and 3?
+    * add new types of locks
     * add multi-cpu support
+    * support minixfs 2 and 3?
     * add dynamic linking
     * add additional architectures?
 

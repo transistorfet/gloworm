@@ -20,12 +20,12 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
 	int result;
-	int length;
 
 	if (proc->map && proc->map->argv) {
 		for (const char *const *arg = proc->map->argv; ; arg++) {
 			#if defined(CONFIG_MMU)
 
+			int length;
 			char *argstr;
 			struct kvec kvec[10];
 

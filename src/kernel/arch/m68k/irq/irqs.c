@@ -88,15 +88,18 @@ extern struct process *current_proc;
 
 void user_error(struct exception_frame *frame, int signal)
 {
-	int error;
-	char *code;
-
 	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
 
+	// After an exception, the `frame` is always pointing to the global kernel stack
+	printk("Exception Frame: %x\n", frame);
+	printk_dump((uint16_t *) frame, 128);
+
 	#if defined(CONFIG_MMU)
 
+	int error;
+	char *code;
 	struct get_page_result page;
 
 	#if defined(CONFIG_LOG_LEVEL_DEBUG)
@@ -105,10 +108,6 @@ void user_error(struct exception_frame *frame, int signal)
 	log_debug("mmu: root pointer is %x\n", root_pointer.table);
 	mmu_table_print(current_proc->map->root_table);
 	#endif
-
-	// After an exception, the `frame` is always pointing to the global kernel stack
-	printk("Exception Frame: %x\n", frame);
-	printk_dump((uint16_t *) frame, 128);
 
 	// The kernel stack is available through the process struct's task info
 	char *ksp = arch_get_kernel_stackp(current_proc);
@@ -129,7 +128,12 @@ void user_error(struct exception_frame *frame, int signal)
 
 	#else
 
-	print_stack(frame, (void *) frame->pc);
+	char *ksp = arch_get_kernel_stackp(current_proc);
+	printk("Process Kernel+User Stack: %x\n", ksp);
+	print_stack(frame, (void *) ksp);
+
+	printk("\nCode: %x\n", frame->pc);
+	printk_dump((uint16_t *) frame->pc, 48);
 
 	#endif
 

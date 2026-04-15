@@ -994,7 +994,9 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 	socklen_t *addr_len;
 	struct sockaddr *addr;
 	struct iovec_iter iter;
+	#if defined(CONFIG_MMU)
 	socklen_t kernel_len = 0;
+	#endif
 
 	file = get_fd(current_proc->fd_table, fd);
 	if (!file || !S_ISSOCK(file->vnode->mode)) {

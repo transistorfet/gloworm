@@ -20,7 +20,6 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 int clone_process(struct process *parent_proc, struct clone_args *args, struct process **result)
 {
 	int error;
-	char *user_sp = NULL;
 	struct process *proc;
 
 	proc = new_proc(0, parent_proc->uid);
