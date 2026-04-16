@@ -227,6 +227,7 @@ int read_loop(int listenfd)
 			}
 		}
 	}
+	return 0;
 }
 
 int run_server(void)

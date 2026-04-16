@@ -95,11 +95,6 @@ struct memory_segment {
 struct memory_map {
 	int refcount;
 
-	#if defined(CONFIG_MMU)
-	/// Root page table used by the MMU that represents this memory map
-	mmu_descriptor_t *root_table;
-	#endif
-
 	struct queue segments;
 	uintptr_t code_start;
 	uintptr_t data_start;
@@ -109,6 +104,11 @@ struct memory_map {
 
 	const char *const *argv;
 	const char *const *envp;
+
+	#if defined(CONFIG_MMU)
+	/// Root page table used by the MMU that represents this memory map
+	mmu_descriptor_t *root_table;
+	#endif
 };
 
 

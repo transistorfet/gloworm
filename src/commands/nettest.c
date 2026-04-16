@@ -122,6 +122,7 @@ int serverloop()
 	printf("Closing and exiting\n");
 	close(fd);
 	*/
+	return 0;
 }
 
 int process_input(char *input)

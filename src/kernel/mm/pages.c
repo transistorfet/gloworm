@@ -62,22 +62,20 @@ int init_page_block(struct page_block *block, void *addr, int size)
 	return init_page_block_with_bitmap(block, (bitmap_t *) addr, bitmap_size, pages_addr, allocatable_pages << PAGE_ADDR_BITS, descriptors_addr);
 }
 
-// TODO should this function only be used when there's no MMU and contiguous blocks are required
-//#if !defined(CONFIG_MMU)
-
-/// Allocate 1 or more contiguous pages from the given block of memory
+/// Allocate one or more contiguous pages from the given block of memory
 ///
 /// Returns a pointer to the first page, or NULL if not found.
 /// It doesn't record the length of the allocation, so when freeing pages, the
 /// allocating code must keep track of the size and deallocate each page
 /// separately
-physical_address_t page_block_alloc_contiguous(struct page_block *block, size_t size)
+physical_address_t page_block_alloc(struct page_block *block, size_t size)
 {
 	int contiguous_pages = size >> PAGE_ADDR_BITS;
 	uint32_t bit, start_bit, end_bit;
 	bitmap_t *bitmap = block->bitmap;
 
-	for (start_bit = 0; start_bit < block->pages; ) {
+	start_bit = 0;
+	while (start_bit < block->pages) {
 		if (bitmap[BIT_INDEX(start_bit)] == ALL_PAGES_AT_INDEX) {
 			// If all bits are allocated, move to the next index
 			start_bit += PAGES_PER_INDEX;
@@ -113,48 +111,8 @@ physical_address_t page_block_alloc_contiguous(struct page_block *block, size_t 
 
 	return NULL;
 }
-//#endif
 
-/// Allocate a single page and return a pointer, or NULL if out of memory
-physical_address_t page_block_alloc_single(struct page_block *block)
-{
-	uint32_t bit;
-	bitmap_t *bitmap = block->bitmap;
-
-	bit = 0;
-	while (bit < block->pages) {
-		if (bitmap[BIT_INDEX(bit)] == ALL_PAGES_AT_INDEX) {
-			bit += PAGES_PER_INDEX;
-		} else if ((bitmap[BIT_INDEX(bit)] & BIT_MASK(bit)) != 0) {
-			bit += 1;
-		} else {
-			bitmap[BIT_INDEX(bit)] |= BIT_MASK(bit);
-			#if defined(CONFIG_MMU)
-			block->page_descriptors[bit].refcount = 1;
-			#endif
-			return (physical_address_t) &block->base[bit];
-		}
-	}
-	return NULL;
-}
-
-/// Free a single page of memory, given the address of the page (as returned by alloc)
-void page_block_free_single(struct page_block *block, physical_address_t ptr)
-{
-	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
-
-	#if defined(CONFIG_MMU)
-	log_trace("decrement recount for %x to %d\n", ptr, block->page_descriptors[page_number].refcount - 1);
-	if (--block->page_descriptors[page_number].refcount != 0) {
-		return;
-	}
-	#endif
-
-	int index = BIT_INDEX(page_number);
-	block->bitmap[index] &= ~(BIT_MASK(page_number));
-}
-
-void page_block_free_contiguous(struct page_block *block, physical_address_t ptr, size_t size)
+void page_block_free(struct page_block *block, physical_address_t ptr, size_t size)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
@@ -172,15 +130,7 @@ void page_block_free_contiguous(struct page_block *block, physical_address_t ptr
 }
 
 #if defined(CONFIG_MMU)
-physical_address_t page_block_make_ref_single(struct page_block *block, physical_address_t ptr)
-{
-	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
-
-	block->page_descriptors[page_number].refcount++;
-	return ptr;
-}
-
-physical_address_t page_block_make_ref_contiguous(struct page_block *block, physical_address_t ptr, size_t size)
+physical_address_t page_block_make_ref(struct page_block *block, physical_address_t ptr, size_t size)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 

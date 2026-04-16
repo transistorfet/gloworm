@@ -122,7 +122,7 @@ void user_error(struct exception_frame *frame, int signal)
 	}
 
 	error = mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) rounddown(frame->pc, PAGE_SIZE), &page);
-	code = (char *) (page.phys + (uintptr_t) frame->pc & (page.size - 1));
+	code = (char *) (page.phys + alignment_offset((uintptr_t) frame->pc, page.size));
 	printk("\nCode: %x (phys: %x)\n", frame->pc, code);
 	printk_dump((uint16_t *) code, 48);
 
@@ -200,7 +200,6 @@ static void page_fault_handler(struct exception_frame *frame)
 	uint16_t ssw;
 	uint16_t mmu_sr;
 	uintptr_t fault_addr;
-	struct get_page_result page;
 
 	fault_addr = frame->formatb.fault_addr;
 	ssw = frame->formatb.ssw;
@@ -231,7 +230,6 @@ static void page_fault_handler(struct exception_frame *frame)
 			// An instruction fault has occurred, and if there's already a page mapped to that address,
 			// it will be returned when we RTE.  It's being recorded in a Program Space function codes, and
 			// was previously only recorded in the Data Space function codes
-			// TODO should you add support for large pages?
 			error = mmu_table_get_page(current_proc->map->root_table, rounddown(fault_addr, PAGE_SIZE), NULL);
 			if (!error) {
 				return;

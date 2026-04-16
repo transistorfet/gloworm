@@ -189,7 +189,7 @@ int alloc_kernel_stack(struct process *proc, int (*thread_start)(), const char *
 	char *stack;
 
 	// Allocate a new stack, which doesn't have to be mapped, because the kernel map has all of memory mapped 1:1
-	stack = (char *) page_alloc_contiguous(PAGE_SIZE);
+	stack = (char *) page_alloc(PAGE_SIZE);
 	proc->map->sbrk = (uintptr_t) stack;
 	proc->map->stack_end = (uintptr_t) stack + PAGE_SIZE;
 

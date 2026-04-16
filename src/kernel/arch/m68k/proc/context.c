@@ -77,7 +77,7 @@ int arch_init_task_info(struct process *proc)
 	#if defined(CONFIG_M68K_USER_MODE)
 
 	if (!proc->task_info.kernel_stack_start) {
-		proc->task_info.kernel_stack_start = (char *) page_alloc_contiguous(KERNEL_STACK_SIZE);
+		proc->task_info.kernel_stack_start = (char *) page_alloc(KERNEL_STACK_SIZE);
 		if (!proc->task_info.kernel_stack_start) {
 			return ENOMEM;
 		}
@@ -98,7 +98,7 @@ int arch_release_task_info(struct process *proc)
 	#if defined(CONFIG_M68K_USER_MODE)
 
 	if (proc->task_info.kernel_stack_start) {
-		page_free_contiguous((physical_address_t) proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
+		page_free((physical_address_t) proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 	}
 
 	#endif

@@ -30,7 +30,7 @@ struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile 
 	if (!region)
 		goto fail;
 
-	memory = (char *) page_alloc_contiguous(size);
+	memory = (char *) page_alloc(size);
 	if (!memory)
 		goto fail;
 
@@ -55,7 +55,7 @@ void memory_region_free(struct memory_region *region)
 		return;
 
 	if (--region->refcount == 0) {
-		page_free_contiguous((uintptr_t) region->mem_start, region->mem_length);
+		page_free((uintptr_t) region->mem_start, region->mem_length);
 		kmfree(region);
 	}
 }
@@ -71,7 +71,7 @@ physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, 
 	physical_address_t page;
 	struct iovec_iter iter;
 
-	page = page_alloc_single();
+	page = page_alloc(PAGE_SIZE);
 	if (!page) {
 		return NULL;
 	}
@@ -105,7 +105,7 @@ physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segm
 {
 	physical_address_t page;
 
-	page = page_alloc_single();
+	page = page_alloc(PAGE_SIZE);
 	if (!page) {
 		return NULL;
 	}
@@ -122,11 +122,7 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtu
 	int error;
 	physical_address_t page_copy;
 
-	if (page_size == PAGE_SIZE) {
-		page_copy = page_alloc_single();
-	} else {
-		page_copy = page_alloc_contiguous(page_size);
-	}
+	page_copy = page_alloc(page_size);
 	if (!page_copy) {
 		return ENOMEM;
 	}
@@ -138,11 +134,7 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtu
 		return error;
 	}
 
-	if (page_size == PAGE_SIZE) {
-		page_free_single((physical_address_t) existing_page);
-	} else {
-		page_free_contiguous((physical_address_t) existing_page, page_size);
-	}
+	page_free((physical_address_t) existing_page, page_size);
 	return 0;
 }
 
@@ -184,7 +176,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 			error = mmu_table_set_page(map->root_table, page_address, (uintptr_t) new_page, PAGE_SIZE, (segment->flags & SEG_WRITE) ? MMU_FLAG_WRITE : 0);
 			if (error < 0) {
 				log_error("error setting newly loaded page: %d\n", error);
-				page_free_single((physical_address_t) new_page);
+				page_free((physical_address_t) new_page, PAGE_SIZE);
 				return error;
 			}
 		}
@@ -680,7 +672,7 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 	start = heap_start;
 	// TODO this is for testing, it preallocated the stack
-	//start = (uintptr_t) page_alloc_contiguous(stack_size);
+	//start = (uintptr_t) page_alloc(stack_size);
 	heap_object = NULL;
 	stack_object = NULL;
 

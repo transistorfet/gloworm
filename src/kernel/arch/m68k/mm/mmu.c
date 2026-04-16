@@ -57,7 +57,7 @@ mmu_descriptor_t *mmu_table_alloc(void)
 {
 	mmu_descriptor_t *root_table;
 
-	root_table = (mmu_descriptor_t *) page_alloc_single();
+	root_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE);
 	init_mmu_table(root_table);
 
 	return root_table;
@@ -69,12 +69,8 @@ void mmu_table_free_inner(mmu_descriptor_t *table, uint8_t bits)
 		switch (MMU_DT(table[i])) {
 			case MMU_DT_PAGE_DESCRIPTOR:
 				// TODO how do you know if it's a WINDOW or an actual page?
-				if (bits == PAGE_ADDR_BITS) {
-					//printk("%x: %d\n", MMU_TABLE_ADDRESS(table[i]), page_get_ref_single(MMU_TABLE_ADDRESS(table[i])));
-					page_free_single(MMU_TABLE_ADDRESS(table[i]));
-				} else {
-					page_free_contiguous(MMU_TABLE_ADDRESS(table[i]), 1 << bits);
-				}
+				//printk("%x: %d\n", MMU_TABLE_ADDRESS(table[i]), page_get_ref_single(MMU_TABLE_ADDRESS(table[i])));
+				page_free(MMU_TABLE_ADDRESS(table[i]), 1 << bits);
 				break;
 			case MMU_DT_TABLE_SHORT:
 			case MMU_DT_TABLE_LONG:
@@ -85,7 +81,7 @@ void mmu_table_free_inner(mmu_descriptor_t *table, uint8_t bits)
 		}
 	}
 	//printk("%x: %d\n", table, page_get_ref_single(table));
-	page_free_single((physical_address_t) table);
+	page_free((physical_address_t) table, PAGE_SIZE);
 }
 
 void mmu_table_free(mmu_descriptor_t *root_table)
@@ -139,7 +135,7 @@ static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virt
 			if (MMU_DT(table[i]) == MMU_DT_INVALID) {
 				if (create_if_needed) {
 					// Create a new table since one hasn't already been created yet
-					next_table = (mmu_descriptor_t *) page_alloc_single();
+					next_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE);
 					init_mmu_table(next_table);
 
 					//printk("set new table %x [table: %x, i: %d, bits: %d]\n", next_table, table, i, bits);
@@ -221,7 +217,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 		switch (flags & MMU_FLAG_TYPE) {
 			case MMU_FLAG_UNMAP: {
 				if (!(flags & MMU_FLAG_WINDOW)) {
-					page_free_single(MMU_TABLE_ADDRESS(result.table[i]));
+					page_free(MMU_TABLE_ADDRESS(result.table[i]), PAGE_SIZE);
 				}
 				physical_addr = 0;
 				break;
@@ -236,7 +232,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 				break;
 			}
 			case MMU_FLAG_PREALLOCATED: {
-				physical_addr = (physical_address_t) page_alloc_single();
+				physical_addr = (physical_address_t) page_alloc(PAGE_SIZE);
 				status |= MMU_DT_PAGE_DESCRIPTOR;
 				break;
 			}
@@ -318,11 +314,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		dest_result.table[i] = src_result.table[i] | additional_status;
 		src_result.table[i] |= additional_status;
 		if (MMU_TABLE_ADDRESS(src_result.table[i]) != 0) {
-			if (src_result.bits == PAGE_ADDR_BITS) {
-				page_make_ref_single(MMU_TABLE_ADDRESS(src_result.table[i]));
-			} else {
-				page_make_ref_contiguous(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
-			}
+			page_make_ref(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
 		}
 		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(dest_result.table[i]), MMU_TABLE_STATUS(dest_result.table[i]), dest_result.table, i);
 
