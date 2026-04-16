@@ -5448,3 +5448,14 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - it looks like changing just the mmu_table_map function to not pass in the GET_TABLE_RETURN_ANY_SIZE flag unless the
   MMU_FLAG_WINDOW flag is passed in seems to have fixed the problem with some large pages being swapped in
 
+
+2026-04-14:
+
+- I got the last bug in the signal handler stuff working.  It was failing when CONFIG_M68K_USER_MODE was not enabled, because in
+  that case the stack is shared.  It wouldn't put the arguments on the stack correctly, and when removing the context, it wasn't
+  popping the user args off the stack.  I tried setting the stack and then getting it back again, but that caused usermode/mmu
+  enabled configs to break, since the usp was being changed before the context was saved.  Adding more #ifdefs and being careful
+  with the order was all it took to get it working under all 3 configs
+- I'm really close to being done here.  I'd like to do that kmalloc change to use pages, and I would *really* like to make the
+  bufcache use pages too, but that is less critical
+

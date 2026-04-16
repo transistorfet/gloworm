@@ -143,9 +143,12 @@ int main()
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	init_kernel_heap(CONFIG_KMEM_START, CONFIG_KMEM_END);
-	// TODO fix these addresses to be configurable
-	init_pages(0x200000, 0x100000);
+	error = init_pages(CONFIG_PAGES_START, CONFIG_PAGES_END);
+	if (error < 0)
+		goto fail;
+	error = init_kernel_heap();
+	if (error < 0)
+		goto fail;
 	error = arch_init_mm();
 	if (error < 0)
 		goto fail;
@@ -158,14 +161,18 @@ int main()
 
 	// Initialize drivers before VFS
 	for (short i = 0; drivers[i]; i++) {
-		drivers[i]->init();
+		error = drivers[i]->init();
+		if (error < 0)
+			goto fail;
 	}
 
 	init_vfs();
 
 	// Initialize specific filesystems
 	for (short i = 0; filesystems[i]; i++) {
-		filesystems[i]->init();
+		error = filesystems[i]->init();
+		if (error < 0)
+			goto fail;
 	}
 
 	// Initialize the networking subsystem
@@ -175,18 +182,24 @@ int main()
 
 	// Initialize specific network interfaces
 	for (short i = 0; interfaces[i]; i++) {
-		interfaces[i]->init();
+		error = interfaces[i]->init();
+		if (error < 0)
+			goto fail;
 	}
 
 	// Initialize specific network protocols
 	for (short i = 0; protocols[i]; i++) {
-		protocols[i]->init();
+		error = protocols[i]->init();
+		if (error < 0)
+			goto fail;
 	}
 	#endif
 
 	#if defined(CONFIG_MINIX_FS)
 	printk("minixfs: mounting (%x) at %s\n", root_dev, "/");
-	vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
+	error = vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
+	if (error < 0)
+		goto fail;
 	#endif
 
 
@@ -203,7 +216,9 @@ int main()
 
 	// TODO device number here is an issue because 0 is used to indicated a mount slot is not used, which when mounting after this causes a /proc error
 	printk("procfs: mounting at /proc\n");
-	vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
+	error = vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
+	if (error < 0)
+		goto fail;
 
 	//vfs_mount(NULL, "/media", DEVNUM(DEVMAJOR_ATA, 0), &minix_mount_ops, SU_UID);
 

@@ -1,11 +1,11 @@
 
 * a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
 * convert kmalloc to use pages
+* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 
 * fix warnings in each config
 * I think the lack of error propogation during init might be harming you here
 * you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
-* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 
 * move memory.c to mm/
 
@@ -14,12 +14,16 @@
 * test with CONFIG_MMU=n to make sure nothing broke
 * test with CONFIG_USER_MODE=n to make sure nothing broke
 
----
+----
 
-* try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
-* should you move memory.c into mm/ instead of proc/
+* figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
+  it seems to only affect some things, namely when sh is compiled into the kernel
+* why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
 
+* add flags to kmalloc/page alloc?
+* add multiple blocks of pages to the page allocator, along with stats
 * should you remove the single page allocator and only use the contiguous verison?
+* try to optimize the memory map code?  Can you simplify the three allocated structs that make up the memory map?
 
 * make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
 * are there any static tables still used beside the table of processes?
@@ -34,12 +38,13 @@
 * replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
 
 * it's time to fix the size in the load scripts
+* [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
-* when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
-  when registering the driver, or it should be conditionally called in dev_write()
-* should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
-  doing so will avoid unnecessarily using iovec
+* there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
+  building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
 
+* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
+* should you change DISABLE_INTS to DISABLE_IRQS(), etc
 * try to reduce the code size as much as possible
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors
@@ -47,65 +52,45 @@
 * make it so that it's easy to run just one test
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
-
-* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-
-* figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
-  it seems to only affect some things, namely when sh is compiled into the kernel
-* why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
-* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
-* the process should wait until all output is flushed before it can exit
-
-* [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
-
------
-
-* these can use a modified kmalloc that uses pages underneath, and/or bucket allocator?
-    * convert fs vnodes to use pages
-    * convert net packets to use pages
-    * do you need a slab allocator for vnodes/packets?
-
-----
-
-* should you support large pages?
-
 * there's an issue with extra-y, and whether to add the prefix or not
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
-* add flags to kmalloc?
-* add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
-
-* make kmalloc use multiple different allocators under the hood, including a bitmap-based allocator for small sized objects, like < 64 bytes
-  then it uses a slab-like allocator with bitmaps for at least common sizes of 16, 24, 32, 48, 64
-
-* see if using memset more, instead of manual initialization reduces code size
-* see if changing queues, ringbuffer, etc to non-inline functions reduces code size
-* make it possible to get a really small memory-usage kernel, at least with specific configurations
-
-* should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
-  much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
+----
 
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable
+* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
 
+* when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
+  when registering the driver, or it should be conditionally called in dev_write()
 * I'm thinking of moving the network interface drivers to drivers/ under net/ similar to linux, which would keep all the drivers in one place
   it works because each thing under drivers/ is moving towards being a subsystem with custom drivers
 * as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface
 * I don't know how the device driver interface in the file system would work with this
 * as part of this, it's possible that bufcache could move to the block driver subsystem code
+* should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
+  doing so will avoid unnecessarily using iovec
 
 * can you reduce memory usage in the memory map tables by reducing how many different pieces are allocated?
 * can you make some of the memory usage and advanced features compile-time selectable, to accomodate systems with lots of memory and
   very little memory?
+* see if using memset more, instead of manual initialization reduces code size
+* see if changing queues, ringbuffer, etc to non-inline functions reduces code size
+* make it possible to get a really small memory-usage kernel, at least with specific configurations
 
-* should you change DISABLE_INTS to DISABLE_IRQS(), etc
-
-* there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
-  building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
+* the process should wait until all output is flushed before it can exit
+* should you support large pages?
+* add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
+* should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
+  much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
 
 * add configuration for base address in linker script
 * make it so the ata device will time out and fail instead of hanging when it doesn't work
 
+* these can use a modified kmalloc that uses pages underneath, and/or bucket allocator?
+    * convert fs vnodes to use pages
+    * convert net packets to use pages
+    * do you need a slab allocator for vnodes/packets?
 
 
 Overview
