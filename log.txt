@@ -5459,3 +5459,50 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I'm really close to being done here.  I'd like to do that kmalloc change to use pages, and I would *really* like to make the
   bufcache use pages too, but that is less critical
 
+
+2026-04-15:
+
+- I was thinking about the address validation stuff, and thought I could make it a config option whether to check addresses when not
+  using mmu, since it could be a bit of a performance drop to check every single address, and someone might want to prioritize speed
+  over crash-resistance
+- for mmu mode, since it will usually be on the global kernel stack and not the process's kernel stack, I can store an address that
+  will be set as the exception return address when a page fault occurs.  That would effectively be a goto fail when a memory fault
+  is detected by the MMU.  I can always change this if I later change the context switching to stay on the process kernel stack when
+  processing a syscall
+
+- actually now that I think about it, the bufcache and pagecache (file cache) should be different.  The bufcache will cache disk
+  blocks, but if there could be multiple disk blocks (1k) in a page (4k) then the first block in the page might not actually belong
+  to the same file as the rest of the blocks, and couldn't be mapped directly into a process's memory as a file, so you'd still need
+  a separate file cache
+- I think I still want a bufcache for the case where I'm not writing data to disk, and need to buffer changes in memory, but that
+  also means I'll need a different way of using pages
+
+- well that ended quickly. A label is not referenceable so it can't compile. Given the stack issue, with cleaning up the faulted
+. func, a setjmp/longjmp scheme might work better, unless there's something simpler
+- also, linux only has a page cache now, not a bufcache, and I guess that works if you can make a page cache of non file data, like
+  inodes? or what
+
+
+2026-04-18:
+
+- ok, so I'm failing over and over on this pagefault disable/recovery thing.  I tried setting the context return address to go to a
+  recovery address, and at first I couldn't acutally get the address to jump to because a label can't be an address
+- so then I implemented setjmp/longjmp, but I can't do that from within an exception (or now that I think about it maybe I could?)
+  But anyways, I tried setting the address of a recovery function, which would then call longjmp to restore the location back to
+  before the fault
+- after fixing bugs and such, it would endlessly loop on a bus error.  This is because the instruction is being repeated as soon as
+  it returns from the exception.  Clearing the restart bits in the SSW word on the stack didn't change anything because it's a data
+  fault, which the rerun bits only apply to intsruction faults
+- part of the issue is that it's not a normal context but an internal kernel one, which only pushes the scratch registers, and I'm
+  on the global kernel stack and not a process stack, so I can't just terminate the kernel stack.  It would be easier to do this if
+  I actually did what linux does and stay on the kernel stack during the syscall, but then signals won't work again, and I'll have
+  to use a context struct in the process to push the context to, or else make the signal dispatching delayed until leaving the
+  kernel and switching to the process's kernel stack
+- I tried doing a longjmp from the pagefault handler, and that sort of worked, in that it did actually get back to where setjmp is,
+  but it then hung after that.  It seemed to be drawing more current during the hang, so maybe something wasn't right, the stack
+  wasn't restored correctly or something... It wouldn't work anyways in that it would break the kernel_rentries counter, but yeah...
+  I can keep the setjmp/longjmp code and maybe use it for something else, but for now, I don't think this is the right solution
+  So frustrating
+
+
+

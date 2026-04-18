@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <kconfig.h>
-#include <asm/types.h>
+#include <sys/types.h>
 #include <sys/param.h>
 
 #include <kernel/printk.h>

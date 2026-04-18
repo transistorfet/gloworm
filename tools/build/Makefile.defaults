@@ -16,7 +16,7 @@ RANLIB				?= $(GCC_PREFIX)ranlib
 
 asflags-y			+= -I$(include-dir)
 ccflags-y			+= -I$(include-dir) -g -Wall
-ccflags-y			+= -nostartfiles -nostdlib -fno-zero-initialized-in-bss
+ccflags-y			+= -nostartfiles -nostdlib -nostdinc -fno-zero-initialized-in-bss
 ldflags-y 			+= -Wl,--build-id=none
 
 ccflags-$(CONFIG_CC_OPTIMIZE_FOR_SIZE)			+= -Os

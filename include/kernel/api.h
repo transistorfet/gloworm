@@ -11,8 +11,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
-#include <kernel/utils/usercopy.h>
-
+#define __user
 
 void init_syscall(void);
 void do_syscall(void);

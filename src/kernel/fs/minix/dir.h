@@ -2,8 +2,6 @@
 #ifndef _SRC_KERNEL_FS_MINIX_DIR_H
 #define _SRC_KERNEL_FS_MINIX_DIR_H
 
-#include <asm/byteorder.h>
-
 #include "minix.h"
 #include "inodes.h"
 #include "zones.h"

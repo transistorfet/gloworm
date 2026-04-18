@@ -1,11 +1,16 @@
 
 * a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
+
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 
+* check the todo comment in mmu.c when freeing tables, where it says it can't be sure if the page needs to be freed or if it's part of fixed
+* fix warnings when -O3/-O2 and no-opts are used
 * is there a better name than alignment_offset?
 * fix warnings in each config
 * I think the lack of error propogation during init might be harming you here
 * you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
+
+* add a page cache/file cache for file data
 
 * move memory.c to mm/
 
@@ -16,19 +21,14 @@
 
 ----
 
-* there is a problem compiling without optimizations where the libc none has fwrite inside of it, from the library I think, so either it's
-  building the library incorrectly and including the wrong object files due to the double compilation, or... something else I don't know
-
 * convert bufcache/disk blocks to use pages
-* there needs to be a way to get the bufs themselves from a file, only for the MMU model, so it can map those pages directly into
-  memory without duplicating them
 
-* replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
-* add flags to kmalloc/page alloc?
+
 * add multiple blocks of pages to the page allocator, along with stats (have to also fix kmem alloc)
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors
-
+* replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
+* add flags to kmalloc/page alloc?
 
 * make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
 * are there any static tables still used beside the table of processes?

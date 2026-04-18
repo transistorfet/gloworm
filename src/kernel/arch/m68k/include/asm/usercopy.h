@@ -2,12 +2,11 @@
 #ifndef _ARCH_M68K_ASM_USERCOPY_H
 #define _ARCH_M68K_ASM_USERCOPY_H
 
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
 #include <kconfig.h>
-#include <kernel/proc/process.h>
-#include <kernel/proc/memory.h>
 #include <kernel/utils/usercopy.h>
 
 #define M68K_FC_USER_DATA		1
@@ -17,7 +16,6 @@
 #define M68K_FC_CPU_SPACE		7
 
 #if defined(CONFIG_MMU)
-
 
 static inline uint8_t get_user_uint8(const void __user *src)
 {
@@ -37,6 +35,7 @@ static inline uint8_t get_user_uint8(const void __user *src)
 		: "=d" (result) : "a" (src) :
 	);
 	return result;
+
 }
 
 static inline void put_user_uint8(void __user *dest, uint8_t value)
