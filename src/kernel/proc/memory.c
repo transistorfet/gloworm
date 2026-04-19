@@ -670,9 +670,8 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 	#if defined(CONFIG_MMU)
 
+	// TODO with MMU enabled, the stack should start at 0xFFFF_FFFF
 	start = heap_start;
-	// TODO this is for testing, it preallocated the stack
-	//start = (uintptr_t) page_alloc(stack_size);
 	heap_object = NULL;
 	stack_object = NULL;
 

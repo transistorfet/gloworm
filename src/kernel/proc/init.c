@@ -103,9 +103,8 @@ int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char
 	if (error < 0)
 		return error;
 
-	// TODO this isn't even used atm, but the placement of the stack here would probably fuck with the kernel stack, especially for certain values of CONFIG_USER_STACK_SIZE
 	// Add the heap and stack segments
-	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) &__kernel_end, CONFIG_USER_STACK_SIZE);
+	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) 0xFFFF_FFFF - CONFIG_USER_STACK_SIZE, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		return error;
 

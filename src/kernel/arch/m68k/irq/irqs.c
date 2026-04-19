@@ -249,20 +249,6 @@ static void page_fault_handler(struct exception_frame *frame)
 			log_error("segfault\n");
 			goto fail;
 		}
-
-		//MMU_FLUSH_ALL();
-		//if (write_flag) {
-		//	asm volatile(
-		//		"ploadw	%1, %0@\n"
-		//		: : "a" (fault_addr), "d" (ssw)
-		//	);
-		//}
-		//else {
-		//	asm volatile(
-		//		"ploadr	%1, %0@\n"
-		//		: : "a" (fault_addr), "d" (ssw)
-		//	);
-		//}
 		return;
 	}
 

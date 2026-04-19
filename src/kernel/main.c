@@ -166,7 +166,9 @@ int main()
 			goto fail;
 	}
 
-	init_vfs();
+	error = init_vfs();
+	if (error < 0)
+		goto fail;
 
 	// Initialize specific filesystems
 	for (short i = 0; filesystems[i]; i++) {

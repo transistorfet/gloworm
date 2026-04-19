@@ -1,16 +1,15 @@
 
 * a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
+* add a page cache/file cache for file data
 
+* is there a better name than alignment_offset?
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 
+* test compiling the shell into the kernel, which I broke at some point during the MMU addition
 * check the todo comment in mmu.c when freeing tables, where it says it can't be sure if the page needs to be freed or if it's part of fixed
 * fix warnings when -O3/-O2 and no-opts are used
-* is there a better name than alignment_offset?
 * fix warnings in each config
-* I think the lack of error propogation during init might be harming you here
 * you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
-
-* add a page cache/file cache for file data
 
 * move memory.c to mm/
 
@@ -22,7 +21,6 @@
 ----
 
 * convert bufcache/disk blocks to use pages
-
 
 * add multiple blocks of pages to the page allocator, along with stats (have to also fix kmem alloc)
 * make everything that uses iters check for errors

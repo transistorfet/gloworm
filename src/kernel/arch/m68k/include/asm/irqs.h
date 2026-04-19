@@ -2,6 +2,9 @@
 #ifndef _ASM_M68K_IRQS_H
 #define _ASM_M68K_IRQS_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include <kconfig.h>
 #include <kernel/irq/action.h>
 
 // 68k Interrupt Vectors Numbers

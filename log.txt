@@ -5504,5 +5504,13 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   I can keep the setjmp/longjmp code and maybe use it for something else, but for now, I don't think this is the right solution
   So frustrating
 
-
+- thinking a bit more about the page cache, and looking into netbsd's unified buffer cache
+- for storing the pages for lookup, I had started to think about using the page tables for storing them, but those aren't going to
+  be present when MMU is not enabled, and they're architecture specific, but I could do a similar thing in a generic way
+- linux used to use a radix tree, which is basically that, but perhaps with smaller levels?  It now uses the xarray structure, which
+  is similar in way, but more unified.  I need to learn more about it, but either way, something like that
+- for netbsd/freebsd, I can't find out too much info, but I assume it's caching buffers instead of pages.  It's unified so it's used
+  as the page cache with pages mapped into memory, but is there a nice way to make it work without duplication?  Earlier I thought
+  there might be, but unless that way is to force the filesystem to align to the page size all the time, you can't make a file's
+  first block (say 1kb block file system) align to a larger page size (say 4kb)
 

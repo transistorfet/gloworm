@@ -78,7 +78,7 @@ struct process_iter {
 	short slot;
 };
 
-int init_proc();
+void init_proc();
 struct process *new_proc(pid_t pid, uid_t uid);
 struct process *get_proc(pid_t pid);
 int reset_proc(struct process *proc);

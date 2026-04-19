@@ -18,15 +18,13 @@
 static struct if_device *active_ifdevs[IFDEV_MAX];
 static void net_if_process_bh(void *_unused);
 
-int init_net_if()
+void init_net_if()
 {
 	for (short i = 0; i < IFDEV_MAX; i++)
 		active_ifdevs[i] = NULL;
 
 	register_bh(BH_NET, net_if_process_bh, NULL);
 	enable_bh(BH_NET);
-
-	return 0;
 }
 
 int net_if_register_device(struct if_device *ifdev)

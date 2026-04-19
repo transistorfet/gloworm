@@ -21,7 +21,7 @@ static struct process table[PROCESS_MAX];
 extern struct process *current_proc;
 
 
-int init_proc()
+void init_proc()
 {
 	next_pid = 2;
 
@@ -31,8 +31,6 @@ int init_proc()
 
 	extern struct process *primordial_process;
 	primordial_process = NULL;
-
-	return 0;
 }
 
 struct process *new_proc(pid_t pid, uid_t uid)
@@ -89,8 +87,6 @@ struct process *get_proc(pid_t pid)
 
 int reset_proc(struct process *proc)
 {
-	// TODO should you free the memory map here, instead of in binaries.c?
-
 	proc->wait_events = 0;
 	proc->wait_check = NULL;
 	memset(&proc->blocked_call, 0, sizeof(struct syscall_record));
