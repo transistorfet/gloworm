@@ -7,7 +7,7 @@ config M68K
 	select CPU_BIG_ENDIAN
 
 config GCC_PREFIX
-	string
+	string "GCC compiler prefix"
 	default m68k-linux-gnu-
 
 config NUM_CPUS
