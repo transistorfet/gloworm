@@ -23,7 +23,11 @@
 
 #define INTERRUPT_MAX		128
 
+extern int kernel_reentries;
 extern void enter_exception(void);
+#if defined(CONFIG_MMU)
+uint32_t recovery_stack;
+#endif
 
 void enter_trace(struct exception_frame frame);
 static void page_fault_handler(struct exception_frame *frame);
@@ -65,6 +69,10 @@ void arch_init_irqs(void)
 
 	// Load the VBR register with the address of our vector table
 	asm volatile("movec	%0, %%vbr\n" : : "r" (vector_table));
+
+	#if defined(CONFIG_MMU)
+	recovery_stack = 0;
+	#endif
 }
 
 void print_stack(void *stack, void *code)
@@ -253,11 +261,22 @@ static void page_fault_handler(struct exception_frame *frame)
 	}
 
 fail:
+	if (kernel_reentries == 2 && recovery_stack) {
+		int stack = recovery_stack;
+		recovery_stack = 0;
+		kernel_reentries -= 1;
+		user_error(frame, SIGSEGV);
+		asm volatile(
+			"move.l	%0, %%sp\n"
+			"bra.l	restore_context\n"
+			: : "g" (stack)
+		);
+	}
+
 	log_error("fatal bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
 	memory_map_print_segments(current_proc->map);
 	#endif
 
-	extern int kernel_reentries;
 	if (kernel_reentries <= 1) {
 		user_error(frame, SIGSEGV);
 	} else {

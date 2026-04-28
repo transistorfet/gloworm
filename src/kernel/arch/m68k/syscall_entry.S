@@ -357,6 +357,9 @@ enter_syscall:
 	or.w	#0x0700, %sr
 	SAVE_CONTEXT
 
+	// Save the stack pointer to recover to if there's a fault during the syscall
+	move.l  %sp, recovery_stack
+
 	// Default to returning -1 on exit.  The syscall return will likely overwrite this before exiting
 	move.l	#-1, (%a0, PROC_RETURN_OFFSET)
 
@@ -373,6 +376,9 @@ enter_syscall:
 
 	// Pop the irq number off the stack
 	//adda.l	#4, %sp
+
+	// Reset the recovery address if we successfully executed the syscall
+	move.l  #0, recovery_stack
 
 	// Jump to the syscall interrupt return
 	bra.w	restore_context
