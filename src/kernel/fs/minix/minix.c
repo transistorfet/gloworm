@@ -65,7 +65,7 @@ int minix_mount(struct mount *mp, device_t dev, struct vnode *parent)
 {
 	struct minix_super *super = load_superblock(dev);
 	if (!super)
-		return -1;
+		return EINVAL;
 	mp->dev = dev;
 	mp->super = super;
 

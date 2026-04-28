@@ -1,6 +1,14 @@
 
+* change LF to CR+LF (or make it configurable) in the TTY driver
+* document the partition vs raw disk image thing
+* document the interrupt being used, and make it more easily configurable for systems that use autovec
+* make it possible to use other devices as timer interrupts, like an MC68230
+* document (and make configurable) the LED output on the 68681, used to indicate a context switch
+
+* make tracing logs module-selectable, so not all trace messages get activated
+* normalize using start/end vs start/length
+
 * a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
-* add a page cache/file cache for file data
 
 * is there a better name than alignment_offset?
 * separate access control paramater to mmu_table_mmap, and map_memory_mmap??
@@ -9,7 +17,6 @@
 * check the todo comment in mmu.c when freeing tables, where it says it can't be sure if the page needs to be freed or if it's part of fixed
 * fix warnings when -O3/-O2 and no-opts are used
 * fix warnings in each config
-* you definitely need to put in a limit to the iterator size created for the stack, in exec, context, etc
 
 * move memory.c to mm/
 
@@ -20,7 +27,12 @@
 
 ----
 
+* add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
+* you should put in a limit to the iterator size created for the stack, in exec, context, etc
+* add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
+
+* is there value in making the code conform to a particular C standard?
 
 * add multiple blocks of pages to the page allocator, along with stats (have to also fix kmem alloc)
 * make everything that uses iters check for errors

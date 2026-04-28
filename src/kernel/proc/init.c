@@ -104,12 +104,13 @@ int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char
 		return error;
 
 	// Add the heap and stack segments
-	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) 0xFFFF_FFFF - CONFIG_USER_STACK_SIZE, CONFIG_USER_STACK_SIZE);
+	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) 0x00000000 - CONFIG_USER_STACK_SIZE, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		return error;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_stack_with_args(proc, (char *) proc->map->stack_end, entry, &argv_buffer, &envp_buffer);
+	exec_initialize_stack_with_args(proc, proc->map->stack_end, entry, &argv_buffer, &envp_buffer);
+	return 0;
 }
 #endif
 

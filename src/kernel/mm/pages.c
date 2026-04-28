@@ -101,6 +101,7 @@ physical_address_t page_block_alloc(struct page_block *block, size_t size)
 			for (bit = start_bit; bit < end_bit; bit++) {
 				#if defined(CONFIG_MMU)
 				block->page_descriptors[bit].refcount = 1;
+				log_trace("allocated page %x\n", &block->base[bit]);
 				#endif
 				bitmap[BIT_INDEX(bit)] |= BIT_MASK(bit);
 			}
@@ -118,7 +119,7 @@ void page_block_free(struct page_block *block, physical_address_t ptr, size_t si
 
 	for (; size >= PAGE_SIZE; page_number++, size -= PAGE_SIZE) {
 		#if defined(CONFIG_MMU)
-		log_trace("decrement recount for %x to %d\n", ptr, block->page_descriptors[page_number].refcount - 1);
+		log_trace("decrement refcount for %x to %d\n", &block->base[page_number], block->page_descriptors[page_number].refcount - 1);
 		if (--block->page_descriptors[page_number].refcount != 0) {
 			continue;
 		}
@@ -136,6 +137,7 @@ physical_address_t page_block_make_ref(struct page_block *block, physical_addres
 
 	for (; size >= PAGE_SIZE; page_number++, size -= PAGE_SIZE) {
 		block->page_descriptors[page_number].refcount++;
+		log_trace("increment refcount for %x to %d\n", &block->base[page_number], block->page_descriptors[page_number].refcount);
 	}
 	return ptr;
 }

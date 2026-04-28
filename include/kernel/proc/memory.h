@@ -2,6 +2,7 @@
 #ifndef _KERNEL_PROC_MEMORY_H
 #define _KERNEL_PROC_MEMORY_H
 
+#include <errno.h>
 #include <stddef.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -183,6 +184,21 @@ static inline uintptr_t memory_region_get_start_address(struct memory_region *re
  * Memory Map Inlines
  *********************/
 
+/// True if the address or start boundary is within or equal to the lower limit of this segment
+#define within_memory_segment_start(segment, address)		((address) >= (segment)->start)
+/// True if the end boundary is greater than the lower limit of this segment
+#define overlapping_memory_segment_start(segment, address)	((address) > (segment)->start)
+/// True if the address is valid within the upper limit of this segment
+///
+/// NOTE the segment end could be 0, which means to the end of the address space,
+/// since it's always one more than the last possible address
+#define within_memory_segment_end(segment, address)		(!(segment)->end || (address) < (segment)->end)
+/// True if the end boundary is within or equal to the upper limit of this segment
+///
+/// NOTE the segment end could be 0, which means to the end of the address space,
+/// since it's always one more than the last possible address
+#define within_or_at_memory_segment_end(segment, address)	(!(segment)->end || (address) <= (segment)->end)
+
 static inline struct memory_segment *memory_map_iter_first(struct memory_map *map)
 {
 	return _queue_head(&map->segments);
@@ -207,7 +223,7 @@ static inline struct memory_segment *memory_map_iter_prev(struct memory_segment 
 static inline struct memory_segment *memory_segment_find_next(struct memory_segment *cur, uintptr_t address)
 {
 	while (cur) {
-		if (address >= cur->start && address < cur->end) {
+		if (within_memory_segment_start(cur, address) && within_memory_segment_end(cur, address)) {
 			return cur;
 		}
 		cur = _queue_next(&cur->node);
@@ -218,7 +234,7 @@ static inline struct memory_segment *memory_segment_find_next(struct memory_segm
 static inline struct memory_segment *memory_segment_find_prev(struct memory_segment *cur, uintptr_t address)
 {
 	while (cur) {
-		if (address >= cur->start && address < cur->end) {
+		if (within_memory_segment_start(cur, address) && within_memory_segment_end(cur, address)) {
 			return cur;
 		}
 		cur = _queue_prev(&cur->node);
@@ -229,6 +245,36 @@ static inline struct memory_segment *memory_segment_find_prev(struct memory_segm
 static inline struct memory_segment *memory_map_find(struct memory_map *map, uintptr_t address)
 {
 	return memory_segment_find_next(memory_map_iter_first(map), address);
+}
+
+
+static inline int memory_map_validate_address_range(struct memory_map *map, uintptr_t address, uintptr_t length)
+{
+	#if !defined(CONFIG_MMU) && defined(CONFIG_VALIDATE_ADDRESSES)
+
+	struct memory_segment *cur;
+
+	cur = memory_segment_find_next(memory_map_iter_first(map), address);
+	while (cur) {
+		if (within_memory_segment_start(cur, address)) {
+			return EFAULT;
+		}
+
+		if (within_memory_segment_end(cur, address + length)) {
+			return 0;
+		}
+
+		address = cur->end;
+		length -= cur->end - cur->start;
+		cur = memory_map_iter_next(cur);
+	}
+	return EFAULT;
+
+	#else
+
+	return 0;
+
+	#endif
 }
 
 #endif

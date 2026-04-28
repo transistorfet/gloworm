@@ -179,7 +179,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
 	// once in memory_map_mmap() before the map is altered
 
-	get_table_flags = GET_TABLE_CREATE_IF_NEEDED | ((flags & MMU_FLAG_WINDOW) ? GET_TABLE_RETURN_ANY_SIZE : 0);
+	get_table_flags = GET_TABLE_CREATE_IF_NEEDED | (((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) ? GET_TABLE_RETURN_ANY_SIZE : 0);
 
 	// Force a table update in the first iteration
 	i = MMU_TABLE_SIZE;
@@ -206,41 +206,40 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 			status |= MMU_STATUS_DESC_WP;
 		}
 
-		// If there's an existing page allocated, and we're not unmapping, then raise an error
-		if (MMU_TABLE_ADDRESS(result.table[i]) != 0) {
-			if ((flags & MMU_FLAG_TYPE) != MMU_FLAG_UNMAP) {
-				return EEXIST;
-			}
-		}
-
 		// Determine which address to map to
-		switch (flags & MMU_FLAG_TYPE) {
-			case MMU_FLAG_UNMAP: {
-				if (!(flags & MMU_FLAG_WINDOW)) {
+		switch (flags & MMU_FLAG_OP) {
+			case MMU_OP_MAP: {
+				// If there's an existing page allocated, and we're not unmapping, then raise an error
+				if (MMU_TABLE_ADDRESS(result.table[i]) != 0) {
+					return EEXIST;
+				}
+
+				switch (flags & MMU_FLAG_TYPE) {
+					case MMU_TYPE_UNALLOCATED: {
+						physical_addr = 0;
+						break;
+					}
+					case MMU_TYPE_FIXED: {
+						physical_addr = ((physical_address_t) virtual_addr);
+						status |= MMU_DT_PAGE_DESCRIPTOR;
+						break;
+					}
+					case MMU_TYPE_PREALLOCATED: {
+						physical_addr = (physical_address_t) page_alloc(PAGE_SIZE);
+						status |= MMU_DT_PAGE_DESCRIPTOR;
+						break;
+					}
+					default: {
+						return EINVAL;
+					}
+				}
+				break;
+			}
+			case MMU_OP_UNMAP: {
+				if (MMU_TABLE_ADDRESS(result.table[i]) != 0 && (flags & MMU_FLAG_TYPE) != MMU_TYPE_FIXED) {
 					page_free(MMU_TABLE_ADDRESS(result.table[i]), PAGE_SIZE);
 				}
 				physical_addr = 0;
-				break;
-			}
-			case MMU_FLAG_UNALLOCATED: {
-				physical_addr = 0;
-				break;
-			}
-			case MMU_FLAG_WINDOW: {
-				physical_addr = ((physical_address_t) virtual_addr);
-				status |= MMU_DT_PAGE_DESCRIPTOR;
-				break;
-			}
-			case MMU_FLAG_PREALLOCATED: {
-				physical_addr = (physical_address_t) page_alloc(PAGE_SIZE);
-				status |= MMU_DT_PAGE_DESCRIPTOR;
-				break;
-			}
-			case MMU_FLAG_MODIFY: {
-				// Use the existing address unmodified
-				physical_addr = MMU_TABLE_ADDRESS(result.table[i]);
-				// Preserve the existing descriptor type, but otherwise overwrite the flags
-				status |= MMU_DT(result.table[i]);
 				break;
 			}
 			default: {
@@ -273,6 +272,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 {
 	int i;
 	int error;
+	int get_table_flags;
 	int additional_status = 0;
 	struct get_table_result src_result, dest_result;
 
@@ -283,18 +283,20 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		additional_status |= MMU_STATUS_DESC_WP;
 	}
 
+	get_table_flags = GET_TABLE_CREATE_IF_NEEDED | (((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) ? GET_TABLE_RETURN_ANY_SIZE : 0);
+
 	// Force a table update in the first iteration
 	i = MMU_TABLE_SIZE;
 
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
 		if (i + 1 >= MMU_TABLE_SIZE) {
-			error = get_table(src_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED, &src_result);
+			error = get_table(src_table, virtual_addr, length, get_table_flags, &src_result);
 			if (error < 0) {
 				return error;
 			}
 
-			error = get_table(dest_table, virtual_addr, length, GET_TABLE_CREATE_IF_NEEDED, &dest_result);
+			error = get_table(dest_table, virtual_addr, length, get_table_flags, &dest_result);
 			if (error < 0) {
 				return error;
 			}
@@ -313,7 +315,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		// get an exception when trying to write to the new page
 		dest_result.table[i] = src_result.table[i] | additional_status;
 		src_result.table[i] |= additional_status;
-		if (MMU_TABLE_ADDRESS(src_result.table[i]) != 0) {
+		if (!((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) && MMU_TABLE_ADDRESS(src_result.table[i]) != 0) {
 			page_make_ref(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
 		}
 		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(dest_result.table[i]), MMU_TABLE_STATUS(dest_result.table[i]), dest_result.table, i);

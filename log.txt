@@ -5514,3 +5514,121 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   there might be, but unless that way is to force the filesystem to align to the page size all the time, you can't make a file's
   first block (say 1kb block file system) align to a larger page size (say 4kb)
 
+
+2026-04-23:
+
+- I've been trying to change the signal context code and move the actual context change until in `restore_context`, after the
+  process is rescheduled and it's returning to the process that has a signal pending, which will eventually allow me to move away
+  from a global stack (or stack per core) and instead use the kernel stack, which would make it possible to kill the process when a
+  bad address is given...
+- but obviously that isn't going too well.  The problem is that the stack is being used for the C call stack too, so you can't call
+  into a complex function and get the right results.  What you could do is reserve space on the stack for the registers and signal
+  context, and then pass that in to be manipulated.  It seems like linux is doing exactly that
+- the other option is to erase the exception from the stack, which you *do* know will be a certain size based on the format byte,
+  and thus can knowingly take off the right amount.  One way or another, you can't return via the actual exception that caused the
+  in-kernel bus error without it restarting that instruction...
+- as such, you kind of need a recovery address, so like I was doing before, but instead of changing the return address, I'd need to
+  remove the exception frame, decrement the `kernel_reentries` value manually (any anything else that's needed), and jump to the
+  location of the recovery
+- I'd still have the problem of not inherently supporting multi core, in that the recovery address would eventually have to be a
+  per-core recovery address/jmp_buf
+
+
+2026-04-24:
+
+- I'm thinking about just longjmp'ing out, or hard resetting the stack when a page fault that can't be handled inside the kernel
+  happens.  The possible concern there is if the stack might have other things on it, which shouldn't be the case except for if
+  do_syscall is called.  In that case, it happens in schedule, which can only happen in one place, but maybe it should also be moved
+  to `restore_context` so that it's always called in a certain place?
+- hmm... thinking about it, schedule might be the right place, so like it could be moved to just after the call to schedule, and
+  then it will loop back on itself to check for reschedule, and then only do_signal before actually returning...
+- I'm thinking about jmp_buf, and if I had to use that, it would be better to put it the process, and if I wanted a generic reset, I
+  could setjmp at the start of the syscall, which would be ok to overwrite even, but then I'd have to call setjmp every time a
+  syscall occurs, which is unacceptable overhead, I think
+- it's probably better to just optionally set the recovery when copying from user space (well... I do do that often...)
+
+- so it's crashing when it does the longjmp, just hanging, but i don't yet know why. I'm suspecting it's because I'm only saving the
+  stack and pc, but returning to a C function. But thinking about it some more, maybe I don't need that. Maybe I can just save the
+  stack pointer, and jump straight to restore_context
+
+
+2026-04-25:
+
+- I changed it to save the stack pointer during the syscall entry when the stack only has the context on it, which is a tiny bit of
+  overhead, but not as much as a jmp_buf.  Then if a fault occurs where that's set, it will in inline assembly change the stack to
+  point to that address and jmp absolutely to `restore_context`
+- in order to make it work, I have to either call `user_error`, which then calls `send_signal` to kill the user process, or else I
+  would have to call `send_signal` directly, or something, and that also will call `request_reschedule` if the process is
+  terminated, to ensure we don't return back to the same user process.  Doing so causes another fault to occur right after the
+  recovery
+- I'm also manually decrementing the `kernel_reentries` counter since the exception stack frame is being skipped over, and I'm only
+  taking recovery action if `kernel_reentries` is exactly 2, which means it came in from user space, and then had one exception on
+  top of that.  Otherwise the fault could occur in an irq handler, and erroneously think it was the user process that caused it
+- it does seem to work, but I'm not 100% confident in it.  I think there's at least some failure cases where it might not do the
+  right thing
+- I've also made it a global recovery address for now (with the idea of making a per-core value later), rather than storing it in
+  the current process.  My concern with that would be if the current process changes before resetting it to 0, leaving a dangling
+  recovery stack value that's not valid for the process causing the fault
+- hmm... I'm also not resetting the value if it's taken, which is a problem.  I'd have to use an intermediate value to store it when
+  recovering since I can't just clear it in restore_context.  If I did, then an irq would reset it, possibly mid way through a user
+  space copy operation
+
+- Steve Moody was able to compile the kernel after changing the compiler name, which is great news.  It sounds like it didn't take
+  much effort.  He mentioned the DUART (MC68681) driver doesn't have a configurable starting memory address like the ATA driver
+  does.  It sounds like he might make a PR to change that
+- I should probably make a makefile target that compiles multiple configurations to validate that they compile without errors, to
+  make it easier to test when changes are made.  That shouldn't be *too* complicated
+- I also want to merge the add-mmu-support branch sooner now, since it has too many changes already.  Besides this recovery issue, I
+  think it's just the page cache that needs to be added, and that could be added after merging.  It works as-is.  It just doesn't
+  reuse file pages
+
+
+2026-04-26:
+
+- I was trying to get the mode working where it compiles the init and shell binaries into the kernel, and I had changed the
+  heap_start value to put the stack at the end of memory, which then caused a bunch of problems
+- one was that TODO I had in mmu_table_free where it frees pages it shouldn't when freeing the table, because it doesn't know if the
+  page should be free'd or if it was allocated with MMU_FLAG_WINDOW
+- another big one was all the comparisons with memory segments are wrong when the `end` value can be 0 (and if it's not then
+  rounding issues will occur)
+- the latter is the one I tried to fix by allowing 0 to be used, but now that I've added that check everywhere, along with a comment
+  saying the end value can be 0 which means the end of memory rather than the beginning, it makes me think maybe I should do this
+  the opposite way, and make end always be the last address, rather than one past the last address, so 0xFFFF0000 to 0xFFFFFFFF as a
+  range, rather than 0xFFFF0000 to 0x00000000 being valid.  It does mean I'll have to fix other parts of the code to add one and/or
+  use <= comparison, but that might be easier to conceptualize?
+- linux maps do seem to print out as "last address plus one", ie 7ffcce40b000-7ffcce42c000 where the end address is even instead of
+  odd, but that might even be just how maps print.  I could print procfs maps in the same way, by adding one before printing
+- the documentation for `struct vm_area_struct` clearly says that `vm_end` will be one byte after the last address, meaning it's the
+  same as I have it
+- honestly, I can't really figure out what linux does, if not simply refuse to have a segment that covers the very top of memory, at
+  least a user segment.  Given that for x86, it maps the kernel to the top of memory, and puts the user program in the bottom part
+  of memory, I could see it never creating a user stack right at the top, which also means it would never have to deal with the edge
+  case of having the end address be 0.  I'm seriously considering that as a solution here
+- With the explicit 0 check, it seems to run the init process and tries to clone itself to execute the shell, but that fails with
+  the error where the page size between the parent and child tables doesn't match.  I had fixed this by making everything that isn't
+  mapped with MMU_FLAG_WINDOW use the smallest page size, but since it's mapping the kernel program space with MMU_FLAG_WINDOW, that
+  hack doesn't work.  This is kind of related to the issue with freeing tables isn't it?
+- there's no extra bits to store extra information in the page descriptor, since the manual says the two unused bits in STATUS must
+  be 0.  I guess I could try changing those to see if it works with them set to 1, but I could also get around this by passing in
+  flags from memory.c, and always unmap segments before freeing the whole table
+
+- I passed in MMU_FLAG_WINDOW to mmu_table_copy and added the same hack to pass in appropriate flags to get_table as is in
+  mmu_table_map, and then get a slightly different fatal exception, which was related to page_make_ref.  I added a comparison to
+  check the flags and not call that function if it's not an allocated page, and then that booted, but when I try to run a command,
+  it gives another error and terminates the process
+- the latest error seems similar in that it's a page fault to addr=211FE3A, a similarly wrong address as I was getting before.  Why
+  would it still be having a problem if the initial fork of the init process worked...
+- oh, this is the page_free error.  The command runs and then the fault occurs when freeing the table
+- I tried making it unmap the segments, and it has an error caused by the fact that it's also passing in MMU_FLAG_WINDOW, which is a
+  map type vs a bit flag
+
+- I separated out the map/unmap operation flag from the type flag (unalloc, prealloc, fixed) and fixed all the code that used
+  MMU_FLAG_WINDOW (now MMU_TYPE_FIXED) as a bitflag. That was causing some of the bugs, and also better allows for the hacks to not
+  free fixed poges when compiling sh into the kernel. The map code had window as a type, so oring it was producing incorrect flags
+- it seems to boot, but then breaks when secondary forking... I'm not sure what's wrong, but removing the code I added to manually
+  to unmap segments individually fixes the problem. Nothing really uses unmap until now, so it might be broken from before, but not
+  caught until now
+
+- well that's kind of embarassing.  The problem with unmap was just that it didn't check for an unset page (page address == 0)
+  before calling page_free on it.  Now it seems to work fine
+

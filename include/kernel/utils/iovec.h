@@ -183,10 +183,10 @@ static inline uint8_t copy_uint8_out_of_iter(struct iovec_iter *iter)
 	}
 }
 
-#if defined(CONFIG_MMU)
-
 struct memory_map;
 extern int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag);
+
+#if defined(CONFIG_MMU)
 
 static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
 {

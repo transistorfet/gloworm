@@ -253,9 +253,11 @@ struct memory_segment *memory_segment_alloc(uintptr_t start, uintptr_t end, int 
 void memory_segment_free(struct memory_segment *segment)
 {
 	#if defined(CONFIG_MMU)
+
 	if (segment->file) {
 		vfs_close(segment->file);
 	}
+
 	#else
 	memory_region_free(segment->region);
 	#endif
@@ -287,6 +289,7 @@ struct memory_map *memory_map_alloc(void)
 
 void memory_map_free(struct memory_map *map)
 {
+	int error;
 	struct memory_segment *cur, *next;
 
 	if (!map) {
@@ -295,9 +298,21 @@ void memory_map_free(struct memory_map *map)
 
 	if (--map->refcount == 0) {
 		#if defined(CONFIG_MMU)
+
+		// The MMU needs to know which pages are not allocated, but fixed addresses so
+		// it doesn't call page_free() on those addresses
+		for (cur = _queue_head(&map->segments); cur; cur = next) {
+			next = _queue_next(&cur->node);
+			error = memory_map_unmap(map, cur->start, cur->end - cur->start);
+			if (error < 0) {
+				printk("error freeing segment %x to %x: %d\n", cur->start, cur->end, error);
+			}
+		}
+
 		if (map->root_table) {
 			mmu_table_free(map->root_table);
 		}
+
 		#endif
 
 		for (cur = _queue_head(&map->segments); cur; cur = next) {
@@ -318,7 +333,7 @@ static inline struct memory_segment *memory_map_insert_segment(struct memory_map
 	// Find the location to insert the new segment before allocating it
 	for (cur = _queue_head(&map->segments); cur; cur = next) {
 		next = _queue_next(&cur->node);
-		if (cur->end <= start && (!next || end <= next->start)) {
+		if (!within_memory_segment_end(cur, start) && (!next || !overlapping_memory_segment_start(next, end))) {
 			break;
 		}
 	}
@@ -347,7 +362,7 @@ static inline void memory_map_adjust_markers(struct memory_map *map, struct memo
 		}
 	}
 
-	if ((segment->flags & SEG_TYPE_STACK) && segment->end > map->stack_end) {
+	if ((segment->flags & SEG_TYPE_STACK) && (!segment->end || segment->end > map->stack_end)) {
 		map->stack_end = segment->end;
 	}
 }
@@ -396,19 +411,19 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	segment->file = object;
 	segment->offset = offset;
 
-	int mmu_flags = 0;
+	int mmu_flags = MMU_OP_MAP;
 	if (flags & SEG_WRITE) {
 		mmu_flags |= MMU_FLAG_WRITE;
 	}
 
 	if (flags & SEG_FIXED) {
-		mmu_flags |= MMU_FLAG_WINDOW;
+		mmu_flags |= MMU_TYPE_FIXED;
 	} else if (flags & SEG_ANONYMOUS) {
-		mmu_flags |= MMU_FLAG_UNALLOCATED;
+		mmu_flags |= MMU_TYPE_UNALLOCATED;
 	} else if (flags & SEG_POPULATE) {
-		mmu_flags |= MMU_FLAG_PREALLOCATED;
+		mmu_flags |= MMU_TYPE_PREALLOCATED;
 	} else {
-		mmu_flags |= MMU_FLAG_UNALLOCATED;
+		mmu_flags |= MMU_TYPE_UNALLOCATED;
 	}
 
 	if (flags & SEG_NOCACHE) {
@@ -509,7 +524,7 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 
 		#if defined(CONFIG_MMU)
 		if (sub_start) {
-			error = mmu_table_map(map->root_table, sub_start, sub_end - sub_start, MMU_FLAG_UNMAP | (cur->flags & SEG_FIXED ? MMU_FLAG_WINDOW : 0));
+			error = mmu_table_map(map->root_table, sub_start, sub_end - sub_start, MMU_OP_UNMAP | (cur->flags & SEG_FIXED ? MMU_TYPE_FIXED : 0));
 			if (error < 0)
 				return error;
 		}
@@ -550,6 +565,8 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 
 	if (src_segment->flags & SEG_WRITE && !(src_segment->flags & SEG_FIXED)) {
 		mmu_flags |= MMU_FLAG_COPY_ON_WRITE;
+	} else if (src_segment->flags & SEG_FIXED) {
+		mmu_flags |= MMU_TYPE_FIXED;
 	}
 
 	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, mmu_flags);
@@ -582,9 +599,9 @@ int memory_map_resize(struct memory_segment *segment, ssize_t diff)
 	if (segment->flags & SEG_GROWSDOWN) {
 		new_addr = segment->start - diff;
 		adjacent = _queue_prev(&segment->node);
-		if (adjacent && adjacent->end > new_addr) {
+		if (adjacent && within_memory_segment_end(adjacent, new_addr)) {
 			// TODO should this be an error or should it move it?
-			if (adjacent->start > new_addr) {
+			if (!within_memory_segment_start(adjacent, new_addr)) {
 				return EFAULT;
 			}
 			adjacent->end = new_addr;
@@ -593,9 +610,9 @@ int memory_map_resize(struct memory_segment *segment, ssize_t diff)
 	} else {
 		new_addr = segment->end + diff;
 		adjacent = _queue_next(&segment->node);
-		if (adjacent && new_addr > adjacent->start) {
+		if (adjacent && within_memory_segment_start(adjacent, new_addr)) {
 			// TODO should this be an error or should it move it?
-			if (new_addr > adjacent->end) {
+			if (!within_or_at_memory_segment_end(adjacent, new_addr)) {
 				return EFAULT;
 			}
 			adjacent->start = new_addr;
