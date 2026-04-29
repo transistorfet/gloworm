@@ -1,5 +1,4 @@
 
-obj-y			+= if/
 obj-y			+= protocol/
 
 obj-y			+= if.o

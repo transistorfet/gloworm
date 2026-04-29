@@ -3,6 +3,8 @@ menu "Device drivers"
 
 source "src/kernel/drivers/block/Kconfig"
 
+source "src/kernel/drivers/net/Kconfig"
+
 source "src/kernel/drivers/tty/Kconfig"
 
 endmenu

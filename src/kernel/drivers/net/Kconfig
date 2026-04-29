@@ -1,0 +1,16 @@
+
+if NET
+
+menu "Network Intefaces"
+
+config SLIP
+	bool "SLIP network interface"
+	default y
+	help
+	  Include support for the SLIP (Serial Line IP) interface, which uses
+	  a character device to send and receive INETV4 packets
+
+endmenu
+
+endif
+
