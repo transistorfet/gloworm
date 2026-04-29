@@ -10,7 +10,7 @@
 struct page_block pages = { 0 };
 
 
-int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size, struct page_descriptor *descriptors)
+int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, size_t size, struct page_descriptor *descriptors)
 {
 	_queue_node_init(&block->node);
 	block->bitmap = bitmap;
@@ -33,7 +33,7 @@ int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int 
 	return 0;
 }
 
-int init_page_block(struct page_block *block, void *addr, int size)
+int init_page_block(struct page_block *block, void *addr, size_t size)
 {
 	void *pages_addr;
 	int total_pages, allocatable_pages;

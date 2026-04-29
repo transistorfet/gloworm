@@ -99,7 +99,7 @@ struct get_table_result {
 	uint8_t bits;
 };
 
-static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, ssize_t length, int flags, struct get_table_result *result)
+static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, size_t length, int flags, struct get_table_result *result)
 {
 	int i;
 	char create_if_needed;
@@ -167,7 +167,7 @@ static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virt
 /// NOTE: The virtual address and length are assumed to be rounded to the nearest PAGE_SIZE
 /// and the length is not past the end of the valid address space (no overflow).  They must
 /// be validated before calling this function
-int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t length, int flags)
+int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, size_t length, int flags)
 {
 	int i;
 	int error;
@@ -252,6 +252,9 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 		//printk("%08x: %08x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(result.table[i]), MMU_TABLE_STATUS(result.table[i]), result.table, i);
 
 		// Advance to the next address
+		if (length < 1 << result.bits) {
+			panic("attempted to allocate too much memory: length=%d but table is %d\n", length, 1 << result.bits);
+		}
 		length -= 1 << result.bits;
 		virtual_addr = (((virtual_address_t) virtual_addr) + (1 << result.bits));
 	}
@@ -268,7 +271,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, ssize_t 
 /// NOTE: The virtual address and length are assumed to be rounded to the nearest PAGE_SIZE
 /// and the length is not past the end of the valid address space (no overflow).  They must
 /// be validated before calling this function
-int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, ssize_t length, int flags)
+int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, size_t length, int flags)
 {
 	int i;
 	int error;
@@ -279,7 +282,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
 	// once in memory_map_mmap() before the map is altered
 
-	if (flags & MMU_FLAG_COPY_ON_WRITE) {
+	if (flags & MMU_FLAG_COPY_ON_WRITE && (((flags & MMU_FLAG_TYPE) != MMU_TYPE_FIXED))) {
 		additional_status |= MMU_STATUS_DESC_WP;
 	}
 
@@ -290,7 +293,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 
 	for (; length > 0; i++) {
 		// If we've reached the end of the current table, then ascend one level
-		if (i + 1 >= MMU_TABLE_SIZE) {
+		if (i + 1 >= MMU_TABLE_SIZE || length < (1 << src_result.bits)) {
 			error = get_table(src_table, virtual_addr, length, get_table_flags, &src_result);
 			if (error < 0) {
 				return error;
@@ -321,6 +324,9 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(dest_result.table[i]), MMU_TABLE_STATUS(dest_result.table[i]), dest_result.table, i);
 
 		// Advance to the next address
+		if (length < 1 << src_result.bits) {
+			panic("attempted to allocate too much memory: length=%d but table is %d\n", length, 1 << src_result.bits);
+		}
 		length -= 1 << src_result.bits;
 		virtual_addr = (((virtual_address_t) virtual_addr) + (1 << src_result.bits));
 	}

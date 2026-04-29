@@ -563,10 +563,10 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 	int error;
 	int mmu_flags = 0;
 
-	if (src_segment->flags & SEG_WRITE && !(src_segment->flags & SEG_FIXED)) {
-		mmu_flags |= MMU_FLAG_COPY_ON_WRITE;
-	} else if (src_segment->flags & SEG_FIXED) {
+	if (src_segment->flags & SEG_FIXED) {
 		mmu_flags |= MMU_TYPE_FIXED;
+	} else if (src_segment->flags & SEG_WRITE) {
+		mmu_flags |= MMU_FLAG_COPY_ON_WRITE;
 	}
 
 	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, mmu_flags);
@@ -691,6 +691,7 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 	start = heap_start;
 	heap_object = NULL;
 	stack_object = NULL;
+	//stack_size = 0 - heap_start - PAGE_SIZE;
 
 	#else
 

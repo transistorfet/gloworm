@@ -5632,3 +5632,24 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - well that's kind of embarassing.  The problem with unmap was just that it didn't check for an unset page (page address == 0)
   before calling page_free on it.  Now it seems to work fine
 
+- I tired making macros to help with the end address edge case with segments, and it I think it made things worse.  I ended up
+  abandoning some of it, but the macros are still there.  It's really annoying how complicated the comparisons are getting, and I
+  feel like there must be an easier way, or I'm making it too complicated
+- I also came across a bug where the running commands when the shell is compiled into the kernel causes either terminal faults, or
+  sometimes it will do the thing where it repeatedly tries to swap out the same page.  I assume it has to do with the fact that it's
+  using fixed segments for the shell code within the kernel which aren't forced to be single-page, and those segments are really
+  big, but it's not a trivial issue either
+- I don't think it's related to the stack being at the top of memory, but instead related to the size of the stack?  It doesn't seem
+  to do it when I make the user stack size big though, so maybe it's related to something else?
+
+
+2026-04-28:
+
+- there was a bug where, I think, the write protect bit was being set on some pages when a FIXED segment was copied, but I'm not
+  sure if that was actually the problem
+- there was a bug where too much memory was being allocated, where copying a fixed segment was not decending into the last table,
+  when it should have, and instead mapped the whole early termination space.  I was able to just add an extra check (which turned
+  out to already be used by map), which reloaded the page if the length was less than the space.  I found this by searching for
+  places that might use a signed length/size value, related to issues with the stack being at the upper end of memory or allocating
+  all of available user memory
+

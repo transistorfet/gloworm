@@ -1,20 +1,9 @@
 
-* change LF to CR+LF (or make it configurable) in the TTY driver
-* document the partition vs raw disk image thing
-* document the interrupt being used, and make it more easily configurable for systems that use autovec
-* make it possible to use other devices as timer interrupts, like an MC68230
-* document (and make configurable) the LED output on the 68681, used to indicate a context switch
+* there's a bug when running nettest or daemon when the MMU is enabled and the shell is compiled into the kernel
 
-* make tracing logs module-selectable, so not all trace messages get activated
 * normalize using start/end vs start/length
 
-* a bad user space address can crash the kernel with a page fault. Need a kernel safe method or check
-
-* is there a better name than alignment_offset?
-* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
-
 * test compiling the shell into the kernel, which I broke at some point during the MMU addition
-* check the todo comment in mmu.c when freeing tables, where it says it can't be sure if the page needs to be freed or if it's part of fixed
 * fix warnings when -O3/-O2 and no-opts are used
 * fix warnings in each config
 
@@ -26,6 +15,19 @@
 * test with CONFIG_USER_MODE=n to make sure nothing broke
 
 ----
+
+* is there a better name than alignment_offset?
+
+* make tracing logs module-selectable, so not all trace messages get activated
+* change LF to CR+LF (or make it configurable) in the TTY driver
+* document the partition vs raw disk image thing
+* document the interrupt being used, and make it more easily configurable for systems that use autovec
+* make it possible to use other devices as timer interrupts, like an MC68230
+* document (and make configurable) the LED output on the 68681, used to indicate a context switch
+
+* a bad user space address can crash the kernel with a page fault. Need to improve the MMU recovery mechanism, and also add address validation to no-MMU
+* the problem with making the user stack use all of memory is actually that it preallocates the tables which takes way too long, so maybe you need to
+  only allocate part of the stack at the top of memory, and grow the stack on demand, or else make it so that the entire tree isn't filled out until needed
 
 * add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
 * you should put in a limit to the iterator size created for the stack, in exec, context, etc
@@ -64,6 +66,8 @@
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
 ----
+
+* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
 
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable

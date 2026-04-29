@@ -232,7 +232,7 @@ size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence)
 	return iter->seg_start + iter->seg_offset;
 }
 
-size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, int size)
+size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size)
 {
 	int error;
 	int cur_seg;

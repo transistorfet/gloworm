@@ -78,7 +78,7 @@ int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *d
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes);
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes);
 size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence);
-size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, int size);
+size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size);
 
 
 static inline void iovec_iter_init_user_buf(struct iovec_iter *iter, char __user *buf, size_t nbytes)

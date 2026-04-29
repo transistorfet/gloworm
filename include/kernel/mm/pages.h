@@ -69,8 +69,8 @@ struct page_block {
 };
 
 
-int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size, struct page_descriptor *descriptors);
-int init_page_block(struct page_block *block, void *addr, int size);
+int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, size_t size, struct page_descriptor *descriptors);
+int init_page_block(struct page_block *block, void *addr, size_t size);
 physical_address_t page_block_alloc(struct page_block *block, size_t size);
 void page_block_free(struct page_block *block, physical_address_t ptr, size_t size);
 #if defined(CONFIG_MMU)

@@ -104,7 +104,7 @@ int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char
 		return error;
 
 	// Add the heap and stack segments
-	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) 0x00000000 - CONFIG_USER_STACK_SIZE, CONFIG_USER_STACK_SIZE);
+	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) 0x00000000 - CONFIG_USER_STACK_SIZE - PAGE_SIZE, CONFIG_USER_STACK_SIZE);
 	if (error < 0)
 		return error;
 

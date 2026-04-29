@@ -25,11 +25,6 @@ static inline uint8_t get_user_uint8(const void __user *src)
 	// can we make a "start iter operation" function which sets this up, and then the subsequent calls are single byte only?
 	asm volatile("movec.l	%0, %%sfc\n" : : "d" (M68K_FC_USER_DATA) :);
 
-	//asm volatile(
-	//	"moves.b	(%1), %%d0\n"
-	//	"move.b		%%d0, (%0)\n"
-	//	: : "a" (&result), "a" (src) : "d0"
-	//);
 	asm volatile(
 		"moves.b	(%1), %0\n"
 		: "=d" (result) : "a" (src) :
@@ -179,7 +174,7 @@ static inline int memcpy_to_user(void __user *dest, const void *src, int n)
 
 static inline int strncpy_from_user(char *dest, const char __user *src, int max)
 {
-	int size;
+	size_t size;
 
 	strncpy(dest, src, max);
 	size = strnlen(dest, max);
@@ -191,7 +186,7 @@ static inline int strncpy_from_user(char *dest, const char __user *src, int max)
 
 static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 {
-	int size;
+	size_t size;
 
 	strncpy(dest, src, max);
 	size = strnlen(dest, max);
