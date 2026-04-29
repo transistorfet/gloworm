@@ -107,8 +107,9 @@ void create_dir_or_panic(const char *path)
 	if (!vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode)) {
 		vfs_release_vnode(vnode);
 	} else {
-		if (vfs_open(NULL, path, O_CREAT, S_IFDIR | 0755, SU_UID, &file))
+		if (vfs_open(NULL, path, O_CREAT, S_IFDIR | 0755, SU_UID, &file)) {
 			panic("Unable to create %s\n", path);
+		}
 		vfs_close(file);
 	}
 }
@@ -118,8 +119,9 @@ void create_special_or_panic(const char *path, device_t rdev)
 	struct vnode *vnode;
 
 	if (vfs_lookup(NULL, path, SU_UID, VLOOKUP_NORMAL, &vnode)) {
-		if (vfs_mknod(NULL, path, S_IFCHR | 0755, rdev, SU_UID, &vnode))
+		if (vfs_mknod(NULL, path, S_IFCHR | 0755, rdev, SU_UID, &vnode)) {
 			panic("Unable to create special file %s\n", path);
+		}
 	}
 	vfs_release_vnode(vnode);
 }
@@ -135,32 +137,45 @@ void parse_boot_args()
 
 int main()
 {
+	int error;
 	tty_68681_preinit();
 
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	init_kernel_heap(CONFIG_KMEM_START, CONFIG_KMEM_END);
-	// TODO fix these addresses to be configurable
-	init_pages(0x200000, 0x100000);
-	arch_init_mm();
+	error = init_pages(CONFIG_PAGES_START, CONFIG_PAGES_END);
+	if (error < 0)
+		goto fail;
+	error = init_kernel_heap();
+	if (error < 0)
+		goto fail;
+	error = arch_init_mm();
+	if (error < 0)
+		goto fail;
 
 	init_time();
 	init_timer_list();
 	init_interrupts();
-	init_syscall();
 	init_proc();
 	init_scheduler();
 
 	// Initialize drivers before VFS
-	for (short i = 0; drivers[i]; i++)
-		drivers[i]->init();
+	for (short i = 0; drivers[i]; i++) {
+		error = drivers[i]->init();
+		if (error < 0)
+			goto fail;
+	}
 
-	init_vfs();
+	error = init_vfs();
+	if (error < 0)
+		goto fail;
 
 	// Initialize specific filesystems
-	for (short i = 0; filesystems[i]; i++)
-		filesystems[i]->init();
+	for (short i = 0; filesystems[i]; i++) {
+		error = filesystems[i]->init();
+		if (error < 0)
+			goto fail;
+	}
 
 	// Initialize the networking subsystem
 	#if defined(CONFIG_NET)
@@ -168,17 +183,25 @@ int main()
 	init_net_protocol();
 
 	// Initialize specific network interfaces
-	for (short i = 0; interfaces[i]; i++)
-		interfaces[i]->init();
+	for (short i = 0; interfaces[i]; i++) {
+		error = interfaces[i]->init();
+		if (error < 0)
+			goto fail;
+	}
 
 	// Initialize specific network protocols
-	for (short i = 0; protocols[i]; i++)
-		protocols[i]->init();
+	for (short i = 0; protocols[i]; i++) {
+		error = protocols[i]->init();
+		if (error < 0)
+			goto fail;
+	}
 	#endif
 
 	#if defined(CONFIG_MINIX_FS)
 	printk("minixfs: mounting (%x) at %s\n", root_dev, "/");
-	vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
+	error = vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
+	if (error < 0)
+		goto fail;
 	#endif
 
 
@@ -195,7 +218,9 @@ int main()
 
 	// TODO device number here is an issue because 0 is used to indicated a mount slot is not used, which when mounting after this causes a /proc error
 	printk("procfs: mounting at /proc\n");
-	vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
+	error = vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
+	if (error < 0)
+		goto fail;
 
 	//vfs_mount(NULL, "/media", DEVNUM(DEVMAJOR_ATA, 0), &minix_mount_ops, SU_UID);
 
@@ -213,5 +238,9 @@ int main()
 
 	log_debug("begin multitasking...\n");
 	begin_multitasking();
+
+fail:
+	printk("error while initializing kernel: %d\n", error);
+	panic("halting after failure to initialize\n");
 }
 

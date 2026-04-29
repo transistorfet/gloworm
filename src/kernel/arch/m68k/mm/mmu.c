@@ -7,53 +7,34 @@
 #include <kernel/printk.h>
 
 
-#define MMU_MOVE_TO_TCR(value)		\
-	asm volatile("pmove	%0, %%tc\n" : : "m" (value))
-
-#define MMU_MOVE_TO_CRP(value)		\
-	asm volatile("pmove	%0, %%crp\n" : : "m" (value))
-
-#define MMU_MOVE_TO_SRP(value)		\
-	asm volatile("pmove	%0, %%srp\n" : : "m" (value))
+#define TABLE_INDEX(vaddr, bits) \
+	( ((vaddr) >> (bits)) & ((1 << MMU_TABLE_ADDR_BITS) - 1) )
 
 
-mmu_descriptor_t *root = NULL;
-
-static inline int init_mmu_table(mmu_descriptor_t *root)
+static inline int init_mmu_table(mmu_descriptor_t *root_table)
 {
-	memset(root, '\0', sizeof(mmu_table_t));
+	memset(root_table, '\0', sizeof(mmu_table_t));
 	return 0;
 }
 
 
-int init_mmu(void)
+int init_mmu(mmu_descriptor_t *supervisor_table)
 {
+	uint32_t tt = 0;
 	uint32_t tcr = 0;
 	struct mmu_root_pointer root_pointer;
 
-	root = (mmu_descriptor_t *) page_alloc_single();
-	init_mmu_table(root);
+	MMU_MOVE_TO_TT0(tt);
+	MMU_MOVE_TO_TT1(tt);
 
-	// Initialize the top-level kernel page table to map directly to real memory with early termination descriptors
-	// Only do this for the range, with 4k page size: 0x0000_0000 to 0x
-	//for (short i = 0; i < (0x01000000 >> (PAGE_ADDR_BITS + MMU_TABLE_ADDR_BITS)) + 1; i++) {
-	//	root[i] = (i << (PAGE_ADDR_BITS + MMU_TABLE_ADDR_BITS)) | MMU_DT_PAGE_DESCRIPTOR;
-	//}
-
-	if (mmu_table_map(root, (uintptr_t) 0x00000000, 0x01000000, MMU_FLAG_DIRECT) < 0) {
-		log_error("error mapping lower memory\n");
-	}
-	if (mmu_table_map(root, (uintptr_t) 0xFF000000, 0x01000000, MMU_FLAG_DIRECT | MMU_FLAG_NOCACHE) < 0) {
-		log_error("error mapping upper memory\n");
-	}
-
-	root_pointer.limit = 0;
-	root_pointer.status = MMU_STATUS_DEFAULT | MMU_STATUS_DESC_S | MMU_DT_TABLE_LONG;
-	root_pointer.table = (uint32_t) root;
+	root_pointer.limit = 0x7fff;
+	root_pointer.status = MMU_DT_TABLE;
+	root_pointer.table = (uint32_t) supervisor_table;
 	MMU_MOVE_TO_SRP(root_pointer);
+	MMU_MOVE_TO_CRP(root_pointer);
 
 	for (short i = 0; i < MMU_TABLE_LEVELS; i++) {
-		tcr = (tcr << 4) | MMU_TABLE_ADDR_BITS;
+		tcr = (tcr >> 4) | (MMU_TABLE_ADDR_BITS << 12);
 	}
 
 	tcr =	tcr |
@@ -62,133 +43,396 @@ int init_mmu(void)
 		(PAGE_ADDR_BITS << MMU_TC_PAGE_SIZE_SHIFT) |
 		(MMU_TABLE_INITIAL_SHIFT << MMU_TC_INITIAL_SHIFT);
 
-	log_debug("tcr: %x\n", tcr);
+	log_debug("mmu: setting TCR to %x\n", tcr);
 
 	MMU_MOVE_TO_TCR(tcr);
+
+	tcr = 0;
+	MMU_MOVE_FROM_TCR(tcr);
+	log_debug("mmu: read back TCR of %x\n", tcr);
 	return 0;
 }
 
 mmu_descriptor_t *mmu_table_alloc(void)
 {
-	mmu_descriptor_t *root;
+	mmu_descriptor_t *root_table;
 
-	root = (mmu_descriptor_t *) page_alloc_single();
-	init_mmu_table(root);
+	root_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE);
+	init_mmu_table(root_table);
 
-	return root;
+	return root_table;
 }
 
-void mmu_table_free(mmu_descriptor_t *root)
+void mmu_table_free_inner(mmu_descriptor_t *table, uint8_t bits)
 {
-	// TODO unmap all
-	page_free_single((page_t *) root);
+	for (int i = 0; i < MMU_TABLE_SIZE; i++) {
+		switch (MMU_DT(table[i])) {
+			case MMU_DT_PAGE_DESCRIPTOR:
+				// TODO how do you know if it's a WINDOW or an actual page?
+				//printk("%x: %d\n", MMU_TABLE_ADDRESS(table[i]), page_get_ref_single(MMU_TABLE_ADDRESS(table[i])));
+				page_free(MMU_TABLE_ADDRESS(table[i]), 1 << bits);
+				break;
+			case MMU_DT_TABLE_SHORT:
+			case MMU_DT_TABLE_LONG:
+				mmu_table_free_inner((mmu_descriptor_t *) MMU_TABLE_ADDRESS(table[i]), bits - MMU_TABLE_ADDR_BITS);
+				break;
+			default:
+				break;
+		}
+	}
+	//printk("%x: %d\n", table, page_get_ref_single(table));
+	page_free((physical_address_t) table, PAGE_SIZE);
 }
 
-int mmu_table_map(mmu_descriptor_t *root, uintptr_t virtual_addr, ssize_t length, int flags)
+void mmu_table_free(mmu_descriptor_t *root_table)
+{
+	uint8_t bits = 32 - MMU_TABLE_INITIAL_SHIFT - MMU_TABLE_ADDR_BITS;
+	mmu_table_free_inner(root_table, bits);
+}
+
+
+#define GET_TABLE_CREATE_IF_NEEDED		0x01
+#define GET_TABLE_RETURN_ANY_SIZE		0x02
+
+struct get_table_result {
+	mmu_descriptor_t *table;
+	uint8_t bits;
+};
+
+static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, size_t length, int flags, struct get_table_result *result)
 {
 	int i;
-	int level = 0;
-	uint16_t status;
-	mmu_descriptor_t *table[5];
-	physical_address_t physical_addr;
+	char create_if_needed;
+	char request_covers_whole_chunk;
+	mmu_descriptor_t *table, *next_table;
 	uint8_t bits = 32 - MMU_TABLE_INITIAL_SHIFT - MMU_TABLE_ADDR_BITS;
 
-	// Check that the length is a multiple of the page size, or raise an error
-	if (length & (PAGE_SIZE - 1)) {
-		return EINVAL;
-	}
+	create_if_needed = flags & GET_TABLE_CREATE_IF_NEEDED;
 
-	// Check that the virtual address given is aligned to a page, and raise an error if it's not
-	if (((virtual_address_t) virtual_addr) & (PAGE_SIZE - 1)) {
-		return EINVAL;
-	}
+	table = root_table;
+	while (1) {
+		i = TABLE_INDEX(virtual_addr, bits);
+		//printk("%08x: bits %d, i %d, table: %x\n", virtual_addr, bits, i, table);
 
-	// Check if the segment to be mapped will wrap around at the end of the address space, and
-	// raise an error if it will
-	if (((virtual_address_t) virtual_addr) + length > 0
-	    && ((virtual_address_t) virtual_addr) + length < ((virtual_address_t) virtual_addr))
-	{
-		return EINVAL;
-	}
+		request_covers_whole_chunk = (virtual_addr & ((1 << bits) - 1)) == 0 && length >= (1 << bits);
 
-	table[0] = root;
-	while (length > 0) {
-		i = ((virtual_address_t) virtual_addr >> bits) & ((1 << MMU_TABLE_ADDR_BITS) - 1);
-		//printk_safe("bits %d, i %d, table: %x\n", bits, i, table[level]);
-		if (bits <= PAGE_ADDR_BITS || length >= (1 << bits)) {
-			status = MMU_DT_PAGE_DESCRIPTOR;
-			if (flags & MMU_FLAG_NOCACHE) {
-				status |= MMU_STATUS_DESC_CI;
+		if (MMU_DT(table[i]) == MMU_DT_PAGE_DESCRIPTOR) {
+			result->bits = bits;
+			if (!request_covers_whole_chunk && !(flags & GET_TABLE_RETURN_ANY_SIZE)) {
+				// There's an early termination page descriptor entry, but we're only mapping a virtual address that's within this single page
+				// instead of mapping the whole page, which is an error
+				result->table = NULL;
+				return EEXIST;
+			} else {
+				result->table = table;
+				return 0;
 			}
-
-			// If there's an existing page allocated, and we're not unmapping, then raise an error
-			if (MMU_TABLE_ADDRESS(table[level][i]) != 0) {
-				if ((flags & MMU_FLAG_TYPE) == MMU_FLAG_UNMAP) {
-					page_free_single((page_t *) MMU_TABLE_ADDRESS(table[level][i]));
-				} else {
-					return EEXIST;
-				}
-			}
-
-			// Determine which address to map to
-			switch (flags & MMU_FLAG_TYPE) {
-				case MMU_FLAG_UNMAP:
-					status = 0;
-					// Fall-through to UNALLOCATED
-				case MMU_FLAG_UNALLOCATED: {
-					physical_addr = 0;
-					break;
-				}
-				case MMU_FLAG_DIRECT: {
-					physical_addr = ((physical_address_t) virtual_addr);
-					break;
-				}
-				case MMU_FLAG_PREALLOCATED: {
-					physical_addr = (physical_address_t) page_alloc_single();
-					break;
-				}
-				default: {
-					return EINVAL;
-				}
-			}
-
-			// Set the descriptor in the current table
-			table[level][i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
-			//printk_safe("set desc %x\n", table[level][i]);
-
-			// Advance to the next address
-			length -= 1 << bits;
-			virtual_addr = (((virtual_address_t) virtual_addr) + (1 << bits));
-
-			// If we've reached the end of the current table, then ascend one level
-			if (i + 1 >= MMU_TABLE_SIZE) {
-				level -= 1;
-				bits += MMU_TABLE_ADDR_BITS;
-			}
+		} else if (MMU_DT(table[i]) == MMU_DT_INVALID && (bits <= PAGE_ADDR_BITS || (request_covers_whole_chunk && (flags & GET_TABLE_RETURN_ANY_SIZE)))) {
+			result->table = table;
+			result->bits = bits;
+			return 0;
 		} else {
-			// Look up the table containing the current virtual address
-			table[level + 1] = (mmu_descriptor_t *) MMU_TABLE_ADDRESS(table[level][i]);
-			if (!table[level + 1]) {
-				// Create a new table since one hasn't already been created yet
-				table[level + 1] = (mmu_descriptor_t *) page_alloc_single();
-				init_mmu_table(table[level + 1]);
+			if (MMU_DT(table[i]) == MMU_DT_INVALID) {
+				if (create_if_needed) {
+					// Create a new table since one hasn't already been created yet
+					next_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE);
+					init_mmu_table(next_table);
 
-				// Set the previous level's table with the address of the newly allocated page
-				table[level][i] = (physical_address_t) MMU_TABLE_DESCRIPTOR(table[level + 1], MMU_DT_TABLE);
+					//printk("set new table %x [table: %x, i: %d, bits: %d]\n", next_table, table, i, bits);
+					// Set the previous level's table with the address of the newly allocated page
+					table[i] = (physical_address_t) MMU_TABLE_DESCRIPTOR(next_table, MMU_DT_TABLE);
+				} else {
+					result->table = NULL;
+					result->bits = bits;
+					return ENOENT;
+				}
 			}
-			//printk_safe("level %d, i %d, table %x, length %d\n", level, i, table[level][i], length);
+			//printk("descending into %x [table: %x, i: %d, bits: %d]\n", next_table, table, i, bits);
+			table = (mmu_descriptor_t *) MMU_TABLE_ADDRESS(table[i]);
 
 			// Decend one level into the next table
-			level += 1;
 			bits -= MMU_TABLE_ADDR_BITS;
 		}
 	}
+	result->table = NULL;
+	result->bits = 0;
+	return ENOENT;
+}
+
+/// Modify the MMU tables according to the flags
+///
+/// A memory area starting at `virtual_addr` that is `length` in size will either be added or
+/// removed from the MMU table tree that starts at `root_table`.
+///
+/// NOTE: The virtual address and length are assumed to be rounded to the nearest PAGE_SIZE
+/// and the length is not past the end of the valid address space (no overflow).  They must
+/// be validated before calling this function
+int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, size_t length, int flags)
+{
+	int i;
+	int error;
+	uint16_t status;
+	int get_table_flags;
+	physical_address_t physical_addr;
+	struct get_table_result result = { NULL, 0 };
+
+	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
+	// once in memory_map_mmap() before the map is altered
+
+	get_table_flags = GET_TABLE_CREATE_IF_NEEDED | (((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) ? GET_TABLE_RETURN_ANY_SIZE : 0);
+
+	// Force a table update in the first iteration
+	i = MMU_TABLE_SIZE;
+
+	for (; length > 0; i++) {
+		// If we've reached the end of the current table, then ascend one level
+		if (i + 1 >= MMU_TABLE_SIZE || (result.table && length < 1 << result.bits)) {
+			error = get_table(root_table, virtual_addr, length, get_table_flags, &result);
+			if (error < 0) {
+				return error;
+			}
+		}
+
+		i = TABLE_INDEX(virtual_addr, result.bits);
+
+		status = 0;
+		if (flags & MMU_FLAG_NOCACHE) {
+			status |= MMU_STATUS_DESC_CI;
+		}
+		//if (flags & MMU_FLAG_SUPERVISOR) {
+		//	status |= MMU_STATUS_DESC_S;
+		//}
+		if (!(flags & MMU_FLAG_WRITE)) {
+			status |= MMU_STATUS_DESC_WP;
+		}
+
+		// Determine which address to map to
+		switch (flags & MMU_FLAG_OP) {
+			case MMU_OP_MAP: {
+				// If there's an existing page allocated, and we're not unmapping, then raise an error
+				if (MMU_TABLE_ADDRESS(result.table[i]) != 0) {
+					return EEXIST;
+				}
+
+				switch (flags & MMU_FLAG_TYPE) {
+					case MMU_TYPE_UNALLOCATED: {
+						physical_addr = 0;
+						break;
+					}
+					case MMU_TYPE_FIXED: {
+						physical_addr = ((physical_address_t) virtual_addr);
+						status |= MMU_DT_PAGE_DESCRIPTOR;
+						break;
+					}
+					case MMU_TYPE_PREALLOCATED: {
+						physical_addr = (physical_address_t) page_alloc(PAGE_SIZE);
+						status |= MMU_DT_PAGE_DESCRIPTOR;
+						break;
+					}
+					default: {
+						return EINVAL;
+					}
+				}
+				break;
+			}
+			case MMU_OP_UNMAP: {
+				if (MMU_TABLE_ADDRESS(result.table[i]) != 0 && (flags & MMU_FLAG_TYPE) != MMU_TYPE_FIXED) {
+					page_free(MMU_TABLE_ADDRESS(result.table[i]), PAGE_SIZE);
+				}
+				physical_addr = 0;
+				break;
+			}
+			default: {
+				return EINVAL;
+			}
+		}
+
+		// Set the descriptor in the current table
+		result.table[i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
+		//printk("%08x: %08x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(result.table[i]), MMU_TABLE_STATUS(result.table[i]), result.table, i);
+
+		// Advance to the next address
+		if (length < 1 << result.bits) {
+			panic("attempted to allocate too much memory: length=%d but table is %d\n", length, 1 << result.bits);
+		}
+		length -= 1 << result.bits;
+		virtual_addr = (((virtual_address_t) virtual_addr) + (1 << result.bits));
+	}
+
 	return 0;
 }
 
-int mmu_table_unmap(mmu_descriptor_t *root, uintptr_t address, ssize_t length)
+/// Copy a range of an MMU table into another
+///
+/// A memory area starting at `virtual_addr` that is `length` in size will be copied, and
+/// page refcounts incremented, from `src_table` to `dest_table`.  The virtual address must
+/// be the same in both tables.
+///
+/// NOTE: The virtual address and length are assumed to be rounded to the nearest PAGE_SIZE
+/// and the length is not past the end of the valid address space (no overflow).  They must
+/// be validated before calling this function
+int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, size_t length, int flags)
 {
+	int i;
+	int error;
+	int get_table_flags;
+	int additional_status = 0;
+	struct get_table_result src_result, dest_result;
+
+	// NOTE: the virtual_addr and length are assumed to be correct.  The checks are only performed
+	// once in memory_map_mmap() before the map is altered
+
+	if (flags & MMU_FLAG_COPY_ON_WRITE && (((flags & MMU_FLAG_TYPE) != MMU_TYPE_FIXED))) {
+		additional_status |= MMU_STATUS_DESC_WP;
+	}
+
+	get_table_flags = GET_TABLE_CREATE_IF_NEEDED | (((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) ? GET_TABLE_RETURN_ANY_SIZE : 0);
+
+	// Force a table update in the first iteration
+	i = MMU_TABLE_SIZE;
+
+	for (; length > 0; i++) {
+		// If we've reached the end of the current table, then ascend one level
+		if (i + 1 >= MMU_TABLE_SIZE || length < (1 << src_result.bits)) {
+			error = get_table(src_table, virtual_addr, length, get_table_flags, &src_result);
+			if (error < 0) {
+				return error;
+			}
+
+			error = get_table(dest_table, virtual_addr, length, get_table_flags, &dest_result);
+			if (error < 0) {
+				return error;
+			}
+
+			if (src_result.bits != dest_result.bits) {
+				log_debug("mmu_table_copy: source page size (%d) doesn't match destination page size (%d)\n", 1 << src_result.bits, 1 << dest_result.bits);
+				return EFAULT;
+			}
+		}
+
+		i = TABLE_INDEX(virtual_addr, src_result.bits);
+
+		//printk("setting i=%d on src %x:%d dest %x:%d with flags %x\n", i, src_result.table[i], src_result.bits, dest_result.table[i], dest_result.bits, additional_status);
+
+		// Set the descriptor in the current table, and force the write protect flag on, so we'll
+		// get an exception when trying to write to the new page
+		dest_result.table[i] = src_result.table[i] | additional_status;
+		src_result.table[i] |= additional_status;
+		if (!((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) && MMU_TABLE_ADDRESS(src_result.table[i]) != 0) {
+			page_make_ref(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
+		}
+		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(dest_result.table[i]), MMU_TABLE_STATUS(dest_result.table[i]), dest_result.table, i);
+
+		// Advance to the next address
+		if (length < 1 << src_result.bits) {
+			panic("attempted to allocate too much memory: length=%d but table is %d\n", length, 1 << src_result.bits);
+		}
+		length -= 1 << src_result.bits;
+		virtual_addr = (((virtual_address_t) virtual_addr) + (1 << src_result.bits));
+	}
 
 	return 0;
+}
+
+int mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, struct get_page_result *result)
+{
+	int error;
+	uint32_t entry;
+	struct get_table_result table_result;
+
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &table_result);
+	if (error < 0) {
+		return error;
+	}
+
+	entry = MMU_TABLE_ADDRESS(table_result.table[TABLE_INDEX(virtual_addr, table_result.bits)]);
+	if (!entry && virtual_addr > (1 << table_result.bits)) {
+		return ENOENT;
+	} else {
+		result->size = 1 << table_result.bits;
+		result->phys = entry;
+	}
+	return 0;
+}
+
+int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, size_t page_size, int flags)
+{
+	int i;
+	int error;
+	int status;
+	struct get_table_result result;
+
+	error = get_table(root_table, virtual_addr, PAGE_SIZE, GET_TABLE_CREATE_IF_NEEDED | GET_TABLE_RETURN_ANY_SIZE, &result);
+	if (error < 0) {
+		return error;
+	}
+
+	if (1 << result.bits != page_size) {
+		log_info("attempted to mmu_table_set_page on the wrong granuale size, expected %d but got %d\n", page_size, result.bits);
+		return EFAULT;
+	}
+
+	i = TABLE_INDEX(virtual_addr, result.bits);
+
+	status = MMU_TABLE_STATUS(result.table[i]) | MMU_DT_PAGE_DESCRIPTOR;
+	if (flags & MMU_FLAG_WRITE) {
+		status &= ~MMU_STATUS_DESC_WP;
+	} else {
+		status |= MMU_STATUS_DESC_WP;
+	}
+
+	result.table[i] = MMU_TABLE_DESCRIPTOR(physical_addr, status);
+	return 0;
+}
+
+int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virtual_addr)
+{
+	uint16_t mmu_sr;
+	struct mmu_root_pointer root_pointer;
+
+	MMU_MOVE_FROM_CRP(root_pointer);
+	if (root_pointer.table == (uintptr_t) root_table) {
+		// TODO should you optionally validate writing?
+		asm volatile(
+			"ptestr %2, %1@, #7\n"
+			"pmove %%psr, %0\n"
+			: "=m" (mmu_sr) : "a" (virtual_addr), "i" (0x1)
+		);
+
+		return !(mmu_sr & 0xEC00);
+	} else {
+		int error;
+		struct get_table_result result;
+
+		error = get_table(root_table, rounddown(virtual_addr, PAGE_SIZE), PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
+		return error >= 0;
+	}
+}
+
+static int mmu_table_print_inner(mmu_descriptor_t *table, uint8_t bits, uintptr_t virtual_addr)
+{
+	int i;
+
+	printk("mmu table for addresses %x to %x [table: %x, bits: %d]\n", virtual_addr, virtual_addr + (1 << bits) - 1, table, bits);
+	for (i = 0; i < MMU_TABLE_SIZE; i++) {
+		if ((table[i] & MMU_STATUS_DESC_TYPE) == MMU_DT_TABLE) {
+			printk("decending at [table: %x, i: %d, bits: %d] into table %x (%x)\n", table, i, bits, MMU_TABLE_ADDRESS(table[i]), MMU_TABLE_STATUS(table[i]));
+			mmu_table_print_inner((mmu_descriptor_t *) MMU_TABLE_ADDRESS(table[i]), bits - MMU_TABLE_ADDR_BITS, virtual_addr);
+		} else {
+			if (table[i]) {
+				printk("%08x: %08x to %08x (%x) [table: %x, i: %d, bits: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(table[i]), MMU_TABLE_ADDRESS(table[i]) + (1 << bits) - 1, MMU_TABLE_STATUS(table[i]), table, i, bits);
+			}
+		}
+		virtual_addr += (1 << bits);
+	}
+	return 0;
+}
+
+/// Print the MMU table
+///
+/// NOTE: this uses the log interface to output the table
+int mmu_table_print(mmu_descriptor_t *root_table)
+{
+	return mmu_table_print_inner(root_table, 32 - MMU_TABLE_INITIAL_SHIFT - MMU_TABLE_ADDR_BITS, 0);
 }
 

@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <kconfig.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/nop.h>
 #include <kernel/fs/vfs.h>
@@ -62,6 +64,9 @@ struct procfs_dir_entry proc_files[] = {
 	{ PFN_STAT,	"stat", 	get_data_stat },
 	{ PFN_STATM,	"statm",	get_data_statm },
 	{ PFN_MAPS,	"maps",		get_data_maps },
+	#if defined(CONFIG_MMU)
+	{ PFN_PAGEDUMP,	"pagedump",	get_data_pagedump },
+	#endif
 	{ 0, NULL, NULL },
 };
 
@@ -83,8 +88,9 @@ static struct vnode *_alloc_vnode(pid_t pid, procfs_filenum_t filenum, mode_t mo
 
 int procfs_init()
 {
-	for (short i = 0; i < MAX_VNODES; i++)
+	for (short i = 0; i < MAX_VNODES; i++) {
 		vnode_table[i].vn.refcount = 0;
+	}
 	return 0;
 }
 
@@ -129,8 +135,9 @@ int procfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resu
 		return ENOTDIR;
 	}
 
-	if (*result)
+	if (*result) {
 		vfs_release_vnode(*result);
+	}
 	*result = _find_vnode(pid, filenum, S_IFDIR | 0755, vnode->mp);
 	return 0;
 }
@@ -158,32 +165,42 @@ int procfs_close(struct vfile *file)
 	return 0;
 }
 
-int procfs_read(struct vfile *file, char *buf, size_t nbytes)
+int procfs_read(struct vfile *file, struct iovec_iter *iter)
 {
 	int limit = 0;
+	size_t nbytes;
 	struct process *proc;
 	char buffer[MAX_BUFFER];
 	struct procfs_dir_entry *entry;
 
 	proc = get_proc(PROCFS_DATA(file->vnode).pid);
-	if (PROCFS_DATA(file->vnode).pid != 0 && !proc)
+	if (PROCFS_DATA(file->vnode).pid != 0 && !proc) {
 		return ENOENT;
+	}
 
 	entry = _get_entry_by_num(proc_files, PROCFS_DATA(file->vnode).filenum);
-	if (!entry)
+	if (!entry) {
 		entry = _get_entry_by_num(root_files, PROCFS_DATA(file->vnode).filenum);
-	if (entry && entry->func)
+	}
+	if (entry && entry->func) {
 		limit = entry->func(proc, buffer, MAX_BUFFER);
+		if (limit < 0) {
+			return limit;
+		}
+	}
 
-	if (file->position + nbytes >= limit)
+	nbytes = iovec_iter_remaining(iter);
+	if (file->position + nbytes >= limit) {
 		nbytes = limit - file->position;
-	if (nbytes)
-		strncpy(buf, &buffer[file->position], nbytes);
+	}
+	if (nbytes) {
+		memcpy_into_iter(iter, &buffer[file->position], nbytes);
+	}
 	file->position += nbytes;
 	return nbytes;
 }
 
-int procfs_write(struct vfile *file, const char *buf, size_t nbytes)
+int procfs_write(struct vfile *file, struct iovec_iter *iter)
 {
 	return 0;
 }
@@ -231,8 +248,9 @@ int procfs_readdir(struct vfile *file, struct dirent *dir)
 		strncpy(dir->d_name, proc_files[file->position].filename, VFS_FILENAME_MAX);
 		dir->d_name[VFS_FILENAME_MAX - 1] = '\0';
 		file->position += 1;
-	} else
+	} else {
 		return ENOTDIR;
+	}
 	return 1;
 }
 
@@ -253,8 +271,9 @@ static procfs_filenum_t _find_filenum_by_name(struct procfs_dir_entry *entries, 
 static struct procfs_dir_entry *_get_entry_by_num(struct procfs_dir_entry *entries, procfs_filenum_t filenum)
 {
 	for (short i = 0; entries[i].filename; i++) {
-		if (entries[i].filenum == filenum)
+		if (entries[i].filenum == filenum) {
 			return &entries[i];
+		}
 	}
 	return NULL;
 }
@@ -262,8 +281,9 @@ static struct procfs_dir_entry *_get_entry_by_num(struct procfs_dir_entry *entri
 static struct vnode *_find_vnode(pid_t pid, procfs_filenum_t filenum, mode_t mode, struct mount *mp)
 {
 	for (short i = 0; i < MAX_VNODES; i++) {
-		if (vnode_table[i].vn.refcount > 0 && PROCFS_DATA(&vnode_table[i]).pid == pid && PROCFS_DATA(&vnode_table[i]).filenum == filenum)
+		if (vnode_table[i].vn.refcount > 0 && PROCFS_DATA(&vnode_table[i]).pid == pid && PROCFS_DATA(&vnode_table[i]).filenum == filenum) {
 			return vfs_clone_vnode(&vnode_table[i].vn);
+		}
 	}
 	return _alloc_vnode(pid, filenum, mode, mp);
 }

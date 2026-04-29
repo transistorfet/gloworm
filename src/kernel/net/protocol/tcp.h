@@ -4,8 +4,10 @@
 
 #include <stdint.h>
 
+#include <kernel/net/protocol.h>
 #include <kernel/utils/queue.h>
 #include <kernel/utils/ringbuffer.h>
+#include "ipv4.h"
 
 #define TCP_ADDRESS(x)		((struct tcp_address *) (x))
 #define TCP_ENDPOINT(x)		((struct tcp_endpoint *) (x))

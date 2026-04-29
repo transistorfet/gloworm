@@ -2,6 +2,9 @@
 #ifndef _ASM_M68K_IRQS_H
 #define _ASM_M68K_IRQS_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include <kconfig.h>
 #include <kernel/irq/action.h>
 
 // 68k Interrupt Vectors Numbers
@@ -63,6 +66,14 @@
 
 typedef short lock_state_t;
 
+#define SAVE_STATUS(saved) {				\
+	asm("move.w	%%sr, %0\n" : "=dm" ((saved)));	\
+}
+
+#define RESTORE_STATUS(saved) {					\
+	asm("move.w	%0, %%sr\n" : : "dm" ((saved)) :);	\
+}
+
 #define LOCK(saved) {					\
 	asm("move.w	%%sr, %0\n" : "=dm" ((saved)));	\
 	DISABLE_INTS();					\
@@ -72,10 +83,9 @@ typedef short lock_state_t;
 	asm("move.w	%0, %%sr\n" : : "dm" ((saved)) :);	\
 }
 
-typedef void (*irq_handler_t)();
+typedef void (*bare_irq_handler_t)();
 
 void arch_init_irqs();
-void arch_set_irq_handler(irq_num_t irq, irq_handler_t handler);
 
 #endif
 

@@ -64,10 +64,12 @@ int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 	pack->network_offset = offset;
 	hdr = (struct ipv4_header *) &pack->data[pack->network_offset];
 
-	if (pack->length - offset < sizeof(struct ipv4_header))
+	if (pack->length - offset < sizeof(struct ipv4_header)) {
 		return -1;
-	if (hdr->version != 4 || hdr->ihl < 5 || hdr->ihl > 9)
+	}
+	if (hdr->version != 4 || hdr->ihl < 5 || hdr->ihl > 9) {
 		return -2;
+	}
 
 	hdr->length = be16toh(hdr->length);
 	hdr->checksum = be16toh(hdr->checksum);
@@ -76,8 +78,9 @@ int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
-	if (checksum != ipv4_calculate_checksum(hdr, sizeof(struct ipv4_header), 0))
+	if (checksum != ipv4_calculate_checksum(hdr, sizeof(struct ipv4_header), 0)) {
 		return -3;
+	}
 	hdr->checksum = checksum;
 
 	custom = (struct ipv4_custom_data *) &pack->custom_data;
@@ -87,34 +90,39 @@ int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t off
 	custom->dest.port = 0;
 
 	next = net_get_protocol(PF_INET, 0, hdr->protocol);
-	if (!next)
+	if (!next) {
 		return -4;
+	}
 	pack->proto = next;
 
 	pack->transport_offset = offset + (((uint16_t) hdr->ihl) << 2);
 	error = next->ops->decode_header(next, pack, pack->transport_offset);
-	if (error)
+	if (error) {
 		return error;
+	}
 	return 0;
 }
 
 int ipv4_forward_packet(struct protocol *proto, struct packet *pack)
 {
-	if (!pack->proto || pack->proto == proto)
+	if (!pack->proto || pack->proto == proto) {
 		return PACKET_DROPPED;
+	}
 	return pack->proto->ops->forward_packet(pack->proto, pack);
 }
 
-int ipv4_encode_header(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, const unsigned char *data, int length)
+int ipv4_encode_header(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, int length)
 {
 	struct ipv4_header *hdr;
 	struct ipv4_custom_data *custom;
 
-	if (!pack->proto)
+	if (!pack->proto) {
 		return -1;
+	}
 
-	if (pack->capacity < pack->length + sizeof(struct ipv4_header) + length)
+	if (pack->capacity < pack->length + sizeof(struct ipv4_header) + length) {
 		return -2;
+	}
 	pack->network_offset = pack->length;
 	pack->length += sizeof(struct ipv4_header);
 
@@ -150,17 +158,20 @@ uint16_t ipv4_calculate_checksum(void *data, int len, uint32_t start)
 	uint16_t carry;
 	uint32_t checksum = start;
 
-	for (short i = 0; i < (len >> 1); i++)
+	for (short i = 0; i < (len >> 1); i++) {
 		checksum += ((uint16_t *) data)[i];
+	}
 
-	if (len & 0x01)
+	if (len & 0x01) {
 		checksum += (((uint8_t *) data)[len - 1] << 8);
+	}
 
 	carry = checksum >> 16;
 	checksum &= 0xFFFF;
 	checksum += carry;
-	if (checksum >> 16)
+	if (checksum >> 16) {
 		checksum += 1;
+	}
 	checksum = ~checksum & 0xFFFF;
 	return checksum;
 }

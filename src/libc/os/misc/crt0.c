@@ -3,9 +3,12 @@
 
 extern int main(int argc, char **argv, char **env);
 
-int _start(int argc, char **argv, char **env)
+void _start(int argc, char **argv, char **env)
 {
+	int error;
+
 	environ = env;
-	return main(argc, argv, env);
+	error = main(argc, argv, env);
+	exit(error);
 }
 

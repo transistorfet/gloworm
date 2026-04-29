@@ -3,6 +3,7 @@
 #define _SRC_KERNEL_FS_DEVFS_DEVFS_H
 
 #include <kernel/fs/vfs.h>
+#include <kernel/utils/iovec.h>
 
 
 #define DEVFS_MAX_FILENAME	14
@@ -39,8 +40,8 @@ int devfs_release(struct vnode *vnode);
 
 int devfs_open(struct vfile *file, int flags);
 int devfs_close(struct vfile *file);
-int devfs_read(struct vfile *file, char *buf, size_t nbytes);
-int devfs_write(struct vfile *file, const char *buf, size_t nbytes);
+int devfs_read(struct vfile *file, struct iovec_iter *iter);
+int devfs_write(struct vfile *file, struct iovec_iter *iter);
 int devfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
 offset_t devfs_seek(struct vfile *file, offset_t position, int whence);
 

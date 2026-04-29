@@ -14,5 +14,12 @@ config MINIX_FS
 	help
 	  This enables the minix file system support.  Only v1 is supported
 
+config PATH_MAX
+	int "maximum path length"
+	default 1024
+	help
+	  The maximum number of characters in a complete file path.  This is
+	  used for buffers involving a complete path
+
 endmenu
 

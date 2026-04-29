@@ -54,7 +54,7 @@ config MMU
 	depends on MC68030
 	depends on M68K_USER_MODE
 	help
-	  If this is option true, the kernel will enable the hardware-based MMU
+	  If this option is true, the kernel will enable the hardware-based MMU
 	  (Memory Management Unit) and run user processes in their own isolated
 	  virtual memory space.  If false, only physical memory addresses will
 	  be used.  It's recommended to select this option if the system it's

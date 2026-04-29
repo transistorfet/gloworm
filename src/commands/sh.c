@@ -502,17 +502,15 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 		}
 
 		if (main) {
-			#ifndef LINUXHOST
-			status = SYSCALL3(SYS_EXECBUILTIN, (int) main, (int) argv, (int) envp);
-			#else
-			status = main(argc, argv, envp);
-			#endif
+			status = (main)(argc, argv, envp);
+			exit(status);
 		} else {
 			status = execve(argv[0], argv, envp);
+
+			// The exec() system call will only return if an error occurs
+			printf("Failed to execute %s: %d\n", argv[1], status);
+			exit(-1);
 		}
-		// The exec() system call will only return if an error occurs
-		printf("Failed to execute %s: %d\n", argv[1], status);
-		exit(-1);
 	}
 
 	return 0;

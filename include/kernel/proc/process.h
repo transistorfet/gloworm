@@ -5,10 +5,10 @@
 #include <stddef.h>
 #include <asm/context.h>
 #include <kernel/syscall.h>
+#include <kernel/mm/map.h>
 #include <kernel/proc/timer.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/filedesc.h>
-#include <kernel/proc/memory.h>
 #include <kernel/proc/scheduler.h>
 #include <kernel/utils/queue.h>
 
@@ -78,10 +78,11 @@ struct process_iter {
 	short slot;
 };
 
-int init_proc();
+void init_proc();
 struct process *new_proc(pid_t pid, uid_t uid);
 struct process *get_proc(pid_t pid);
-void close_proc(struct process *proc);
+int reset_proc(struct process *proc);
+int close_proc(struct process *proc);
 void cleanup_proc(struct process *proc);
 struct process *find_exited_child(pid_t parent, pid_t child);
 int set_proc_alarm(struct process *proc, uint32_t seconds);

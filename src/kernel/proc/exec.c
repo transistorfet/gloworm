@@ -2,76 +2,89 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/param.h>
+
 #include <asm/context.h>
+#include <asm/addresses.h>
+
+#include <kernel/mm/map.h>
 #include <kernel/proc/exec.h>
-#include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/strarray.h>
 
 
-int copy_string_array(char **stack, int *count, const char *const arr[])
+static int copy_exec_args(struct memory_map *map, virtual_address_t address_offset, struct iovec_iter *iter, struct string_array *argv, struct string_array *envp)
 {
-	int len = 0;
-	*count = 0;
+	int result;
+	offset_t position;
 
-	for (int i = 0; arr[i] != NULL; i++) {
-		// String, line terminator, and a pointer
-		len += sizeof(char *) + strlen(arr[i]) + 1;
-		*count += 1;
-	}
-	len += sizeof(char *);
-
-	// Align to the nearest word
-	len = roundup(len, 2);
-
-	char **dest_arr = (char **) (*stack - len);
-	char *buffer = ((char *) dest_arr) + (sizeof(char *) * (*count + 1));
-	*stack = (char *) dest_arr;
-
-	int i = 0, j = 0;
-	for (; j < *count; j++) {
-		dest_arr[j] = &buffer[i];
-		strcpy(dest_arr[j], arr[j]);
-		i += strlen(arr[j]) + 1;
-	}
-	dest_arr[j] = NULL;
-
-	return 0;
-}
-
-char *copy_exec_args(struct memory_map *map, char *user_sp, const char *const argv[], const char *const envp[])
-{
-	int argc, envc;
-
+	position = iovec_iter_seek(iter, 0, SEEK_CUR);
 	if (envp) {
-		copy_string_array(&user_sp, &envc, envp);
-		map->envp = (const char *const *) user_sp;
+		position -= envp->used;
+		position = iovec_iter_seek(iter, position, SEEK_SET);
+		result = string_array_copy_to_iter(envp, address_offset + position, iter);
+		if (result < 0)
+			return result;
+		map->envp = (const char *const *) (address_offset + position);
 	} else {
 		map->envp = NULL;
 	}
 
 	if (argv) {
-		copy_string_array(&user_sp, &argc, argv);
-		map->argv = (const char *const *) user_sp;
+		position -= argv->used;
+		position = iovec_iter_seek(iter, position, SEEK_SET);
+		result = string_array_copy_to_iter(argv, address_offset + position, iter);
+		if (result < 0)
+			return result;
+		map->argv = (const char *const *) (address_offset + position);
 	} else {
 		map->argv = NULL;
 	}
+	position = iovec_iter_seek(iter, position, SEEK_SET);
 
-	user_sp -= sizeof(char **);
-	*((char ***) user_sp) = (char **) map->envp;
-	user_sp -= sizeof(char **);
-	*((char ***) user_sp) = (char **) map->argv;
-	user_sp -= sizeof(int);
-	*((int *) user_sp) = argc;
+	result = iovec_iter_push_back(iter, &map->envp, sizeof(char **));
+	if (result < 0)
+		return result;
+	result = iovec_iter_push_back(iter, &map->argv, sizeof(char **));
+	if (result < 0)
+		return result;
+	result = iovec_iter_push_back(iter, &argv->len, sizeof(int));
+	if (result < 0)
+		return result;
 
-	return user_sp;
+	position = iovec_iter_seek(iter, 0, SEEK_CUR);
+	return position;
 }
 
-void exec_initialize_stack_with_args(struct process *proc, void *stack_pointer, void *entry, const char *const argv[], const char *const envp[])
+int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stack_pointer, void *entry, struct string_array *argv, struct string_array *envp)
 {
-	// TODO this will be done to the user stack (which is the same as the kernel stack if no user mode)
-	stack_pointer = copy_exec_args(proc->map, stack_pointer, argv, envp);
+	int result;
+	struct kvec kvec[4];
+	struct iovec_iter iter;
+	virtual_address_t buffered_size = PAGE_SIZE;
 
-	arch_add_process_context(proc, stack_pointer, entry);
+	result = iovec_iter_load_pages_iter(proc->map, &iter, kvec, 4, stack_pointer - buffered_size, buffered_size, 1);
+	if (result < 0) {
+		return result;
+	}
+
+	result = iovec_iter_seek(&iter, 0, SEEK_END);
+	if (result < 0) {
+		return result;
+	}
+
+	if (current_proc != proc) {
+		arch_extended_switch_context(NULL, proc);
+	}
+
+	result = copy_exec_args(proc->map, stack_pointer - buffered_size, &iter, argv, envp);
+	if (result < 0) {
+		return result;
+	}
+	stack_pointer = stack_pointer - buffered_size + result;
+
+	arch_add_process_context(proc, (char *) stack_pointer, entry);
+
+	return 0;
 }
 

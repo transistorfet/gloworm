@@ -15,7 +15,7 @@ struct fd_table *alloc_fd_table();
 void free_fd_table(struct fd_table *table);
 void init_fd_table(struct fd_table *table);
 void release_fd_table(struct fd_table *table);
-void dup_fd_table(struct fd_table *dest, struct fd_table *source);
+void dup_fd_table(struct fd_table *dest, struct fd_table *source, int limit);
 
 int find_unused_fd(struct fd_table *table);
 struct vfile *get_fd(struct fd_table *table, int fd);

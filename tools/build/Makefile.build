@@ -96,7 +96,7 @@ $(user-cmulti): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%/built-in.o $(libex-obj-
 
 $(OUTPUT)%.strip: $(OUTPUT)%.elf
 	$(STRIP) $< -o $@
-	$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $< $@
+	#$(OBJCOPY) -O binary -j .text -j .got -j .rodata -j .data $< $@
 
 
 # Generic Build Rules
@@ -137,6 +137,9 @@ cmd_ld_elf = $(LD) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -o $@ $^
 cmd_ld_bin = $(LD) $(CFLAGS) $(ccflags-y) $(LDFLAGS) $(ldflags-y) -Wl,--oformat=binary -o $@ $^
 cmd_cc_o = $(CC) $(DEPFLAGS) $(CFLAGS) $(ccflags-y) -c -o $@ $<
 cmd_as_o = $(AS) $(DEPFLAGS) $(ASFLAGS) $(asflags-y) -c -o $@ $<
+
+cmd_host_ld_elf = $(HOST_LD) $(HOST_CFLAGS) $(host-ccflags-y) $(HOST_LDFLAGS) $(host-ldflags-y) -o $@ $^
+cmd_host_cc_o = $(HOST_CC) $(HOST_DEPFLAGS) $(HOST_CFLAGS) $(host-ccflags-y) -c -o $@ $<
 
 # Include the dependencies generated for each object file, if it exists
 -include $(obj-y:.o=.d)

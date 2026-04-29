@@ -14,6 +14,7 @@
 
 // Info for Current Running Process (accessed by syscall interface)
 void *kernel_stack;
+void *kernel_stack_backup;
 int need_reschedule;
 int kernel_reentries;
 struct process *idle_proc;
@@ -34,7 +35,7 @@ void init_scheduler()
 	_queue_init(&run_queue);
 	_queue_init(&blocked_queue);
 
-	idle_proc = create_idle_task();
+	idle_proc = create_idle_thread();
 	if (!idle_proc) {
 		panic("eternal slumber\n");
 	}
@@ -48,10 +49,12 @@ void insert_proc(struct process *proc)
 
 void exit_proc(struct process *proc, int status)
 {
+	short orphans;
 	short saved_status;
 
-	if (proc->state == PS_EXITED)
+	if (proc->state == PS_EXITED) {
 		return;
+	}
 
 	LOCK(saved_status);
 	if (proc->state == PS_BLOCKED) {
@@ -63,9 +66,14 @@ void exit_proc(struct process *proc, int status)
 	proc->state = PS_EXITED;
 	proc->exitcode = status;
 
-	close_proc(proc);
+	orphans = close_proc(proc);
+	if (orphans) {
+		resume_waiting_parent(get_proc(1));
+	}
 	need_reschedule = 1;
 	UNLOCK(saved_status);
+
+	resume_waiting_parent(proc);
 }
 
 void stop_proc(struct process *proc)
@@ -112,8 +120,9 @@ void resume_proc(struct process *proc)
 	if (proc->state == PS_RUNNING || proc->state == PS_RESUMING || proc->state == PS_EXITED) {
 		UNLOCK(saved_status);
 		return;
-	} else if (proc->state == PS_BLOCKED)
+	} else if (proc->state == PS_BLOCKED) {
 		_queue_remove(&blocked_queue, &proc->node);
+	}
 	_queue_insert(&run_queue, &proc->node);
 	proc->state = PS_RESUMING;
 	proc->wait_events = 0;
@@ -135,8 +144,9 @@ void resume_waiting_parent(struct process *proc)
 	struct process *parent;
 
 	parent = get_proc(proc->parent);
-	if (parent->state == PS_BLOCKED && (parent->bits & PB_WAITING))
+	if (parent->state == PS_BLOCKED && (parent->bits & PB_WAITING)) {
 		resume_proc(parent);
+	}
 }
 
 void resume_blocked_procs(int events, struct vnode *vnode, device_t rdev)
@@ -149,8 +159,9 @@ void resume_blocked_procs(int events, struct vnode *vnode, device_t rdev)
 	for (; cur; cur = next) {
 		next = (struct process *) _queue_next(&cur->node);
 		UNLOCK(saved_status);
-		if (cur->wait_check && (events & cur->wait_events) && cur->wait_check(cur, events, vnode, rdev))
+		if (cur->wait_check && (events & cur->wait_events) && cur->wait_check(cur, events, vnode, rdev)) {
 			resume_proc(cur);
+		}
 		LOCK(saved_status);
 	}
 	UNLOCK(saved_status);
@@ -173,10 +184,12 @@ void cancel_syscall(struct process *proc)
 	short saved_status;
 
 	LOCK(saved_status);
-	if (proc->state == PS_BLOCKED)
+	if (proc->state == PS_BLOCKED) {
 		resume_proc(proc);
-	if (proc->state == PS_RESUMING)
+	}
+	if (proc->state == PS_RESUMING) {
 		proc->state = PS_RUNNING;
+	}
 	proc->bits &= ~((uint16_t) PB_BLOCK_CONDITIONS);
 	set_proc_return_value(proc, EINTR);
 	proc->bits |= PB_DONT_SET_RETURN_VAL;
@@ -260,13 +273,19 @@ void schedule()
 	}
 
 	// No processes to run, so run the idle process
-	if (!next)
+	if (!next) {
 		next = idle_proc;
+	}
 
 	// Switch the current process
 	current_proc = next;
+
+	if (current_proc != previous_proc) {
+		arch_extended_switch_context(previous_proc, current_proc);
+	}
 	UNLOCK(saved_status);
 
+	// Restart the new process's the last system call
 	if (current_proc->state == PS_RESUMING) {
 		current_proc->state = PS_RUNNING;
 		restart_current_syscall();

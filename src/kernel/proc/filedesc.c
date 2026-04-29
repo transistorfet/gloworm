@@ -18,9 +18,15 @@ struct fd_table *alloc_fd_table()
 
 void free_fd_table(struct fd_table *table)
 {
-	kmfree(table);
+	if (--table->refcount == 0) {
+		release_fd_table(table);
+		kmfree(table);
+	}
 }
 
+/// Init an existing table
+///
+/// Usually called by alloc_fd_table() to initialize a newly allocated table
 void init_fd_table(struct fd_table *table)
 {
 	for (short i = 0; i < OPEN_MAX; i++) {
@@ -28,6 +34,9 @@ void init_fd_table(struct fd_table *table)
 	}
 }
 
+/// Close all open files
+///
+/// All files will be closed.  Called when a process exits
 void release_fd_table(struct fd_table *table)
 {
 	for (short i = 0; i < OPEN_MAX; i++) {
@@ -37,9 +46,13 @@ void release_fd_table(struct fd_table *table)
 	}
 }
 
-void dup_fd_table(struct fd_table *dest, struct fd_table *source)
+void dup_fd_table(struct fd_table *dest, struct fd_table *source, int limit)
 {
-	for (short i = 0; i < OPEN_MAX; i++) {
+	if (!limit) {
+		limit = OPEN_MAX - 1;
+	}
+
+	for (short i = 0; i <= limit; i++) {
 		if (source->files[i]) {
 			// TODO this needs to be replaced with a new vfs_duplicate() function
 			dest->files[i] = vfs_clone_fileptr(source->files[i]);

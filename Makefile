@@ -11,16 +11,17 @@ this-makefile	:= $(lastword $(MAKEFILE_LIST))
 src-root	:= $(realpath $(dir $(this-makefile)))
 kconfig-file	:= $(src-root)/.config
 config-h	:= $(src-root)/include/generated/config.h
+config-tests-h	:= $(src-root)/include/generated/config_tests.h
 
 -include $(kconfig-file)
 
 include $(src-root)/tools/build/Makefile.defaults
 
 build-root	:= $(if $(OUTPUT),$(shell mkdir -p $(OUTPUT) && cd $(OUTPUT) && pwd))
-export src-root build-root kconfig-file config-h
+export src-root build-root kconfig-file config-h config-tests-h
 
 PHONY += all
-all: generate-config decend
+all: $(config-h) decend
 
 PHONY += config
 config:
@@ -34,18 +35,21 @@ PHONY += dockerconfig
 dconfig:
 	cd tools/config && ./run.sh
 
-PHONY += generate-config
-generate-config: $(config-h)
+# Build Rules for Configs
+$(src-root)/include/generated/%.h: $(src-root)/.%
+	@echo ">> generating config from $<"
+	$(shell mkdir -p $(dir $@))
+	cat $< | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $@
 
-$(config-h): $(kconfig-file)
-	$(shell mkdir -p $(dir $(config-h)))
-	cat $(kconfig-file) | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $(config-h)
+#$(config-h): $(kconfig-file)
+#	$(shell mkdir -p $(dir $(config-h)))
+#	cat $(kconfig-file) | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $(config-h)
 
 PHONY += decend
-decend: generate-config
+decend: $(config-h) $(config-tests-h)
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src
 
-src/%: generate-config
+src/%: $(config-h)
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@)) $@
 
 # Build the image that can be written to the 68kSupervisor of computie
@@ -62,11 +66,11 @@ kernel.bin: src/kernel/kernel.bin
 kernel.elf: src/kernel/kernel.elf
 
 # Test building and running targets
-tests: generate-config
+tests: $(config-tests-h)
 	#$(MAKE) -f $(src-root)/tools/build/Makefile.test dir=tests tests
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests tests
 
-bare-tests: generate-config
+bare-tests: $(config-h)
 	#$(MAKE) -f $(src-root)/tools/build/Makefile.test dir=tests bare-tests
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests bare-tests
 
@@ -110,10 +114,10 @@ commandfiles:
 
 devicefiles:
 	$(SUDO) mkdir -p $(MOUNTPOINT)/dev
-	$(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
-	$(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
-	$(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
-	$(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty0 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty1 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/mem0 && $(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
+	$(SUDO) rm -f $(MOUNTPOINT)/dev/ata0 && $(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
 
 otherfiles:
 	$(SUDO) mkdir -p $(MOUNTPOINT)/etc

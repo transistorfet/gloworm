@@ -3,8 +3,10 @@
 #define _KERNEL_PAGES_H
 
 #include <stdint.h>
+#include <string.h>
 #include <kconfig.h>
 #include <kernel/utils/queue.h>
+#include <asm/addresses.h>
 
 #if defined(CONFIG_PAGE_SIZE_256)
 #define PAGE_ADDR_BITS	8
@@ -67,26 +69,27 @@ struct page_block {
 };
 
 
-int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, int size, struct page_descriptor *descriptors);
-int init_page_block(struct page_block *block, void *addr, int size);
-page_t *page_block_alloc_contiguous(struct page_block *block, size_t size);
-page_t *page_block_alloc_single(struct page_block *block);
-void page_block_free_single(struct page_block *block, page_t *ptr);
-void page_block_free_contiguous(struct page_block *block, page_t *ptr, size_t size);
+int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, size_t size, struct page_descriptor *descriptors);
+int init_page_block(struct page_block *block, void *addr, size_t size);
+physical_address_t page_block_alloc(struct page_block *block, size_t size);
+void page_block_free(struct page_block *block, physical_address_t ptr, size_t size);
 #if defined(CONFIG_MMU)
-page_t *page_block_make_ref_single(struct page_block *block, page_t *ptr);
-page_t *page_block_make_ref_contiguous(struct page_block *block, page_t *ptr, size_t size);
+physical_address_t page_block_make_ref(struct page_block *block, physical_address_t ptr, size_t size);
+int page_block_get_ref_single(struct page_block *block, physical_address_t ptr);
 #endif
+
+static inline void zero_page(physical_address_t ptr)
+{
+	memset((void *) ptr, 0, PAGE_SIZE);
+}
 
 extern struct page_block pages;
 #define init_pages(start, end)					init_page_block(&pages, (void *) start, end)
-#define page_alloc_contiguous(contiguous_pages)			page_block_alloc_contiguous(&pages, contiguous_pages)
-#define page_alloc_single()					page_block_alloc_single(&pages)
-#define page_free_single(page)					page_block_free_single(&pages, page)
-#define page_free_contiguous(page, size)			page_block_free_contiguous(&pages, page, size)
+#define page_alloc(contiguous_pages)				page_block_alloc(&pages, contiguous_pages)
+#define page_free(page, size)					page_block_free(&pages, page, size)
 #if defined(CONFIG_MMU)
-#define page_make_ref_single(page)				page_block_make_ref_single(&pages, page)
-#define page_make_ref_contiguous(page, size)			page_block_make_ref_contiguous(&pages, page, size)
+#define page_make_ref(page, size)				page_block_make_ref(&pages, page, size)
+#define page_get_ref_single(page)				page_block_get_ref_single(&pages, page)
 #endif
 
 #endif

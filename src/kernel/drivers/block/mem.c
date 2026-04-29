@@ -8,15 +8,16 @@
 #include <kernel/printk.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
+#include <kernel/utils/iovec.h>
 
 
 // Driver Definition
 int mem_init();
 int mem_open(devminor_t minor, int access);
 int mem_close(devminor_t minor);
-int mem_read(devminor_t minor, char *buffer, offset_t offset, size_t size);
-int mem_write(devminor_t minor, const char *buffer, offset_t offset, size_t size);
-int mem_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid);
+int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int mem_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int mem_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int mem_poll(devminor_t minor, int events);
 offset_t mem_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
 
@@ -66,35 +67,37 @@ int mem_close(devminor_t minor)
 	return 0;
 }
 
-int mem_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
+int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
 	if (minor >= num_devices)
 		return ENXIO;
+	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
 	if (offset > geo->size)
 		return EINVAL;
 	if (offset + size > geo->size)
 		size = geo->size - offset;
-	memcpy(buffer, &geo->base[offset], size);
+	memcpy_into_iter(iter, &geo->base[offset], size);
 	return size;
 }
 
-int mem_write(devminor_t minor, const char *buffer, offset_t offset, size_t size)
+int mem_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
 	if (minor >= num_devices)
 		return ENXIO;
+	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
 	if (offset > geo->size)
 		return EINVAL;
 	if (offset + size > geo->size)
 		size = geo->size - offset;
-	memcpy(&geo->base[offset], buffer, size);
+	memcpy_out_of_iter(iter, &geo->base[offset], size);
 	return size;
 }
 
-int mem_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
+int mem_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	if (minor >= num_devices)
 		return ENXIO;

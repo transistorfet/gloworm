@@ -72,6 +72,11 @@ config LOG_LEVEL_TRACE
 
 endchoice
 
+config DEBUG
+	bool "Enable extra debugging features"
+	help
+	  This will add in some extra debugging features
+
 endif
 
 endmenu

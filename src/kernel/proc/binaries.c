@@ -8,9 +8,10 @@
 #include <kconfig.h>
 #include <kernel/printk.h>
 #include <kernel/fs/vfs.h>
+#include <kernel/mm/map.h>
 #include <kernel/proc/exec.h>
-#include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/math.h>
 
 #include <elf.h>
 
@@ -22,9 +23,9 @@
 #endif
 
 int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry);
-int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry);
+int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map *map, void **entry);
 
-int load_binary(const char *path, struct process *proc, const char *const argv[], const char *const envp[])
+int load_binary(const char *path, struct process *proc, struct string_array *argv, struct string_array *envp)
 {
 	int error;
 	void *entry;
@@ -47,7 +48,7 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 	if (!map)
 		return ENOMEM;
 
-	error = load_elf_binary(file, map, &entry);
+	error = load_elf_binary(proc, file, map, &entry);
 	// If the file was not a valid ELF binary, then execute it as a flat binary
 	if (error == ENOEXEC) {
 		error = vfs_seek(file, 0, SEEK_SET);
@@ -65,75 +66,99 @@ int load_binary(const char *path, struct process *proc, const char *const argv[]
 		return error;
 	}
 
+	// Reset the fd table and signal handlers for the executing proc
+	reset_proc(proc);
+
 	// Swap the existing memory map for the newly created one
-	memory_map_free(proc->map);
 	proc->map = map;
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
-	exec_initialize_stack_with_args(proc, (char *) map->stack_end, entry, argv, envp);
+	error = exec_initialize_stack_with_args(proc, map->stack_end, entry, argv, envp);
+	if (error < 0) {
+		return error;
+	}
 
-	return error;
+	return 0;
 }
 
 int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 {
-	int mem_size;
+	size_t mem_size;
 	int error = ENOMEM;
+	struct kvec kvec;
+	struct iovec_iter iter;
 	uintptr_t user_mem_start;
-	struct memory_object *object = NULL;
 
 	// The extra data is for the bss segment, which we don't know the proper size of
 	mem_size = roundup(file->vnode->size + 0x200, PAGE_SIZE);
 
-	object = memory_object_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
+	#if defined(CONFIG_MMU)
+
+	struct vfile *object = file;
+
+	// TODO this is wrong, it should be some known address?
+	user_mem_start = 0x40000;
+
+	#else
+
+	struct memory_region *object = NULL;
+	object = memory_region_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
 	if (!object) {
 		goto fail;
 	}
 
-	user_mem_start = object->anonymous.address;
+	user_mem_start = memory_region_get_start_address(object);
 
-	error = memory_map_mmap(map, user_mem_start, mem_size, AREA_TYPE_CODE | AREA_EXECUTABLE, object);
+	#endif
+
+	error = memory_map_mmap(map, user_mem_start, mem_size, SEG_TYPE_CODE | SEG_EXECUTABLE, object, 0);
 	if (error < 0) {
 		goto fail;
 	}
-	// Since the object has now been added to the map, it will be freed when the map is freed
+	// Since the region or file has now been added to the map, it will be freed when the map is freed
 	// so we set the pointer to NULL again to avoid a double-free
 	object = NULL;
 
-	error = vfs_read(file, (void *) user_mem_start, mem_size);
+	iovec_iter_init_simple_kvec(&iter, &kvec, (void *) user_mem_start, mem_size);
+	error = vfs_read(file, &iter);
 	if (error <= 0) {
 		goto fail;
 	}
 
 	*entry = (void *) user_mem_start;
 
-	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
-	if (error < 0)
+	error = memory_map_insert_heap_stack(map, user_mem_start + mem_size, CONFIG_USER_STACK_SIZE);
+	if (error < 0) {
 		goto fail;
+	}
 
 	return 0;
 
 fail:
-	if (object)
-		memory_object_free(object);
+	if (object) {
+		MEMORY_OBJECT_FREE(object);
+	}
 	memory_map_free(map);
 	return error;
 }
 
 #define PROG_HEADER_MAX	    6
 
-int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
+int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map *map, void **entry)
 {
 	short num_ph;
 	size_t mem_size;
+	size_t segment_size;
 	int error = ENOMEM;
+	struct kvec kvec[100];
+	struct iovec_iter iter;
 	uintptr_t user_mem_start;
 	uintptr_t memory_segment_start, memory_segment_end, file_segment_start, file_segment_end;
-	struct memory_object *object = NULL;
 	Elf32_Ehdr header;
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
 
-	if (!(error = vfs_read(file, (char *) &header, sizeof(Elf32_Ehdr))))
+	iovec_iter_init_simple_kvec(&iter, kvec, (char *) &header, sizeof(Elf32_Ehdr));
+	if (!(error = vfs_read(file, &iter)))
 		return error;
 
 	// Look for the ELF signature, 32-bit Big Endian ELF Version 1
@@ -148,8 +173,15 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 	num_ph = header.e_phnum <= PROG_HEADER_MAX ? header.e_phnum : PROG_HEADER_MAX;
 	if (!(error = vfs_seek(file, header.e_phoff, SEEK_SET)))
 		return error;
-	if (!(error = vfs_read(file, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph)))
+	iovec_iter_init_simple_kvec(&iter, kvec, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
+	if (!(error = vfs_read(file, &iter)))
 		return error;
+
+	#if defined(CONFIG_MMU)
+	int preload = 0;
+	#else
+	int preload = 1;
+	#endif
 
 	// Calculate the total size of memory to allocate (not including the stack)
 	mem_size = 0;
@@ -165,53 +197,87 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 			if (prog_headers[i].p_vaddr > mem_size)
 				mem_size = prog_headers[i].p_vaddr;
-			mem_size += roundup(prog_headers[i].p_memsz, PAGE_SIZE);
+			segment_size = alignment_offset(prog_headers[i].p_vaddr, PAGE_SIZE) + prog_headers[i].p_memsz;
+			mem_size += roundup(segment_size, PAGE_SIZE);
+		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
+			preload = 1;
 		}
 	}
 	if (mem_size == 0)
 		return ENOEXEC;
 
-	object = memory_object_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
+	#if defined(CONFIG_MMU)
+
+	struct vfile *object = file;
+
+	// TODO this is wrong of course, but it's a placeholder for the time being
+	// it should come from the elf?
+	user_mem_start = 0x40000;
+
+	#else
+
+	struct memory_region *object = NULL;
+	object = memory_region_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
 	if (!object) {
 		error = ENOMEM;
 		goto fail;
 	}
 
-	user_mem_start = object->anonymous.address;
+	user_mem_start = memory_region_get_start_address(object);
+
+	#endif
 
 	// Load all the program segments
 	for (short i = 0; i < num_ph; i++) {
 		if (prog_headers[i].p_type == PT_LOAD && prog_headers[i].p_filesz > 0) {
 			file_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 			file_segment_end = file_segment_start + prog_headers[i].p_filesz;
-			memory_segment_start = file_segment_start & ~(PAGE_SIZE - 1);
-			memory_segment_end = memory_segment_start + roundup(prog_headers[i].p_memsz, PAGE_SIZE);
+			memory_segment_start = rounddown(file_segment_start, PAGE_SIZE);
+			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
-			if ((error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET)) < 0) {
-				goto fail;
-			}
-			if ((error = vfs_read(file, (char *) file_segment_start, prog_headers[i].p_filesz)) < 0) {
-				goto fail;
-			}
-			memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
-
-			int flags = 0;
+			#if defined(CONFIG_MMU)
+			int flags = preload ? SEG_POPULATE : 0;
+			#else
+			int flags = SEG_FIXED;
+			#endif
 			if (prog_headers[i].p_flags & PF_R) {
-				flags |= AREA_READ;
+				flags |= SEG_READ;
 			}
 			if (prog_headers[i].p_flags & PF_W) {
-				flags |= AREA_WRITE;
+				flags |= SEG_WRITE;
 			}
 			if (prog_headers[i].p_flags & PF_X) {
-				flags |= AREA_EXECUTABLE | AREA_TYPE_CODE;
+				flags |= SEG_EXECUTABLE | SEG_TYPE_CODE;
 			}
 			// If it's not a code area, then mark it as data
-			if (!(flags & AREA_TYPE_CODE)) {
-				flags |= AREA_TYPE_DATA;
+			if (!(flags & SEG_TYPE_CODE)) {
+				flags |= SEG_TYPE_DATA;
 			}
 
-			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, memory_object_make_ref(object))) < 0) {
+			if ((error = memory_map_mmap(map, memory_segment_start, memory_segment_end - memory_segment_start, flags, MEMORY_OBJECT_MAKE_REF(object), prog_headers[i].p_offset)) < 0) {
 				goto fail;
+			}
+
+			if (preload) {
+				error = vfs_seek(file, prog_headers[i].p_offset, SEEK_SET);
+				if (error < 0) {
+					goto fail;
+				}
+
+				#if defined(CONFIG_MMU)
+				error = iovec_iter_load_pages_iter(map, &iter, kvec, 100, file_segment_start, prog_headers[i].p_filesz, 1);
+				if (error < 0) {
+					goto fail;
+				}
+				#else
+				iovec_iter_init_simple_kvec(&iter, kvec, (char *) file_segment_start, prog_headers[i].p_filesz);
+				#endif
+
+				error = vfs_read(file, &iter);
+				if (error < 0) {
+					goto fail;
+				}
+				memset((char *) file_segment_end, '\0', prog_headers[i].p_memsz - prog_headers[i].p_filesz);
 			}
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
 			memory_segment_start = user_mem_start + prog_headers[i].p_vaddr;
@@ -225,17 +291,25 @@ int load_elf_binary(struct vfile *file, struct memory_map *map, void **entry)
 
 	*entry = (void *) user_mem_start + header.e_entry;
 
+	#if !defined(CONFIG_MMU)
 	// Free the extra reference that was used to create the individual segments
-	memory_object_free(object);
+	memory_region_free(object);
+	#endif
 
-	error = memory_map_insert_heap_stack(map, CONFIG_USER_STACK_SIZE);
-	if (error < 0)
+	error = memory_map_insert_heap_stack(map, roundup(user_mem_start + mem_size, PAGE_SIZE), CONFIG_USER_STACK_SIZE);
+	if (error < 0) {
 		goto fail;
+	}
 
 	return 0;
 
 fail:
-	if (object)
-		memory_object_free(object);
+	#if !defined(CONFIG_MMU)
+	if (object) {
+		// Free the extra reference to the user memory area
+		// NOTE: the caller will close the file and free the memory map
+		memory_region_free(object);
+	}
+	#endif
 	return error;
 }

@@ -24,19 +24,22 @@ struct connection {
 
 struct connection *clients[MAX_CONNECTIONS];
 
-int run_server();
+void handle_signal(int signum);
+int run_server(void);
 
 int main(int argc, char **argv)
 {
-	/*
 	int pid;
 
-	pid = fork();
-	if (pid < 0)
-		return pid;
-	if (pid > 0)
-		return 0;
-	*/
+	if (argc >= 2 && !strcmp(argv[1], "-d")) {
+		pid = fork();
+		if (pid < 0) {
+			return pid;
+		}
+		if (pid > 0) {
+			return 0;
+		}
+	}
 
 	run_server();
 	return 0;
@@ -49,7 +52,7 @@ int create_listener()
 	struct sigaction act;
 	struct sockaddr_in addr;
 
-	act.sa_handler = NULL;
+	act.sa_handler = handle_signal;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
 	sigaction(SIGINT, &act, NULL);
@@ -78,6 +81,12 @@ int create_listener()
 	}
 
 	return listenfd;
+}
+
+void handle_signal(int signum)
+{
+	printf("Received signal %d\n", signum);
+	return;
 }
 
 struct connection *create_connection(int sockfd)
@@ -144,8 +153,9 @@ int handle_read(struct connection *conn)
 	printf("received:\n%s\n", conn->headers);
 
 	char *end = strstr(conn->headers, "\r\n\r\n");
-	if (!end)
+	if (!end) {
 		return 0;
+	}
 
 	int i = 0;
 	char response[MAX_HEADERS];
@@ -161,8 +171,9 @@ int handle_read(struct connection *conn)
 	printf("sending %d characters:\n%s\n", i, response);
 
 	error = send(conn->fd, response, i, 0);
-	if (error < 0)
+	if (error < 0) {
 		printf("Error sending: %d\n", error);
+	}
 
 	return 0;
 }
@@ -183,22 +194,26 @@ int read_loop(int listenfd)
 		FD_SET(listenfd, &rd);
 		for (int i = 0; i < MAX_CONNECTIONS; i++) {
 			if (clients[i]) {
-				if (clients[i]->fd > max)
+				if (clients[i]->fd > max) {
 					max = clients[i]->fd;
+				}
 				FD_SET(clients[i]->fd, &rd);
 			}
 		}
 
 		error = select(max + 1, &rd, NULL, NULL, &timeout);
 		if (error < 0) {
-			if (error == EINTR)
-				continue;
+			if (error == EINTR) {
+				printf("Received EINTR\n");
+				break;
+			}
 			printf("Error during select: %d\n", error);
 			return -1;
 		}
 
-		if (error == 0)
+		if (error == 0) {
 			continue;
+		}
 
 		if (FD_ISSET(listenfd, &rd)) {
 			handle_connection(listenfd);
@@ -206,23 +221,27 @@ int read_loop(int listenfd)
 
 		for (int i = 0; i < MAX_CONNECTIONS; i++) {
 			if (clients[i] > 0 && FD_ISSET(clients[i]->fd, &rd)) {
-				if (handle_read(clients[i]))
+				if (handle_read(clients[i])) {
 					close_connection(clients[i]);
+				}
 			}
 		}
 	}
+	return 0;
 }
 
-int run_server()
+int run_server(void)
 {
 	int listenfd;
 
-	for (int i = 0; i < MAX_CONNECTIONS; i++)
+	for (int i = 0; i < MAX_CONNECTIONS; i++) {
 		clients[i] = NULL;
+	}
 
 	listenfd = create_listener();
-	if (listenfd < 0)
+	if (listenfd < 0) {
 		return -1;
+	}
 
 	read_loop(listenfd);
 

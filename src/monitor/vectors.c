@@ -34,6 +34,7 @@ const interrupt_handler_t boot_vectors[16] __attribute__((section(".vectors"))) 
 };
 
 asm(
+".text\n"
 "fatal_error_entry:\n"
 //	move.b	#0x01, %d0
 //	lea	0x201d, %a0

@@ -3,6 +3,9 @@
 #define _SRC_KERNEL_FS_PROCFS_PROCFS_H
 
 #include <kernel/fs/vfs.h>
+#include <kernel/utils/iovec.h>
+
+struct process;
 
 #define PROCFS_DATA(vnode)	(((struct procfs_vnode *) (vnode))->data)
 
@@ -12,6 +15,7 @@
 #define PFN_STAT	3
 #define PFN_STATM	4
 #define PFN_MAPS	5
+#define PFN_PAGEDUMP	6
 
 #define PFN_MOUNTS	100
 
@@ -45,8 +49,8 @@ int procfs_release(struct vnode *vnode);
 
 int procfs_open(struct vfile *file, int flags);
 int procfs_close(struct vfile *file);
-int procfs_read(struct vfile *file, char *buf, size_t nbytes);
-int procfs_write(struct vfile *file, const char *buf, size_t nbytes);
+int procfs_read(struct vfile *file, struct iovec_iter *iter);
+int procfs_write(struct vfile *file, struct iovec_iter *iter);
 int procfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
 offset_t procfs_seek(struct vfile *file, offset_t position, int whence);
 int procfs_readdir(struct vfile *file, struct dirent *dir);

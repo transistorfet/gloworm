@@ -3,6 +3,8 @@
 #define _SRC_KERNEL_NET_PROTOCOL_IPV4_H
 
 #include <stdint.h>
+
+#include <kernel/net/packet.h>
 #include "inet_af.h"
 
 extern struct protocol ipv4_protocol;
@@ -14,7 +16,7 @@ struct ipv4_custom_data {
 
 uint16_t ipv4_calculate_checksum(void *data, int len, uint32_t start);
 
-int ipv4_encode_header(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, const unsigned char *data, int length);
+int ipv4_encode_header(struct packet *pack, const struct ipv4_address *src, const struct ipv4_address *dest, int length);
 
 #endif
 

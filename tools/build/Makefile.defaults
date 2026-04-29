@@ -16,7 +16,7 @@ RANLIB				?= $(GCC_PREFIX)ranlib
 
 asflags-y			+= -I$(include-dir)
 ccflags-y			+= -I$(include-dir) -g -Wall
-ccflags-y			+= -nostartfiles -nostdlib -fno-zero-initialized-in-bss
+ccflags-y			+= -nostartfiles -nostdlib -nostdinc -fno-zero-initialized-in-bss
 ldflags-y 			+= -Wl,--build-id=none
 
 ccflags-$(CONFIG_CC_OPTIMIZE_FOR_SIZE)			+= -Os
@@ -34,11 +34,19 @@ firmware-ccflags-$(CONFIG_M68K)	+= -mpcrel
 
 # reduce the elf output size by reducing the alignment
 ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
+# TODO not sure if these should be kept or not.  align-int specifically will generate structs with padding
+#ccflags-y			+= -malign-int -mstrict-align
 
 export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 
-HOST_GCC			?= gcc
-HOST_CFLAGS			?= -I$(src-root)/include -Wall -O3
+HOST_ARCH			= testapp
+HOST_LD				?= gcc
+HOST_CC				?= gcc
+HOST_CFLAGS			?=
+HOST_LDFLAGS			?=
 
-export HOST_GCC HOST_CFLAGS
+host-ccflags-y			+= -I$(include-dir) -g -Wall -O3
+host-ccflags-y			+= -Isrc/libc/arch/$(HOST_ARCH)/include -Isrc/kernel/arch/$(HOST_ARCH)/include
+
+export HOST_ARCH HOST_LD HOST_CC HOST_GCC HOST_CFLAGS HOST_LDFLAGS
 

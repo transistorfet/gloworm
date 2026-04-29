@@ -3,8 +3,7 @@ import time
 import serial
 import argparse
 
-devicefile = '/dev/ttyUSB0'
-#baud = 9600
+devicefile = '/dev/ttyUSB1'
 baud = 38400
 
 def main():

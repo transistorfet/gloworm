@@ -112,11 +112,20 @@ static inline void run_signal_handler(struct process *proc, int signum)
 
 void cleanup_signal_handler()
 {
-	arch_remove_signal_context(current_proc);
+	int signum;
+
+	signum = arch_remove_signal_context(current_proc);
 
 	// TODO maybe we should restart the syscall anyways, which would then block again if it's not ready, instead of suspending here?
 	if (current_proc->bits & PB_SYSCALL) {
 		suspend_proc(current_proc, 0);
+	}
+
+	// With a custom signal handler, the return value would likely get changed, so re-set it to EINTR
+	// Otherwise the current system call can't be cancelled, and Ctrl-C with a custom handler can't exit the program
+	if (!(current_proc->signals.actions[signum - 1].sa_flags & SA_RESTART)) {
+		set_proc_return_value(current_proc, EINTR);
+		current_proc->bits |= PB_DONT_SET_RETURN_VAL;
 	}
 
 	check_pending_signals();
@@ -148,8 +157,9 @@ static inline void run_signal_default_action(struct process *proc, int signum, s
 	}
 
 	// Since we don't execute the signal handler cleanup for a default action, we cancel the syscall here instead
-	if (!(current_proc->signals.actions[signum - 1].sa_flags & SA_RESTART))
-		cancel_syscall(current_proc);
+	if (!(proc->signals.actions[signum - 1].sa_flags & SA_RESTART)) {
+		cancel_syscall(proc);
+	}
 }
 
 static inline sigset_t signal_to_map(int signum)

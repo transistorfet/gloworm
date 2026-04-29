@@ -1,9 +1,13 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/param.h>
 
-#include <kernel/proc/memory.h>
+#include <kconfig.h>
+#include <kernel/mm/map.h>
 #include <kernel/proc/process.h>
+#include <kernel/utils/usercopy.h>
+#include <kernel/utils/iovec.h>
 
 #include "data.h"
 
@@ -15,24 +19,114 @@ static inline size_t get_proc_size(struct process *proc);
 int get_data_cmdline(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
-	for (const char *const *arg = proc->map->argv; *arg; arg++) {
-		strncpy(&buffer[i], *arg, max - i);
-		i += strlen(*arg) + 1;
-		buffer[i - 1] = ' ';
-		if (i > max)
-			break;
+	int result;
+
+	if (proc->map && proc->map->argv) {
+		for (const char *const *arg = proc->map->argv; ; arg++) {
+			#if defined(CONFIG_MMU)
+
+			int length;
+			char *argstr;
+			struct kvec kvec[10];
+
+			result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, sizeof(uintptr_t), 0);
+			if (result < 0) {
+				return result;
+			}
+			result = memcpy_out_of_kvec(kvec, result, 0, &argstr, sizeof(uintptr_t));
+			if (result < 0) {
+				return result;
+			}
+
+			if (!argstr) {
+				break;
+			}
+
+			// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
+			length = roundup((uintptr_t) argstr, PAGE_SIZE) - (uintptr_t) argstr;
+			result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, length, 0);
+			if (result < 0) {
+				return result;
+			}
+			result = strncpy_out_of_kvec(kvec, result, 0, &buffer[i], max - i);
+			if (result < 0) {
+				return result;
+			}
+
+			#else
+
+			if (!arg) {
+				break;
+			}
+
+			strncpy(&buffer[i], (const char *) arg, max - i);
+			result = strnlen(&buffer[i], max - i);
+
+			#endif
+
+			i += result;
+			buffer[i] = ' ';
+			if (i > max) {
+				break;
+			}
+		}
 	}
-	buffer[i - 1] = '\0';
+	buffer[i] = '\0';
 	return i;
 }
 
 
 int get_data_stat(struct process *proc, char *buffer, int max)
 {
+	const char *cmd;
+
+	#if defined(CONFIG_MMU)
+	int result;
+	int length;
+	uintptr_t arg;
+	struct kvec kvec[10];
+	char cmd_buffer[32];
+	#endif
+
+	if (proc->map && proc->map->argv) {
+
+		#if defined(CONFIG_MMU)
+
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) proc->map->argv, sizeof(uintptr_t), 0);
+		if (result < 0) {
+			return result;
+		}
+		result = memcpy_out_of_kvec(kvec, result, 0, &arg, sizeof(uintptr_t));
+		if (result < 0) {
+			return result;
+		}
+
+		// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
+		length = roundup(arg, PAGE_SIZE) - arg;
+		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, length, 0);
+		if (result < 0) {
+			return result;
+		}
+		result = strncpy_out_of_kvec(kvec, result, 0, cmd_buffer, 32);
+		if (result < 0) {
+			return result;
+		}
+		cmd = cmd_buffer;
+
+		#else
+
+		cmd = proc->map->argv[0];
+
+		#endif
+
+	} else {
+		cmd = "<defunct>";
+	}
+
 	return snprintf(buffer, max,
 		"%d %s %c %d %d %d %d %ld %ld\n",
 		proc->pid,
-		proc->map->argv[0],
+		cmd,
 		get_proc_state(proc),
 		proc->parent,
 		proc->pgid,
@@ -45,29 +139,43 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 
 int get_data_statm(struct process *proc, char *buffer, int max)
 {
-	return snprintf(buffer, max,
-		"%ld %lx %lx %lx %lx %lx %lx\n",
-		get_proc_size(proc),
-		(uintptr_t) proc->map->code_start,
-		proc->map->data_start - proc->map->code_start,
-		(uintptr_t) proc->map->data_start,
-		proc->map->sbrk - proc->map->data_start,
-		(uintptr_t) proc->map->sbrk,
-		proc->map->stack_end
-	);
-
+	if (proc->map) {
+		return snprintf(buffer, max,
+			"%ld %lx %lx %lx %lx %lx %lx\n",
+			get_proc_size(proc),
+			(uintptr_t) proc->map->code_start,
+			proc->map->data_start - proc->map->code_start,
+			(uintptr_t) proc->map->data_start,
+			proc->map->sbrk - proc->map->data_start,
+			(uintptr_t) proc->map->sbrk,
+			proc->map->stack_end
+		);
+	} else {
+		return snprintf(buffer, max, "0 0 0 0 0 0 0\n");
+	}
 }
 
 int get_data_maps(struct process *proc, char *buffer, int max)
 {
 	int i = 0;
 
-	for (struct memory_area *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
-		i += snprintf(&buffer[i], max - i, "%lx-%lx %x\n", cur->start, cur->end, cur->flags);
+	if (proc->map) {
+		for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+			i += snprintf(&buffer[i], max - i, "%lx-%lx %x\n", cur->start, cur->end, cur->flags);
+		}
 	}
 	return i;
 }
 
+#if defined(CONFIG_MMU)
+int get_data_pagedump(struct process *proc, char *buffer, int max)
+{
+	if (proc->map) {
+		mmu_table_print(proc->map->root_table);
+	}
+	return 0;
+}
+#endif
 
 static inline char get_proc_state(struct process *proc)
 {
@@ -90,8 +198,10 @@ static inline size_t get_proc_size(struct process *proc)
 {
 	size_t size = 0;
 
-	for (struct memory_area *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
-		size += cur->end - cur->start;
+	if (proc->map) {
+		for (struct memory_segment *cur = memory_map_iter_first(proc->map); cur; cur = memory_map_iter_next(cur)) {
+			size += cur->end - cur->start;
+		}
 	}
 	return size;
 }

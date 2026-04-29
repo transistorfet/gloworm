@@ -9,7 +9,7 @@ int MAIN(command_kill)(int argc, char **argv, char **envp)
 {
 	int error;
 	int i = 1;
-	pid_t pid;
+	pid_t pid = 0;
 	int signal = 6;
 	char *endptr;
 
@@ -21,6 +21,12 @@ int MAIN(command_kill)(int argc, char **argv, char **envp)
 	if (argv[i][0] == '-') {
 		signal = strtol(&argv[i][1], &endptr, 10);
 		i += 1;
+		printf("sending signal %d\n", signal);
+	}
+
+	if (argc <= i) {
+		printf("Must provide a pid\n");
+		return -1;
 	}
 
 	pid = strtol(argv[i], &endptr, 10);

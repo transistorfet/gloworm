@@ -12,6 +12,7 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/scheduler.h>
+#include <kernel/utils/iovec.h>
 
 #include <asm/irqs.h>
 
@@ -60,9 +61,9 @@ struct termios default_tio = {
 int tty_init();
 int tty_open(devminor_t minor, int access);
 int tty_close(devminor_t minor);
-int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size);
-int tty_write(devminor_t minor, const char *buffer, offset_t offset, size_t size);
-int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid);
+int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int tty_poll(devminor_t minor, int events);
 
 struct driver tty_driver = {
@@ -77,13 +78,13 @@ struct driver tty_driver = {
 };
 
 
-static struct tty_device devices[TTY_DEVICE_NUM];
+static struct tty_device tty_devices[TTY_DEVICE_NUM];
 
 static void tty_reset_input(device_t minor)
 {
-	devices[minor].ready = 0;
-	devices[minor].buf_read = 0;
-	devices[minor].buf_write = 0;
+	tty_devices[minor].ready = 0;
+	tty_devices[minor].buf_read = 0;
+	tty_devices[minor].buf_write = 0;
 }
 
 
@@ -91,7 +92,9 @@ static inline void tty_read_input(device_t minor)
 {
 	char ch;
 	int error;
-	struct tty_device *tty = &devices[minor];
+	struct kvec kvec;
+	struct iovec_iter iter;
+	struct tty_device *tty = &tty_devices[minor];
 
 	while (1) {
 		// If the buffer is full, then consider the line to be terminated and resume the waiting proc
@@ -101,7 +104,8 @@ static inline void tty_read_input(device_t minor)
 			return;
 		}
 
-		error = dev_read(tty->rdev, &ch, 0, 1);
+		iovec_iter_init_simple_kvec(&iter, &kvec, &ch, 1);
+		error = dev_read(tty->rdev, 0, &iter);
 		if (error <= 0) {
 			tty->error = error;
 			return;
@@ -132,9 +136,11 @@ static inline void tty_read_input(device_t minor)
 				if ((tty->tio.c_lflag & ECHOE)) {
 					if (tty->buffer[tty->buf_write] == '\t') {
 						// TODO proper handling of this might require window dimensions and cursor position tracking
-						dev_write(tty->rdev, "\x08\x08\x08\x08\x08\x08\x08\x08", 0, 8);
+						iovec_iter_init_simple_kvec(&iter, &kvec, "\x08\x08\x08\x08\x08\x08\x08\x08", 8);
+						dev_write(tty->rdev, 0, &iter);
 					} else {
-						dev_write(tty->rdev, "\x08 \x08", 0, 3);
+						iovec_iter_init_simple_kvec(&iter, &kvec, "\x08 \x08", 3);
+						dev_write(tty->rdev, 0, &iter);
 					}
 				}
 			}
@@ -142,8 +148,10 @@ static inline void tty_read_input(device_t minor)
 			// Ignore
 		} else {
 			tty->buffer[tty->buf_write++] = ch;
-			if ((tty->tio.c_lflag & ECHO))
-				dev_write(tty->rdev, &ch, 0, 1);
+			if ((tty->tio.c_lflag & ECHO)) {
+				iovec_iter_init_simple_kvec(&iter, &kvec, &ch, 1);
+				dev_write(tty->rdev, 0, &iter);
+			}
 			if (ch == '\n') {
 				tty->ready = 1;
 				resume_blocked_procs(VFS_POLL_READ, NULL, DEVNUM(DEVMAJOR_TTY, minor));
@@ -156,23 +164,24 @@ static inline void tty_read_input(device_t minor)
 static void tty_process_input(void *_unused)
 {
 	for (short minor = 0; minor < TTY_DEVICE_NUM; minor++) {
-		if (devices[minor].opens && (devices[minor].tio.c_lflag & ICANON))
+		if (tty_devices[minor].opens && (tty_devices[minor].tio.c_lflag & ICANON)) {
 			tty_read_input(minor);
+		}
 	}
 }
 
 int tty_init()
 {
 	for (short i = 0; i < TTY_DEVICE_NUM; i++) {
-		devices[i].rdev = DEVNUM(DEVMAJOR_TTY68681, i);
-		devices[i].pgid = 0;
-		devices[i].error = 0;
-		devices[i].opens = 0;
-		devices[i].ready = 0;
-		devices[i].buf_read = 0;
-		devices[i].buf_write = 0;
+		tty_devices[i].rdev = DEVNUM(DEVMAJOR_TTY68681, i);
+		tty_devices[i].pgid = 0;
+		tty_devices[i].error = 0;
+		tty_devices[i].opens = 0;
+		tty_devices[i].ready = 0;
+		tty_devices[i].buf_read = 0;
+		tty_devices[i].buf_write = 0;
 
-		memcpy(&devices[i].tio, &default_tio, sizeof(struct termios));
+		memcpy(&tty_devices[i].tio, &default_tio, sizeof(struct termios));
 	}
 
 	register_driver(DEVMAJOR_TTY, &tty_driver);
@@ -186,8 +195,8 @@ int tty_open(devminor_t minor, int mode)
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
 	// TODO you need to notify the serial driver to request the tty bottom half run after any input
-	if (devices[minor].opens++ == 0)
-		return dev_open(devices[minor].rdev, mode | O_NONBLOCK | O_EXCL);
+	if (tty_devices[minor].opens++ == 0)
+		return dev_open(tty_devices[minor].rdev, mode | O_NONBLOCK | O_EXCL);
 	return 0;
 }
 
@@ -195,38 +204,41 @@ int tty_close(devminor_t minor)
 {
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
-	if (devices[minor].opens == 0)
+	if (tty_devices[minor].opens == 0)
 		return EBADF;
-	if (--devices[minor].opens == 0)
-		return dev_close(devices[minor].rdev);
+	if (--tty_devices[minor].opens == 0)
+		return dev_close(tty_devices[minor].rdev);
 	return 0;
 }
 
-int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
+int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
+	size_t size;
+
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
 
 	// If an error occurred when buffering the data, then return it and clear the error
-	if (devices[minor].error) {
-		int error = devices[minor].error;
-		devices[minor].error = 0;
+	if (tty_devices[minor].error) {
+		int error = tty_devices[minor].error;
+		tty_devices[minor].error = 0;
 		return error;
 	}
 
-	if (!(devices[minor].tio.c_lflag & ICANON)) {
-		if (devices[minor].buf_read < devices[minor].buf_write) {
-			size_t max = devices[minor].buf_write - devices[minor].buf_read;
+	size = iovec_iter_remaining(iter);
+	if (!(tty_devices[minor].tio.c_lflag & ICANON)) {
+		if (tty_devices[minor].buf_read < tty_devices[minor].buf_write) {
+			size_t max = tty_devices[minor].buf_write - tty_devices[minor].buf_read;
 			if (size < max)
 				max = size;
-			memcpy(buffer, &devices[minor].buffer[devices[minor].buf_read], max);
-			devices[minor].buf_read += max;
-			if (devices[minor].buf_read >= devices[minor].buf_write)
+			memcpy_into_iter(iter, &tty_devices[minor].buffer[tty_devices[minor].buf_read], max);
+			tty_devices[minor].buf_read += max;
+			if (tty_devices[minor].buf_read >= tty_devices[minor].buf_write)
 				tty_reset_input(minor);
 			return max;
 		}
 
-		int read = dev_read(devices[minor].rdev, buffer, offset, size);
+		int read = dev_read(tty_devices[minor].rdev, offset, iter);
 		if (read == 0) {
 			suspend_current_syscall(VFS_POLL_READ);
 			return 0;
@@ -235,35 +247,37 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 	} else {
 		size_t max;
 		size_t count;
+		uint8_t byte;
 
 		// If an entire line is not available yet, then suspend the process
-		if (!devices[minor].ready) {
+		if (!tty_devices[minor].ready) {
 			suspend_current_syscall(VFS_POLL_READ);
 			return 0;
 		}
 
 		// Copy the lesser of the remaining buffered bytes or the requested size
-		max = devices[minor].buf_write - devices[minor].buf_read;
+		max = tty_devices[minor].buf_write - tty_devices[minor].buf_read;
 		if (size < max)
 			max = size;
 		for (count = 0; count < max; count++) {
-			buffer[count] = devices[minor].buffer[devices[minor].buf_read++];
+			byte = tty_devices[minor].buffer[tty_devices[minor].buf_read++];
+			copy_uint8_into_iter(iter, byte);
 
 			// If we reach the end of a line, shift any remaining data over to make room, and exit the loop
-			if (buffer[count] == '\n') {
+			if (byte == '\n') {
 				count += 1;
-				int remaining = devices[minor].buf_write - devices[minor].buf_read;
+				int remaining = tty_devices[minor].buf_write - tty_devices[minor].buf_read;
 				if (remaining) {
-					memcpy(devices[minor].buffer, &devices[minor].buffer[devices[minor].buf_read], remaining);
-					devices[minor].buf_write -= devices[minor].buf_read;
-					devices[minor].buf_read = 0;
+					memcpy(tty_devices[minor].buffer, &tty_devices[minor].buffer[tty_devices[minor].buf_read], remaining);
+					tty_devices[minor].buf_write -= tty_devices[minor].buf_read;
+					tty_devices[minor].buf_read = 0;
 				}
 				break;
 			}
 		}
 
 		// If an entire line has been read, then reset the buffer and attempt to read more input from the raw device
-		if (devices[minor].buf_read >= devices[minor].buf_write) {
+		if (tty_devices[minor].buf_read >= tty_devices[minor].buf_write) {
 			tty_reset_input(minor);
 			request_bh_run(BH_TTY);
 		}
@@ -271,14 +285,14 @@ int tty_read(devminor_t minor, char *buffer, offset_t offset, size_t size)
 	}
 }
 
-int tty_write(devminor_t minor, const char *buffer, offset_t offset, size_t size)
+int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 {
 	int written;
 
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
 
-	written = dev_write(devices[minor].rdev, buffer, offset, size);
+	written = dev_write(tty_devices[minor].rdev, offset, iter);
 	if (!written) {
 		suspend_current_syscall(VFS_POLL_WRITE);
 		return 0;
@@ -286,7 +300,7 @@ int tty_write(devminor_t minor, const char *buffer, offset_t offset, size_t size
 	return written;
 }
 
-int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
+int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	short saved_status;
 
@@ -296,39 +310,43 @@ int tty_ioctl(devminor_t minor, unsigned int request, void *argp, uid_t uid)
 	switch (request) {
 		case TCGETS: {
 			LOCK(saved_status);
-			memcpy((struct termios *) argp, &devices[minor].tio, sizeof(struct termios));
+			memcpy_into_iter(iter, &tty_devices[minor].tio, sizeof(struct termios));
 			UNLOCK(saved_status);
 			return 0;
 		}
 		case TCSETS: {
 			LOCK(saved_status);
-			memcpy(&devices[minor].tio, (struct termios *) argp, sizeof(struct termios));
+			memcpy_out_of_iter(iter, &tty_devices[minor].tio, sizeof(struct termios));
 			UNLOCK(saved_status);
 			return 0;
 		}
 
 		case TIOCGPGRP: {
-			*((int *) argp) = devices[minor].pgid;
+			int arg;
+			arg = tty_devices[minor].pgid;
+			memcpy_into_iter(iter, &arg, sizeof(int));
 			return 0;
 		}
 		case TIOCSPGRP: {
-			devices[minor].pgid = *((int *) argp);
+			int arg;
+			memcpy_out_of_iter(iter, &arg, sizeof(int));
+			tty_devices[minor].pgid = arg;
 			return 0;
 		}
 		default:
-			return dev_ioctl(devices[minor].rdev, request, argp, uid);
+			return dev_ioctl(tty_devices[minor].rdev, request, iter, uid);
 	}
 }
 
 int tty_poll(devminor_t minor, int events)
 {
 	int revents = 0;
-	struct tty_device *tty = &devices[minor];
+	struct tty_device *tty = &tty_devices[minor];
 
 	if ((events & VFS_POLL_READ) && tty->opens > 0 && tty->ready)
 		revents |= VFS_POLL_READ;
 	if ((events & VFS_POLL_WRITE) && tty->opens > 0)
-		revents |= dev_poll(devices[minor].rdev, VFS_POLL_WRITE);
+		revents |= dev_poll(tty_devices[minor].rdev, VFS_POLL_WRITE);
 	if ((events & VFS_POLL_ERROR) && tty->opens > 0 && tty->error)
 		revents |= VFS_POLL_ERROR;
 

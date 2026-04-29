@@ -638,18 +638,18 @@ int vfs_close(struct vfile *file)
 	return error;
 }
 
-int vfs_read(struct vfile *file, char *buffer, size_t size)
+int vfs_read(struct vfile *file, struct iovec_iter *iter)
 {
 	if ((file->flags & O_ACCMODE) == O_WRONLY)
 		return EACCES;
-	return file->ops->read(file, buffer, size);
+	return file->ops->read(file, iter);
 }
 
-int vfs_write(struct vfile *file, const char *buffer, size_t size)
+int vfs_write(struct vfile *file, struct iovec_iter *iter)
 {
 	if ((file->flags & O_ACCMODE) == O_RDONLY)
 		return EACCES;
-	return file->ops->write(file, buffer, size);
+	return file->ops->write(file, iter);
 }
 
 int vfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)

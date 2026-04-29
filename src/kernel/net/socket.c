@@ -52,12 +52,14 @@ int net_socket_create(int domain, int type, int protocol, uid_t uid, struct vfil
 	struct sock_vnode *vnode;
 
 	proto = net_get_protocol(domain, type, protocol);
-	if (!proto)
+	if (!proto) {
 		return EAFNOSUPPORT;
+	}
 
 	vnode = kmalloc(sizeof(struct sock_vnode));
-	if (!vnode)
+	if (!vnode) {
 		return NULL;
+	}
 	vfs_init_vnode(&vnode->vn, &sock_vnode_ops, NULL, S_IFSOCK | 0600, 1, uid, 0, 0, 0, 0, 0, 0, 0);
 
 	*file = new_fileptr(&vnode->vn, 0);
@@ -105,10 +107,12 @@ int net_socket_bind(struct vfile *file, const struct sockaddr *addr, socklen_t l
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!addr || addr->sa_family != sock->domain)
+	if (!addr || addr->sa_family != sock->domain) {
 		return EAFNOSUPPORT;
-	if (sock->ep)
+	}
+	if (sock->ep) {
 		return EISCONN;
+	}
 
 	return net_create_endpoint(sock->proto, sock, addr, len, &sock->ep);
 }
@@ -120,13 +124,15 @@ int net_socket_connect(struct vfile *file, const struct sockaddr *addr, socklen_
 
 	if (!sock->ep) {
 		int error = net_create_endpoint(sock->proto, sock, NULL, 0, &sock->ep);
-		if (error)
+		if (error) {
 			return error;
+		}
 	}
 
-	if (!sock->ep->ops->connect)
+	if (!sock->ep->ops->connect) {
 		// TODO should you free the endpoint here?  It will still be freed when the socket is closed
 		return EAFNOSUPPORT;
+	}
 
 	result = sock->ep->ops->connect(sock->ep, addr, len);
 	if (result == EWOULDBLOCK) {
@@ -140,10 +146,12 @@ int net_socket_listen(struct vfile *file, int n)
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->listen)
+	}
+	if (!sock->ep->ops->listen) {
 		return EAFNOSUPPORT;
+	}
 	return sock->ep->ops->listen(sock->ep, n);
 }
 
@@ -155,10 +163,12 @@ int net_socket_accept(struct vfile *file, struct sockaddr *addr, socklen_t *addr
 	struct socket *client;
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->accept)
+	}
+	if (!sock->ep->ops->accept) {
 		return EAFNOSUPPORT;
+	}
 
 	error = sock->ep->ops->accept(sock->ep, addr, addr_len, &ep);
 	if (error == EWOULDBLOCK) {
@@ -172,8 +182,9 @@ int net_socket_accept(struct vfile *file, struct sockaddr *addr, socklen_t *addr
 	}
 
 	error = net_socket_create(sock->domain, sock->type, sock->proto->protocol, uid, &newfile);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	client = SOCKET(newfile->vnode);
 	client->ep = ep;
@@ -187,41 +198,48 @@ int net_socket_shutdown(struct vfile *file, int how)
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (how != SHUT_RD && how != SHUT_WR && how != SHUT_RDWR)
+	}
+	if (how != SHUT_RD && how != SHUT_WR && how != SHUT_RDWR) {
 		return EINVAL;
-	if (!sock->ep->ops->shutdown)
+	}
+	if (!sock->ep->ops->shutdown) {
 		return 0;
+	}
 
 	return sock->ep->ops->shutdown(sock->ep, how);
 }
 
-int net_socket_read(struct vfile *file, char *buf, size_t nbytes)
+int net_socket_read(struct vfile *file, struct iovec_iter *iter)
 {
-	if (!S_ISSOCK(file->vnode->mode))
+	if (!S_ISSOCK(file->vnode->mode)) {
 		return EBADF;
-	return net_socket_recv(file, buf, nbytes, 0);
+	}
+	return net_socket_recv(file, iter, 0);
 }
 
-int net_socket_write(struct vfile *file, const char *buf, size_t nbytes)
+int net_socket_write(struct vfile *file, struct iovec_iter *iter)
 {
-	if (!S_ISSOCK(file->vnode->mode))
+	if (!S_ISSOCK(file->vnode->mode)) {
 		return EBADF;
-	return net_socket_send(file, buf, nbytes, 0);
+	}
+	return net_socket_send(file, iter, 0);
 }
 
-ssize_t net_socket_send(struct vfile *file, const void *buf, size_t n, int flags)
+ssize_t net_socket_send(struct vfile *file, struct iovec_iter *iter, int flags)
 {
 	int result;
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->send)
+	}
+	if (!sock->ep->ops->send) {
 		return EAFNOSUPPORT;
+	}
 
-	result = sock->ep->ops->send(sock->ep, buf, n);
+	result = sock->ep->ops->send(sock->ep, iter);
 	if (result == EWOULDBLOCK) {
 		suspend_current_syscall(VFS_POLL_WRITE);
 		return 0;
@@ -229,17 +247,19 @@ ssize_t net_socket_send(struct vfile *file, const void *buf, size_t n, int flags
 	return result;
 }
 
-ssize_t net_socket_recv(struct vfile *file, void *buf, size_t n, int flags)
+ssize_t net_socket_recv(struct vfile *file, struct iovec_iter *iter, int flags)
 {
 	int result;
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->recv)
+	}
+	if (!sock->ep->ops->recv) {
 		return EAFNOSUPPORT;
+	}
 
-	result = sock->ep->ops->recv(sock->ep, buf, n);
+	result = sock->ep->ops->recv(sock->ep, iter);
 	if (result == EWOULDBLOCK) {
 		suspend_current_syscall(VFS_POLL_READ);
 		return 0;
@@ -248,37 +268,42 @@ ssize_t net_socket_recv(struct vfile *file, void *buf, size_t n, int flags)
 	return result;
 }
 
-ssize_t net_socket_sendto(struct vfile *file, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len)
+ssize_t net_socket_sendto(struct vfile *file, struct iovec_iter *iter, int flags, const struct sockaddr *addr, socklen_t addr_len)
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (addr->sa_family != sock->domain)
+	if (addr->sa_family != sock->domain) {
 		return EINVAL;
+	}
 
 	// If no endpoint is open, then create an ephemeral endpoint
 	if (!sock->ep) {
 		int error = net_create_endpoint(sock->proto, sock, NULL, 0, &sock->ep);
-		if (error)
+		if (error) {
 			return error;
+		}
 	}
 
-	if (!sock->ep->ops->send_to)
+	if (!sock->ep->ops->send_to) {
 		return EAFNOSUPPORT;
+	}
 
-	return sock->ep->ops->send_to(sock->ep, buf, n, addr, addr_len);
+	return sock->ep->ops->send_to(sock->ep, iter, addr, addr_len);
 }
 
-ssize_t net_socket_recvfrom(struct vfile *file, void *buf, size_t n, int flags, struct sockaddr *addr, socklen_t *addr_len)
+ssize_t net_socket_recvfrom(struct vfile *file, struct iovec_iter *iter, int flags, struct sockaddr *addr, socklen_t *addr_len)
 {
 	int result;
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->recv_from)
+	}
+	if (!sock->ep->ops->recv_from) {
 		return EAFNOSUPPORT;
+	}
 
-	result = sock->ep->ops->recv_from(sock->ep, buf, n, addr, addr_len);
+	result = sock->ep->ops->recv_from(sock->ep, iter, addr, addr_len);
 	if (result == EWOULDBLOCK) {
 		suspend_current_syscall(VFS_POLL_READ);
 		return 0;
@@ -297,8 +322,9 @@ int net_socket_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t
 {
 	//struct socket *sock = SOCKET(file->vnode);
 
-	if (!S_ISSOCK(file->vnode->mode))
+	if (!S_ISSOCK(file->vnode->mode)) {
 		return EBADF;
+	}
 
 	switch (request) {
 
@@ -312,12 +338,15 @@ int net_socket_poll(struct vfile *file, int events)
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!S_ISSOCK(file->vnode->mode))
+	if (!S_ISSOCK(file->vnode->mode)) {
 		return EBADF;
-	if (!sock->ep)
+	}
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->poll)
+	}
+	if (!sock->ep->ops->poll) {
 		return EAFNOSUPPORT;
+	}
 	return sock->ep->ops->poll(sock->ep, events);
 }
 
@@ -325,10 +354,12 @@ int net_socket_get_options(struct vfile *file, int level, int optname, void *opt
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->get_options)
+	}
+	if (!sock->ep->ops->get_options) {
 		return EAFNOSUPPORT;
+	}
 	return sock->ep->ops->get_options(sock->ep, level, optname, optval, optlen);
 }
 
@@ -336,10 +367,12 @@ int net_socket_set_options(struct vfile *file, int level, int optname, const voi
 {
 	struct socket *sock = SOCKET(file->vnode);
 
-	if (!sock->ep)
+	if (!sock->ep) {
 		return ENOTCONN;
-	if (!sock->ep->ops->set_options)
+	}
+	if (!sock->ep->ops->set_options) {
 		return EAFNOSUPPORT;
+	}
 	return sock->ep->ops->set_options(sock->ep, level, optname, optval, optlen);
 }
 

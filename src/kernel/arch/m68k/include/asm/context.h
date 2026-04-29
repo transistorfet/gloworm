@@ -11,6 +11,16 @@
 #include <asm/mmu.h>
 #endif
 
+
+struct syscall_registers {
+	uint32_t d0;
+	uint32_t d1;
+	uint32_t a0;
+	uint32_t a1;
+	uint32_t d2;
+	uint32_t d3;
+};
+
 /// The registers stored on the stack as part of a saved context
 struct context_registers {
 	// Full Context
@@ -54,7 +64,7 @@ struct arch_task_info {
 
 	#if defined(CONFIG_M68K_USER_MODE)
 	/// A pointer to the start of the kernel stack for this process
-	char* kernel_stack;
+	char* kernel_stack_start;
 	#endif
 };
 
@@ -70,6 +80,11 @@ struct arch_task_info {
 
 // TODO this also defined in the assembly file =/
 #define FULL_CONTEXT_SIZE	64
+
+extern void *create_context(void *kernel_stack, void *entry, void *user_stack, int is_kernel);
+extern void *drop_context(void *kernel_stack);
+extern void _user_exit();
+extern void _user_sigreturn();
 
 #endif
 

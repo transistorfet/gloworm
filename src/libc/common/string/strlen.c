@@ -2,13 +2,11 @@
 #include <string.h>
 
 
-unsigned long strlen(const char *str)
+size_t strlen(const char *str)
 {
 	volatile register int i = 0;
 
-	for (; str[i] != '\0'; i++) {
-		/* intentionally empty */
-	}
-	return(i);
+	for (; str[i] != '\0'; i++) {}
+	return i;
 }
 

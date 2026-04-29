@@ -2,8 +2,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+#include <kconfig.h>
 #include <kernel/printk.h>
+#include <kernel/mm/pages.h>
 #include <kernel/mm/kmalloc.h>
+#include <kernel/utils/math.h>
 
 
 struct block {
@@ -13,20 +17,39 @@ struct block {
 
 struct heap {
 	struct block *free_blocks;
+	size_t total_pages;
+	size_t bytes_free;
+	size_t bytes_allocated;
 };
 
 
-static struct heap main_heap = { 0 };
+static struct page_block *kmem_page_block = &pages;
+static struct heap main_heap = { 0, 0, 0, 0 };
 
 
-void init_kernel_heap(uintptr_t start, uintptr_t end)
+int init_kernel_heap(void)
 {
-	struct block *space = (struct block *) start;
+	main_heap.free_blocks = NULL;
+	main_heap.total_pages = 0;
+	main_heap.bytes_free = 0;
+	main_heap.bytes_allocated = 0;
+	return 0;
+}
 
-	space->size = end - start;
-	space->next = NULL;
+int kernel_heap_set_private_page_block(uintptr_t start, uintptr_t end)
+{
+	int error;
 
-	main_heap.free_blocks = space;
+	if (kmem_page_block != &pages) {
+		log_error("kmem: private page block was already set to %x\n", kmem_page_block);
+		return -1;
+	}
+
+	error = init_page_block(kmem_page_block, (char *) start, end - start);
+	if (error < 0) {
+		return error;
+	}
+	return 0;
 }
 
 void *kzalloc(uintptr_t size)
@@ -47,8 +70,8 @@ void *kmalloc(uintptr_t size)
 	struct block *nextfree = NULL;
 	struct block *cur = main_heap.free_blocks;
 
-	// Align the size to 4 bytes
-	size += ((4 - (size & 0x3)) & 0x3);
+	// Align the size to the size of a pointer
+	size = roundup(size, sizeof(uintptr_t));
 	uintptr_t block_size = size + sizeof(struct block);
 
 	for (; cur; prev = cur, cur = cur->next) {
@@ -60,7 +83,6 @@ void *kmalloc(uintptr_t size)
 				cur->size = block_size;
 
 				nextfree->next = cur->next;
-
 			} else {
 				nextfree = cur->next;
 			}
@@ -72,14 +94,38 @@ void *kmalloc(uintptr_t size)
 				main_heap.free_blocks = nextfree;
 			}
 
+			main_heap.bytes_free -= cur->size;
+			main_heap.bytes_allocated += cur->size;
 			return (void *) (cur + 1);
-		} else {
-
 		}
 	}
-	// Out Of Memory
-	panic("Kernel out of memory!  Halting...\n");
-	return NULL;
+
+	// We're out of free blocks, so attempt to allocate a new page of memory, and panic
+	// if we've run out of pages
+	uintptr_t page_size = roundup(block_size, PAGE_SIZE);
+	cur = (struct block *) page_block_alloc(kmem_page_block, page_size);
+	if (!cur) {
+		// Out Of Memory
+		panic("Kernel out of memory!  Halting...\n");
+		return NULL;
+	}
+
+	// Successfully allocated a new page.  If it's got enough leftover space to create a new
+	// free block, then create one and add it to the free list before we return
+	cur->size = page_size;
+	cur->next = NULL;
+	main_heap.total_pages += page_size;
+	main_heap.bytes_allocated += page_size;
+	if (page_size - block_size > sizeof(struct block) + 8) {
+		cur->size = block_size;
+		nextfree = (struct block *) ((char *) cur + block_size);
+		nextfree->size = page_size - block_size;
+		nextfree->next = NULL;
+		// A bit of a hack, but it should work.  Reuse the existing kmfree function to
+		// correctly insert the new block into its sorted position in the free list
+		kmfree((void *) (nextfree + 1));
+	}
+	return (void *) (cur + 1);
 }
 
 void kmfree(void *ptr)
@@ -94,6 +140,8 @@ void kmfree(void *ptr)
 		panic("Double free detected at %x! Halting...\n", block);
 	}
 
+	main_heap.bytes_free += block->size;
+	main_heap.bytes_allocated -= block->size;
 	for (struct block *cur = main_heap.free_blocks; cur; prev = cur, cur = cur->next) {
 		if (cur->next == block) {
 			panic("Double free detected at %x! Halting...\n", cur);
@@ -112,11 +160,14 @@ void kmfree(void *ptr)
 		}
 
 		if (cur >= block) {
+
+
 			// Insert the free'd block into the list
-			if (prev)
+			if (prev) {
 				prev->next = block;
-			else
+			} else {
 				main_heap.free_blocks = block;
+			}
 			block->next = cur;
 
 			// If this block is adjacent to the next free block, then merge them
@@ -128,6 +179,37 @@ void kmfree(void *ptr)
 		}
 	}
 
+	block->next = NULL;
+	if (prev) {
+		prev->next = block;
+	} else if (!main_heap.free_blocks) {
+		main_heap.free_blocks = block;
+	} else {
+		panic("kmalloc free list in broken: couldn't find insertion point but list not empty %x\n", main_heap.free_blocks);
+	}
+}
+
+void kernel_heap_compact(void)
+{
+	struct block *prev = NULL;
+	struct block *cur = main_heap.free_blocks;
+
+	for (; cur; prev = cur, cur = cur->next) {
+		// If this is a page-aligned block that's an even number of pages in size,
+		// then free the pages instead of re-inserting it
+		if (alignment_offset((uintptr_t) cur, PAGE_SIZE) == 0 && alignment_offset(cur->size, PAGE_SIZE) == 0) {
+			if (prev) {
+				prev->next = cur->next;
+			} else {
+				main_heap.free_blocks = cur->next;
+			}
+
+			page_block_free(kmem_page_block, (uintptr_t) cur, cur->size >> PAGE_ADDR_BITS);
+
+			main_heap.bytes_free -= cur->size;
+			main_heap.total_pages -= cur->size;
+		}
+	}
 }
 
 /*

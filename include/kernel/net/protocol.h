@@ -18,6 +18,7 @@
 struct socket;
 struct protocol;
 struct endpoint;
+struct iovec_iter;
 
 struct protocol_ops {
 	int (*init)();
@@ -41,10 +42,10 @@ struct endpoint_ops {
 	int (*accept)(struct endpoint *ep, struct sockaddr *sockaddr, socklen_t *len, struct endpoint **result);
 	int (*connect)(struct endpoint *ep, const struct sockaddr *sockaddr, socklen_t len);
 	int (*shutdown)(struct endpoint *ep, int how);
-	int (*send)(struct endpoint *ep, const unsigned char *buf, int nbytes);
-	int (*recv)(struct endpoint *ep, unsigned char *buf, int max);
-	int (*send_to)(struct endpoint *ep, const unsigned char *buf, int nbytes, const struct sockaddr *sockaddr, socklen_t len);
-	int (*recv_from)(struct endpoint *ep, unsigned char *buf, int max, struct sockaddr *sockaddr, socklen_t *len);
+	int (*send)(struct endpoint *ep, struct iovec_iter *iter);
+	int (*recv)(struct endpoint *ep, struct iovec_iter *iter);
+	int (*send_to)(struct endpoint *ep, struct iovec_iter *iter, const struct sockaddr *sockaddr, socklen_t len);
+	int (*recv_from)(struct endpoint *ep, struct iovec_iter *iter, struct sockaddr *sockaddr, socklen_t *len);
 	int (*get_options)(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen);
 	int (*set_options)(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen);
 	int (*poll)(struct endpoint *ep, int events);
@@ -59,7 +60,7 @@ struct endpoint {
 };
 
 
-int init_net_protocol();
+void init_net_protocol();
 int net_register_protocol(struct protocol *proto);
 struct protocol *net_get_protocol(int domain, int type, int protocol);
 

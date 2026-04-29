@@ -5,11 +5,11 @@ always-y		+= libc-$(SRCARCH)-os.a
 ccflags-$(CONFIG_M68K)	+= -mpcrel
 
 
-LIBC_NONE_SRCS = $(wildcard $(dir)/arch/$(SRCARCH)/**/*.[cs]) $(wildcard $(dir)/none/**/*.[cs]) $(wildcard $(dir)/common/**/*.[cs])
-LIBC_NONE_OBJS = $(addprefix $(OUTPUT),$(patsubst %.c,%.o, $(patsubst %.s,%.o, $(LIBC_NONE_SRCS))))
+LIBC_NONE_SRCS = $(wildcard $(dir)/arch/$(SRCARCH)/**/*.[cS]) $(wildcard $(dir)/none/**/*.[cS]) $(wildcard $(dir)/common/**/*.[cS])
+LIBC_NONE_OBJS = $(addprefix $(OUTPUT),$(patsubst %.c,%.o, $(patsubst %.S,%.o, $(LIBC_NONE_SRCS))))
 
-LIBC_OS_SRCS = $(wildcard $(dir)/arch/$(SRCARCH)/**/*.[cs]) $(wildcard $(dir)/os/**/*.[cs]) $(wildcard $(dir)/common/**/*.[cs])
-LIBC_OS_OBJS = $(addprefix $(OUTPUT),$(patsubst %.c,%.o, $(patsubst %.s,%.o, $(LIBC_OS_SRCS))))
+LIBC_OS_SRCS = $(wildcard $(dir)/arch/$(SRCARCH)/**/*.[cS]) $(wildcard $(dir)/os/**/*.[cS]) $(wildcard $(dir)/common/**/*.[cS])
+LIBC_OS_OBJS = $(addprefix $(OUTPUT),$(patsubst %.c,%.o, $(patsubst %.S,%.o, $(LIBC_OS_SRCS))))
 
 
 #$(info >> $(LIBC_OS_SRCS))
