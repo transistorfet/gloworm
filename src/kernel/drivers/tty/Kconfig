@@ -14,5 +14,18 @@ config TTY_68681
 	  This enables the driver for the Morotola MC68681 dual-serial port
 	  controller
 
+config TTY_68681_BASE
+	hex "MC68681 base address"
+	depends on TTY_68681
+	default 0x00700001
+	help
+	  Base memory-mapped I/O address of the MC68681 controller.
+
+config TTY_68681_INTVEC
+	int "MC68681 Interrupt vector"
+	depends on TTY_68681
+	default 64
+	help
+	  Interrupt vector for the MC68681 controller.
 endif
 

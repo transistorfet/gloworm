@@ -50,36 +50,37 @@ void tty_68681_reset_leds(uint8_t bits);
 
 
 // MC68681 Register Addresses
-#define MR1A_MR2A_ADDR	((volatile uint8_t *) 0x700001)
-#define SRA_RD_ADDR	((volatile uint8_t *) 0x700003)
-#define CSRA_WR_ADDR	((volatile uint8_t *) 0x700003)
-#define CRA_WR_ADDR	((volatile uint8_t *) 0x700005)
-#define TBA_WR_ADDR	((volatile uint8_t *) 0x700007)
-#define RBA_RD_ADDR	((volatile uint8_t *) 0x700007)
+#define DUART_REG_BASE 	CONFIG_TTY_68681_BASE 
+#define MR1A_MR2A_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x00)
+#define SRA_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x02)
+#define CSRA_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x02)
+#define CRA_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x04)
+#define TBA_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x06)
+#define RBA_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x06)
 
-#define MR1B_MR2B_ADDR	((volatile uint8_t *) 0x700011)
-#define SRB_RD_ADDR	((volatile uint8_t *) 0x700013)
-#define CSRB_WR_ADDR	((volatile uint8_t *) 0x700013)
-#define CRB_WR_ADDR	((volatile uint8_t *) 0x700015)
-#define TBB_WR_ADDR	((volatile uint8_t *) 0x700017)
-#define RBB_RD_ADDR	((volatile uint8_t *) 0x700017)
+#define MR1B_MR2B_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x10)
+#define SRB_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x12)
+#define CSRB_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x12)
+#define CRB_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x14)
+#define TBB_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x16)
+#define RBB_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x16)
 
-#define ACR_WR_ADDR	((volatile uint8_t *) 0x700009)
+#define ACR_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x08)
 
-#define CTUR_WR_ADDR	((volatile uint8_t *) 0x70000D)
-#define CTLR_WR_ADDR	((volatile uint8_t *) 0x70000F)
-#define START_RD_ADDR	((volatile uint8_t *) 0x70001D)
-#define STOP_RD_ADDR	((volatile uint8_t *) 0x70001F)
+#define CTUR_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x0C)
+#define CTLR_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x0E)
+#define START_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1C)
+#define STOP_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1E)
 
-#define IPCR_RD_ADDR	((volatile uint8_t *) 0x700009)
-#define OPCR_WR_ADDR	((volatile uint8_t *) 0x70001B)
-#define INPUT_RD_ADDR	((volatile uint8_t *) 0x70001B)
-#define OUT_SET_ADDR	((volatile uint8_t *) 0x70001D)
-#define OUT_RESET_ADDR	((volatile uint8_t *) 0x70001F)
+#define IPCR_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x08)
+#define OPCR_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1A)
+#define INPUT_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1A)
+#define OUT_SET_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1C)
+#define OUT_RESET_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1E)
 
-#define ISR_RD_ADDR	((volatile uint8_t *) 0x70000B)
-#define IMR_WR_ADDR	((volatile uint8_t *) 0x70000B)
-#define IVR_WR_ADDR	((volatile uint8_t *) 0x700019)
+#define ISR_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x0A)
+#define IMR_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x0A)
+#define IVR_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x18)
 
 
 // MC68681 Command Numbers
@@ -132,7 +133,7 @@ void tty_68681_reset_leds(uint8_t bits);
 #define ISR_S_TX_READY			0x01
 
 
-#define TTY_INT_VECTOR			64
+#define TTY_INT_VECTOR			CONFIG_TTY_68681_INTVEC
 
 #define CH_A				0
 #define CH_B				1
