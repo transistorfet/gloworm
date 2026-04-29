@@ -289,7 +289,6 @@ struct memory_map *memory_map_alloc(void)
 
 void memory_map_free(struct memory_map *map)
 {
-	int error;
 	struct memory_segment *cur, *next;
 
 	if (!map) {
@@ -298,6 +297,7 @@ void memory_map_free(struct memory_map *map)
 
 	if (--map->refcount == 0) {
 		#if defined(CONFIG_MMU)
+		int error;
 
 		// The MMU needs to know which pages are not allocated, but fixed addresses so
 		// it doesn't call page_free() on those addresses

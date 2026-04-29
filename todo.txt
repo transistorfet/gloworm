@@ -1,20 +1,11 @@
 
-* there's a bug when running nettest or daemon when the MMU is enabled and the shell is compiled into the kernel
-
-* normalize using start/end vs start/length
-
-* test compiling the shell into the kernel, which I broke at some point during the MMU addition
-* fix warnings when -O3/-O2 and no-opts are used
-* fix warnings in each config
-
 * move memory.c to mm/
 
-* check custom signal handlers in each config
-* try with 4k pages, that failed during init last time I tried it
-* test with CONFIG_MMU=n to make sure nothing broke
-* test with CONFIG_USER_MODE=n to make sure nothing broke
-
 ----
+
+* there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
+
+* normalize using start/end vs start/length
 
 * is there a better name than alignment_offset?
 
