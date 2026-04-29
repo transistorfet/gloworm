@@ -4,7 +4,7 @@
 #include <sys/param.h>
 
 #include <kconfig.h>
-#include <kernel/proc/memory.h>
+#include <kernel/mm/map.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/usercopy.h>
 #include <kernel/utils/iovec.h>

@@ -8,8 +8,8 @@
 #include <kconfig.h>
 #include <kernel/printk.h>
 #include <kernel/fs/vfs.h>
+#include <kernel/mm/map.h>
 #include <kernel/proc/exec.h>
-#include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/math.h>
 

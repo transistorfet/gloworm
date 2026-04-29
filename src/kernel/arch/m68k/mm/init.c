@@ -2,11 +2,10 @@
 #include <errno.h>
 #include <kconfig.h>
 #include <kernel/printk.h>
-#include <kernel/proc/memory.h>
+#include <kernel/mm/map.h>
 
 #if defined(CONFIG_MMU)
 #include <asm/mmu.h>
-// TODO this is going to move to mm, so this still makes sense
 #endif
 
 struct memory_map *kernel_memory_map = NULL;

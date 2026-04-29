@@ -5,10 +5,10 @@
 #include <stddef.h>
 #include <asm/context.h>
 #include <kernel/syscall.h>
+#include <kernel/mm/map.h>
 #include <kernel/proc/timer.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/filedesc.h>
-#include <kernel/proc/memory.h>
 #include <kernel/proc/scheduler.h>
 #include <kernel/utils/queue.h>
 

@@ -6,8 +6,8 @@
 #include <asm/context.h>
 #include <asm/addresses.h>
 
+#include <kernel/mm/map.h>
 #include <kernel/proc/exec.h>
-#include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/strarray.h>

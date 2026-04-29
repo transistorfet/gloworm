@@ -3,9 +3,9 @@
 
 #include <asm/irqs.h>
 #include <kernel/api.h>
+#include <kernel/mm/map.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/timer.h>
-#include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 #include <kernel/proc/filedesc.h>
 #include <kernel/proc/scheduler.h>

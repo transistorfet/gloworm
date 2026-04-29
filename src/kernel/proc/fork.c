@@ -6,10 +6,10 @@
 
 #include <asm/context.h>
 #include <kernel/printk.h>
+#include <kernel/mm/map.h>
 #include <kernel/mm/pages.h>
 #include <kernel/proc/fork.h>
 #include <kernel/proc/exec.h>
-#include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
 

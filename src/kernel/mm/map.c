@@ -7,10 +7,10 @@
 #include <sys/param.h>
 
 #include <kernel/printk.h>
-#include <kernel/mm/kmalloc.h>
+#include <kernel/mm/map.h>
 #include <kernel/mm/pages.h>
+#include <kernel/mm/kmalloc.h>
 #include <kernel/fs/fileptr.h>
-#include <kernel/proc/memory.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/math.h>

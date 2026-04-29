@@ -7,12 +7,12 @@
 #include <kernel/api.h>
 #include <kernel/printk.h>
 #include <kernel/arch/context.h>
+#include <kernel/mm/map.h>
 #include <kernel/mm/pages.h>
 #include <kernel/mm/kmalloc.h>
 #include <kernel/proc/init.h>
 #include <kernel/proc/exec.h>
 #include <kernel/proc/fork.h>
-#include <kernel/proc/memory.h>
 #include <kernel/proc/process.h>
 #include <kernel/proc/binaries.h>
 #include <kernel/utils/strarray.h>

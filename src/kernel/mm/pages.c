@@ -41,7 +41,7 @@ int init_page_block(struct page_block *block, void *addr, size_t size)
 	int bitmap_size, bitmap_pages;
 	void *descriptors_addr = NULL;
 	#if defined(CONFIG_MMU)
-	int descriptors_size = 0
+	int descriptors_size = 0;
 	#endif
 
 	total_pages = size >> PAGE_ADDR_BITS;
