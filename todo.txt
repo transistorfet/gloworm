@@ -1,8 +1,4 @@
 
-* move memory.c to mm/
-
-----
-
 * there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
 
 * normalize using start/end vs start/length

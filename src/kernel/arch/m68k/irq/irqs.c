@@ -230,7 +230,7 @@ static void page_fault_handler(struct exception_frame *frame)
 				: "=m" (mmu_sr) : "a" (fault_addr), "d" (ssw & 0x7)
 			);
 		}
-		log_info("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
+		log_debug("bus error: %s %c fc=%d addr=%x ssw=%x mmusr=%x pid=%d pc=%x\n", ff && df ? "i+d" : ff ? "i" : "d", rwm_type, ssw & 0x7, fault_addr, ssw, mmu_sr, current_proc->pid, frame->pc);
 
 		if (ff && df) {
 			log_error("the infamous ff+df cycle fault\n");
