@@ -58,7 +58,7 @@ struct termios default_tio = {
 
 
 // Driver Definition
-int tty_init();
+int tty_init(void);
 int tty_open(devminor_t minor, int access);
 int tty_close(devminor_t minor);
 int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
@@ -170,7 +170,7 @@ static void tty_process_input(void *_unused)
 	}
 }
 
-int tty_init()
+int tty_init(void)
 {
 	for (short i = 0; i < TTY_DEVICE_NUM; i++) {
 		tty_devices[i].rdev = DEVNUM(DEVMAJOR_TTY68681, i);

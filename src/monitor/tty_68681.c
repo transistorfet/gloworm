@@ -76,7 +76,7 @@
 
 extern void spin_loop(int count);
 
-int init_tty()
+int init_tty(void)
 {
 	asm volatile("or.w	#0x0700, %sr");
 

@@ -284,7 +284,7 @@ struct command command_list[30];
 	command_list[commands++].main = (f);	\
 }
 
-void init_commands()
+void init_commands(void)
 {
 	commands = 0;
 

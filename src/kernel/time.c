@@ -6,7 +6,7 @@ static time_t system_seconds;
 static time_t system_uptime;
 static time_t system_useconds;
 
-void init_time()
+void init_time(void)
 {
 	// TODO no real time clock atm
 	system_seconds = 0;
@@ -19,7 +19,7 @@ void set_system_time(time_t t)
 	system_seconds = t;
 }
 
-time_t get_system_time()
+time_t get_system_time(void)
 {
 	return system_seconds;
 }

@@ -7,7 +7,7 @@
 
 static struct queue timer_list;
 
-void init_timer_list()
+void init_timer_list(void)
 {
 	_queue_init(&timer_list);
 }
@@ -42,7 +42,7 @@ int remove_timer(struct timer *timer)
 	return 0;
 }
 
-void check_timers()
+void check_timers(void)
 {
 	time_t uptime[2];
 	struct timer *next = NULL;

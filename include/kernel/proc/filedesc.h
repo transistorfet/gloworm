@@ -11,7 +11,7 @@ struct fd_table {
 	struct vfile *files[OPEN_MAX];
 };
 
-struct fd_table *alloc_fd_table();
+struct fd_table *alloc_fd_table(void);
 void free_fd_table(struct fd_table *table);
 void init_fd_table(struct fd_table *table);
 void release_fd_table(struct fd_table *table);

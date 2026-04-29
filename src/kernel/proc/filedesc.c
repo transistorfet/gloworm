@@ -7,7 +7,7 @@
 #include <kernel/proc/filedesc.h>
 
 
-struct fd_table *alloc_fd_table()
+struct fd_table *alloc_fd_table(void)
 {
 	struct fd_table *table;
 

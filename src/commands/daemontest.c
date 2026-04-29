@@ -7,7 +7,7 @@
 
 int process_input(char *input);
 
-int main()
+int main(void)
 {
 	int i;
 	int fd;

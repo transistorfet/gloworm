@@ -137,7 +137,7 @@ struct vfile {
 #define VLOOKUP_NORMAL		0000
 #define VLOOKUP_PARENT_OF	0001
 
-int init_vfs();
+int init_vfs(void);
 
 void vfs_mount_iter_start(struct mount_iter *iter);
 struct mount *vfs_mount_iter_next(struct mount_iter *iter);

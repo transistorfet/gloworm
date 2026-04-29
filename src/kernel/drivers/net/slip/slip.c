@@ -21,7 +21,7 @@
 
 #define SLIP_IFDEV(x)		((struct slip_if_device *) (x))
 
-int slip_if_init();
+int slip_if_init(void);
 int slip_if_up(struct if_device *ifdev);
 int slip_if_down(struct if_device *ifdev);
 int slip_if_poll(struct if_device *ifdev);
@@ -55,7 +55,7 @@ static void slip_if_process_input(void *_unused);
 static void slip_if_write_data(struct slip_if_device *ifdev);
 static void slip_if_read_data(struct slip_if_device *ifdev);
 
-int slip_if_init()
+int slip_if_init(void)
 {
 	memset(slip_devices, '\0', sizeof(struct slip_if_device) * SLIP_DEVICES);
 	slip_devices[0].ifdev.ops = &slip_if_ops;

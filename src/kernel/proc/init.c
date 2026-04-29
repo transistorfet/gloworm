@@ -59,7 +59,7 @@ struct process *create_init_task(void)
 	const char *envp[1] = { NULL };
 	const char *argv[2] = { "init", NULL };
 
-	extern void init_task();
+	extern void init_task(void);
 	error = launch_user_task_in_kernel(proc, init_task, argv, envp);
 	if (error)
 		goto fail;

@@ -86,7 +86,7 @@ static struct procfs_dir_entry *_get_entry_by_num(struct procfs_dir_entry *entri
 static struct vnode *_find_vnode(pid_t pid, procfs_filenum_t filenum, mode_t mode, struct mount *mp);
 static struct vnode *_alloc_vnode(pid_t pid, procfs_filenum_t filenum, mode_t mode, struct mount *mp);
 
-int procfs_init()
+int procfs_init(void)
 {
 	for (short i = 0; i < MAX_VNODES; i++) {
 		vnode_table[i].vn.refcount = 0;

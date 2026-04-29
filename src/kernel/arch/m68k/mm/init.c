@@ -10,7 +10,7 @@
 
 struct memory_map *kernel_memory_map = NULL;
 
-void page_fault_handler();
+void page_fault_handler(void);
 
 int arch_init_mm(void)
 {

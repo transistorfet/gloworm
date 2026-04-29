@@ -4,15 +4,15 @@
 
 #define STACK_POINTER_INIT	0x200000
 
-extern void _start();
-extern void _error();
-extern void init_tty();
+extern void _start(void);
+extern void _error(void);
+extern void init_tty(void);
 extern void set_leds(uint8_t bits);
 extern void dump(const uint16_t *addr, short len);
 
-void fatal_error_entry();
+void fatal_error_entry(void);
 
-typedef void (*interrupt_handler_t)();
+typedef void (*interrupt_handler_t)(void);
 
 const interrupt_handler_t boot_vectors[16] __attribute__((section(".vectors"))) = {
 	(interrupt_handler_t) STACK_POINTER_INIT,

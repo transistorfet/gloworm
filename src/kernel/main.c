@@ -30,7 +30,7 @@
 
 extern int arch_init_mm(void);
 
-extern void tty_68681_preinit();
+extern void tty_68681_preinit(void);
 
 extern struct driver tty_68681_driver;
 extern struct driver tty_driver;
@@ -126,7 +126,7 @@ void create_special_or_panic(const char *path, device_t rdev)
 	vfs_release_vnode(vnode);
 }
 
-void parse_boot_args()
+void parse_boot_args(void)
 {
 	if (!strncmp(boot_args, "mem", 3)) {
 		root_dev = DEVNUM(DEVMAJOR_MEM, boot_args[3] - '0');
@@ -135,7 +135,7 @@ void parse_boot_args()
 	}
 }
 
-int main()
+int main(void)
 {
 	int error;
 	tty_68681_preinit();

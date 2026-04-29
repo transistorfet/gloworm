@@ -20,15 +20,15 @@ static int nodes_in_cache;
 static struct queue cache;
 extern struct vnode_ops minix_vnode_ops;
 
-static void release_unused_vnodes();
+static void release_unused_vnodes(void);
 
-static void init_minix_vnodes()
+static void init_minix_vnodes(void)
 {
 	nodes_in_cache = 0;
 	_queue_init(&cache);
 }
 
-static void sync_vnodes()
+static void sync_vnodes(void)
 {
 	struct vnode *vnode;
 
@@ -132,7 +132,7 @@ static int release_vnode(struct vnode *vnode)
 	return 0;
 }
 
-static void release_unused_vnodes()
+static void release_unused_vnodes(void)
 {
 	struct queue_node *last;
 

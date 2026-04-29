@@ -29,14 +29,14 @@ void init_interrupts(void)
 {
 	init_bh();
 
-	extern void enter_handle_exception();
+	extern void enter_handle_exception(void);
 	for (short i = 0; i < INTERRUPT_MAX; i++) {
 		action_table[i].irq = 0;
 		action_table[i].flags = 0;
 		action_table[i].handler = NULL;
 	}
 
-	//extern void enter_handle_trace();
+	//extern void enter_handle_trace(void);
 	//set_interrupt(IV_TRACE, enter_handle_trace);
 
 	arch_init_irqs();
@@ -71,7 +71,7 @@ void do_irq(irq_num_t irq)
 {
 	//printk("irq %d\n", irq);
 	// TODO call the appropriate interrupt
-	//extern irq_handler_t handle_serial_irq();
+	//extern irq_handler_t handle_serial_irq(void);
 	//handle_serial_irq();
 
 	struct irq_action *action = &action_table[(short) irq];

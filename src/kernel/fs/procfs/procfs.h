@@ -40,7 +40,7 @@ struct procfs_vnode {
 };
 
 
-int procfs_init();
+int procfs_init(void);
 int procfs_mount(struct mount *mp, device_t dev, struct vnode *parent);
 int procfs_unmount(struct mount *mp);
 

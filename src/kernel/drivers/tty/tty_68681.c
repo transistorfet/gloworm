@@ -24,7 +24,7 @@
 
 
 // Kernel Driver Definition
-int tty_68681_init();
+int tty_68681_init(void);
 int tty_68681_open(devminor_t minor, int access);
 int tty_68681_close(devminor_t minor);
 int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
@@ -44,7 +44,7 @@ struct driver tty_68681_driver = {
 	tty_68681_seek,
 };
 
-void tty_68681_tx_safe_mode();
+void tty_68681_tx_safe_mode(void);
 void tty_68681_set_leds(uint8_t bits);
 void tty_68681_reset_leds(uint8_t bits);
 
@@ -354,7 +354,7 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 	}
 }
 
-void handle_serial_irq()
+void handle_serial_irq(void)
 {
 	// TODO this is for debugging to tell me when the handler exits
 	*OUT_SET_ADDR = 0x08;
@@ -435,7 +435,7 @@ void tty_68681_reset_leds(uint8_t bits)
 	*OUT_RESET_ADDR = (bits << 4);
 }
 
-void tty_68681_tx_safe_mode()
+void tty_68681_tx_safe_mode(void)
 {
 	DISABLE_INTS();
 
@@ -459,7 +459,7 @@ void tty_68681_tx_safe_mode()
 	ASSERT_CTS(&channels[CH_A]);
 }
 
-void tty_68681_normal_mode()
+void tty_68681_normal_mode(void)
 {
 	// Reset everything
 	*CRA_WR_ADDR = CMD_RESET_TX;
@@ -515,7 +515,7 @@ void tty_68681_normal_mode()
 }
 
 
-void tty_68681_preinit()
+void tty_68681_preinit(void)
 {
 	_buf_init(&channels[CH_A].rx, 0);
 	_buf_init(&channels[CH_A].tx, 0);
@@ -543,7 +543,7 @@ static inline struct serial_channel *from_minor_dev(device_t minor)
 	}
 }
 
-int tty_68681_init()
+int tty_68681_init(void)
 {
 	tty_68681_normal_mode();
 
@@ -670,7 +670,7 @@ offset_t tty_68681_seek(devminor_t minor, offset_t position, int whence, offset_
 
 ////// Printk Interface //////
 
-void console_prepare_for_panic()
+void console_prepare_for_panic(void)
 {
 	tty_68681_tx_safe_mode();
 }

@@ -10,10 +10,10 @@
 
 #define MAX_INPUT	100
 
-int serverloop();
+int serverloop(void);
 int process_input(char *input);
 
-int MAIN(command_nettest)()
+int MAIN(command_nettest)(void)
 {
 	int pid;
 
@@ -34,7 +34,7 @@ void handle_signal(int signum)
 	return;
 }
 
-int serverloop()
+int serverloop(void)
 {
 	int i;
 	int error;

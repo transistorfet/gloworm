@@ -21,7 +21,7 @@ static struct process table[PROCESS_MAX];
 extern struct process *current_proc;
 
 
-void init_proc()
+void init_proc(void)
 {
 	next_pid = 2;
 

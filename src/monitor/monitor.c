@@ -19,7 +19,7 @@
 #define VERSION		"2025-01-31-" BOARD
 
 
-extern void init_tty();
+extern void init_tty(void);
 extern void spin_loop(int count);
 char *led = (char *) 0x201c;
 
@@ -640,7 +640,7 @@ int load_commands(struct command *command_list)
 #define BUF_SIZE	100
 #define ARG_SIZE	10
 
-void serial_read_loop()
+void serial_read_loop(void)
 {
 	int i;
 	short argc;
@@ -681,7 +681,7 @@ void serial_read_loop()
 #define ARDUINO_TRACE_ON()	asm volatile("movea.l	#0x2019, %%a0\n" "move.b	#1, (%%a0)" : : : "%a0");
 #define ARDUINO_TRACE_OFF()	asm volatile("movea.l	#0x2019, %%a0\n" "move.b	#0, (%%a0)" : : : "%a0");
 
-int main()
+int main(void)
 {
 	//init_heap((void *) 0x101000, 0x1000);
 

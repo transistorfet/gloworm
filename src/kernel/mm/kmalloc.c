@@ -213,7 +213,7 @@ void kernel_heap_compact(void)
 }
 
 /*
-void print_free()
+void print_free(void)
 {
 	printk_safe("free list:\n");
 	for (struct block *cur = main_heap.free_blocks; cur; cur = cur->next) {

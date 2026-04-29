@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
-int getchar()
+int getchar(void)
 {
 	unsigned char ch;
 	read(STDIN_FILENO, &ch, 1);

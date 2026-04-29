@@ -12,7 +12,7 @@
 struct vfile file_table[FILE_TABLE_MAX];
 
 
-void init_fileptr_table()
+void init_fileptr_table(void)
 {
 	for (short i = 0; i < FILE_TABLE_MAX; i++) {
 		file_table[i].ops = NULL;

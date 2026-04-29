@@ -110,7 +110,7 @@ static inline void run_signal_handler(struct process *proc, int signum)
 	resume_proc_without_restart(proc);
 }
 
-void cleanup_signal_handler()
+void cleanup_signal_handler(void)
 {
 	int signum;
 
@@ -131,7 +131,7 @@ void cleanup_signal_handler()
 	check_pending_signals();
 }
 
-void check_pending_signals()
+void check_pending_signals(void)
 {
 	int signum;
 

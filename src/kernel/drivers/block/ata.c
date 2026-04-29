@@ -14,7 +14,7 @@
 
 
 // Driver Definition
-int ata_init();
+int ata_init(void);
 int ata_open(devminor_t minor, int access);
 int ata_close(devminor_t minor);
 int ata_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
@@ -74,14 +74,14 @@ static inline void ATA_DELAY(short delay)
 	for (; delay > 0; delay--) { asm volatile(""); }
 }
 
-static inline void ATA_WAIT()
+static inline void ATA_WAIT(void)
 {
 	ATA_DELAY(4);
 	while (*ATA_REG_STATUS & ATA_ST_BUSY) { }
 }
 */
 
-int ata_detect()
+int ata_detect(void)
 {
 	uint8_t status;
 
@@ -114,7 +114,7 @@ int ata_detect()
 }
 
 /*
-int ata_reset()
+int ata_reset(void)
 {
 	(*ATA_REG_DEV_CONTROL) = 0x04;
 	ATA_DELAY(16);
@@ -253,7 +253,7 @@ static inline struct partition *ata_get_device(devminor_t minor)
 }
 
 
-int ata_init()
+int ata_init(void)
 {
 	//*COMET_VME_CF_CONTROL = 0xb8;
 

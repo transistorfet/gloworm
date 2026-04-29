@@ -7,7 +7,7 @@
 
 #include "prototype.h"
 
-int MAIN(init_task)()
+int MAIN(init_task)(void)
 {
 	// Open stdin
 	int fd = open("/dev/tty0", O_RDWR, 0);

@@ -21,7 +21,7 @@
 #define TCP_TX_BUFFER		1024
 
 
-int tcp_init();
+int tcp_init(void);
 int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
 int tcp_forward_packet(struct protocol *proto, struct packet *pack);
 int tcp_create_endpoint(struct protocol *proto, struct socket *sock, const struct sockaddr *sockaddr, socklen_t len, struct endpoint **result);
@@ -94,7 +94,7 @@ static struct queue tcp_endpoints;
  *  Public Protocol Functions  *
  *******************************/
 
-int tcp_init()
+int tcp_init(void)
 {
 	_queue_init(&tcp_endpoints);
 	net_register_protocol(&tcp_protocol);

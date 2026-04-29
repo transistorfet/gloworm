@@ -60,7 +60,7 @@ struct endpoint {
 };
 
 
-void init_net_protocol();
+void init_net_protocol(void);
 int net_register_protocol(struct protocol *proto);
 struct protocol *net_get_protocol(int domain, int type, int protocol);
 

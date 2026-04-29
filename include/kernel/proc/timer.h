@@ -17,10 +17,10 @@ struct timer {
 	timer_callback_t callback;
 };
 
-void init_timer_list();
+void init_timer_list(void);
 void init_timer(struct timer *timer);
 int add_timer(struct timer *timer, int seconds, int microseconds);
 int remove_timer(struct timer *timer);
-void check_timers();
+void check_timers(void);
 
 #endif

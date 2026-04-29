@@ -107,7 +107,7 @@ void free(void *ptr)
 }
 
 /*
-void print_free()
+void print_free(void)
 {
 	int i = 0;
 	struct block *cur = main_heap.free_blocks;

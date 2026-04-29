@@ -28,7 +28,7 @@ static struct mount *_find_mount_by_vnode(struct vnode *mount)
 }
 
 
-int init_vfs()
+int init_vfs(void)
 {
 	root_fs = NULL;
 	//vfs_root = new_vnode(0, 0777);

@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-int create_listener()
+int create_listener(void)
 {
 	int error;
 	int listenfd;

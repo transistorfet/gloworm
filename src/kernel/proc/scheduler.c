@@ -25,7 +25,7 @@ struct syscall_record *current_syscall;
 static struct queue run_queue;
 static struct queue blocked_queue;
 
-void init_scheduler()
+void init_scheduler(void)
 {
 	need_reschedule = 0;
 	kernel_reentries = 1;
@@ -209,7 +209,7 @@ void suspend_current_syscall(int events)
 	suspend_syscall(current_proc, PB_SYSCALL, events, syscall_wait_check, current_syscall);
 }
 
-void restart_current_syscall()
+void restart_current_syscall(void)
 {
 	short saved_status;
 
@@ -239,7 +239,7 @@ void return_to_current_proc(int ret)
 }
 
 
-void request_reschedule()
+void request_reschedule(void)
 {
 	need_reschedule = 1;
 }
@@ -259,7 +259,7 @@ void reschedule_proc_to_now(struct process *proc)
 	UNLOCK(saved_status);
 }
 
-void schedule()
+void schedule(void)
 {
 	short saved_status;
 	struct process *next;
@@ -292,7 +292,7 @@ void schedule()
 	}
 }
 
-__attribute__((noreturn)) void begin_multitasking()
+__attribute__((noreturn)) void begin_multitasking(void)
 {
 	current_proc = (struct process *) run_queue.head;
 

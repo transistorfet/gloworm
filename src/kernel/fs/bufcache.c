@@ -26,7 +26,7 @@ static struct buf *_load_block(device_t dev, block_t num);
 static inline int _read_entry(struct buf *entry);
 static inline int _write_entry(struct buf *entry);
 
-void init_bufcache()
+void init_bufcache(void)
 {
 	_queue_init(&cache);
 
@@ -39,7 +39,7 @@ void init_bufcache()
 	}
 }
 
-void sync_bufcache()
+void sync_bufcache(void)
 {
 	for (short i = 0; i < BLOCKCACHE_MAX; i++) {
 		if (blocks[i].flags & BCF_ALLOCATED) {

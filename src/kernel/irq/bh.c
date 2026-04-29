@@ -9,7 +9,7 @@ uint16_t bh_enabled;
 uint16_t bh_requested;
 static struct bh_handler bh_handlers[BH_MAX];
 
-void init_bh()
+void init_bh(void)
 {
 	bh_enabled = 0;
 	bh_requested = 0;
@@ -40,7 +40,7 @@ void request_bh_run(int bhnum)
 	bh_requested |= (0x0001 << bhnum);
 }
 
-void run_bh_handlers()
+void run_bh_handlers(void)
 {
 	int bit = 0x0001;
 	uint16_t requested = bh_enabled & bh_requested;

@@ -34,7 +34,7 @@ static char *mem_drive = (char *) 0x080000;		// The address in ROM of the start 
 static const short inode_num = 2;			// Inode offset into zone of the kernel inode
 
 
-int init_tty();
+int init_tty(void);
 int putchar(int ch);
 void load_partition(struct boot_drive *drive);
 void load_kernel(struct boot_drive *drive, char *offset);
@@ -153,7 +153,7 @@ void load_kernel(struct boot_drive *drive, char *offset)
 #define ATA_WAIT()		{ while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
 #define ATA_WAIT_FOR_DATA()	{ while (!((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) { } }
 
-void ata_wait()
+void ata_wait(void)
 {
 	ATA_DELAY(10);
 	ATA_WAIT();
@@ -269,7 +269,7 @@ int ata_read_sector(int sector, char *buffer)
 #define SR_RX_READY			0x01
 
 
-int init_tty()
+int init_tty(void)
 {
 	// Disable interrupts
 	*IMR_WR_ADDR = 0x00;

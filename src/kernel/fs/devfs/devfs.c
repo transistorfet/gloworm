@@ -44,7 +44,7 @@ static struct devfs_dirent devices[DEVFS_DIRENT_MAX];
 static inline struct devfs_dirent *_new_dirent();
 static struct vnode *_new_vnode(device_t dev, mode_t mode, struct vnode_ops *ops);
 
-int init_devfs()
+int init_devfs(void)
 {
 	devfs_root = _new_vnode(0, 0755, &devfs_vnode_ops);
 

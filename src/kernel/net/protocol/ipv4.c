@@ -8,7 +8,7 @@
 #include "ipv4.h"
 
 
-int ipv4_init();
+int ipv4_init(void);
 int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
 int ipv4_forward_packet(struct protocol *proto, struct packet *pack);
 
@@ -47,7 +47,7 @@ struct ipv4_header {
 	uint32_t dest;
 };
 
-int ipv4_init()
+int ipv4_init(void)
 {
 	net_register_protocol(&ipv4_protocol);
 	return 0;

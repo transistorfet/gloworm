@@ -11,7 +11,7 @@
 #define ICMP_TYPE_ECHO		8
 
 
-int icmp_init();
+int icmp_init(void);
 int icmp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
 int icmp_forward_packet(struct protocol *proto, struct packet *pack);
 
@@ -40,7 +40,7 @@ struct icmp_header {
 };
 
 
-int icmp_init()
+int icmp_init(void)
 {
 	net_register_protocol(&icmp_protocol);
 	return 0;

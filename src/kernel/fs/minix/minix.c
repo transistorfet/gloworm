@@ -54,7 +54,7 @@ struct mount_ops minix_mount_ops = {
 };
 
 
-int minix_init()
+int minix_init(void)
 {
 	init_minix_vnodes();
 	return 0;

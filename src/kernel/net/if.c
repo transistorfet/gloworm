@@ -18,7 +18,7 @@
 static struct if_device *active_ifdevs[IFDEV_MAX];
 static void net_if_process_bh(void *_unused);
 
-void init_net_if()
+void init_net_if(void)
 {
 	for (short i = 0; i < IFDEV_MAX; i++)
 		active_ifdevs[i] = NULL;

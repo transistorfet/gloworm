@@ -12,7 +12,7 @@
 
 
 // Driver Definition
-int mem_init();
+int mem_init(void);
 int mem_open(devminor_t minor, int access);
 int mem_close(devminor_t minor);
 int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
@@ -44,7 +44,7 @@ static struct mem_geometry devices[] = {
 };
 
 
-int mem_init()
+int mem_init(void)
 {
 	register_driver(DEVMAJOR_MEM, &mem_driver);
 

@@ -25,7 +25,7 @@ struct udp_header {
 };
 
 
-int udp_init();
+int udp_init(void);
 int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
 int udp_forward_packet(struct protocol *proto, struct packet *pack);
 int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struct sockaddr *sockaddr, socklen_t len, struct endpoint **result);
@@ -85,7 +85,7 @@ static struct udp_endpoint *udp_lookup_endpoint(struct protocol *proto, uint32_t
 static struct queue udp_endpoints;
 
 
-int udp_init()
+int udp_init(void)
 {
 	_queue_init(&udp_endpoints);
 	net_register_protocol(&udp_protocol);

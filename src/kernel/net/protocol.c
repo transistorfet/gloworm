@@ -15,7 +15,7 @@
 static struct protocol *proto_list[PROTOCOLS_MAX];
 
 
-void init_net_protocol()
+void init_net_protocol(void)
 {
 	for (short i = 0; i < PROTOCOLS_MAX; i++) {
 		proto_list[i] = NULL;

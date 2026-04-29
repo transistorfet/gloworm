@@ -19,8 +19,8 @@ struct buf {
 	void *block;
 };
 
-void init_bufcache();
-void sync_bufcache();
+void init_bufcache(void);
+void sync_bufcache(void);
 struct buf *get_block(device_t dev, block_t num);
 int release_block(struct buf *buf, short dirty);
 void mark_block_dirty(struct buf *buf);

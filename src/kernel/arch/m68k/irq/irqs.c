@@ -36,9 +36,9 @@ static bare_irq_handler_t vector_table[INTERRUPT_MAX];
 
 void arch_init_irqs(void)
 {
-	extern void enter_exception();
-	extern void enter_syscall();
-	extern void enter_irq();
+	extern void enter_exception(void);
+	extern void enter_syscall(void);
+	extern void enter_irq(void);
 
 	// Processor exceptions
 	for (short i = IRQ_BUS_ERROR; i < IRQ_AUTOVEC1; i++) {

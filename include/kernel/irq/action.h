@@ -4,7 +4,7 @@
 
 typedef unsigned int irq_num_t;
 
-typedef void (*irq_handler_t)();
+typedef void (*irq_handler_t)(void);
 
 struct irq_action {
 	irq_num_t irq;
@@ -12,7 +12,7 @@ struct irq_action {
 	irq_handler_t handler;
 };
 
-void init_interrupts();
+void init_interrupts(void);
 void request_irq(irq_num_t irq, irq_handler_t handler, int flags);
 void free_irq(irq_num_t irq);
 void enable_irq(irq_num_t irq);

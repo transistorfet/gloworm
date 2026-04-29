@@ -11,7 +11,7 @@
 #define PRINTK_BUFFER	512
 
 /// Functions that must be provided by the console driver
-void console_prepare_for_panic();
+void console_prepare_for_panic(void);
 int console_putchar_direct(int ch);
 int console_putchar_buffered(int ch);
 

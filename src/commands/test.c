@@ -19,7 +19,7 @@ int readline(char *buffer, short max)
 	return 0;
 }
 
-int main()
+int main(void)
 {
 	char buffer[BUF_SIZE];
 

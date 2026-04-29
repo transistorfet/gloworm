@@ -29,7 +29,7 @@ struct stat;
 
 // Syscalls
 
-pid_t fork();
+pid_t fork(void);
 pid_t clone(int (*fn)(void *), void *stack, int flags, void *arg);
 void exit(int status);
 int execve(const char *path, char *const argv[], char *const envp[]);
@@ -37,17 +37,17 @@ pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
 int kill(pid_t pid, int sig);
 unsigned int alarm(unsigned int seconds);
-int pause();
+int pause(void);
 int brk(void *addr);
 void *sbrk(intptr_t increment);
-pid_t gettid();
-pid_t getpid();
-pid_t getppid();
+pid_t gettid(void);
+pid_t getpid(void);
+pid_t getppid(void);
 pid_t getpgid(pid_t pid);
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getsid(pid_t pid);
 pid_t setsid(void);
-uid_t getuid();
+uid_t getuid(void);
 int setuid(uid_t uid);
 
 int mkdir(const char *path, mode_t mode);

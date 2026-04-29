@@ -4,9 +4,9 @@
 
 #include <sys/types.h>
 
-void init_time();
+void init_time(void);
 void set_system_time(time_t t);
-time_t get_system_time();
+time_t get_system_time(void);
 void get_system_uptime(time_t uptime[2]);
 void adjust_system_time(time_t usec);
 

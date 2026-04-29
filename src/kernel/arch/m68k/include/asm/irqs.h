@@ -83,9 +83,9 @@ typedef short lock_state_t;
 	asm("move.w	%0, %%sr\n" : : "dm" ((saved)) :);	\
 }
 
-typedef void (*bare_irq_handler_t)();
+typedef void (*bare_irq_handler_t)(void);
 
-void arch_init_irqs();
+void arch_init_irqs(void);
 
 #endif
 
