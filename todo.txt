@@ -1,4 +1,6 @@
 
+* it's time to fix the size in the load scripts
+
 * there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
 
 * normalize using start/end vs start/length
@@ -29,6 +31,7 @@
 * replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
 * add flags to kmalloc/page alloc?
 
+* could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one
 * make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
 * are there any static tables still used beside the table of processes?
 * go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
@@ -39,7 +42,6 @@
   it seems to only affect some things, namely when sh is compiled into the kernel
 * why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
 
-* it's time to fix the size in the load scripts
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
@@ -176,7 +178,6 @@ Operating System:
     * make a PIE format that can be loaded and executed (this will likely require a custom linker script)
 
 
-
     * should you add timestamps to packets? (not currently a use for it)
     * rewrite the math functions to use fewer registers, and cover the 32 bit divide by 32 bit number case
     * minixfs, implement versions 2 and 3
@@ -185,12 +186,7 @@ Operating System:
     * can you change the fd allocator, such that calling it twice will return 2 different fds, even though they aren't reserved until set
       (ie. store the last allocated fd, but it has to be in the process struct)
 
-    * remove the execbuiltin syscall, which is temporary until all commands can be executable files
-
-
     * there is an issue running the shell on linux related to the setting the process group
-    * could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one
-    * the return from syscalls is sometimes generating a move %d0, %d1; move %d1, %d0
     * re-evaluate file permissions checks to make sure they're correct according to posix
     * you need some tests, but ideally it would use a simple emulator.  Maybe easy68k or something could be used
 

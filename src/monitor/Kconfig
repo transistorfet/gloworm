@@ -12,9 +12,9 @@ if MONITOR
 
 choice
 	prompt "Board ROM configuration"
-	default AM29F040
+	default SINGLE_AM29F040
 
-config AM29F040
+config SINGLE_AM29F040
 	bool "Single 8-bit AM29F040"
 	help
 	  The monitor will be stored in one 8-bit AM29F040 flash chips.  This
@@ -30,6 +30,12 @@ config DUAL_AM29F040
 	  writing a new firmware image.
 
 endchoice
+
+config MONITOR_TESTCMDS
+	bool "Extra test commands"
+	default n
+	help
+	  Build the monitor firmware with the extra testing commands
 
 endif
 

@@ -276,17 +276,17 @@ struct command {
 	main_t main;
 };
 
-int commands;
+int num_commands;
 struct command command_list[30];
 
-#define add_command(n, f)	{		\
-	command_list[commands].name = (n);	\
-	command_list[commands++].main = (f);	\
+#define add_command(n, f)	{			\
+	command_list[num_commands].name = (n);		\
+	command_list[num_commands++].main = (f);	\
 }
 
 void init_commands(void)
 {
-	commands = 0;
+	num_commands = 0;
 
 	add_command("dump", 	command_dump);
 	add_command("poke", 	command_poke);
@@ -465,10 +465,10 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 	int pid, status;
 	char *fullpath;
 	char buffer[NAME_SIZE];
-	main_t main = NULL;
+	main_t main_func = NULL;
 
-	main = find_command(argv[0]);
-	if (!main) {
+	main_func = find_command(argv[0]);
+	if (!main_func) {
 		fullpath = resolve_file_location(argv[0], buffer, NAME_SIZE);
 		if (fullpath) {
 			argv[0] = fullpath;
@@ -501,7 +501,7 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 				exit(-1);
 		}
 
-		if (main) {
+		if (main_func) {
 			status = (main)(argc, argv, envp);
 			exit(status);
 		} else {

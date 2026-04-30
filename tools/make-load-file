@@ -6,6 +6,6 @@ ADDR=$3
 BOOTARGS=$4
 
 echo "load $ADDR" > $DEST
-wc -c $SRC | awk '{printf "%04X", $1}' >> $DEST
+wc -c $SRC | awk '{printf "%08X", $1}' >> $DEST
 hexdump -v -e '/1 "%02X"' $SRC >> $DEST
 echo "\nboot $ADDR $BOOTARGS" >> $DEST

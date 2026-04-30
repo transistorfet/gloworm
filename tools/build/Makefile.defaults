@@ -37,6 +37,10 @@ ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
 # TODO not sure if these should be kept or not.  align-int specifically will generate structs with padding
 #ccflags-y			+= -malign-int -mstrict-align
 
+# TODO these remove too much, such that the kernel won't boot with them
+#ccflags-$(CONFIG_GC_SECTIONS)	+= -ffunction-sections -fdata-sections
+#ldflags-$(CONFIG_GC_SECTIONS)	+= -Wl,--gc-sections -Wl,--print-gc-sections
+
 export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 
 HOST_ARCH			= testapp

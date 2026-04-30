@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <kconfig.h>
 
-#if defined(CONFIG_AM29F040)
+#if defined(CONFIG_SINGLE_AM29F040)
 #define BOARD	"k30"
 #elif defined(CONFIG_DUAL_AM29F040)
 #define BOARD	"68k"
@@ -16,7 +16,7 @@
 #error "Board type not set"
 #endif
 
-#define VERSION		"2025-01-31-" BOARD
+#define VERSION		"2026-04-29-" BOARD
 
 
 extern void init_tty(void);
@@ -120,8 +120,8 @@ void dump(const uint16_t *addr, short len)
 #define ROM_ADDR	0x000000
 #define ROM_SIZE	0x1800
 
-#define RAM_ADDR	0x200000
-#define RAM_SIZE	0x100000
+#define RAM_ADDR	0x100000
+#define RAM_SIZE	0x200000
 
 #define SUPERVISOR_ADDR	0x200000
 
@@ -217,7 +217,7 @@ void command_peek(int argc, char **args)
 
 void erase_flash(uint32_t sector)
 {
-	#if defined(CONFIG_AM29F040)
+	#if defined(CONFIG_SINGLE_AM29F040)
 	printf("Erasing flash sector %d", sector);
 	*((volatile uint8_t *) 0x555) = 0xAA;
 	putchar('.');
@@ -248,7 +248,7 @@ void erase_flash(uint32_t sector)
 	#endif
 }
 
-#if defined(CONFIG_AM29F040)
+#if defined(CONFIG_SINGLE_AM29F040)
 #define SECTOR_SIZE	0x010000
 #elif defined(CONFIG_DUAL_AM29F040)
 #define SECTOR_SIZE	0x020000
@@ -290,7 +290,7 @@ void command_eraserom(int argc, char **args)
 
 void program_flash_data(uint16_t *addr, uint16_t data)
 {
-	#if defined(CONFIG_AM29F040)
+	#if defined(CONFIG_SINGLE_AM29F040)
 	*((volatile uint8_t *) 0x555) = 0xAA;
 	*((volatile uint8_t *) 0x2AA) = 0x55;
 	*((volatile uint8_t *) 0x555) = 0xA0;
@@ -386,7 +386,7 @@ void command_load(int argc, char **args)
 	uint16_t data;
 	uint16_t *mem = (uint16_t *) RAM_ADDR;
 
-	size = fetch_word(4);
+	size = (fetch_word(4) << 16) | fetch_word(4);
 	odd_size = size & 0x01;
 	size >>= 1;
 	//printf("Expecting %x\n", size);
@@ -419,6 +419,7 @@ void command_boot(int argc, char **args)
 }
 
 
+#if defined(CONFIG_MONITOR_TESTCMDS)
 void command_ramtest(int argc, char **args)
 {
 	uint16_t data;
@@ -595,7 +596,9 @@ void command_atatest(int argc, char **args)
 	return;
 }
 
-#endif
+#endif	// CONFIG_ATA
+
+#endif	// CONFIG_MONITOR_TESTCMDS
 
 /**************************
  * Command Line Execution *
@@ -628,10 +631,12 @@ int load_commands(struct command *command_list)
 	add_command("writerom", command_writerom);
 	add_command("verifyrom", command_verifyrom);
 
+	#if defined(CONFIG_MONITOR_TESTCMDS)
 	add_command("ramtest", command_ramtest);
 	add_command("v", command_vmetest);
 	#if defined(CONFIG_ATA)
 	add_command("a", command_atatest);
+	#endif
 	#endif
 
 	return num_commands;
@@ -658,7 +663,7 @@ void serial_read_loop(void)
 		if (!strcmp(args[0], "test")) {
 			fputs("this is only a test\n", stdout);
 		} else if (!strcmp(args[0], "help")) {
-			for (int i = 0; i < num_commands; i++) {
+			for (i = 0; i < num_commands; i++) {
 				fputs(command_list[i].name, stdout);
 				putchar('\n');
 			}
@@ -693,7 +698,7 @@ int main(void)
 
 	//spin_loop(10000);
 
-	fputs("\n\nWelcome to the k30-VME Monitor!\n\n", stdout);
+	fputs("\n\nWelcome to the " BOARD " Monitor!\n\n", stdout);
 
 	/*
 	int *data = malloc(sizeof(int) * 10);

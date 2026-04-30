@@ -173,7 +173,7 @@ static void slip_decode_packet(struct slip_if_device *ifdev, short length)
 
 	if (ifdev->ifdev.flags & IFF_DEBUG) {
 		log_debug("DEBUG: recv packet: ");
-		for (int i = 0; i < pack->length; i++) {
+		for (i = 0; i < pack->length; i++) {
 			log_debug("%x ", (int) pack->data[i]);
 		}
 		log_debug("\n");
