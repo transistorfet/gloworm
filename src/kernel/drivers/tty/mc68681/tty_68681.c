@@ -185,9 +185,14 @@ struct serial_channel {
 	char bh_num;
 };
 
-static char tick = 0;
-static char handle_timer = 0;
 static struct serial_channel channels[2];
+
+#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+static char handle_timer = 0;
+#endif
+#if defined(CONFIG_TTY_68681_GPIO_LEDS)
+static char tick = 0;
+#endif
 
 static inline void config_serial_channel(struct serial_channel *channel)
 {
@@ -264,10 +269,12 @@ static inline int tty_68681_putchar_buffered(struct serial_channel *channel, int
 
 static void tty_68681_process_input(void *_unused)
 {
+	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 	if (handle_timer) {
 		handle_timer = 0;
 		check_timers();
 	}
+	#endif
 
 	for (short i = 0; i < 2; i++) {
 		if (channels[i].rx_ready) {
@@ -318,21 +325,27 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 				byte = *channels[minor].ports->recv;
 
 				if (_buf_is_full(&channels[minor].rx)) {
+					#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 					*OUT_SET_ADDR = 0x10;
+					#endif
 					break;
 				}
 				_buf_put_char(&channels[minor].rx, byte);
 			}
 		}
 
+		#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 		if (count >= 100) {
 			*OUT_SET_ADDR = 0x20;
 			//printk("failed reading\n");
 		}
+		#endif
 
 		if (_buf_free_space(&channels[minor].rx) < 10) {
-			*OUT_SET_ADDR = 0x40;
 			DEASSERT_CTS(&channels[minor]);
+			#if defined(CONFIG_TTY_68681_GPIO_LEDS)
+			*OUT_SET_ADDR = 0x40;
+			#endif
 		}
 
 		channels[minor].rx_ready = 1;
@@ -356,8 +369,10 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 
 void handle_serial_irq(void)
 {
+	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	// TODO this is for debugging to tell me when the handler exits
 	*OUT_SET_ADDR = 0x08;
+	#endif
 
 	register char isr = *ISR_RD_ADDR;
 
@@ -370,6 +385,7 @@ void handle_serial_irq(void)
 		volatile register char reset = *STOP_RD_ADDR;
 		reset;	// make the compiler happy
 
+		#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 		if (tick) {
 			tick = 0;
 			*OUT_SET_ADDR = 0x80;
@@ -377,11 +393,15 @@ void handle_serial_irq(void)
 			tick = 1;
 			*OUT_RESET_ADDR = 0x80;
 		}
+		#endif
+
+		#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 		adjust_system_time(71111);
 		request_reschedule();
 
 		handle_timer = 1;
 		request_bh_run(BH_TTY68681);
+		#endif
 	}
 
 	/*
@@ -421,18 +441,24 @@ void handle_serial_irq(void)
 	}
 	*/
 
+	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	// TODO this is for debugging to tell me when the handler exits
 	*OUT_RESET_ADDR = 0x08;
+	#endif
 }
 
 void tty_68681_set_leds(uint8_t bits)
 {
+	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	*OUT_SET_ADDR = (bits << 4);
+	#endif
 }
 
 void tty_68681_reset_leds(uint8_t bits)
 {
+	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	*OUT_RESET_ADDR = (bits << 4);
+	#endif
 }
 
 void tty_68681_tx_safe_mode(void)
@@ -451,7 +477,9 @@ void tty_68681_tx_safe_mode(void)
 	*CRA_WR_ADDR = CMD_ENABLE_TX_RX;
 
 	*OPCR_WR_ADDR = 0x00;
+	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	*OUT_SET_ADDR = 0xF0;
+	#endif
 
 	// This slight delay prevents garbled output being sent during the welcome message
 	inline_delay(10);
@@ -489,22 +517,32 @@ void tty_68681_normal_mode(void)
 	config_serial_channel(&channels[CH_B]);
 	channels[CH_B].bh_num = BH_SLIP;
 
+	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 	// Configure timer
 	*CTUR_WR_ADDR = 0x20;
 	*CTLR_WR_ADDR = 0x00;
+	#endif
 
 	// Enable interrupts
 	*IVR_WR_ADDR = TTY_INT_VECTOR;
-	*IMR_WR_ADDR = ISR_TIMER_CHANGE | ISR_INPUT_CHANGE | ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY | ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
+	*IMR_WR_ADDR = 0
+		#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+		| ISR_TIMER_CHANGE
+		#endif
+		| ISR_INPUT_CHANGE
+		| ISR_CH_A_RX_READY_FULL | ISR_CH_A_TX_READY
+		| ISR_CH_B_RX_READY_FULL | ISR_CH_B_TX_READY;
 
 	// Register the interrupt handler with the kernel for the irq number we configured the device for above
 	request_irq(TTY_INT_VECTOR, handle_serial_irq, 0);
 	enable_irq(TTY_INT_VECTOR);
 
+	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	// Flash LEDs briefly at boot
 	*OPCR_WR_ADDR = 0x00;
 	*OUT_SET_ADDR = 0xF0;
 	*OUT_RESET_ADDR = 0xF0;
+	#endif
 
 	// This slight delay prevents garbled output being sent during the welcome message
 	inline_delay(10);
@@ -635,6 +673,7 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *i
 		return ENODEV;
 
 	switch (request) {
+		#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 		case TSETLEDS: {
 			int leds;
 			memcpy_out_of_iter(iter, &leds, sizeof(int));
@@ -643,6 +682,7 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *i
 			tty_68681_set_leds(leds);
 			return 0;
 		}
+		#endif
 		default:
 			break;
 	}

@@ -1,0 +1,44 @@
+
+config TTY_68681
+	bool "MC68681"
+	default y
+	help
+	  This enables the driver for the Morotola MC68681 dual-serial port
+	  controller
+
+if TTY_68681
+
+config TTY_68681_BASE
+	hex "MC68681 base address"
+	depends on TTY_68681
+	default 0x00700001
+	help
+	  Base memory-mapped I/O address of the MC68681 controller.
+
+config TTY_68681_INTVEC
+	int "MC68681 Interrupt vector"
+	depends on TTY_68681
+	default 64
+	help
+	  Interrupt vector for the MC68681 controller.
+
+config TTY_68681_CLOCKSOURCE
+	bool "Use the MC68681's periodic timer as a clock source"
+	depends on TTY_68681
+	default y
+	help
+	  If this option is selected, the MC68681's timer will be set up in
+	  periodic mode to generate an interrupt every 71ms.  On the interrupt,
+	  the clock will be advanced and a process reschedule will be requested
+
+config TTY_68681_GPIO_LEDS
+	bool "Use the MC68681's GPIO outputs to control debug LEDs"
+	depends on TTY_68681
+	default y
+	help
+	  If this option is selected, the MC68681's general purpose output pins
+	  will be set up to control LEDs, on outputs 4 through 7.  Output 7
+	  will be flashed every time a context switch occurs
+
+endif
+

@@ -1,40 +1,42 @@
 
-* it's time to fix the size in the load scripts
+* make it possible to use other devices as timer interrupts, like an MC68230
+
+* document the partition vs raw disk image thing
+* document (and make configurable) the LED output on the 68681, used to indicate a context switch
+* should you change DISABLE_INTS to DISABLE_IRQS(), etc
+* for all drivers, check that they all have valid pointers to a function (or do filesystems automatically substitute nop?)
+* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
+* make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
+* could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one
+* change LF to CR+LF (or make it configurable) in the TTY driver
+* are there any static tables still used beside the table of processes?
+* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
+* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
+
+* add a page cache/file cache for file data
+* convert bufcache/disk blocks to use pages
+
+* add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
+
+* make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
+* make the slip's tty device configurable
+* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
+
 
 * there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
-
-* normalize using start/end vs start/length
-
-* is there a better name than alignment_offset?
+* you should put in a limit to the iterator size created for the stack, in exec, context, etc
 
 * make tracing logs module-selectable, so not all trace messages get activated
-* change LF to CR+LF (or make it configurable) in the TTY driver
-* document the partition vs raw disk image thing
-* document the interrupt being used, and make it more easily configurable for systems that use autovec
-* make it possible to use other devices as timer interrupts, like an MC68230
-* document (and make configurable) the LED output on the 68681, used to indicate a context switch
 
 * a bad user space address can crash the kernel with a page fault. Need to improve the MMU recovery mechanism, and also add address validation to no-MMU
 * the problem with making the user stack use all of memory is actually that it preallocates the tables which takes way too long, so maybe you need to
   only allocate part of the stack at the top of memory, and grow the stack on demand, or else make it so that the entire tree isn't filled out until needed
-
-* add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
-* you should put in a limit to the iterator size created for the stack, in exec, context, etc
-* add a page cache/file cache for file data
-* convert bufcache/disk blocks to use pages
-
-* is there value in making the code conform to a particular C standard?
 
 * add multiple blocks of pages to the page allocator, along with stats (have to also fix kmem alloc)
 * make everything that uses iters check for errors
 * make everything that uses usercopy functions check for errors
 * replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
 * add flags to kmalloc/page alloc?
-
-* could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one
-* make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
-* are there any static tables still used beside the table of processes?
-* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 
 * I think there's a bug where if you start the httpd server (at least in daemon mode), and then kill it and run it again, it will fail with error -43, address in use
 * the error -43 address in use error also corresponds to ps no longer working.  I haven't verified if it's all fs functions, or just procfs
@@ -44,34 +46,25 @@
 
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
-* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-* should you change DISABLE_INTS to DISABLE_IRQS(), etc
-* try to reduce the code size as much as possible
-
 * make it so that it's easy to run just one test
-* I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
 * there's an issue with extra-y, and whether to add the prefix or not
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
 ----
 
-* separate access control paramater to mmu_table_mmap, and map_memory_mmap??
+* is there a better name than alignment_offset?
+* separate access control paramater (rwx) to mmu_table_mmap, and map_memory_mmap??
+* I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 
-* make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
-* make the slip's tty device configurable
-* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
-
-* when the tty 68681 driver struct has NULL for write, it jumps to the firmware because it's not NULL checked.  Either there should be a check
-  when registering the driver, or it should be conditionally called in dev_write()
-* I'm thinking of moving the network interface drivers to drivers/ under net/ similar to linux, which would keep all the drivers in one place
-  it works because each thing under drivers/ is moving towards being a subsystem with custom drivers
+* should you make each drivers/ subdir be its own subsystem with a common set of things, and then the specific drivers within directories
 * as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface
 * I don't know how the device driver interface in the file system would work with this
 * as part of this, it's possible that bufcache could move to the block driver subsystem code
 * should you refactor block drivers to always use bufcache, move bufcache to drivers/block/, and separate the char and block driver interfaces?
   doing so will avoid unnecessarily using iovec
 
+* try to reduce the code size as much as possible
 * can you reduce memory usage in the memory map tables by reducing how many different pieces are allocated?
 * can you make some of the memory usage and advanced features compile-time selectable, to accomodate systems with lots of memory and
   very little memory?
@@ -80,18 +73,12 @@
 * make it possible to get a really small memory-usage kernel, at least with specific configurations
 
 * the process should wait until all output is flushed before it can exit
-* should you support large pages?
-* add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
 * should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
   much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
 
+* is there value in making the code conform to a particular C standard?
 * add configuration for base address in linker script
 * make it so the ata device will time out and fail instead of hanging when it doesn't work
-
-* these can use a modified kmalloc that uses pages underneath, and/or bucket allocator?
-    * convert fs vnodes to use pages
-    * convert net packets to use pages
-    * do you need a slab allocator for vnodes/packets?
 
 
 Overview
@@ -107,6 +94,9 @@ Overview
 
 
 Operating System:
+
+    * should you support large pages?
+    * add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
 
     * implement the shadow memory solution from Minix/Fuzix for the issue of forking processes without MMU, where the addresses are
       not patched and point to the old processes memory space.  Both OSes copy a shadow data segment into the parent process's
