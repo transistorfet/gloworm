@@ -463,7 +463,7 @@ void tty_68681_reset_leds(uint8_t bits)
 
 void tty_68681_tx_safe_mode(void)
 {
-	DISABLE_INTS();
+	DISABLE_IRQS();
 
 	*CRA_WR_ADDR = CMD_RESET_MR;
 
@@ -583,9 +583,14 @@ static inline struct serial_channel *from_minor_dev(device_t minor)
 
 int tty_68681_init(void)
 {
+	int error;
+
 	tty_68681_normal_mode();
 
-	register_driver(DEVMAJOR_TTY68681, &tty_68681_driver);
+	error = register_driver(DEVMAJOR_TTY68681, &tty_68681_driver);
+	if (error < 0)
+		return error;
+
 	register_bh(BH_TTY68681, tty_68681_process_input, NULL);
 	enable_bh(BH_TTY68681);
 	return 0;

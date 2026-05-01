@@ -65,6 +65,7 @@ int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
 int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
 int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int tty_poll(devminor_t minor, int events);
+offset_t tty_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
 
 struct driver tty_driver = {
 	tty_init,
@@ -74,7 +75,7 @@ struct driver tty_driver = {
 	tty_write,
 	tty_ioctl,
 	tty_poll,
-	NULL,
+	tty_seek,
 };
 
 
@@ -172,6 +173,8 @@ static void tty_process_input(void *_unused)
 
 int tty_init(void)
 {
+	int error;
+
 	for (short i = 0; i < TTY_DEVICE_NUM; i++) {
 		tty_devices[i].rdev = DEVNUM(DEVMAJOR_TTY68681, i);
 		tty_devices[i].pgid = 0;
@@ -184,7 +187,10 @@ int tty_init(void)
 		memcpy(&tty_devices[i].tio, &default_tio, sizeof(struct termios));
 	}
 
-	register_driver(DEVMAJOR_TTY, &tty_driver);
+	error = register_driver(DEVMAJOR_TTY, &tty_driver);
+	if (error < 0)
+		return error;
+
 	register_bh(BH_TTY, tty_process_input, NULL);
 	enable_bh(BH_TTY);
 	return 0;
@@ -351,5 +357,10 @@ int tty_poll(devminor_t minor, int events)
 		revents |= VFS_POLL_ERROR;
 
 	return revents;
+}
+
+offset_t tty_seek(devminor_t minor, offset_t position, int whence, offset_t offset)
+{
+	return -1;
 }
 

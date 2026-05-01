@@ -10,8 +10,19 @@ static struct driver *drv_table[MAX_DRIVERS];
 
 int register_driver(devmajor_t major, struct driver *driver)
 {
-	if (major >= MAX_DRIVERS)
+	if (major >= MAX_DRIVERS) {
 		return -1;
+	}
+
+	if (drv_table[major]) {
+		log_error("register_driver: a driver is already registered under the major number %d\n", major);
+		return -1;
+	}
+
+	if (!driver->init || !driver->open || !driver->close || !driver->read || !driver->write || !driver->ioctl || !driver->poll || !driver->seek) {
+		log_error("register_driver: missing ops function for driver major %d\n", major);
+		return -1;
+	}
 
 	drv_table[major] = driver;
 	return 0;

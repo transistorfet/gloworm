@@ -46,7 +46,11 @@ static struct mem_geometry devices[] = {
 
 int mem_init(void)
 {
-	register_driver(DEVMAJOR_MEM, &mem_driver);
+	int error;
+
+	error = register_driver(DEVMAJOR_MEM, &mem_driver);
+	if (error < 0)
+		return error;
 
 	for (short i = 0; i < num_devices; i++)
 		log_notice("mem%d: ram disk of %d bytes\n", i, devices[i].size);

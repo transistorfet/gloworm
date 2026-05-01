@@ -3,7 +3,7 @@
 
 * document the partition vs raw disk image thing
 * document (and make configurable) the LED output on the 68681, used to indicate a context switch
-* should you change DISABLE_INTS to DISABLE_IRQS(), etc
+* should you add a name to the driver struct?
 * for all drivers, check that they all have valid pointers to a function (or do filesystems automatically substitute nop?)
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 * make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
@@ -12,6 +12,7 @@
 * are there any static tables still used beside the table of processes?
 * go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 * normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
+* add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages

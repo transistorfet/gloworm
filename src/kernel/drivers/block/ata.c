@@ -255,12 +255,17 @@ static inline struct partition *ata_get_device(devminor_t minor)
 
 int ata_init(void)
 {
+	int error;
+
 	//*COMET_VME_CF_CONTROL = 0xb8;
 
 	for (short i = 0; i < PARTITION_MAX; i++) {
 		drives[0].parts[i].base = 0;
 	}
-	register_driver(DEVMAJOR_ATA, &ata_driver);
+
+	error = register_driver(DEVMAJOR_ATA, &ata_driver);
+	if (error < 0)
+		return error;
 
 	// TODO this doesn't work very well
 	if (!ata_detect()) {

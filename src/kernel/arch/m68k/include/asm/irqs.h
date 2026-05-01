@@ -55,8 +55,8 @@
 
 #define HALT()			asm volatile("stop #0x2700\n")
 
-#define DISABLE_INTS()		asm volatile("or.w	#0x0700, %sr");
-#define ENABLE_INTS()		asm volatile("and.w	#0xF8FF, %sr");
+#define DISABLE_IRQS()		asm volatile("or.w	#0x0700, %sr");
+#define ENABLE_IRQS()		asm volatile("and.w	#0xF8FF, %sr");
 
 #define TRACE_ON()		asm volatile("or.w	#0x8000, %sr");
 #define TRACE_OFF()		asm volatile("and.w	#0x7FFF, %sr");
@@ -76,7 +76,7 @@ typedef short lock_state_t;
 
 #define LOCK(saved) {					\
 	asm("move.w	%%sr, %0\n" : "=dm" ((saved)));	\
-	DISABLE_INTS();					\
+	DISABLE_IRQS();					\
 }
 
 #define UNLOCK(saved) {						\
