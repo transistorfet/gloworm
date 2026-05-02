@@ -3,7 +3,9 @@
 #define _TIME_H
 
 #include <stddef.h>
-#include <sys/types.h>
+
+typedef long time_t;
+typedef long clock_t;
 
 struct tm {
 	int tm_sec;			// seconds after the minute [0, 59]

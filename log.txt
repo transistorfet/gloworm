@@ -5653,3 +5653,27 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   places that might use a signed length/size value, related to issues with the stack being at the upper end of memory or allocating
   all of available user memory
 
+
+2026-05-01:
+
+- I'm trying to change the clock stuff so it's easier to use and more robust to bad clocks, and it seems like there are a lot of
+  ways the updates can stop happening that then cause program crashes, which don't seem to make sense.
+- if the scheduler doesn't run, after the init process is created, then it will try to return to the process and I think be using
+  the kernel memory map instead of the process's, and as a result it tries to execute 0x40000 which is FFFF and causes an exception
+  11 f-line emualtor.  Is it just that the extended switch isn't called, or is it that the current process is NULL but a NULL check
+  isn't performed
+- I'm not sure the state of it at the moment, I think both check timers and request reschedule aren't running, and it starts, the
+  timeout happens right away, and ntpdate crashes immediately but gets to a shell
+
+- the bottom half for the timer wasn't running, and it turned out to be because it wasn't enabled.  Only the tty was enabled, but
+  not the slip or net ones, which explains why networking wasn't working.  I've changed it so registering the bh will automatically
+  enable it, since that's usually what's wanted, and it won't run anyways until returning from an interrutp, so something that
+  really wants to not run it can lock and then register and enable?  Now that I think about it, maybe passing in the enable state
+  might be better, but... maybe I'll leave that for later since it's more overhead that's usually not needed
+
+- so I'm currently left with two bugs, one is where it will continuously bus error on the same address and same pid, pid 4 which is
+  the shell that runs the rc script.  This only happens if clock source isn't registered, which I would expect instead for it to
+  block forever on the signal timer.  I think this is related to scheduling, and maybe means there's a missing reschedule request
+- the other bug is that when the clock is registered, so normal conditions, the ntpdate command fails with a bus error for a very
+  odd address.  It happens just after the signal handler returns
+

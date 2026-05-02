@@ -3,6 +3,7 @@
 #define _KERNEL_PROC_SCHEDULER_H
 
 #include <sys/types.h>
+#include <kernel/time.h>
 
 struct vnode;
 struct process;
@@ -32,6 +33,7 @@ void restart_current_syscall(void);
 void set_proc_return_value(struct process *proc, int ret);
 void return_to_current_proc(int ret);
 
+void check_reschedule(nanos_t uptime);
 void request_reschedule(void);
 void reschedule_proc_to_now(struct process *proc);
 __attribute__((noreturn)) void begin_multitasking(void);

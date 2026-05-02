@@ -188,8 +188,25 @@ struct serial_channel {
 static struct serial_channel channels[2];
 
 #if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+
+#define TTY_68681_CLOCK_OVERFLOW	60
+
 static char handle_timer = 0;
+static uint16_t clock_cycles = 0;
+
+cycles_t tty_68681_read_clock(struct clocksource *clk);
+nanos_t tty_68681_cycles_to_nanos(struct clocksource *clk, cycles_t cycles);
+
+struct clocksource tty_68681_clock = {
+	"mc68681 timer",
+	100,
+	TTY_68681_CLOCK_OVERFLOW,
+	tty_68681_read_clock,
+	tty_68681_cycles_to_nanos,
+};
+
 #endif
+
 #if defined(CONFIG_TTY_68681_GPIO_LEDS)
 static char tick = 0;
 #endif
@@ -272,7 +289,7 @@ static void tty_68681_process_input(void *_unused)
 	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 	if (handle_timer) {
 		handle_timer = 0;
-		check_timers();
+		update_time();
 	}
 	#endif
 
@@ -367,6 +384,16 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 	}
 }
 
+cycles_t tty_68681_read_clock(struct clocksource *clk)
+{
+	return clock_cycles;
+}
+
+nanos_t tty_68681_cycles_to_nanos(struct clocksource *clk, cycles_t cycles)
+{
+	return (nanos_t) (cycles * 71111111);
+}
+
 void handle_serial_irq(void)
 {
 	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
@@ -396,8 +423,10 @@ void handle_serial_irq(void)
 		#endif
 
 		#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
-		adjust_system_time(71111);
-		request_reschedule();
+		clock_cycles += 1;
+		if (clock_cycles >= TTY_68681_CLOCK_OVERFLOW) {
+			clock_cycles = 0;
+		}
 
 		handle_timer = 1;
 		request_bh_run(BH_TTY68681);
@@ -521,6 +550,7 @@ void tty_68681_normal_mode(void)
 	// Configure timer
 	*CTUR_WR_ADDR = 0x20;
 	*CTLR_WR_ADDR = 0x00;
+	clock_cycles = 0;
 	#endif
 
 	// Enable interrupts
@@ -586,6 +616,10 @@ int tty_68681_init(void)
 	int error;
 
 	tty_68681_normal_mode();
+
+	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+	register_clock(&tty_68681_clock);
+	#endif
 
 	error = register_driver(DEVMAJOR_TTY68681, &tty_68681_driver);
 	if (error < 0)

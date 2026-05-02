@@ -4,9 +4,6 @@
 
 #include <stdint.h>
 
-typedef long time_t;
-typedef long clock_t;
-
 typedef int pid_t;
 typedef short device_t;
 

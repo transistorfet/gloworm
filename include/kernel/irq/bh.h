@@ -2,11 +2,12 @@
 #ifndef _KERNEL_IRQ_BH_H
 #define _KERNEL_IRQ_BH_H
 
-#define BH_MAX			4
-#define BH_TTY68681		0
-#define BH_TTY			1
-#define BH_SLIP			2
-#define BH_NET			3
+#define BH_MAX			10
+#define BH_TIMER		0
+#define BH_TTY68681		1
+#define BH_TTY			2
+#define BH_SLIP			3
+#define BH_NET			4
 
 typedef void (*bh_handler_t)(void *);
 

@@ -51,9 +51,6 @@ struct process *create_init_task(void)
 	if (!proc->fd_table)
 		goto fail;
 
-	// Set the current proc, or some of the functions that will be called won't do the right thing
-	current_proc = proc;
-
 	#if defined(CONFIG_SHELL_IN_KERNEL)
 
 	const char *envp[1] = { NULL };

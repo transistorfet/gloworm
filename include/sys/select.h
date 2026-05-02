@@ -2,8 +2,8 @@
 #ifndef _SYS_SELECT_H
 #define _SYS_SELECT_H
 
+#include <time.h>
 #include <string.h>
-#include <sys/types.h>
 
 #define _FDS_MAX	128
 
