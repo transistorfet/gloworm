@@ -10,6 +10,7 @@ static time_t system_seconds;
 static time_t system_subseconds_nanos;
 static cycles_t current_clock_last_cycle;
 static nanos_t monotonic_uptime_nanos;
+static char clock_warning_given = 0;
 
 struct clocksource *current_clock;
 
@@ -20,6 +21,7 @@ void init_time(void)
 	current_clock_last_cycle = 0;
 	monotonic_uptime_nanos = 0;
 	current_clock = NULL;
+	clock_warning_given = 0;
 }
 
 int register_clock(struct clocksource *clock)
@@ -60,6 +62,10 @@ void update_time(void)
 		// Convert to nanoseconds
 		diff = current_clock->cycles_to_nanos(current_clock, diff);
 	} else {
+		if (!clock_warning_given) {
+			clock_warning_given = 1;
+			log_error("clock: no clock was set, defaulting to rough counting\n");
+		}
 		// If there's no current clock, just increase the clock by a bit
 		// This function should be called periodically whenever an irq occurs, which could
 		// be any length of time.  A fixed amount is better than nothing
