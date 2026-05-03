@@ -38,7 +38,7 @@ extern struct process *current_proc;
 extern struct syscall_record *current_syscall;
 
 
-#if defined(CONFIG_TTY_68681)
+#if defined(CONFIG_TTY_68681) && defined(CONFIG_TTY_68681_GPIO_LEDS)
 void tty_68681_set_leds(uint8_t bits);
 void tty_68681_reset_leds(uint8_t bits);
 #endif
@@ -50,7 +50,7 @@ void tty_68681_reset_leds(uint8_t bits);
 /// the syscall info that is about to be executed
 void syscall_entry(void)
 {
-	#if defined(CONFIG_TTY_68681)
+	#if defined(CONFIG_TTY_68681) && defined(CONFIG_TTY_68681_GPIO_LEDS)
 	tty_68681_set_leds(0x01);
 	#endif
 }
@@ -62,7 +62,7 @@ void syscall_entry(void)
 /// debugging info, as a counterpart to `syscall_entry()`
 void syscall_exit(void)
 {
-	#if defined(CONFIG_TTY_68681)
+	#if defined(CONFIG_TTY_68681) && defined(CONFIG_TTY_68681_GPIO_LEDS)
 	tty_68681_reset_leds(0x01);
 	#endif
 }

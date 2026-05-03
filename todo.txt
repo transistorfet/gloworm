@@ -11,6 +11,7 @@
 
 * document the partition vs raw disk image thing
 * document (and make configurable) the LED output on the 68681, used to indicate a context switch
+* should you add -Wconversion (or -Wextra or something that includes it) to catch implicit conversions?  Generates a lot of warnings currently
 * should you add a name to the driver struct?
 * for all drivers, check that they all have valid pointers to a function (or do filesystems automatically substitute nop?)
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?

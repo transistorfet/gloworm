@@ -54,6 +54,10 @@ void tty_68681_reset_leds(uint8_t bits);
 #define TTY_68681_CLOCK_COUNTER_LOAD	0x480	// equals 10 milliseconds
 /// Each time the counter hardware counter expires, the cycle count will be
 /// incremented, and when that cycle count reaches MAX_CYCLES, it will wrap to 0
+/// Since the MC68681 counter cannot be read while running, this value stands in
+/// for a timestamp counter value. The `update_time` function must be called more
+/// often than this time to avoid losing track of cycles, while also being low
+/// enough that we can do 32-bit operations on nanosecond values without overflowing
 #define TTY_68681_CLOCK_MAX_CYCLES	60
 /// The quality rating of this clock (100 is average/good)
 #define TTY_68681_CLOCK_RATING		100
