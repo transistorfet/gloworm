@@ -154,7 +154,6 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 
 	if (segment->ops && segment->ops->load_page_at) {
 		page_address = rounddown(vaddr, PAGE_SIZE);
-		// TODO should you add support for large pages?
 		error = mmu_table_get_page(map->root_table, page_address, &result);
 		if (!error) {
 			if (write_error && (segment->flags & SEG_WRITE)) {

@@ -306,13 +306,7 @@ void schedule(void)
 
 __attribute__((noreturn)) void begin_multitasking(void)
 {
-	current_proc = (struct process *) run_queue.head;
-
-	//panic("Panicking for good measure\n");
-
-	// Force an address error for testing
-	//volatile uint16_t *data = (uint16_t *) 0x100001;
-	//volatile uint16_t value = *data;
+	need_reschedule = 1;
 
 	// Start Multitasking
 	GOTO_LABEL("restore_context");

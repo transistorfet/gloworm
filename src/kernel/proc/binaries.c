@@ -10,6 +10,7 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/map.h>
 #include <kernel/proc/exec.h>
+#include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
 #include <kernel/utils/math.h>
 
@@ -71,6 +72,9 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 
 	// Swap the existing memory map for the newly created one
 	proc->map = map;
+	if (!current_proc || current_proc == proc) {
+		arch_extended_switch_context(NULL, proc);
+	}
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
 	error = exec_initialize_stack_with_args(proc, map->stack_end, entry, argv, envp);

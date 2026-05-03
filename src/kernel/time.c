@@ -1,5 +1,6 @@
 
 #include <time.h>
+#include <asm/irqs.h>
 #include <kernel/time.h>
 #include <kernel/printk.h>
 #include <kernel/irq/bh.h>
@@ -24,11 +25,11 @@ void init_time(void)
 int register_clock(struct clocksource *clock)
 {
 	if (!current_clock || clock->rating > current_clock->rating) {
-		log_debug("%s: switching to clock %s\n", __func__, clock->name);
+		log_debug("clock: switching to clock %s\n", clock->name);
 		current_clock = clock;
 		return 1;
 	} else {
-		log_info("%s: the rating of clock %s is not better than %s\n", __func__, clock->name, current_clock->name);
+		log_info("clock: the rating of clock %s is not better than %s\n", clock->name, current_clock->name);
 		return 0;
 	}
 }
@@ -38,25 +39,32 @@ void update_time(void)
 	nanos_t diff;
 	cycles_t cycles;
 
-	request_bh_run(BH_TIMER);
+	short saved_status;
+	LOCK(saved_status);
 
-	if (!current_clock)
-		return;
+	if (current_clock) {
+		cycles = current_clock->read(current_clock);
 
-	cycles = current_clock->read(current_clock);
+		// Check if the clock has overflowed
+		if (cycles == current_clock_last_cycle) {
+			// If no change, then do nothing and return
+			UNLOCK(saved_status);
+			return;
+		} else if (cycles > current_clock_last_cycle) {
+			diff = cycles - current_clock_last_cycle;
+		} else {
+			diff = (current_clock->max_cycles - current_clock_last_cycle) + cycles;
+		}
+		current_clock_last_cycle = cycles;
 
-	// Check if the clock has overflowed
-	if (cycles == current_clock_last_cycle) {
-		return;
-	} else if (cycles < current_clock_last_cycle) {
-		diff = (current_clock->max_cycles - current_clock_last_cycle) + cycles;
+		// Convert to nanoseconds
+		diff = current_clock->cycles_to_nanos(current_clock, diff);
 	} else {
-		diff = cycles;
+		// If there's no current clock, just increase the clock by a bit
+		// This function should be called periodically whenever an irq occurs, which could
+		// be any length of time.  A fixed amount is better than nothing
+		diff = 1000000;
 	}
-	current_clock_last_cycle = cycles;
-
-	// Convert to nanoseconds
-	diff = current_clock->cycles_to_nanos(current_clock, diff);
 
 	// Update monotonic uptime
 	monotonic_uptime_nanos += diff;
@@ -67,6 +75,10 @@ void update_time(void)
 		system_subseconds_nanos -= NANOS_PER_SECOND;
 		system_seconds += 1;
 	}
+
+	request_bh_run(BH_TIMER);
+
+	UNLOCK(saved_status);
 }
 
 void set_system_time(time_t t)

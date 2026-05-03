@@ -1,4 +1,6 @@
 
+* fix bug with signals, where setting the proc alarm to 0 will make it occur right away, and will always crash the problem due to stack corruption of some kind
+
 * so I'm currently left with two bugs, one is where it will continuously bus error on the same address and same pid, pid 4 which is
   the shell that runs the rc script.  This only happens if clock source isn't registered, which I would expect instead for it to
   block forever on the signal timer.  I think this is related to scheduling, and maybe means there's a missing reschedule request
