@@ -5653,3 +5653,127 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   places that might use a signed length/size value, related to issues with the stack being at the upper end of memory or allocating
   all of available user memory
 
+
+2026-05-01:
+
+- I'm trying to change the clock stuff so it's easier to use and more robust to bad clocks, and it seems like there are a lot of
+  ways the updates can stop happening that then cause program crashes, which don't seem to make sense.
+- if the scheduler doesn't run, after the init process is created, then it will try to return to the process and I think be using
+  the kernel memory map instead of the process's, and as a result it tries to execute 0x40000 which is FFFF and causes an exception
+  11 f-line emualtor.  Is it just that the extended switch isn't called, or is it that the current process is NULL but a NULL check
+  isn't performed
+- I'm not sure the state of it at the moment, I think both check timers and request reschedule aren't running, and it starts, the
+  timeout happens right away, and ntpdate crashes immediately but gets to a shell
+
+- the bottom half for the timer wasn't running, and it turned out to be because it wasn't enabled.  Only the tty was enabled, but
+  not the slip or net ones, which explains why networking wasn't working.  I've changed it so registering the bh will automatically
+  enable it, since that's usually what's wanted, and it won't run anyways until returning from an interrutp, so something that
+  really wants to not run it can lock and then register and enable?  Now that I think about it, maybe passing in the enable state
+  might be better, but... maybe I'll leave that for later since it's more overhead that's usually not needed
+
+- so I'm currently left with two bugs, one is where it will continuously bus error on the same address and same pid, pid 4 which is
+  the shell that runs the rc script.  This only happens if clock source isn't registered, which I would expect instead for it to
+  block forever on the signal timer.  I think this is related to scheduling, and maybe means there's a missing reschedule request
+- the other bug is that when the clock is registered, so normal conditions, the ntpdate command fails with a bus error for a very
+  odd address.  It happens just after the signal handler returns
+
+
+2026-05-02:
+
+- sitting down to these last few bugs, and looking at the [registered] clock one, since it was how I had left it last night.  It
+  seems to be trying to run the start address, but it keeps swapping out the same page, which never resolves.  It looks the same as
+  the error I was getting during init, where it would try to execute 0x40000 without loading the page.  In this case, it's not that
+  it's not causing a page fault when it should, but instead it's causing a page fault that can't seem to resolve.  But in either
+  case, it's right at the start of the execution of that process
+- it didn't seem to be affected by the lack of `update_time` in the irq exit
+- I want to find the root cause here, but I know that "forcing" a context switch is likely to resolve the issue in the long term
+  (like it won't actually boot as-is because time doesn't advance), so maybe I should have a back "clock" that just counts how many
+  times it passes a point.  The clock will be wildly inaccurate, but at least it will boot and run (somewhat)
+
+- I finally looked a bit closer, and saw that the check in irqs.c, where it calls get_page and then checks for error, is actually
+  checking for !error and returning, which is what happens.  It finds a valid page, and then returns because there's nothing wrong.
+  I seem to recall I had a problem with this earlier where it would sometimes throw a bus error when it shouldn't, and left it to
+  return because it would just "work" if I did
+- I can only image that it's not working this time because it's using the wrong mmu table for the process
+
+- that is exactly what's happening.  The mmu table should be 12C500 but is 129200, so something's wrong....
+- I searched for "current_proc =" and found 3 instances in scheduler.c, where I would have expected 2 (the one that sets it to NULL
+  when initiailizing, and one that sets it in `schedule()`).  The third one is in `begin_multitasking()` which definitely is wrong.
+  It will mess up the startup sequence because current_proc will be the same as previous_proc, and then it won't do the extended
+  switch too
+- I would have expected this to fix the problem, but it doesn't seem to, or at least it maybe changes things but causes a different
+  one.  I've tried both calling schedule() directly instead of assigning current_proc, and also removing everything and relying on
+  the `needs_reschedule` variable that invokes a schedule() on `restore_context`
+- I removed a bunch of the log messages that were getting in the way, and now it seems to get further, getting to the signal from
+  ntpdate, and then pid 6 crashes, and it gets into this same unresolving bus error issue.  This is when leaving begin_multitasking
+  empty of scheduling related stuff
+- when I force a schedule before `restore_context` in `begin_multitasking`, it now doesn't crash on pid 6, but still gets into the
+  unresolvable bus error
+- when there's a forced `schedule()` on startup, it fails before the timeout occurs.  When there's no forced `schedule()`, it gets
+  to the timeout, and then fails, so they're different.  They might be related to the condition happening when the clock is
+  [not registered] as well (this is testing with a clock [registered])
+- the problem is causing the infinite bus error is the same, where it's using the wrong table... very strange
+
+- oooh I think this is the problem in exec.c where I'm force-switching the extended context, which might not work correctly.
+  Printing out the current and previous procs and map root tables:
+    ```
+    cur=110F14 prev=110C7A curroot=12D400 prevroot=12C600
+    switched
+    bus error: d w fc=1 addr=49370 ssw=709 mmusr=A04 pid=6 pc=415EC
+    bus error: i r fc=5 addr=40198 ssw=B64D mmusr=202 pid=6 pc=104C1E
+    get page -2: should be 135100 but is 12D400
+    cur=110F14 prev=110F14 curroot=135100 prevroot=135100
+    bus error: i r fc=5 addr=40198 ssw=B64D mmusr=202 pid=6 pc=104C1E
+    get page 0: should be 135100 but is 12D400
+    bus error: i r fc=5 addr=40198 ssw=B64D mmusr=202 pid=6 pc=104C1E
+    get page 0: should be 135100 but is 12D400
+    ```
+- it switches to cur=110F14 with curroot=12D400, but then later says that the table should actually be 135100 instead of 12D400.
+  The process is the same, but the root table has changed, and the most likely reason is that it called exec().
+- I suppose there's also a high risk/likelyhood that the current_proc pointer could be the same if a process exits, and then a new
+  one is forked, and it uses the same slot in the process table.  So checking that the pointers are the same might not actually be
+  accurate to know if the process has changed?  The pid should be different though since we don't recycle them (until it wraps)
+- in light of the fact that it switches a lot of times after starting multitasking, it seems odd that explicitly calling schedule in
+  begin_multitasking vs not causes it to behave differently.  Maybe it's a non-deterministic effect though
+- confirmed that the extended switch in exec.c is the problem by just removing the conditional and always doing the switch
+- I want a better solution here than having the forced switch
+
+- oh actually the clock is registered.  I had that backwards earlier
+
+- Ok, so I moved the arch_extended_switch_context to binaries.c, since the init.c code is the only place that uses the exec calls,
+  and that should be handled by the forced context switch on startup
+- I had thought about making a function in scheduler.c which will invalidate the current_proc/previous_proc as necessary, which I
+  could still do, or make a function in map.c which swaps the process memory_map, and does all the right checks and such, but
+  honestly none of them are a great place for it.  The fact that it could affect usercopy code is also a factor, so I wanted it to
+  go before the exec_initialize_stack_with_args call
+- currently the clock is registered, and pid 6 is crashing on boot, and also time is advancing too fast
+
+- this is so weird.  Sometimes just the ntpdate process crashes, and sometimes after it crashes, it reruns the rc script, the rc
+  shell crashes, ntpdate crashes a second time, and then the pid 3 shell starts and it's more or less fine again...
+- it does not seem to be the case that the root pointer is wrong, or at least I checked in add/remove signal context as well as in
+  that one place in bus error handling
+- it's like the stack page is incorrect, and it's actually a page that has instruction data instead of the actual stack
+
+- it took restoring the adjust_system_time() and bh stuff to get it working again, and not ever calling update time.  I had disabled
+  the timer bh even, so it must not have been the rescheduler time checking code I added.  Was it honestly just the uint64_t
+  multiplication?  Is that code totally messing everything up?  I know it sucks but sheesh
+- yes, it literally is even `diff = cycles * 71111111` in the new update_time.  Without the `cycles *` part, it works fine.  Fuuuck
+- wait, I renamed the two multiplication functions and it didn't do anything.  It probably isn't using them when it's compiling for
+  68030 because it has native 32-bit multiply
+- printing cycles is 0.  Could that cause problems?  Is it even calling the signal handler's terminate too soon?!?  That could
+  corrupt the stack.  Hmm....
+- wait again, the print function is taking a 32-bit number, so maybe it's not converting it correctly?  Is it actually 0?  the clock
+  read function is putting the number into %d0 for the upper and %d1 for the lower, and the update_time function seems to be saving
+  both, but doing different things with them
+- If I explicitly convert the number to a 32-bit number, it has teh right values
+- well... that's interesting... printing out the `diff` value, it's positive but then goes negative.  I guess that's just because
+  it's unsigned and the printk is only printing signed, but it still seems weird...  is something wrong with overflows?
+- well it was supposed to be `diff = diff * 71111111`, so there's that.  it's still not working though
+- is this an interrupts problem?  Interrupts should still be disabled...
+- math was still wrong, and the diff was going up.  I had diff = cycles instead of diff = cycles - current_clock_last_cycles
+- and now it's always increasing by one cycle, never more, and doesn't have the crash during ntpdate, but is it literally just that
+  tho clock going too fast makes it crash?   I still think the problem is that it services the timer expired too early, maybe even
+  before it returns to that process?
+
+- that's exactly it.  The timer occurs too soon.  I changed it to always be 0 seconds, and it now crashes again
+

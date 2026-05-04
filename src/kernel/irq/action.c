@@ -25,10 +25,8 @@ void handle_trace(void);
 
 static struct irq_action action_table[INTERRUPT_MAX];
 
-void init_interrupts(void)
+void init_irqs(void)
 {
-	init_bh();
-
 	extern void enter_handle_exception(void);
 	for (short i = 0; i < INTERRUPT_MAX; i++) {
 		action_table[i].irq = 0;

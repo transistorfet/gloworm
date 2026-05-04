@@ -1,5 +1,5 @@
 
-#include <sys/types.h>
+#include <time.h>
 #include <sys/syscall.h>
 
 int stime(const time_t *t)

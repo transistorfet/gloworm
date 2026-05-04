@@ -3,7 +3,6 @@
 #include <string.h>
 #include <sys/param.h>
 
-#include <asm/context.h>
 #include <asm/addresses.h>
 
 #include <kernel/mm/map.h>
@@ -71,10 +70,6 @@ int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stac
 	result = iovec_iter_seek(&iter, 0, SEEK_END);
 	if (result < 0) {
 		return result;
-	}
-
-	if (current_proc != proc) {
-		arch_extended_switch_context(NULL, proc);
 	}
 
 	result = copy_exec_args(proc->map, stack_pointer - buffered_size, &iter, argv, envp);

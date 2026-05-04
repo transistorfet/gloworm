@@ -77,6 +77,10 @@ config DEBUG
 	help
 	  This will add in some extra debugging features
 
+config DEBUG_LEDS
+	bool
+	default n
+
 endif
 
 endmenu

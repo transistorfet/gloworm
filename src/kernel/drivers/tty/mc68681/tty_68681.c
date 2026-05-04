@@ -45,42 +45,66 @@ struct driver tty_68681_driver = {
 };
 
 void tty_68681_tx_safe_mode(void);
-void tty_68681_set_leds(uint8_t bits);
-void tty_68681_reset_leds(uint8_t bits);
 
+#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+
+/// The value loaded into the 16-bit counter register
+#define TTY_68681_CLOCK_COUNTER_LOAD	0x480	// equals 10 milliseconds
+/// Each time the counter hardware counter expires, the cycle count will be
+/// incremented, and when that cycle count reaches MAX_CYCLES, it will wrap to 0
+/// Since the MC68681 counter cannot be read while running, this value stands in
+/// for a timestamp counter value. The `update_time` function must be called more
+/// often than this time to avoid losing track of cycles, while also being low
+/// enough that we can do 32-bit operations on nanosecond values without overflowing
+#define TTY_68681_CLOCK_MAX_CYCLES	60
+/// The quality rating of this clock (100 is average/good)
+#define TTY_68681_CLOCK_RATING		100
+
+cycles_t tty_68681_read_clock(struct clocksource *clk);
+nanos_t tty_68681_cycles_to_nanos(struct clocksource *clk, cycles_t cycles);
+
+struct clocksource tty_68681_clock = {
+	"mc68681 timer",
+	TTY_68681_CLOCK_RATING,
+	TTY_68681_CLOCK_MAX_CYCLES,
+	tty_68681_read_clock,
+	tty_68681_cycles_to_nanos,
+};
+
+#endif
 
 // MC68681 Register Addresses
 #define DUART_REG_BASE 	CONFIG_TTY_68681_BASE 
-#define MR1A_MR2A_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x00)
-#define SRA_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x02)
-#define CSRA_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x02)
-#define CRA_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x04)
-#define TBA_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x06)
-#define RBA_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x06)
+#define MR1A_MR2A_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x00)
+#define SRA_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x02)
+#define CSRA_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x02)
+#define CRA_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x04)
+#define TBA_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x06)
+#define RBA_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x06)
 
-#define MR1B_MR2B_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x10)
-#define SRB_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x12)
-#define CSRB_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x12)
-#define CRB_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x14)
-#define TBB_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x16)
-#define RBB_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x16)
+#define MR1B_MR2B_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x10)
+#define SRB_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x12)
+#define CSRB_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x12)
+#define CRB_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x14)
+#define TBB_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x16)
+#define RBB_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x16)
 
-#define ACR_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x08)
+#define ACR_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x08)
 
-#define CTUR_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x0C)
-#define CTLR_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x0E)
-#define START_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1C)
-#define STOP_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1E)
+#define CTUR_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x0C)
+#define CTLR_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x0E)
+#define START_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x1C)
+#define STOP_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x1E)
 
-#define IPCR_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x08)
-#define OPCR_WR_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1A)
-#define INPUT_RD_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1A)
-#define OUT_SET_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1C)
-#define OUT_RESET_ADDR	((volatile uint8_t *) DUART_REG_BASE + 0x1E)
+#define IPCR_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x08)
+#define OPCR_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x1A)
+#define INPUT_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x1A)
+#define OUT_SET_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x1C)
+#define OUT_RESET_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x1E)
 
-#define ISR_RD_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x0A)
-#define IMR_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x0A)
-#define IVR_WR_ADDR		((volatile uint8_t *) DUART_REG_BASE + 0x18)
+#define ISR_RD_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x0A)
+#define IMR_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x0A)
+#define IVR_WR_ADDR			((volatile uint8_t *) DUART_REG_BASE + 0x18)
 
 
 // MC68681 Command Numbers
@@ -188,10 +212,15 @@ struct serial_channel {
 static struct serial_channel channels[2];
 
 #if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+
+// NOTE this is forced to a floating point number for the calculation and then back to a 32-bit int,
+// which should be able to hold this value comfortably. Without the float conversion, the compiler
+// will not generate an accurate number. No floating point operations should be performed at runtime
+#define TTY_68681_CYCLES_TO_NANOS		(uint32_t) ((double) TTY_68681_CLOCK_COUNTER_LOAD * 16 * 2 * NANOS_PER_SECOND / 3686400)
+
 static char handle_timer = 0;
-#endif
-#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-static char tick = 0;
+static uint16_t clock_cycles = 0;
+
 #endif
 
 static inline void config_serial_channel(struct serial_channel *channel)
@@ -272,7 +301,7 @@ static void tty_68681_process_input(void *_unused)
 	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 	if (handle_timer) {
 		handle_timer = 0;
-		check_timers();
+		update_time();
 	}
 	#endif
 
@@ -382,33 +411,26 @@ void handle_serial_irq(void)
 
 	if (isr & ISR_TIMER_CHANGE) {
 		// Clear the interrupt bit by reading the stop address
-		volatile register char reset = *STOP_RD_ADDR;
+		volatile register uint8_t reset = *STOP_RD_ADDR;
 		reset;	// make the compiler happy
 
-		#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-		if (tick) {
-			tick = 0;
-			*OUT_SET_ADDR = 0x80;
-		} else {
-			tick = 1;
-			*OUT_RESET_ADDR = 0x80;
-		}
-		#endif
-
 		#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
-		adjust_system_time(71111);
-		request_reschedule();
+		clock_cycles += 1;
+		if (clock_cycles >= TTY_68681_CLOCK_MAX_CYCLES) {
+			clock_cycles = 0;
+		}
 
 		handle_timer = 1;
 		request_bh_run(BH_TTY68681);
 		#endif
 	}
 
-	/*
 	if (isr & ISR_INPUT_CHANGE) {
 		// Reading from the IPCR register will clear the interrupt
-		uint8_t status = *IPCR_RD_ADDR;
+		volatile register uint8_t status = *IPCR_RD_ADDR;
+		status;	// make the compiler happy
 
+		/*
 		tty_68681_tx_safe_mode();
 		asm(
 		"move.l	#0, %a0\n"
@@ -437,27 +459,12 @@ void handle_serial_irq(void)
 			);
 		}
 		//TRACE_ON();
-
+		*/
 	}
-	*/
 
 	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	// TODO this is for debugging to tell me when the handler exits
 	*OUT_RESET_ADDR = 0x08;
-	#endif
-}
-
-void tty_68681_set_leds(uint8_t bits)
-{
-	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-	*OUT_SET_ADDR = (bits << 4);
-	#endif
-}
-
-void tty_68681_reset_leds(uint8_t bits)
-{
-	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-	*OUT_RESET_ADDR = (bits << 4);
 	#endif
 }
 
@@ -519,8 +526,9 @@ void tty_68681_normal_mode(void)
 
 	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 	// Configure timer
-	*CTUR_WR_ADDR = 0x20;
-	*CTLR_WR_ADDR = 0x00;
+	*CTUR_WR_ADDR = TTY_68681_CLOCK_COUNTER_LOAD >> 8;
+	*CTLR_WR_ADDR = (uint8_t) TTY_68681_CLOCK_COUNTER_LOAD;
+	clock_cycles = 0;
 	#endif
 
 	// Enable interrupts
@@ -566,8 +574,25 @@ void tty_68681_preinit(void)
 	tty_68681_tx_safe_mode();
 }
 
+////// Kernel Clock Driver Interface //////
 
-////// Kernel Driver Interface //////
+#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+
+cycles_t tty_68681_read_clock(struct clocksource *clk)
+{
+	return clock_cycles;
+}
+
+nanos_t tty_68681_cycles_to_nanos(struct clocksource *clk, cycles_t cycles)
+{
+	// NOTE the TTY_68681_CLOCK_MAX_CYCLES value is selected to never overflow a 32-bit number
+	// so we can convert the cycles to 32-bit and speed this calculation up
+	return (nanos_t) ((uint32_t) cycles * TTY_68681_CYCLES_TO_NANOS);
+}
+
+#endif
+
+////// Kernel Character Driver Interface //////
 
 static inline struct serial_channel *from_minor_dev(device_t minor)
 {
@@ -586,6 +611,10 @@ int tty_68681_init(void)
 	int error;
 
 	tty_68681_normal_mode();
+
+	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
+	register_clock(&tty_68681_clock);
+	#endif
 
 	error = register_driver(DEVMAJOR_TTY68681, &tty_68681_driver);
 	if (error < 0)
@@ -683,8 +712,8 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *i
 			int leds;
 			memcpy_out_of_iter(iter, &leds, sizeof(int));
 			leds &= 0x03;
-			tty_68681_reset_leds(~leds);
-			tty_68681_set_leds(leds);
+			debug_leds_reset(~leds);
+			debug_leds_set(leds);
 			return 0;
 		}
 		#endif
@@ -729,4 +758,37 @@ int console_putchar_buffered(int ch)
 {
 	return tty_68681_putchar_buffered(&channels[CH_A], ch);
 }
+
+////// Debug LED Interface //////
+
+#if defined(CONFIG_TTY_68681_GPIO_LEDS)
+uint8_t led_state;
+
+void debug_leds_set(uint8_t bits)
+{
+	led_state |= bits;
+	*OUT_SET_ADDR = (bits << 4);
+}
+
+void debug_leds_reset(uint8_t bits)
+{
+	led_state &= ~bits;
+	*OUT_RESET_ADDR = (bits << 4);
+}
+
+void debug_leds_toggle(uint8_t bits)
+{
+	uint8_t set = ~led_state & bits;
+	uint8_t reset = led_state & bits;
+
+	if (set) {
+		debug_leds_set(set);
+	}
+
+	if (reset) {
+		debug_leds_reset(reset);
+	}
+}
+#endif
+
 

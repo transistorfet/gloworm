@@ -32,6 +32,7 @@
 	.global bh_requested
 	.global run_bh_handlers
 	.global mmu_table_create
+	.global update_time
 
 	.equ	SHORT_CONTEXT_SIZE, 24		// The size of the syscall registers on the stack (not including the interrupt return)
 	.equ	FULL_CONTEXT_SIZE, 64		// The size of the saved registers on the stack (not including the interrupt return)
@@ -412,6 +413,8 @@ enter_irq:
 
 	// Pop the irq number off the stack
 	adda.l	#4, %sp
+
+	bsr.w	update_time
 
 	// Jump to the syscall interrupt return
 	bra.w	restore_context

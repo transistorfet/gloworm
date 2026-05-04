@@ -23,21 +23,22 @@ void register_bh(int bhnum, bh_handler_t fn, void *data)
 {
 	bh_handlers[bhnum].fn = fn;
 	bh_handlers[bhnum].data = data;
+	bh_enabled |= (1 << bhnum);
 }
 
 void enable_bh(int bhnum)
 {
-	bh_enabled |= (0x0001 << bhnum);
+	bh_enabled |= (1 << bhnum);
 }
 
 void disable_bh(int bhnum)
 {
-	bh_enabled &= ~(0x0001 << bhnum);
+	bh_enabled &= ~(1 << bhnum);
 }
 
 void request_bh_run(int bhnum)
 {
-	bh_requested |= (0x0001 << bhnum);
+	bh_requested |= (1 << bhnum);
 }
 
 void run_bh_handlers(void)

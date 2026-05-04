@@ -4,6 +4,7 @@
 
 #include <asm/irqs.h>
 #include <kernel/api.h>
+#include <kernel/time.h>
 #include <kernel/printk.h>
 #include <kernel/utils/queue.h>
 #include <kernel/arch/context.h>
@@ -17,6 +18,7 @@ void *kernel_stack;
 void *kernel_stack_backup;
 int need_reschedule;
 int kernel_reentries;
+nanos_t next_reschedule_time;
 struct process *idle_proc;
 struct process *current_proc;
 struct process *previous_proc;
@@ -27,7 +29,8 @@ static struct queue blocked_queue;
 
 void init_scheduler(void)
 {
-	need_reschedule = 0;
+	need_reschedule = 1;
+	next_reschedule_time = 0;
 	kernel_reentries = 1;
 	current_proc = NULL;
 	previous_proc = NULL;
@@ -239,6 +242,14 @@ void return_to_current_proc(int ret)
 }
 
 
+void check_reschedule(nanos_t uptime)
+{
+	if (uptime > next_reschedule_time) {
+		next_reschedule_time = uptime + CONFIG_RESCHEDULE_PERIOD_MS * 1000 * 1000;
+		need_reschedule = 1;
+	}
+}
+
 void request_reschedule(void)
 {
 	need_reschedule = 1;
@@ -279,11 +290,16 @@ void schedule(void)
 
 	// Switch the current process
 	current_proc = next;
+	next_reschedule_time = get_monotonic_uptime() + CONFIG_RESCHEDULE_PERIOD_MS * 1000 * 1000;
 
 	if (current_proc != previous_proc) {
 		arch_extended_switch_context(previous_proc, current_proc);
 	}
 	UNLOCK(saved_status);
+
+	#if defined(CONFIG_DEBUG_LEDS)
+	debug_leds_toggle(DBGLED3);
+	#endif
 
 	// Restart the new process's the last system call
 	if (current_proc->state == PS_RESUMING) {
@@ -294,13 +310,7 @@ void schedule(void)
 
 __attribute__((noreturn)) void begin_multitasking(void)
 {
-	current_proc = (struct process *) run_queue.head;
-
-	//panic("Panicking for good measure\n");
-
-	// Force an address error for testing
-	//volatile uint16_t *data = (uint16_t *) 0x100001;
-	//volatile uint16_t value = *data;
+	need_reschedule = 1;
 
 	// Start Multitasking
 	GOTO_LABEL("restore_context");

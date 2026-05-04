@@ -38,11 +38,6 @@ extern struct process *current_proc;
 extern struct syscall_record *current_syscall;
 
 
-#if defined(CONFIG_TTY_68681)
-void tty_68681_set_leds(uint8_t bits);
-void tty_68681_reset_leds(uint8_t bits);
-#endif
-
 /// Called on entry to any system call
 ///
 /// Any code that should run before a syscall is processed should go here, such
@@ -50,8 +45,8 @@ void tty_68681_reset_leds(uint8_t bits);
 /// the syscall info that is about to be executed
 void syscall_entry(void)
 {
-	#if defined(CONFIG_TTY_68681)
-	tty_68681_set_leds(0x01);
+	#if defined(CONFIG_DEBUG_LEDS)
+	debug_leds_toggle(DBGLED0);
 	#endif
 }
 
@@ -62,8 +57,8 @@ void syscall_entry(void)
 /// debugging info, as a counterpart to `syscall_entry()`
 void syscall_exit(void)
 {
-	#if defined(CONFIG_TTY_68681)
-	tty_68681_reset_leds(0x01);
+	#if defined(CONFIG_DEBUG_LEDS)
+	debug_leds_toggle(DBGLED0);
 	#endif
 }
 

@@ -2,6 +2,7 @@
 #ifndef _STAT_H
 #define _STAT_H
 
+#include <time.h>
 #include <sys/types.h>
 
 #define S_IFMT    0170000	/* type of file */

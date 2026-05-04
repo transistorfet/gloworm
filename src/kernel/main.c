@@ -14,6 +14,7 @@
 #include <kernel/printk.h>
 #include <kernel/syscall.h>
 #include <kernel/drivers.h>
+#include <kernel/irq/bh.h>
 #include <kernel/irq/action.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/pages.h>
@@ -153,9 +154,10 @@ int main(void)
 	if (error < 0)
 		goto fail;
 
+	init_bh();
+	init_irqs();
 	init_time();
 	init_timer_list();
-	init_interrupts();
 	init_proc();
 	init_scheduler();
 
