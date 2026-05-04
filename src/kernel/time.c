@@ -47,7 +47,6 @@ void update_time(void)
 	if (current_clock) {
 		cycles = current_clock->read(current_clock);
 
-		// Check if the clock has overflowed
 		if (cycles == current_clock_last_cycle) {
 			// If no change, then do nothing and return
 			UNLOCK(saved_status);
@@ -55,6 +54,7 @@ void update_time(void)
 		} else if (cycles > current_clock_last_cycle) {
 			diff = cycles - current_clock_last_cycle;
 		} else {
+			// If the clock has overflowed
 			diff = (current_clock->max_cycles - current_clock_last_cycle) + cycles;
 		}
 		current_clock_last_cycle = cycles;
