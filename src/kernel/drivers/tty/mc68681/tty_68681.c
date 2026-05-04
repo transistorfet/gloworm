@@ -213,8 +213,8 @@ static struct serial_channel channels[2];
 
 #if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 
-// NOTE this is force to a floating point number for the calculation and then back to a 32-bit int,
-// which should be able to hold this value comfortable. Without the float conversion, the compiler
+// NOTE this is forced to a floating point number for the calculation and then back to a 32-bit int,
+// which should be able to hold this value comfortably. Without the float conversion, the compiler
 // will not generate an accurate number. No floating point operations should be performed at runtime
 #define TTY_68681_CYCLES_TO_NANOS		(uint32_t) ((double) TTY_68681_CLOCK_COUNTER_LOAD * 16 * 2 * NANOS_PER_SECOND / 3686400)
 

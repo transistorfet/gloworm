@@ -245,6 +245,7 @@ void return_to_current_proc(int ret)
 void check_reschedule(nanos_t uptime)
 {
 	if (uptime > next_reschedule_time) {
+		next_reschedule_time = uptime + CONFIG_RESCHEDULE_PERIOD_MS * 1000 * 1000;
 		need_reschedule = 1;
 	}
 }
