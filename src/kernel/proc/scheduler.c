@@ -245,7 +245,6 @@ void return_to_current_proc(int ret)
 void check_reschedule(nanos_t uptime)
 {
 	if (uptime > next_reschedule_time) {
-		next_reschedule_time = uptime + CONFIG_RESCHEDULE_PERIOD;
 		need_reschedule = 1;
 	}
 }
@@ -290,12 +289,16 @@ void schedule(void)
 
 	// Switch the current process
 	current_proc = next;
-	next_reschedule_time = get_monotonic_uptime() + CONFIG_RESCHEDULE_PERIOD;
+	next_reschedule_time = get_monotonic_uptime() + CONFIG_RESCHEDULE_PERIOD_MS * 1000 * 1000;
 
 	if (current_proc != previous_proc) {
 		arch_extended_switch_context(previous_proc, current_proc);
 	}
 	UNLOCK(saved_status);
+
+	#if defined(CONFIG_DEBUG_LEDS)
+	debug_leds_toggle(DBGLED3);
+	#endif
 
 	// Restart the new process's the last system call
 	if (current_proc->state == PS_RESUMING) {

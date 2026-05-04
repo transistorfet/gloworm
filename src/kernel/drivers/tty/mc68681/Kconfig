@@ -34,6 +34,7 @@ config TTY_68681_CLOCKSOURCE
 config TTY_68681_GPIO_LEDS
 	bool "Use the MC68681's GPIO outputs to control debug LEDs"
 	depends on TTY_68681
+	select DEBUG_LEDS
 	default y
 	help
 	  If this option is selected, the MC68681's general purpose output pins

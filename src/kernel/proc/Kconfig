@@ -17,7 +17,7 @@ config KERNEL_STACK_SIZE
 	  process that's executed, to be used exclusively by the kernel.
 	  It is expressed in bytes, and must be aligned to CONFIG_PAGE_SIZE
 
-config RESCHEDULE_PERIOD
+config CONFIG_RESCHEDULE_PERIOD_MS
 	int "reschedule period in milliseconds"
 	default 100
 	help

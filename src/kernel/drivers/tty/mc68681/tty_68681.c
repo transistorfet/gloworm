@@ -45,8 +45,6 @@ struct driver tty_68681_driver = {
 };
 
 void tty_68681_tx_safe_mode(void);
-void tty_68681_set_leds(uint8_t bits);
-void tty_68681_reset_leds(uint8_t bits);
 
 #if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 
@@ -222,12 +220,6 @@ static struct serial_channel channels[2];
 
 static char handle_timer = 0;
 static uint16_t clock_cycles = 0;
-
-#endif
-
-#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-
-static char tick = 0;
 
 #endif
 
@@ -419,18 +411,8 @@ void handle_serial_irq(void)
 
 	if (isr & ISR_TIMER_CHANGE) {
 		// Clear the interrupt bit by reading the stop address
-		volatile register char reset = *STOP_RD_ADDR;
+		volatile register uint8_t reset = *STOP_RD_ADDR;
 		reset;	// make the compiler happy
-
-		#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-		if (tick) {
-			tick = 0;
-			*OUT_SET_ADDR = 0x80;
-		} else {
-			tick = 1;
-			*OUT_RESET_ADDR = 0x80;
-		}
-		#endif
 
 		#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 		clock_cycles += 1;
@@ -443,11 +425,12 @@ void handle_serial_irq(void)
 		#endif
 	}
 
-	/*
 	if (isr & ISR_INPUT_CHANGE) {
 		// Reading from the IPCR register will clear the interrupt
-		uint8_t status = *IPCR_RD_ADDR;
+		volatile register uint8_t status = *IPCR_RD_ADDR;
+		status;	// make the compiler happy
 
+		/*
 		tty_68681_tx_safe_mode();
 		asm(
 		"move.l	#0, %a0\n"
@@ -476,27 +459,12 @@ void handle_serial_irq(void)
 			);
 		}
 		//TRACE_ON();
-
+		*/
 	}
-	*/
 
 	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
 	// TODO this is for debugging to tell me when the handler exits
 	*OUT_RESET_ADDR = 0x08;
-	#endif
-}
-
-void tty_68681_set_leds(uint8_t bits)
-{
-	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-	*OUT_SET_ADDR = (bits << 4);
-	#endif
-}
-
-void tty_68681_reset_leds(uint8_t bits)
-{
-	#if defined(CONFIG_TTY_68681_GPIO_LEDS)
-	*OUT_RESET_ADDR = (bits << 4);
 	#endif
 }
 
@@ -744,8 +712,8 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *i
 			int leds;
 			memcpy_out_of_iter(iter, &leds, sizeof(int));
 			leds &= 0x03;
-			tty_68681_reset_leds(~leds);
-			tty_68681_set_leds(leds);
+			debug_leds_reset(~leds);
+			debug_leds_set(leds);
 			return 0;
 		}
 		#endif
@@ -790,4 +758,37 @@ int console_putchar_buffered(int ch)
 {
 	return tty_68681_putchar_buffered(&channels[CH_A], ch);
 }
+
+////// Debug LED Interface //////
+
+#if defined(CONFIG_TTY_68681_GPIO_LEDS)
+uint8_t led_state;
+
+void debug_leds_set(uint8_t bits)
+{
+	led_state |= bits;
+	*OUT_SET_ADDR = (bits << 4);
+}
+
+void debug_leds_reset(uint8_t bits)
+{
+	led_state &= ~bits;
+	*OUT_RESET_ADDR = (bits << 4);
+}
+
+void debug_leds_toggle(uint8_t bits)
+{
+	uint8_t set = ~led_state & bits;
+	uint8_t reset = led_state & bits;
+
+	if (set) {
+		debug_leds_set(set);
+	}
+
+	if (reset) {
+		debug_leds_reset(reset);
+	}
+}
+#endif
+
 

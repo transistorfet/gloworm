@@ -6,13 +6,13 @@
 #include <kernel/irq/bh.h>
 
 
+struct clocksource *current_clock;
 static time_t system_seconds;
 static time_t system_subseconds_nanos;
 static cycles_t current_clock_last_cycle;
 static nanos_t monotonic_uptime_nanos;
-static char clock_warning_given = 0;
 
-struct clocksource *current_clock;
+static char clock_warning_given = 0;
 
 void init_time(void)
 {
@@ -64,7 +64,7 @@ void update_time(void)
 	} else {
 		if (!clock_warning_given) {
 			clock_warning_given = 1;
-			log_error("clock: no clock was set, defaulting to rough counting\n");
+			log_warning("clock: no clock was set, defaulting to rough counting\n");
 		}
 		// If there's no current clock, just increase the clock by a bit
 		// This function should be called periodically whenever an irq occurs, which could

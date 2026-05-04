@@ -66,5 +66,15 @@ void printk_dump_bytes(uint8_t *data, uint32_t length);
 #define log_trace(...)
 #endif
 
+#if defined(CONFIG_DEBUG_LEDS)
+#define DBGLED0		0x01
+#define DBGLED1		0x02
+#define DBGLED2		0x04
+#define DBGLED3		0x08
+void debug_leds_set(uint8_t bits);
+void debug_leds_reset(uint8_t bits);
+void debug_leds_toggle(uint8_t bits);
+#endif
+
 #endif
 
