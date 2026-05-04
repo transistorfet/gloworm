@@ -12,7 +12,7 @@
 #include <kernel/arch/context.h>
 #include <kernel/proc/signal.h>
 #include <kernel/proc/process.h>
-#include <kernel/utils/math.h>
+#include <kernel/utils/macros.h>
 
 #include <asm/context.h>
 #include <asm/exceptions.h>

@@ -13,8 +13,8 @@
 #include <kernel/fs/fileptr.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
-#include <kernel/utils/math.h>
 #include <kernel/utils/iovec.h>
+#include <kernel/utils/macros.h>
 
 
 #if !defined(CONFIG_MMU)

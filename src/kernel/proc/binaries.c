@@ -12,7 +12,7 @@
 #include <kernel/proc/exec.h>
 #include <kernel/arch/context.h>
 #include <kernel/proc/process.h>
-#include <kernel/utils/math.h>
+#include <kernel/utils/macros.h>
 
 #include <elf.h>
 

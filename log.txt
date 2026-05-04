@@ -5777,3 +5777,8 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 
 - that's exactly it.  The timer occurs too soon.  I changed it to always be 0 seconds, and it now crashes again
 
+
+2026-05-03:
+
+- got the clock source PR merged.  I'll do some small stuff before fixing that signal issue when the timeout is too soon
+

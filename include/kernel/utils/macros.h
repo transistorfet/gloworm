@@ -8,5 +8,8 @@
 
 #define alignment_offset(value, size)	((value) & ((size) - 1))
 
+#define containerof(ttype, item, member)	\
+	((ttype *) (((char *) item) - offsetof(type, member)))
+
 #endif
 

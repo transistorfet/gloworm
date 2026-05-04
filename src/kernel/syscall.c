@@ -26,8 +26,8 @@
 #include <kernel/proc/filedesc.h>
 #include <kernel/proc/scheduler.h>
 #include <kernel/net/socket.h>
-#include <kernel/utils/math.h>
 #include <kernel/utils/iovec.h>
+#include <kernel/utils/macros.h>
 #include <kernel/utils/usercopy.h>
 #include <kernel/utils/strarray.h>
 

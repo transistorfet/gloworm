@@ -7,7 +7,7 @@
 #include <kernel/printk.h>
 #include <kernel/mm/pages.h>
 #include <kernel/mm/kmalloc.h>
-#include <kernel/utils/math.h>
+#include <kernel/utils/macros.h>
 
 
 struct block {

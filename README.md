@@ -6,14 +6,16 @@ Gloworm OS
 ###### *Split into its own repository August 07, 2023*
 
 Gloworm is a simple Unix-like OS written in C for retro hardware, specifically the
-[Computie68k](https://github.com/transistorfet/computie/) series of computers.  It's largely based
-on reading Operating Systems Design and Implementation 2ed by Andrew S.  Tanenbaum, although I've
-gone with a monolithic design, at least for the time being, for the simplicity of it.  It can do
-pre-emptive multitasking using the 68681 timer.  It also has an implementation of the minix version 1
-filesystem, which uses RAM (through a device driver) to store the data, or a Compact Flash card
-connected as an IDE device.  The second serial port can be configured as a SLIP device, with a basic
-implementation of UDP and TCP through a BSD sockets-style API, and an NTP command is provided for
-updating the system time on boot (when booting from disk).
+[Computie68k](https://github.com/transistorfet/computie/) and
+[Retroverse](https://github.com/transistorfet/retroverse/) series of computers.  It was initially
+based on reading Operating Systems Design and Implementation 2ed by Andrew S.  Tanenbaum, although
+I've gone with a monolithic design for the simplicity of it.  Since then I've taken more influence
+from the Linux kernel, and a bit from FreeBSD.  It can do pre-emptive multitasking using a timer
+source (the 68681 timer, in the case of the Computies).  It also has an implementation of the Minix
+version 1 filesystem, which either uses RAM (through a device driver) to store the data, or a
+Compact Flash card connected as an IDE device.  The second serial port can be configured as a SLIP
+device, with a basic implementation of UDP and TCP through a BSD sockets-style API, and an NTP
+command is provided for updating the system time on boot (when booting from disk).
 
 ![alt text](images/OS-basic.gif "OS")
 
@@ -83,7 +85,13 @@ separate location.  By default, it will store object files in the `src/` tree.
 
 ```sh
 make dockerconfig
+# make the binary and put all object files in directory "build/"
 make O=build all
+```
+- OR -
+```sh
+make menuconfig
+make
 ```
 
 The `kernel.bin` file contains the complete kernel (and shell, if the option is selected).  The
@@ -109,6 +117,11 @@ Which will produce a 20MB disk image in `minix-build.img` using the `build/image
 mountpoint, and the minixv1 filesystem.  It does not include a partition table, so that needs to be
 created on the flash drive by other means.  It can be written to the partition-specific block device
 file using `dd` on a unix-like desktop.
+
+```sh
+dd if=minix-build.img of=/dev/sdXX bs=1M
+```
+For me, it would be `/dev/sdc1`
 
 In order to boot off the CompactFlash directly, the `boot.load` script can be loaded over serial and
 written to an alternate location such as `0x020000`.  It must be a location that is outside of the

@@ -1,37 +1,31 @@
 
 * fix bug with signals, where setting the proc alarm to 0 will make it occur right away, and will always crash the problem due to stack corruption of some kind
+* add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
 
-* so I'm currently left with two bugs, one is where it will continuously bus error on the same address and same pid, pid 4 which is
-  the shell that runs the rc script.  This only happens if clock source isn't registered, which I would expect instead for it to
-  block forever on the signal timer.  I think this is related to scheduling, and maybe means there's a missing reschedule request
-* the other bug is that when the clock is registered, so normal conditions, the ntpdate command fails with a bus error for a very
-  odd address.  It happens just after the signal handler returns
 
-* make it possible to use other devices as timer interrupts, like an MC68230
-
-* document the partition vs raw disk image thing
-* document (and make configurable) the LED output on the 68681, used to indicate a context switch
-* should you add -Wconversion (or -Wextra or something that includes it) to catch implicit conversions?  Generates a lot of warnings currently
 * should you add a name to the driver struct?
-* for all drivers, check that they all have valid pointers to a function (or do filesystems automatically substitute nop?)
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-* make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes
-* could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one
-* change LF to CR+LF (or make it configurable) in the TTY driver
-* are there any static tables still used beside the table of processes?
-* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 * normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
-* add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
+* finish implementing ext2
 
-* add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
+* refactor queue (and ringbuffer), try not inlining everything to see if significantly reduces the size, and make it possible/easier to have multiple nodes in the same struct
+* make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes. The problem is we already have a queue node for the runlist, and queue doesn't handle two lists well
+* could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one;  you need a way to have two queues in a struct, by doing pointer arithmetic
+
 
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable
 * send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
 
+
+
+* make a dockerfile that can also compile the entire project
+* change LF to CR+LF (or make it configurable) in the TTY driver
+* add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
+* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 
 * there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
 * you should put in a limit to the iterator size created for the stack, in exec, context, etc

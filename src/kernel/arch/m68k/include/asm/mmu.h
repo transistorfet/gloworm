@@ -7,7 +7,7 @@
 
 #include <asm/addresses.h>
 #include <kernel/mm/pages.h>
-#include <kernel/utils/math.h>
+#include <kernel/utils/macros.h>
 
 
 #define MMU_MOVE_TO_TCR(value)		\
