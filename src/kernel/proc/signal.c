@@ -104,10 +104,18 @@ static inline void run_signal_handler(struct process *proc, int signum)
 		cancel_syscall(proc);
 	}
 
-	arch_add_signal_context(proc, signum);
+	proc->signal_pending = signum;
 
 	// Resume the process without restarting the last syscall
 	resume_proc_without_restart(proc);
+}
+
+void do_signal(void)
+{
+	arch_add_signal_context(current_proc, current_proc->signal_pending);
+	// This has already been checked by `restore_context`, which in turn called this
+	// function, so it's ok to zero this value here
+	current_proc->signal_pending = 0;
 }
 
 void cleanup_signal_handler(void)

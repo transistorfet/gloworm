@@ -220,8 +220,8 @@ size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence)
 		} else {
 			// Rewind the position backwards
 			while (iter->cur_seg > 0 && offset < iter->seg_start) {
-				iter->seg_start -= iter->kvec.segs[iter->cur_seg].bytes;
 				iter->cur_seg -= 1;
+				iter->seg_start -= iter->kvec.segs[iter->cur_seg].bytes;
 			}
 		}
 		iter->seg_offset = offset - iter->seg_start;

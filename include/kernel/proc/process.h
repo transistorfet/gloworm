@@ -42,10 +42,9 @@ struct process {
 	struct queue_node node;
 	/// The value that will be returned to the user process when the kernel returns
 	uintptr_t return_value;
+	uintptr_t signal_pending;
 	/// Architecture-specific task state
 	struct arch_task_info task_info;
-
-	struct memory_map *map;
 
 	int state;
 	pid_t tid;
@@ -72,6 +71,7 @@ struct process {
 	device_t ctty;
 	struct vnode *cwd;
 	struct fd_table *fd_table;
+	struct memory_map *map;
 };
 
 struct process_iter {

@@ -75,6 +75,19 @@ int test_iovec_kvec_seek()
 	result = memcpy_into_iter(&iter, "01234567890123456789", 20);
 	assert_iter_position(&iter, result, 20, 1, 252);
 
+	// Can we push across page boundaries?
+	kvec[0].buf = page1 + (256 - 0x1C);
+	kvec[0].bytes = 0x1C;
+	kvec[1].buf = page2;
+	kvec[1].bytes = 0x04;
+	iovec_iter_init_kvec(&iter, kvec, 2);
+	result = iovec_iter_seek(&iter, 0, SEEK_END);
+	result = iovec_iter_push_back(&iter, "test", 4);
+	result = iovec_iter_push_back(&iter, "meep", 4);
+	assert_iter_position(&iter, result, 24, 0, 24);
+	assert(!strncmp(&page1[252], "meep", 4));
+	assert(!strncmp(&page2[0], "test", 4));
+
 	return 0;
 }
 

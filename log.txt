@@ -5782,3 +5782,78 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 
 - got the clock source PR merged.  I'll do some small stuff before fixing that signal issue when the timeout is too soon
 
+
+2026-05-04:
+
+- the signal change, to make it manipulate the stack just before returning, went much easier than I was expecting, but then the 0
+  timeout bug remains.  I set the alarm timer to 0 and it crashes, but I can confirm that it ran the signal handler (printing
+  'timeout') and *then* crashed.  It's accessing address 0xFFFFFFF78, which is odd.  I don't think I have any stacks set to that
+  (I'm not compiling the shell into the kernel).
+- It's occurring at PC=0x400A0, which is an address inside main, which doesn't make a heck of a lot of sense, but is it possible it
+  could be removing the context or something, at least from the user stack, before it returns, and somehow the wrong return address
+  appears on the user stack at the wrong time causing it to just into the wrong place?  So the signal still runs but it fails when
+  returning
+
+- ok so, I found the page of the user stack and dumped the contents when do_signal is finished.  The thing on the top of the user
+  stack is the return address just after the alarm() syscall stub is called.  That is odd though, because do_signal should have put
+  something onto the user stack
+- if I look higher up the stack there's a couple ints of nothing noteworthy, and then an address that lies within the putchar
+  or puts syscall.  I'm not 100% certain the ntpdate binary I'm looking at is the same as the one on disk
+- my instinct is that the user stack is not right, but it's not calling sigreturn or sig cleanup at least
+- I put log messages in to print the user stack before and after add or remove signal context run
+- 45C04 before 45BFC after add, and remove is never run before ir crashes, but the data in page 45C00 doesn't look right, so I tried
+  disabling memory freeing
+- that looks much better
+- it has a different address in main at the start, which makes me think the dump I'm looking at isn't accurate to disk
+- but I don't have that disk
+- I think it is, the address put onto the stack at the top is 0004 0064 which is the instruction after alarm, and the address before
+  that, 0004 009C is the address after socket(), which actually occurs later
+- the restorer address is 401F0
+- the restorer address doesn't appear anywhere near the place where add_signal_context is operating, but it does appear at address
+  45C30 (page 137930), so something is definitely messed up.  I wonder if it's the stack writing/page stuff in add_signal_context
+
+- huh... that's odd... I printed out the buffer and the top of the stack just after it writes the restorer value onto the user
+  stack, and the buffer is an odd address, 137EE4, but the top of the stack is the expected return value.  I think it's getting
+  erased by the actual return, before I actually dump the data in the page, which is after the handler runs
+- If that was accurate, I would have expected 137FFC, which is the corresponding address for the value that it eventually has, which
+  is 45BFC.  It should be 45BE4 according to the buffer.  It's not handling the page gap properly?  Could this be unrelated to the
+  zero timeout?
+
+
+2025-05-05:
+
+- another clue is that it prints the bus error message, and the the fatal bus error, meaning it thought it was in the kernel still,
+  despite it being a user address.  That's because kernel retries didn't get change correctly, but I don't know where what the cause
+  is yet
+
+- I added a function to better dump data from user space, so I could print out the stack after adding the signal context, and it's
+  showing the signal number correctly, where it was in the next page, but it's still showing the wrong number for the return
+  address, which makes me think there is actually some really bizzare edge case in the iovec stuff
+- so it was previously printing out: `iovec seg=0 buf=137EE4 pos=0 top=401F0 rem=8` where top is the top element, but the pos=0 for
+  some bizzare reason (and I think it's because it's on the boundary of a page).  I dumped the stack at address 0x45BE4 to see the
+  full area, and sure enough, there's the restorer's address, 0x401F0, at the spot that's 0x20 minus the original USP value of
+  0x45C04, so I think it is actually an iovec problem
+
+- confirmed.  I looked through the code a bit, and saw that it was likely calculating the seg_start wrong when going backwards.  I
+  was able to write a test before the fix which proved that when the segments are different sizes, the seg_start will not be correct
+  when seeking backwards, but if they're the same size (ie. all page sizes) then they just happen to be the same either way, and the
+  mistake doesn't cause any harm
+- that bug was probably around for a while.  It passes the test now, when it was failing before
+- but that doesn't fix the problem?! what the heck
+- OH! hahah because I forgot to build it.  I just ran the tests but didn't do a regular make =P
+
+- Ok so now it "works" in that it doesn't crash, but it seems to never return to the normal after executing the sigreturn.  It says
+  after the removal of the signal context, the stack is 0x45C04, which is the same as it was at the end of add_signal_context.  It
+  then executings 40328, which seems to be inside inet_aton, which doesn't make a lot of sense
+- on I see, it's returned from the alarm syscall, and the application didn't check for a timeout, so it it carried on, but the alarm
+  is not self-resetting, so it's just stuck always waiting.  ^C actually fixed it fine, and it boot fine
+
+- well, if I put a send_signal(SIGSEGV) in sendto(), it works as expected, in that it terminates and doesn't cause a stack trace and
+  stuff.  It just terminates
+- but if I put it in alarm, and don't exit, and the alarm timer goes off right away, and another signal is sent, then it seems to
+  cause a major fault of some kind
+- Ah I see this particular bug.  It's because the process was terminated, but it didn't exit right away.  It instead tried to
+  execute the alarm syscall and at that point, current_proc = NULL and pid=0 and all that, which is why it looks so bad
+- I guess this isn't really a bug, since the bug would be that something didn't check for error and exit when it should have
+
+

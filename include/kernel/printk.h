@@ -3,6 +3,7 @@
 #define _KERNEL_PRINTK_H
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <kconfig.h>
 
@@ -31,8 +32,8 @@ int printk_buffered(const char *fmt, ...);
 
 __attribute__((noreturn)) void panic(const char *fmt, ...);
 
-void printk_dump(uint16_t *data, uint32_t length);
-void printk_dump_bytes(uint8_t *data, uint32_t length);
+void printk_dump(void *ptr, size_t length);
+void printk_dump_bytes(void *ptr, size_t length);
 
 // TODO this has been set to direct because otherwise the buffer fills up, and everything slows to a crawl
 #define printk(...)		printk_direct(__VA_ARGS__)
@@ -66,6 +67,7 @@ void printk_dump_bytes(uint8_t *data, uint32_t length);
 #define log_trace(...)
 #endif
 
+// Debug LEDS
 #if defined(CONFIG_DEBUG_LEDS)
 #define DBGLED0		0x01
 #define DBGLED1		0x02
@@ -74,6 +76,15 @@ void printk_dump_bytes(uint8_t *data, uint32_t length);
 void debug_leds_set(uint8_t bits);
 void debug_leds_reset(uint8_t bits);
 void debug_leds_toggle(uint8_t bits);
+#endif
+
+// MMU-specific functions
+#if defined(CONFIG_MMU)
+#include <asm/addresses.h>
+
+struct memory_map;
+
+void printk_dump_user(struct memory_map *map, virtual_address_t vaddr, size_t length);
 #endif
 
 #endif

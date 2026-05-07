@@ -106,10 +106,6 @@ void user_error(struct exception_frame *frame, int signal)
 
 	#if defined(CONFIG_MMU)
 
-	int error;
-	char *code;
-	struct get_page_result page;
-
 	#if defined(CONFIG_LOG_LEVEL_DEBUG)
 	struct mmu_root_pointer root_pointer;
 	MMU_MOVE_FROM_CRP(root_pointer);
@@ -123,16 +119,13 @@ void user_error(struct exception_frame *frame, int signal)
 	printk_dump((uint16_t *) ksp, 128);
 
 	virtual_address_t usp = (virtual_address_t) arch_get_user_stackp(current_proc);
-	error = mmu_table_get_page(current_proc->map->root_table, rounddown(usp, PAGE_SIZE), &page);
-	printk("User Stack: %x (page %x)\n", usp, page.phys);
-	if (usp && error < 0) {
-		printk_dump((uint16_t *) &(((char *) page.phys)[alignment_offset(usp, page.size)]), 128);
+	printk("User Stack: %x\n", usp);
+	if (usp) {
+		printk_dump_user(current_proc->map, usp, 128);
 	}
 
-	error = mmu_table_get_page(current_proc->map->root_table, (virtual_address_t) rounddown(frame->pc, PAGE_SIZE), &page);
-	code = (char *) (page.phys + alignment_offset((uintptr_t) frame->pc, page.size));
-	printk("\nCode: %x (phys: %x)\n", frame->pc, code);
-	printk_dump((uint16_t *) code, 48);
+	printk("\nCode: %x\n", frame->pc);
+	printk_dump_user(current_proc->map, frame->pc, 64);
 
 	#else
 

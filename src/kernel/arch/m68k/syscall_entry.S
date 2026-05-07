@@ -33,11 +33,14 @@
 	.global run_bh_handlers
 	.global mmu_table_create
 	.global update_time
+	.global recovery_stack
 
 	.equ	SHORT_CONTEXT_SIZE, 24		// The size of the syscall registers on the stack (not including the interrupt return)
 	.equ	FULL_CONTEXT_SIZE, 64		// The size of the saved registers on the stack (not including the interrupt return)
+	.equ	SIGNAL_CONTEXT_SIZE,256		// The reserved size on the stack before calling do_signal to allow space for the signal and task contexts
 	.equ	PROC_RETURN_OFFSET, 8		// The offset into struct process where the return_value is located
-	.equ	PROC_SP_OFFSET, 12		// The offset into struct process where the stack pointer is located
+	.equ	PROC_SIG_PEND_OFFSET, 12	// The offset into struct process where the signal_pending value is located
+	.equ	PROC_SP_OFFSET, 16		// The offset into struct process where the stack pointer is located
 
 	.section .text
 
@@ -207,17 +210,25 @@ drop_context:
  * Switch to the current user stack, restore the context, and return from the interrupt
  */
 restore_context:
-	// If we returning into the kernel, instead of a user process, then skip the next few checks
+	// If we're returning into the kernel, instead of a user process, then do a quick return
 	cmp.l	#1, kernel_reentries
-	bne.s	204f
+	beq.s	202f
+
+	// Decrement the number of times we've entered the kernel
+	sub.l	#1, kernel_reentries
+
+	// We'll stay on the kernel stack after returning, so just pop off the saved scratch register values and return
+	movem.l	(%sp)+, %d0-%d1/%a0-%a1
+
+	rte
 
     202:
 
-	// Check if there are any back half handlers to be run
+	// Check if there are any bottom half handlers to be run
 	cmp.l	#0, bh_requested
 	beq.s	203f
 
-	// Enable interrupts while running the back half handlers
+	// Enable interrupts while running the bottom half handlers
 	and.w	#0xF8FF, %sr
 	bsr	run_bh_handlers
 	or.w	#0x0700, %sr
@@ -236,18 +247,11 @@ restore_context:
 	// After a process has been scheduled and a syscall restarted, it might need to be suspended right away again, so loop over the checks
 	bra.s	202b
 
-    204:	// Now we'll actually return, and do a context switch if necessary
+    204:	// Returning to a user process, check for context switch
 
-	// Decrement the number of times we've entered the kernel, and if this is the last time, then switch to the user stack
+	// Decrement the number of times we've entered the kernel (we've already checked that kernel_reentries=1 so this will always be 0)
+	// TODO should I just force this to 0, for safety?
 	sub.l	#1, kernel_reentries
-	beq.s	205f
-
-	// We'll stay on the kernel stack after returning, so just pop off the saved scratch register values and return
-	movem.l	(%sp)+, %d0-%d1/%a0-%a1
-
-	rte
-
-    205:	// Returning to a user process, check for context switch
 
 	movea.l  current_proc, %a0
 	movea.l  previous_proc, %a1
@@ -265,10 +269,10 @@ restore_context:
 
 	// Skip if no previous process
 	cmpa.l  #0, %a1
-	beq.s   207f
+	beq.s   206f
 	// Skip the extended context switch if the proc hasn't changed
 	cmpa.l  %a0, %a1
-	beq.s   207f
+	beq.s   206f
 
 	// Switch to the previous process's stack
 	movea.l  (%a1, PROC_SP_OFFSET), %sp
@@ -276,18 +280,46 @@ restore_context:
 	// Save the extended context of the previously running process, not including the system call registers
 	move.l  (%sp)+, %d1
 	cmp.l   #FULL_CONTEXT_SIZE, %d1
-	beq.s   206f
+	beq.s   205f
 	SAVE_EXTRA_REGISTERS
-    206:
+    205:
 	move.l  #FULL_CONTEXT_SIZE, -(%sp)     // push a new context size
 
 	// Update the new stack pointer of the previous proc
 	move.l  %sp, (%a1, PROC_SP_OFFSET)
 
-    207:
+    206:
 
 	// Switch to the current process's user stack
 	movea.l (%a0, PROC_SP_OFFSET), %sp
+
+	// Check if there are any signals to be run for the current process
+	move.l	(%a0, PROC_SIG_PEND_OFFSET), %d0
+	cmp.l	#0, %d0
+	beq.s	210f
+
+	// Save the extended context of the previously running process, not including the system call registers
+	move.l  (%sp)+, %d1
+	cmp.l   #FULL_CONTEXT_SIZE, %d1
+	beq.s   207f
+	SAVE_EXTRA_REGISTERS
+    207:
+	move.l  #FULL_CONTEXT_SIZE, -(%sp)     // push a new context size
+
+	// Update the new stack pointer of the current proc
+	move.l  %sp, (%a0, PROC_SP_OFFSET)
+
+	// Reserve space on the stack for the signal context
+	sub.l	#SIGNAL_CONTEXT_SIZE, %sp
+
+	bsr	do_signal
+
+	// Load the current process address back into %a0, because it was probably clobbered by do_signal
+	movea.l  current_proc, %a0
+	// Update the current process's user stack, which was updated by do_signal
+	movea.l (%a0, PROC_SP_OFFSET), %sp
+
+    210:
 
 	// Check the context size
 	move.l  (%sp)+, %d1
