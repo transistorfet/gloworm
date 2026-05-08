@@ -26,6 +26,7 @@ ldflags-y 			+= -Wl,--entry=_start -Tsrc/kernel/arch/$(SRCARCH)/kernel.ld
 # Set these flags for all subdirectories instead of just the current Makefile
 CFLAGS				+= $(kernel-ccflags-y)
 CFLAGS				+= -Isrc/kernel/arch/$(SRCARCH)/include
+CFLAGS				+= -Isrc/libc/arch/$(SRCARCH)/include
 
 # Recompile the init and sh user programs into a version without a main() that
 # can be linked into the kernel, to run sh without a working disk drive

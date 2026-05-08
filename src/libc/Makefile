@@ -4,6 +4,7 @@ always-y		+= libc-$(SRCARCH)-os.a
 
 ccflags-$(CONFIG_M68K)	+= -mpcrel
 
+CFLAGS			+= -Isrc/libc/arch/$(SRCARCH)/include
 
 LIBC_NONE_SRCS = $(wildcard $(dir)/arch/$(SRCARCH)/**/*.[cS]) $(wildcard $(dir)/none/**/*.[cS]) $(wildcard $(dir)/common/**/*.[cS])
 LIBC_NONE_OBJS = $(addprefix $(OUTPUT),$(patsubst %.c,%.o, $(patsubst %.S,%.o, $(LIBC_NONE_SRCS))))

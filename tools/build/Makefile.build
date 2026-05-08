@@ -3,18 +3,23 @@
 # since we'll always stay in the root directory when recursing
 MAKEFLAGS		+= -rR --no-print-directory
 
-always-y		:=	# targets that are always build
+src-root		:= $(if $(src-root),$(src-root),$(realpath $(shell pwd)))
+kconfig-file		:= $(if $(C),$(src-root)/$(C),$(src-root)/.config)
+
+always-y		:=	# targets that are always built
 obj-y			:=	# targets to be built and included in the in-target
 subdir-y		:=	# subdirectories to be built recursively
 #lib-y			:=
-libex-y			:=	# external libraries to include when linking
-extra-y			:=	# extra targets to build 
-tests-y			:=	# test targets to build (each file listed is its own binary)
+libex-y			:=	# external libraries to include when linking (absolute path)
+extra-y			:=	# extra files needed to build, but which aren't included in the output
+tests-subdir-y		:=	# test targets to build (each directory listed is its own binary)
+tests-obj-y		:=	# test targets to build (each file listed is its own binary)
 userprogs		:=	# user programs to compile
 ccflags-y		:=
 asflags-y		:=
 ldflags-y		:=
 objprefix		:= $(OUTPUT)$(dir)/
+srcprefix		:= $(dir)/
 
 targets			:=
 
@@ -43,6 +48,7 @@ obj-y			:= $(patsubst %/,%/built-in.o, $(obj-y))
 subdir-y		+= $(patsubst %/,%, $(filter %/,$(tests-y)))
 tests-subdir-y		:= $(addprefix $(dir)/, $(patsubst %/,%, $(filter %/,$(tests-y))))
 tests-obj-y		:= $(addprefix $(dir)/, $(patsubst %.o,%,$(filter %.o, $(tests-y))))
+tests-y			:= $(tests-obj-y) $(tests-subdir-y)
 
 # Executables compiled from a single .c file
 user-csingle		:= $(foreach m, $(userprogs), $(if $($(m)-objs),,$(m)))
@@ -58,15 +64,18 @@ in-target		:= $(objprefix)built-in.o
 user-csingle		:= $(addprefix $(objprefix),$(user-csingle))
 user-cmulti		:= $(addprefix $(objprefix),$(user-cmulti))
 always-y		:= $(addprefix $(objprefix),$(always-y))
-extra-y			:= $(addprefix $(objprefix),$(extra-y))
 
-subdir-y		:= $(addprefix $(dir)/,$(subdir-y))
+subdir-y		:= $(addprefix $(srcprefix),$(subdir-y))
+extra-y			:= $(addprefix $(srcprefix),$(extra-y))
+
 libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
+
+### Rules
 
 targets			:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOALS)
 
 PHONY += all
-all: $(targets)
+all: $(targets) $(config-h)
 
 # Include the testing rules if there are any tests to build & run
 ifneq ($(tests-y),)
@@ -129,7 +138,10 @@ $(OUTPUT)%.o: %.c
 $(OUTPUT)%.o: %.S
 	$(cmd_as_o)
 
-DEPFLAGS = -Wp,-MT,$(patsubst %.c,%.o,$@) -Wp,-MMD,$(basename $<).d
+$(src-root)/include/generated/config.h: $(kconfig-file)
+	$(cmd_gen_config)
+
+DEPFLAGS = -Wp,-MT,$(OUTPUT)$(patsubst %.c,%.o,$@) -Wp,-MMD,$(OUTPUT)$(basename $<).d
 
 # Commands
 cmd_ar_a = $(AR) rcs $@ $^
@@ -140,6 +152,8 @@ cmd_as_o = $(AS) $(DEPFLAGS) $(ASFLAGS) $(asflags-y) -c -o $@ $<
 
 cmd_host_ld_elf = $(HOST_LD) $(HOST_CFLAGS) $(host-ccflags-y) $(HOST_LDFLAGS) $(host-ldflags-y) -o $@ $^
 cmd_host_cc_o = $(HOST_CC) $(HOST_DEPFLAGS) $(HOST_CFLAGS) $(host-ccflags-y) -c -o $@ $<
+
+cmd_gen_config = cat $< | sed '/^\s*\#.*CONFIG_/d; s/^\(\s*\)\#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/\#define \1 \2/' > $@
 
 # Include the dependencies generated for each object file, if it exists
 -include $(obj-y:.o=.d)

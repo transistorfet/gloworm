@@ -5,56 +5,45 @@ MAKEFLAGS += -rR
 ifneq ($(O),)
     OUTPUT := $(patsubst %/,%,$(O))/
 endif
-export OUTPUT
+export OUTPUT C
 
 this-makefile	:= $(lastword $(MAKEFILE_LIST))
 src-root	:= $(realpath $(dir $(this-makefile)))
-kconfig-file	:= $(src-root)/.config
+kconfig-file	:= $(if $(C),$(src-root)/$(C),$(src-root)/.config)
 config-h	:= $(src-root)/include/generated/config.h
-config-tests-h	:= $(src-root)/include/generated/config_tests.h
+export src-root kconfig-file
 
--include $(kconfig-file)
-
-include $(src-root)/tools/build/Makefile.defaults
-
-build-root	:= $(if $(OUTPUT),$(shell mkdir -p $(OUTPUT) && cd $(OUTPUT) && pwd))
-export src-root build-root kconfig-file config-h config-tests-h
 
 PHONY += all
-all: $(config-h) decend
+all: decend
 
 PHONY += config
 config:
-	kconfig-conf $(src-root)/Kconfig
+	KCONFIG_CONFIG=$(kconfig-file) kconfig-conf $(src-root)/Kconfig
 
 PHONY += menuconfig
 menuconfig:
-	kconfig-mconf $(src-root)/Kconfig
+	KCONFIG_CONFIG=$(kconfig-file) kconfig-mconf $(src-root)/Kconfig
 
 PHONY += dockerconfig
-dconfig:
-	cd tools/config && ./run.sh
+dockerconfig:
+	cd tools/config && KCONFIG_CONFIG=$(kconfig-file) ./configure.sh
 
-# Build Rules for Configs
-$(src-root)/include/generated/%.h: $(src-root)/.%
-	@echo ">> generating config from $<"
-	$(shell mkdir -p $(dir $@))
-	cat $< | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $@
-
-#$(config-h): $(kconfig-file)
-#	$(shell mkdir -p $(dir $(config-h)))
-#	cat $(kconfig-file) | sed '/^\s*#.*CONFIG_/d; s/^\(\s*\)#/\1\/\//; s/=y/=1/; s/\(.*\)=\(.*\)/#define \1 \2/' > $(config-h)
+PHONY += defconfig
+defconfig: FORCE
+	KCONFIG_CONFIG=defaults.config kconfig-conf --alldefconfig $(src-root)/Kconfig
 
 PHONY += decend
-decend: $(config-h) $(config-tests-h)
+decend:
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src
-
-src/%: $(config-h)
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@)) $@
 
 # Build the image that can be written to the 68kSupervisor of computie
 output.txt: $(OUTPUT)src/monitor/monitor.bin
 	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
+
+# Make it possible to compile individual targets in src and tests
+src/% tests/%:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@)) $@
 
 # Convenience targets
 PHONY += monitor.load monitor.bin monitor.elf kernel.load kernel.bin kernel.elf
@@ -66,12 +55,12 @@ kernel.bin: src/kernel/kernel.bin
 kernel.elf: src/kernel/kernel.elf
 
 # Test building and running targets
-tests: $(config-tests-h)
-	#$(MAKE) -f $(src-root)/tools/build/Makefile.test dir=tests tests
+PHONY += tests
+tests:
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests tests
 
-bare-tests: $(config-h)
-	#$(MAKE) -f $(src-root)/tools/build/Makefile.test dir=tests bare-tests
+PHONY += bare-tests
+bare-tests:
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests bare-tests
 
 
@@ -80,8 +69,7 @@ bare-tests: $(config-h)
 BLOCKS := 20480
 IMAGE := minix-build.img
 LOOPBACK := /dev/loop8
-#MOUNTPOINT := $(OUTPUT)image
-MOUNTPOINT := build/image
+MOUNTPOINT := $(if $(OUTPUT),$(OUTPUT)image,build/image)
 SUDO := sudo
 
 PHONY += create-image build-image-files mount-image umount-image
@@ -133,7 +121,7 @@ clean:
 	#ifneq ($(OUTPUT),)
 	#	rm -f $(OUTPUT)
 	#endif
-	find src/ $(OUTPUT) \( -name "*.o" -or -name "*.d" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
+	find src/ tests/ \( -name "*.o" -or -name "*.d" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
 
 
 PHONY += help
@@ -153,7 +141,7 @@ help:
 	@echo  '* kernel.bin    - Build the kernel'
 	@echo  '* monitor.bin   - Build the monitor (loaded into the ROM)'
 	@echo  '* src/commands  - Build all the user programs'
-	@echo  '  src/dir/      - Build all files in dir and below'
+	@echo  '  src/<dir>/    - Build all files in dir and below'
 	@echo  '  output.txt    - Build the file included by 68kSupervisor to boot from'
 	@echo  '                  the arduino'
 	@echo  ''
@@ -167,6 +155,10 @@ help:
 	@echo  '  umount-image  - Unmount the disk image file'
 	@echo  '  build-image   - Build `all` and copy the kernel, commands, /etc, and /dev'
 	@echo  '                  to the image mountpoint'
+	@echo  ''
+	@echo  'Additional settings as variables:'
+	@echo  '  O=<dir>       - put all build artifacts and outputs into <dir>'
+	@echo  '  C=<file>      - use <file> as the config file for this build'
 
 
 PHONY += FORCE

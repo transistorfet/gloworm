@@ -114,4 +114,23 @@ config PAGE_SIZE_32K
 
 endchoice
 
+if !MMU
+
+config VALIDATE_ADDRESSES
+	bool "enable user address validation on all syscalls"
+	default y
+	depends on !MMU
+	help
+	  If this option is true, the kernel will validate each address passed
+	  in from a non-kernel process through a syscall before dereferencing
+	  that address.  It will do this by searching through the process's
+	  memory map to validate that the address is within a defined memory
+	  segment.
+
+	  This option is only available when the MMU is not enabled.  When the
+	  MMU is enabled, an invalid address will cause a bus error (page fault)
+	  which can be redirected to appropriate error handling.
+
+endif
+
 endif

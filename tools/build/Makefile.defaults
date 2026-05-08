@@ -4,6 +4,7 @@ GCC_PREFIX			:= $(patsubst "%",%,$(CONFIG_GCC_PREFIX))
 
 build-file			:= $(dir)/Makefile
 include-dir			:= $(src-root)/include
+config-h			:= $(src-root)/include/generated/config.h
 
 AR				?= $(GCC_PREFIX)ar
 AS				?= $(GCC_PREFIX)gcc

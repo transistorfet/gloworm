@@ -48,8 +48,10 @@ __attribute__((noreturn)) void panic(const char *fmt, ...)
 	__builtin_unreachable();
 }
 
-void printk_dump(uint16_t *data, uint32_t length)
+void printk_dump(void *ptr, size_t length)
 {
+	uint16_t *data = ptr;
+
 	length >>= 1; // Adjust the dump size from bytes to words
 	while (length > 0) {
 		printk("%x: ", (unsigned int) data);
@@ -62,8 +64,10 @@ void printk_dump(uint16_t *data, uint32_t length)
 	printk("\n");
 }
 
-void printk_dump_bytes(uint8_t *data, uint32_t length)
+void printk_dump_bytes(void *ptr, size_t length)
 {
+	uint8_t *data = ptr;
+
 	while (length > 0) {
 		printk("%x: ", (uintptr_t) data);
 		for (short i = 0; i < 16 && length > 0; i++, length--) {

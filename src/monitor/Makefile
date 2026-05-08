@@ -14,3 +14,5 @@ ldflags-y 		+= -Wl,--entry=_start -Tsrc/monitor/monitor.ld
 # (gcc-14): "array subscript 0 is outside array bounds of ‘volatile uint8_t[0]’"
 ccflags-y		+= -Warray-bounds=0
 
+CFLAGS			+= -Isrc/libc/arch/$(SRCARCH)/include
+

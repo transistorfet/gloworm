@@ -102,6 +102,12 @@ monitor program running on a board.  To send it, run:
 python3 tools/load.py build/src/kernel/kernel.load
 ```
 
+Alternate configurations can be built using the `C` variable passed to make
+```sh
+make O=build/config-68k C=config/68k.config
+make O=build/config-k30 C=config/k30.config
+```
+
 
 Building A FlashCard Root Image
 -------------------------------

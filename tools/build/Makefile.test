@@ -6,10 +6,10 @@ bare-tests-common-deps	:= tests/entry.o src/monitor/tty_68681.o src/libc/libc-$(
 bare-tests-common-deps	:= $(addprefix $(OUTPUT),$(bare-tests-common-deps))
 
 PHONY += tests
-tests: $(host-tests-run) $(tests-subdir-y)
+tests: $(host-tests-run) $(tests-subdir-y) $(config-h)
 
 PHONY += bare-tests
-bare-tests: $(bare-tests-load) $(tests-subdir-y)
+bare-tests: $(bare-tests-load) $(tests-subdir-y) $(config-h)
 
 %.test.run: %.test.host
 	./$<

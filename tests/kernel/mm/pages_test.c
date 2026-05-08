@@ -26,21 +26,21 @@ int test_page_single_allocation(void)
 	init_page_block(&block, (void *) base, SIZE);
 
 	// NOTE: ADDR(0x1000) should be the first non-bitmap page, and there should only be 7 available pages
-	assert(page_block_alloc_single(&block) == (physical_address_t) ADDR(1 * PAGE_SIZE));
-	assert(page_block_alloc_single(&block) == (physical_address_t) ADDR(2 * PAGE_SIZE));
-	assert(page_block_alloc_single(&block) == (physical_address_t) ADDR(3 * PAGE_SIZE));
-	assert(page_block_alloc_single(&block) == (physical_address_t) ADDR(4 * PAGE_SIZE));
-	page_block_free_single(&block, (physical_address_t) ADDR(4 * PAGE_SIZE));
-	assert(page_block_alloc_single(&block) == (physical_address_t) ADDR(4 * PAGE_SIZE));
-	assert(page_block_alloc_single(&block) == (physical_address_t) ADDR(5 * PAGE_SIZE));
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(1 * PAGE_SIZE));
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(2 * PAGE_SIZE));
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(3 * PAGE_SIZE));
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(4 * PAGE_SIZE));
+	page_block_free(&block, (physical_address_t) ADDR(4 * PAGE_SIZE), PAGE_SIZE);
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(4 * PAGE_SIZE));
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(5 * PAGE_SIZE));
 	// Out of memory because it's too big and there's only one page left
-	assert(page_block_alloc_single(&block) == (physical_address_t) 0);
+	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) 0);
 
-	page_block_free_single(&block, (physical_address_t) ADDR(3 * PAGE_SIZE));
-	page_block_free_single(&block, (physical_address_t) ADDR(4 * PAGE_SIZE));
-	assert((uint8_t *) page_block_alloc_single(&block) == ADDR(3 * PAGE_SIZE));
-	assert((uint8_t *) page_block_alloc_single(&block) == ADDR(4 * PAGE_SIZE));
-	assert((uint8_t *) page_block_alloc_single(&block) == 0);
+	page_block_free(&block, (physical_address_t) ADDR(3 * PAGE_SIZE), PAGE_SIZE);
+	page_block_free(&block, (physical_address_t) ADDR(4 * PAGE_SIZE), PAGE_SIZE);
+	assert((uint8_t *) page_block_alloc(&block, PAGE_SIZE) == ADDR(3 * PAGE_SIZE));
+	assert((uint8_t *) page_block_alloc(&block, PAGE_SIZE) == ADDR(4 * PAGE_SIZE));
+	assert((uint8_t *) page_block_alloc(&block, PAGE_SIZE) == 0);
 
 	return 0;
 }
@@ -62,21 +62,21 @@ int test_page_contiguous_allocation(void)
 	init_page_block(&block, (void *) base, SIZE);
 
 	// NOTE: ADDR(0x1000) should be the first non-bitmap page, and there should only be 7 available pages
-	assert(page_block_alloc_contiguous(&block, 1 * PAGE_SIZE) == (physical_address_t) ADDR(1 * PAGE_SIZE));
-	assert(page_block_alloc_contiguous(&block, 2 * PAGE_SIZE) == (physical_address_t) ADDR(2 * PAGE_SIZE));
-	assert(page_block_alloc_contiguous(&block, 3 * PAGE_SIZE) == (physical_address_t) ADDR(4 * PAGE_SIZE));
+	assert(page_block_alloc(&block, 1 * PAGE_SIZE) == (physical_address_t) ADDR(1 * PAGE_SIZE));
+	assert(page_block_alloc(&block, 2 * PAGE_SIZE) == (physical_address_t) ADDR(2 * PAGE_SIZE));
+	assert(page_block_alloc(&block, 3 * PAGE_SIZE) == (physical_address_t) ADDR(4 * PAGE_SIZE));
 	// Out of memory because it's too big and there's only one page left
-	assert(page_block_alloc_contiguous(&block, 4 * PAGE_SIZE) == (physical_address_t) 0);
+	assert(page_block_alloc(&block, 4 * PAGE_SIZE) == (physical_address_t) 0);
 
 	// Verify that there's still one page left
-	assert(page_block_alloc_contiguous(&block, 1 * PAGE_SIZE) == (physical_address_t) ADDR(7 * PAGE_SIZE));
+	assert(page_block_alloc(&block, 1 * PAGE_SIZE) == (physical_address_t) ADDR(7 * PAGE_SIZE));
 
 	// Confirm we're now out of memory
-	assert(page_block_alloc_contiguous(&block, 1 * PAGE_SIZE) == (physical_address_t) 0);
+	assert(page_block_alloc(&block, 1 * PAGE_SIZE) == (physical_address_t) 0);
 
-	page_block_free_contiguous(&block, (physical_address_t) ADDR(3 * PAGE_SIZE), 2 * PAGE_SIZE);
-	assert((uint8_t *) page_block_alloc_contiguous(&block, 2 * PAGE_SIZE) == ADDR(3 * PAGE_SIZE));
-	assert((uint8_t *) page_block_alloc_contiguous(&block, 2 * PAGE_SIZE) == 0);
+	page_block_free(&block, (physical_address_t) ADDR(3 * PAGE_SIZE), 2 * PAGE_SIZE);
+	assert((uint8_t *) page_block_alloc(&block, 2 * PAGE_SIZE) == ADDR(3 * PAGE_SIZE));
+	assert((uint8_t *) page_block_alloc(&block, 2 * PAGE_SIZE) == 0);
 
 	return 0;
 }

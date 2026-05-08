@@ -46,6 +46,7 @@ extra-$(CONFIG_CMD_TESTS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest
 
 userprog-ccflags-y		+= -Ttext=0x0000
 CFLAGS				+= -Isrc/kernel/arch/$(SRCARCH)/include
+CFLAGS				+= -Isrc/libc/arch/$(SRCARCH)/include
 
 # When other utilities are included into the shell, this flag will tell them not to include a main function
 $(objprefix)sh.o: CFLAGS += -DIN_SHELL

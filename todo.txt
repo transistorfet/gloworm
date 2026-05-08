@@ -1,7 +1,6 @@
 
-* fix bug with signals, where setting the proc alarm to 0 will make it occur right away, and will always crash the problem due to stack corruption of some kind
-* add a makefile target that builds multiple config options, to be run when making a change to ensure they all compile without warnings
-
+* make it possible to make a new config from a base config without modifying the base or the default .config file
+* fix docker config
 
 * should you add a name to the driver struct?
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
@@ -50,7 +49,6 @@
 
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
-* make it so that it's easy to run just one test
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
 * there's an issue with extra-y, and whether to add the prefix or not
 * fix the issue with Makefile.build where it needs to run make before running make bare-tests
