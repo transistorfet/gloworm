@@ -21,17 +21,38 @@ PHONY += config
 config:
 	KCONFIG_CONFIG=$(kconfig-file) kconfig-conf $(src-root)/Kconfig
 
-PHONY += menuconfig
-menuconfig:
-	KCONFIG_CONFIG=$(kconfig-file) kconfig-mconf $(src-root)/Kconfig
-
 PHONY += dockerconfig
 dockerconfig:
 	cd tools/config && KCONFIG_CONFIG=$(kconfig-file) ./configure.sh
 
+PHONY += menuconfig
+menuconfig:
+	@if [ $(from) ]; then									\
+		if [ -f "$(kconfig-file)" && ! "$(overwrite)" ]; then				\
+			echo "WARNING: a config named $(kconfig-file) already exists. Use the overwrite=y flag to copy anyways";	\
+		else										\
+			cp $(from) $(kconfig-file);						\
+			KCONFIG_CONFIG=$(kconfig-file) kconfig-mconf $(src-root)/Kconfig;	\
+		fi										\
+	else											\
+		KCONFIG_CONFIG=$(kconfig-file) kconfig-mconf $(src-root)/Kconfig;		\
+	fi
+
 PHONY += defconfig
 defconfig: FORCE
-	KCONFIG_CONFIG=defaults.config kconfig-conf --alldefconfig $(src-root)/Kconfig
+	@if [ -f "$(kconfig-file)" ] && [ ! "$(overwrite)" ]; then					\
+		echo "WARNING: a config named $(kconfig-file) already exists. Use the overwrite=y flag to copy anyways";	\
+	else											\
+		if [ "$(from)" ]; then								\
+			cp $(from) $(kconfig-file);						\
+		fi;										\
+		KCONFIG_CONFIG=$(kconfig-file) kconfig-conf --alldefconfig $(src-root)/Kconfig;	\
+	fi
+
+PHONY += defaults.config
+defaults.config:
+	KCONFIG_CONFIG=$@ kconfig-conf --alldefconfig $(src-root)/Kconfig
+
 
 PHONY += decend
 decend:

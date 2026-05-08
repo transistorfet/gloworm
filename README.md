@@ -79,19 +79,51 @@ Configuring & Building
 To configure the system, you can either install the Debian `kconfig-frontends` package, or use the
 provided Dockerfile to run them from a container, or hand-edit one of the existing configs.  Default
 config files for the 68k-SBC/SMT, k30-SBC, and k30p-VME are provided in `config/`.  Copy one to the
-root directory and rename it `.config` to make it active.  The complete system can then be built
-using `make`.  An optional argument can be provided to `make` to store all build file outputs in a
-separate location.  By default, it will store object files in the `src/` tree.
+root directory and rename it `.config` to make it active, or use `make menuconfig from=<file>` to
+automatically copy it to the config location.  The complete system can then be built using `make`.
+An optional argument can be provided to `make` to store all build file outputs in a separate
+location.  By default, it will store object files in the `src/` tree.
 
-```sh
-make dockerconfig
-# make the binary and put all object files in directory "build/"
-make O=build all
-```
-- OR -
 ```sh
 make menuconfig
 make
+```
+
+##### Put build files in another directory
+
+```sh
+make O=build
+```
+
+##### Make a new configuration based on an existing config and edit with menuconfig
+
+```sh
+make menuconfig from=config/k30p.config
+```
+
+##### Building a specific configuration file
+
+```sh
+make O=build/config-68k C=config/68k.config
+make O=build/config-k30 C=config/k30.config
+```
+
+##### Make a default configuration
+
+```sh
+make defconfig
+```
+
+##### Make a default configuration based on an existing config
+
+```sh
+make defconfig from=config/68k.config
+```
+
+##### Configure using kconfig inside a docker container
+
+```sh
+make dockerconfig
 ```
 
 The `kernel.bin` file contains the complete kernel (and shell, if the option is selected).  The
@@ -100,12 +132,6 @@ monitor program running on a board.  To send it, run:
 
 ```sh
 python3 tools/load.py build/src/kernel/kernel.load
-```
-
-Alternate configurations can be built using the `C` variable passed to make
-```sh
-make O=build/config-68k C=config/68k.config
-make O=build/config-k30 C=config/k30.config
 ```
 
 
