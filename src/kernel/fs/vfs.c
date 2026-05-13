@@ -37,7 +37,6 @@ int init_vfs(void)
 		mountpoints[i].dev = 0;
 	}
 
-	init_bufcache();
 	init_fileptr_table();
 	return 0;
 }
@@ -91,10 +90,12 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 			mountpoints[i].ops = ops;
 			mountpoints[i].mount_node = vnode;
 			mountpoints[i].root_node = NULL;
+			mountpoints[i].super = NULL;
 			mountpoints[i].dev = dev;
 			mountpoints[i].bits = mountflags;
+			mountpoints[i].block_size = 0;
 
-			error = ops->mount(&mountpoints[i], dev, vnode);
+			error = ops->mount(&mountpoints[i], vnode);
 			if (error) {
 				mountpoints[i].dev = 0;
 				vfs_release_vnode(vnode);

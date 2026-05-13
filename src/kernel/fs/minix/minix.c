@@ -61,13 +61,14 @@ int minix_init(void)
 }
 
 
-int minix_mount(struct mount *mp, device_t dev, struct vnode *parent)
+int minix_mount(struct mount *mp, struct vnode *parent)
 {
-	struct minix_super *super = load_superblock(dev);
-	if (!super)
-		return EINVAL;
-	mp->dev = dev;
-	mp->super = super;
+	int error;
+
+	error = load_superblock(mp);
+	if (error < 0) {
+		return error;
+	}
 
 	struct vnode *root = get_vnode(mp, 1);
 	if (!root) {
@@ -91,7 +92,7 @@ int minix_unmount(struct mount *mp)
 int minix_sync(struct mount *mp)
 {
 	sync_vnodes();
-	sync_bufcache();
+	sync_bufcache(&mp->bufcache);
 	return 0;
 }
 
@@ -317,7 +318,7 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 		zone = zone_lookup(file->vnode, znum, MFS_LOOKUP_ZONE);
 		if (!zone)
 			break;
-		buf = get_block(file->vnode->mp->dev, zone);
+		buf = get_block(&file->vnode->mp->bufcache, zone);
 		if (!buf)
 			break;
 
@@ -362,7 +363,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 			error = ENOSPC;
 			break;
 		}
-		buf = get_block(file->vnode->mp->dev, zone);
+		buf = get_block(&file->vnode->mp->bufcache, zone);
 		if (!buf) {
 			error = EIO;
 			break;
@@ -442,7 +443,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 		zone = zone_lookup(file->vnode, znum, MFS_LOOKUP_ZONE);
 		if (!zone)
 			return 0;
-		buf = get_block(file->vnode->mp->dev, zone);
+		buf = get_block(&file->vnode->mp->bufcache, zone);
 		if (!buf)
 			return EIO;
 		entries = (struct minix_v1_dirent *) buf->block;

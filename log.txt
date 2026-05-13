@@ -5857,3 +5857,57 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I guess this isn't really a bug, since the bug would be that something didn't check for error and exit when it should have
 
 
+2026-05-08:
+
+- I'm trying to think about how I'll make it possible to keep track of buffered sectors of a disk drive/device, that:
+    - could be 512 bytes or 4kb, or possibly other sizes
+    - can be loaded into page data such that they might only fill part of a page, or multiple pages (256 byte pages or 4kb pages)
+    - the file system will specify a different block size, which could mean needing to load multiple device blocks
+    - also (but not for now at least) can be mapped into memory for processes
+
+- I like the bio_vec thing, which it sounds like replaced the buff_head struct, so it's just an array of block descriptors, which
+  have a pointer to the address in memory of the data, and a pointer to the page that contains it, and the size.  I guess it needs
+  the size because it doesn't have a pointer to anything about the device itself, which might indirectly have the size associated
+  with it.  It takes up 4Kb for every 1MB of cached harddrive data, so it's not that much in comparison to just have the block size
+  in every bio_vec entry, and that handles any device with any sized sector
+
+  struct bio_vec {
+      struct page_descriptor *page;
+      uint8_t *data;
+      size_t size;
+  };
+
+  struct buf {
+      struct _queue_node node;
+      int length;
+      struct bio_vec bio_vec[];
+  };
+
+- or do you even need the length if you had other information?  In this model, the `buf` would represent a whole fs block?  It needs
+  to be in a queue as well, for caching
+- you know a block will only be "in" one filesystem at a time, so you can assume that a buf, and a bio_vec, attached to the same
+  device, will have the same size
+- linux uses an offset instead of a pointer into the page
+
+
+2026-05-09:
+
+- in linux, there's a bdev_block_size function which seems to look at the root inode to determine the block size, which is stored in
+  a u8 value in every single inode (vnode).  I don't like that but it does at least speed up access.  Each inode has a pointer to
+  the superblock of the filesystem that contains it as well, which I also don't think I have?  Oh actually I do sort of, I have a
+  pointer to the struct mount which represents the filesystem, so I could always find it out that way if needed
+
+- It sounds like for linux, a hardware device has sectors, and a filesystem has blocks.  It's up to the device driver to deal with
+  larger sector sizes than 512, and a block buffer, and buffer head (associated with each other) always represent one filesystem
+  block (not sector).  A raw read through the device file is always in the large block size (which is 4096, no larger)
+
+- I think I'm not really worried about the case where the page size is less than the block size, or less than the sector size.  I'm
+  not worried either about the case where the sector size is less than the block size.  It's only when the block size is less than
+  the page size that it becomes complicated, because there needs to be multiple blocks in each page, and it might not work to always
+  put sequential blocks into each
+- page size > block size - what do when this
+
+- it sounds like for linux, there can actually be the same data multiple times in the same page cache, once as file data, and once
+  as block data, so yes, it can be like that.  I don't yet know how it differentiates though.  It mentioning tagging but I'm not
+  sure if that's related
+

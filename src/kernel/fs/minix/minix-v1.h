@@ -26,7 +26,7 @@
 #define MINIX_V1_BOOT_ZONE			0
 #define MINIX_V1_SUPER_ZONE			1
 #define MINIX_V1_BITMAP_ZONES			2
-#define MINIX_V1_INODE_BITMAP_START(super_v1)	(MINIX_V1_BITMAP_ZONES)
+#define MINIX_V1_INODE_BITMAP_START		(MINIX_V1_BITMAP_ZONES)
 #define MINIX_V1_ZONE_BITMAP_START(super_v1)	(MINIX_V1_BITMAP_ZONES + (super_v1)->imap_blocks)
 #define MINIX_V1_INODE_TABLE_START(super_v1)	(MINIX_V1_BITMAP_ZONES + (super_v1)->imap_blocks + (super_v1)->zmap_blocks)
 

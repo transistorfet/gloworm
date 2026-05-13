@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <kernel/time.h>
+#include <kernel/fs/bufcache.h>
 
 #ifndef F_OK
 #define F_OK		0	// Test if file exists
@@ -60,7 +61,7 @@ struct iovec_iter;
 struct mount_ops {
 	char *fstype;								// Filesystem Type Name (used by mount syscall)
 	int (*init)();								// Initialize the filesystem at boot
-	int (*mount)(struct mount *mp, device_t dev, struct vnode *parent);	// Mount the filesystem using the pre-allocated struct mount
+	int (*mount)(struct mount *mp, struct vnode *parent);			// Mount the filesystem using the pre-allocated struct mount
 	int (*unmount)(struct mount *mp);					// Unmount the filesystem
 	int (*sync)(struct mount *mp);						// Sync data to disk
 };
@@ -103,6 +104,8 @@ struct mount {
 	void *super;			// The fs-specific superblock data
 	device_t dev;			// The device that's mounted
 	uint16_t bits;			// Bitflags for this mountpoint
+	size_t block_size;		// Filesystem-specific block size
+	struct bufcache bufcache;	// Buffer cache for this filesystem
 };
 
 struct vnode {

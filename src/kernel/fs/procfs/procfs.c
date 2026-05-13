@@ -94,7 +94,7 @@ int procfs_init(void)
 	return 0;
 }
 
-int procfs_mount(struct mount *mp, device_t dev, struct vnode *parent)
+int procfs_mount(struct mount *mp, struct vnode *parent)
 {
 	mp->root_node = _alloc_vnode(0, 0, S_IFDIR | 0755, mp);
 	return 0;

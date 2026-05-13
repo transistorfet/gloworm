@@ -13,19 +13,21 @@
 #include "minix.h"
 #include "bitmaps.h"
 
-static inode_t alloc_inode(struct minix_super *super, mode_t mode, uid_t uid, gid_t gid, device_t rdev)
+static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, device_t rdev)
 {
 	bitnum_t inode_num;
 	struct buf *inode_buf;
+	struct minix_super *super;
 	struct minix_v1_inode *inode_table;
 
-	inode_num = bit_alloc(super->dev, MINIX_V1_INODE_BITMAP_START(&super->super_v1), super->super_v1.imap_blocks, 0);
+	super = MINIX_SUPER(mp->super);
+	inode_num = bit_alloc(&mp->bufcache, MINIX_V1_INODE_BITMAP_START, super->super_v1.imap_blocks, 0);
 	if (!inode_num)
 		return ENOSPC;
 
 	short inode_offset = (inode_num - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (inode_num - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
-	inode_buf = get_block(super->dev, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
+	inode_buf = get_block(&mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
 	if (!inode_buf)
 		return ENOMEM;
 
@@ -46,9 +48,9 @@ static inode_t alloc_inode(struct minix_super *super, mode_t mode, uid_t uid, gi
 	return inode_num;
 }
 
-static int free_inode(struct minix_super *super, inode_t ino)
+static int free_inode(struct mount *mp, inode_t ino)
 {
-	return bit_free(super->dev, MINIX_V1_INODE_BITMAP_START(&super->super_v1), ino);
+	return bit_free(&mp->bufcache, MINIX_V1_INODE_BITMAP_START, ino);
 }
 
 static int read_inode(struct vnode *vnode, inode_t ino)
@@ -61,7 +63,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 
 	short inode_offset = (ino - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (ino - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
-	inode_buf = get_block(super->dev, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
+	inode_buf = get_block(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
 	if (!inode_buf)
 		return ENOMEM;
 
@@ -93,7 +95,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	super = MINIX_SUPER(vnode->mp->super);
 	short inode_offset = (ino - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (ino - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
-	inode_buf = get_block(super->dev, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
+	inode_buf = get_block(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
 	if (!inode_buf)
 		return ENOMEM;
 

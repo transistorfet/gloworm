@@ -96,13 +96,13 @@ static struct vnode *alloc_vnode(struct mount *mp, mode_t mode, uid_t uid, gid_t
 	struct vnode *vnode;
 
 	// TODO this should pass in the mp or superblock, but that would mean alloc_inode couldn't be used by the hacky mkfs function
-	bitnum_t ino = alloc_inode(MINIX_SUPER(mp->super), mode, uid, gid, device);
+	bitnum_t ino = alloc_inode(mp, mode, uid, gid, device);
 	if (!ino)
 		return NULL;
 
 	vnode = load_vnode(mp, ino);
 	if (!vnode) {
-		free_inode(MINIX_SUPER(mp->super), ino);;
+		free_inode(mp, ino);;
 		return NULL;
 	}
 
@@ -117,7 +117,7 @@ static void mark_vnode_dirty(struct vnode *vnode)
 
 static int delete_vnode(struct vnode *vnode)
 {
-	free_inode(MINIX_SUPER(vnode->mp->super), vnode->ino);
+	free_inode(vnode->mp, vnode->ino);
 	vnode->ino = 0;
 	return 0;
 }

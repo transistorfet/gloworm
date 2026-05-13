@@ -1,28 +1,34 @@
 
-* make it possible to make a new config from a base config without modifying the base or the default .config file
-* fix docker config
-
-* should you add a name to the driver struct?
-* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
+* if you make a separate bufcache for each device, then it can store the block size there
+* the alternotive seems to be possing in the block size every time you get or set a block or sync, but you still need a lookup either way
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
 * finish implementing ext2
 
-* refactor queue (and ringbuffer), try not inlining everything to see if significantly reduces the size, and make it possible/easier to have multiple nodes in the same struct
+* should you add a name to the driver struct?
+* need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
+* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
+
+* refactor queue and ringbuffer, try not inlining everything to see if significantly reduces the size
+* for queue, make it possible/easier to have multiple nodes in the same struct
 * make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes. The problem is we already have a queue node for the runlist, and queue doesn't handle two lists well
 * could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one;  you need a way to have two queues in a struct, by doing pointer arithmetic
+* change LF to CR+LF (or make it configurable) in the TTY driver.  The computer should send CR+LF whenever an LF is sent by a user program (unless raw enabled), and CR characters should be ignored, so the terminal could send CR+LF or LF
+
+* make a script or rule to run all tests, build all bare-tests, and compile the kernel for each of the test configs, and throw an error if any errors or warnings are encountered
+* add a github action to run the verification script on all PRs and commits to main
+* add an emulator that can run the bare tests
+* fix docker config
+* make a dockerfile that can also compile the entire project
+
+----
 
 
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable
 * send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
 
-
-
-* make a dockerfile that can also compile the entire project
-* change LF to CR+LF (or make it configurable) in the TTY driver
 * add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
 * go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
 
@@ -50,8 +56,6 @@
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
 * make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
-* there's an issue with extra-y, and whether to add the prefix or not
-* fix the issue with Makefile.build where it needs to run make before running make bare-tests
 
 ----
 

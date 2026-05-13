@@ -9,6 +9,8 @@
 
 #include "minix-v1.h"
 
+#define MINIX_SUPERBLOCK_SIZE	512
+
 #define MINIX_SUPER(super)	((struct minix_super *) (super))
 #define MINIX_BLOCK(block)	((struct minix_block *) (block))
 #define MINIX_VNODE(vnode)	((struct minix_vnode *) (vnode))
@@ -16,9 +18,9 @@
 
 #define MBF_DIRTY		0x0001
 
+typedef unsigned int zone_t;
 
 struct minix_super {
-	device_t dev;
 	char max_filename;
 
 	union {
@@ -38,7 +40,7 @@ struct minix_vnode {
 
 
 int minix_init(void);
-int minix_mount(struct mount *mp, device_t dev, struct vnode *parent);
+int minix_mount(struct mount *mp, struct vnode *parent);
 int minix_unmount(struct mount *mp);
 int minix_sync(struct mount *mp);
 int minix_load_superblock(device_t dev);

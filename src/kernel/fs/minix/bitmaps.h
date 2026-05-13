@@ -26,14 +26,14 @@ static inline char bit_mask(char bits)
 	return byte;
 }
 
-static inline int bitmap_init(device_t dev, zone_t bitmap_start, int bitmap_size, int num_entries, short reserve)
+static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, int bitmap_size, int num_entries, short reserve)
 {
 	char *block;
 	struct buf *buf;
 
 	// Set only num_entries bits as free, and the rest of the block as reserved (unallocatable)
 	for (short i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
-		buf = get_block(dev, i);
+		buf = get_block(bufcache, i);
 		if (!buf)
 			return -1;
 		block = buf->block;
@@ -57,7 +57,7 @@ static inline int bitmap_init(device_t dev, zone_t bitmap_start, int bitmap_size
 		release_block(buf, BCF_DIRTY);
 	}
 
-	buf = get_block(dev, bitmap_start);
+	buf = get_block(bufcache, bitmap_start);
 	if (!buf)
 		return -1;
 	block = buf->block;
@@ -72,7 +72,7 @@ static inline int bitmap_init(device_t dev, zone_t bitmap_start, int bitmap_size
 	return 0;
 }
 
-static inline bitnum_t bit_alloc(device_t dev, zone_t bitmap_start, int bitmap_size, zone_t near)
+static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start, int bitmap_size, zone_t near)
 {
 	char bit;
 	char *block;
@@ -80,7 +80,7 @@ static inline bitnum_t bit_alloc(device_t dev, zone_t bitmap_start, int bitmap_s
 	struct buf *buf;
 
 	for (; zone < bitmap_size; zone++) {
-		buf = get_block(dev, bitmap_start + zone);
+		buf = get_block(bufcache, bitmap_start + zone);
 		if (!buf)
 			return 0;
 		block = buf->block;
@@ -101,12 +101,12 @@ static inline bitnum_t bit_alloc(device_t dev, zone_t bitmap_start, int bitmap_s
 	return 0;
 }
 
-static inline int bit_free(device_t dev, zone_t bitmap_start, bitnum_t bitnum)
+static inline int bit_free(struct bufcache *bufcache, zone_t bitmap_start, bitnum_t bitnum)
 {
 	zone_t zone = (bitnum >> 3) / MINIX_V1_ZONE_SIZE;
 	int i = (bitnum >> 3);
 	char bit = (bitnum & 0x7);
-	struct buf *buf = get_block(dev, bitmap_start + zone);
+	struct buf *buf = get_block(bufcache, bitmap_start + zone);
 	if (!buf)
 		return -1;
 	char *block = buf->block;

@@ -9,8 +9,11 @@
 static int minix_mkfs(device_t dev)
 {
 	struct buf *super_buf;
+	struct bufcache bufcache;
 	struct minix_v1_superblock *super_v1;
 	struct minix_v1_superblock super_v1_cached;
+
+	init_bufcache(&bufcache, dev, 1 << MINIX_V1_LOG_INODES_PER_ZONE);
 
 	super_v1 = &super_v1_cached;
 
@@ -25,7 +28,7 @@ static int minix_mkfs(device_t dev)
 	super_v1->state = 0x0001;
 
 	// Write the superblock
-	super_buf = get_block(dev, MINIX_V1_SUPER_ZONE);
+	super_buf = get_block(&bufcache, MINIX_V1_SUPER_ZONE);
 	if (!super_buf)
 		return -1;
 	super_v1 = (struct minix_v1_superblock *) super_buf->block;
@@ -47,12 +50,12 @@ static int minix_mkfs(device_t dev)
 	super_v1 = &super_v1_cached;
 
 	// Initialize bitmap zones
-	bitmap_init(dev, MINIX_V1_INODE_BITMAP_START(super_v1), super_v1->imap_blocks, super_v1->num_inodes, 2);
-	bitmap_init(dev, MINIX_V1_ZONE_BITMAP_START(super_v1), super_v1->zmap_blocks, super_v1->num_zones, 2);
+	bitmap_init(&bufcache, MINIX_V1_INODE_BITMAP_START, super_v1->imap_blocks, super_v1->num_inodes, 2);
+	bitmap_init(&bufcache, MINIX_V1_ZONE_BITMAP_START(super_v1), super_v1->zmap_blocks, super_v1->num_zones, 2);
 
 	// Zero the inode table
 	for (int i = 0; i < (super_v1->num_inodes >> MINIX_V1_LOG_INODES_PER_ZONE); i++) {
-		struct buf *inode_buf = get_block(dev, MINIX_V1_INODE_TABLE_START(super_v1) + i);
+		struct buf *inode_buf = get_block(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1) + i);
 		if (!inode_buf)
 			return ENOMEM;
 		memset(inode_buf->block, 0x00, MINIX_V1_ZONE_SIZE);
@@ -63,7 +66,7 @@ static int minix_mkfs(device_t dev)
 	zone_t dir_zone = super_v1->first_zone;
 
 	// Initialize root inode
-	struct buf *inode_buf = get_block(dev, MINIX_V1_INODE_TABLE_START(super_v1));
+	struct buf *inode_buf = get_block(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1));
 	if (!inode_buf)
 		return ENOMEM;
 	struct minix_v1_inode *inode_table = inode_buf->block;
@@ -77,7 +80,7 @@ static int minix_mkfs(device_t dev)
 	release_block(inode_buf, BCF_DIRTY);
 
 	// Initialize root directory
-	struct buf *dir_buf = get_block(dev, dir_zone);
+	struct buf *dir_buf = get_block(&bufcache, dir_zone);
 	if (!dir_buf)
 		return ENOMEM;
 	struct minix_v1_dirent *entries = dir_buf->block;
@@ -90,7 +93,8 @@ static int minix_mkfs(device_t dev)
 
 	release_block(dir_buf, BCF_DIRTY);
 
-	//sync_bufcache();
+	//sync_bufcache(&bufcache);
+	free_bufcache(&bufcache);
 
 	return 0;
 }
