@@ -5911,3 +5911,9 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   as block data, so yes, it can be like that.  I don't yet know how it differentiates though.  It mentioning tagging but I'm not
   sure if that's related
 
+
+2026-05-15:
+
+- I'm chuggin' away at the ext2 implementation, going relatively smoothly since I've already implemented it once, and can look at
+  that ruxpin impl to compare, as well as good documentation on ext2
+

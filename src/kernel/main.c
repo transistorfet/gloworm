@@ -54,13 +54,17 @@ struct driver *drivers[] = {
 	NULL	// Null Termination
 };
 
-extern struct mount_ops minix_mount_ops;
 extern struct mount_ops procfs_mount_ops;
+extern struct mount_ops minix_mount_ops;
+extern struct mount_ops ext2_mount_ops;
 
 struct mount_ops *filesystems[] = {
 	&procfs_mount_ops,
 	#if defined(CONFIG_MINIX_FS)
 	&minix_mount_ops,
+	#endif
+	#if defined(CONFIG_EXT2_FS)
+	&ext2_mount_ops,
 	#endif
 	NULL	// Null Termination
 };
@@ -237,6 +241,15 @@ int main(void)
 	#endif
 
 	create_init_task();
+
+	#if defined(CONFIG_EXT2_FS)
+	device_t extra_dev = DEVNUM(DEVMAJOR_ATA, 1);
+	const char *extra_mountpoint = "/media";
+	printk("ext2fs: mounting (%x) at %s\n", extra_dev, extra_mountpoint);
+	error = vfs_mount(NULL, extra_mountpoint, extra_dev, &ext2_mount_ops, 0, SU_UID);
+	if (error < 0)
+		goto fail;
+	#endif
 
 	log_debug("begin multitasking...\n");
 	begin_multitasking();
