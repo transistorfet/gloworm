@@ -11,13 +11,13 @@
 
 static inline uint16_t __bswap_16(uint16_t x)
 {
-	asm volatile("rol.w	#8, %0\n" : "+md" (x));
+	asm("rol.w	#8, %0\n" : "+md" (x));
 	return x;
 }
 
 static inline uint32_t __bswap_32(uint32_t x)
 {
-	asm volatile(
+	asm(
 	"rol.w	#8, %0\n"
 	"swap	%0\n"
 	"rol.w	#8, %0\n"

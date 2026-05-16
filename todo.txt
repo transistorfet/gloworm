@@ -1,6 +1,9 @@
 
-* if you make a separate bufcache for each device, then it can store the block size there
-* the alternotive seems to be possing in the block size every time you get or set a block or sync, but you still need a lookup either way
+* typing "ls .." from / caused a segfault on addr=27ED0208
+* should you store the log blocksize as well, inside the super?  looks like you convert the block size to log block size often
+* replace VFS_FILENAME_MAX?
+
+* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
@@ -8,7 +11,6 @@
 
 * should you add a name to the driver struct?
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 
 * refactor queue and ringbuffer, try not inlining everything to see if significantly reduces the size
 * for queue, make it possible/easier to have multiple nodes in the same struct
@@ -59,7 +61,7 @@
 
 ----
 
-* is there a better name than alignment_offset?
+* is there a better name than alignment_offset?  lower_bits()?  bitwise_modulus()?  bitwise_remainder()?
 * separate access control paramater (rwx) to mmu_table_mmap, and map_memory_mmap??
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 
