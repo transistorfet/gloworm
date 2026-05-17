@@ -19,7 +19,7 @@ int nop_open(struct vfile *file, int flags);
 int nop_close(struct vfile *file);
 int nop_read(struct vfile *file, struct iovec_iter *iter);
 int nop_write(struct vfile *file, struct iovec_iter *iter);
-int nop_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
+int nop_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int nop_poll(struct vfile *file, int events);
 offset_t nop_seek(struct vfile *file, offset_t position, int whence);
 int nop_readdir(struct vfile *file, struct dirent *dir);

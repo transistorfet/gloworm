@@ -10,7 +10,7 @@
 #include <kernel/utils/iovec.h>
 
 
-#define BUFCACHE_MAX		20
+#define BUFCACHE_MAX		100
 
 
 static inline struct buf *_find_free_entry(struct bufcache *cache);
@@ -124,20 +124,20 @@ static inline struct buf *_find_free_entry(struct bufcache *cache)
 	// Recycle the last used entry
 	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node), count++) { }
 
-	if (!last) {
-		if (count < BUFCACHE_MAX) {
-			last = _create_entry(cache);
-			if (!last)
-				return NULL;
-		} else {
-			panic("Error: ran out of bufcache entries\n");
+	if (count < BUFCACHE_MAX) {
+		// We haven't reached the limit, so create a new entry instead
+		last = _create_entry(cache);
+		if (!last)
 			return NULL;
-		}
+	} else if (!last) {
+		panic("Error: ran out of bufcache entries\n");
+		return NULL;
 	}
 
 	_queue_remove(&cache->blocks, &last->node);
 	_queue_insert(&cache->blocks, &last->node);
 	if (last->num != 0 && last->block) {
+		log_warning("recycling cached block %d\n", last->num);
 		_write_entry(cache, last);
 	}
 	return last;
@@ -187,10 +187,13 @@ static inline int _write_entry(struct bufcache *cache, struct buf *entry)
 	}
 	//printk("WRITING %x: %x <- %x x %x\n", entry->dev, (entry->num * cache->block_size), entry->block, cache->block_size);
 	iovec_iter_init_simple_kvec(&iter, &kvec, entry->block, cache->block_size);
+	/*
+	// TODO disable writing
 	int size = dev_write(cache->dev, (entry->num * cache->block_size), &iter);
 	if (size != cache->block_size) {
 		return -1;
 	}
+	*/
 	entry->flags &= ~BCF_DIRTY;
 	return 1;
 }

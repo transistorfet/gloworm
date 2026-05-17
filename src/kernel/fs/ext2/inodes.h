@@ -15,65 +15,94 @@
 #include "super.h"
 #include "bitmaps.h"
 
-/*
+static inline int get_inode_group(struct mount *mp, inode_t ino)
+{
+	const struct ext2_super *super = EXT2_SUPER(mp->super);
+	const int group = (ino - 1) >> super->log_inodes_per_group;
+	if (group > super->num_groups) {
+		return EINVAL;
+	}
+	return group;
+}
+
+static inline struct inode_location get_inode_block_and_offset(struct mount *mp, inode_t ino)
+{
+	const struct ext2_super *super = EXT2_SUPER(mp->super);
+	const int group = (ino - 1) >> super->log_inodes_per_group;
+	if (group > super->num_groups) {
+		const struct inode_location result = { EINVAL };
+		return result;
+	}
+
+	const int group_inode = alignment_offset((ino - 1), 1 << super->log_inodes_per_group);
+	const block_t block_offset = group_inode >> super->log_inodes_per_block;
+	const int byte_offset = alignment_offset(group_inode, 1 << super->log_inodes_per_block) << super->log_inode_size;
+	const struct inode_location result = { super->groups[group].inode_table + block_offset, byte_offset };
+	return result;
+}
+
 static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, device_t rdev)
 {
-	bitnum_t inode_num;
+	int group;
 	struct buf *inode_buf;
+	bitnum_t group_inode_num;
 	struct ext2_super *super;
-	struct ext2_inode *inode_table;
-	int block_size = mp->bufcache.block_size;
+	struct ext2_inode *inode;
 
 	super = EXT2_SUPER(mp->super);
 
-	for (int group = 0; group < super->num_groups; group++) {
-		inode_num = bit_alloc(&mp->bufcache, super->groups[group].inode_bitmap, super->super.inodes_per_group, 0);
-		if (!inode_num)
-			return ENOSPC;
-
-		super->groups[group].free_inode_count -= 1;
-		super->super.total_unalloc_inodes -= 1;
-
-		// TODO this needs to be fixed
-		short inode_offset = (inode_num - 1) & (EXT2_INODES_PER_BLOCK(block_size) - 1);
-		block_t block_offset = (inode_num - 1) >> EXT2_LOG_INODES_PER_BLOCK(block_size);
-		inode_buf = get_block(&mp->bufcache, EXT2_INODE_TABLE_START(&super->super) + block_offset);
-		if (!inode_buf)
-			return ENOMEM;
-
-		inode_table = inode_buf->block;
-		inode_table[inode_offset].mode = htole16(mode);
-		inode_table[inode_offset].uid = htole16(uid);
-		inode_table[inode_offset].size = 0;
-		inode_table[inode_offset].gid = (uint8_t) gid;
-		inode_table[inode_offset].nlinks = (uint8_t) 1;
-		inode_table[inode_offset].mtime = htole32(get_system_time());
-		for (short j = 0; j < EXT2_INODE_BLOCKNUMS; j++)
-			inode_table[inode_offset].blocks[j] = NULL;
-		if (S_ISCHR(mode))
-			inode_table[inode_offset].blocks[0] = htole16(rdev);
-
-		release_block(inode_buf, BCF_DIRTY);
-
-		return (super->super.inodes_per_group * group) + inode_num;
+	for (group = 0; group < super->num_groups; group++) {
+		// TODO should you try to distribute allocations across block groups?
+		if (super->groups[group].free_inode_count > 0) {
+			break;
+		}
 	}
+	if (group >= super->num_groups)
+		return ENOSPC;
 
-	return ENOSPC;
+	group_inode_num = bit_alloc(&mp->bufcache, super->groups[group].inode_bitmap, 0);
+	if (!group_inode_num)
+		return ENOSPC;
+	super->groups[group].free_inode_count -= 1;
+	super->super.total_unalloc_inodes -= 1;
+	const ext2_inode_t inodenum = (super->super.inodes_per_group * group) + group_inode_num + 1;
+
+	const block_t block_offset = group_inode_num >> super->log_inodes_per_block;
+	const int byte_offset = alignment_offset(group_inode_num, 1 << super->log_inodes_per_block) << super->log_inode_size;
+	inode_buf = get_block(&mp->bufcache, super->groups[group].inode_table + block_offset);
+	if (!inode_buf)
+		return ENOMEM;
+
+	inode = (struct ext2_inode *) &((char *) inode_buf->block)[byte_offset];
+	inode->mode = htole16(mode);
+	inode->uid = htole16(uid);
+	inode->size = 0;
+	inode->gid = (uint8_t) gid;
+	inode->nlinks = (uint8_t) 1;
+	inode->mtime = htole32(get_system_time());
+	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++)
+		inode->blocks[j] = NULL;
+	if (S_ISCHR(mode))
+		inode->blocks[0] = htole16(rdev);
+
+	release_block(inode_buf, BCF_DIRTY);
+
+	return inodenum;
 }
 
 static int free_inode(struct mount *mp, inode_t ino)
 {
 	int error;
-	struct ext2_super *super;
 
-	super = EXT2_SUPER(mp->super);
-	error = bit_free(&mp->bufcache, EXT2_INODE_BITMAP_START(&super->super), ino);
+	const int group = get_inode_group(mp, ino);
+	struct ext2_super * const super = EXT2_SUPER(mp->super);
+	error = bit_free(&mp->bufcache, super->groups[group].inode_bitmap, ino);
 	if (error < 0)
 		return error;
 	super->groups[group].free_inode_count += 1;
 	super->super.total_unalloc_inodes += 1;
+	return 0;
 }
-*/
 
 static int read_inode(struct vnode *vnode, inode_t ino)
 {

@@ -318,8 +318,9 @@ int net_socket_wakeup(struct socket *sock, int events)
 	return 0;
 }
 
-int net_socket_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int net_socket_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
+	int error;
 	//struct socket *sock = SOCKET(file->vnode);
 
 	if (!S_ISSOCK(file->vnode->mode)) {
@@ -328,8 +329,13 @@ int net_socket_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t
 
 	switch (request) {
 
-		default:
-			return net_if_ioctl(request, (struct ifreq *) argp, uid);
+		default: {
+			struct ifreq ifreq;
+			memcpy_out_of_iter(iter, &ifreq, sizeof(struct ifreq));
+			error = net_if_ioctl(request, &ifreq, uid);
+			memcpy_into_iter(iter, &ifreq, sizeof(struct ifreq));
+			return error;
+		}
 	}
 	return 0;
 }

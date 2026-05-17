@@ -42,7 +42,7 @@ int devfs_open(struct vfile *file, int flags);
 int devfs_close(struct vfile *file);
 int devfs_read(struct vfile *file, struct iovec_iter *iter);
 int devfs_write(struct vfile *file, struct iovec_iter *iter);
-int devfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
+int devfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 offset_t devfs_seek(struct vfile *file, offset_t position, int whence);
 
 #endif

@@ -87,7 +87,7 @@ struct vfile_ops {
 	int (*close)(struct vfile *file);
 	int (*read)(struct vfile *file, struct iovec_iter *iter);
 	int (*write)(struct vfile *file, struct iovec_iter *iter);
-	int (*ioctl)(struct vfile *file, unsigned int request, void *argp, uid_t uid);
+	int (*ioctl)(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 	int (*poll)(struct vfile *file, int events);
 	offset_t (*seek)(struct vfile *file, offset_t position, int whence);
 	int (*readdir)(struct vfile *file, struct dirent *dir);
@@ -162,7 +162,7 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 int vfs_close(struct vfile *file);
 int vfs_read(struct vfile *file, struct iovec_iter *iter);
 int vfs_write(struct vfile *file, struct iovec_iter *iter);
-int vfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
+int vfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int vfs_poll(struct vfile *file, int events);
 offset_t vfs_seek(struct vfile *file, offset_t position, int whence);
 int vfs_readdir(struct vfile *file, struct dirent *dir);
