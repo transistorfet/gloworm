@@ -3,6 +3,7 @@ obj-y			+= devfs/
 obj-y			+= procfs/
 obj-y			+= partition/
 obj-$(CONFIG_MINIX_FS)	+= minix/
+obj-$(CONFIG_EXT2_FS)	+= ext2/
 
 obj-y			+= access.o
 obj-y			+= bufcache.o

@@ -396,7 +396,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 	return wbytes;
 }
 
-int minix_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int minix_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	return EINVAL;
 }

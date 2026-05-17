@@ -14,6 +14,13 @@ config MINIX_FS
 	help
 	  This enables the minix file system support.  Only v1 is supported
 
+config EXT2_FS
+	bool "ext2 file system"
+	default n
+	help
+	  This enables the ext2 file system support.  Only ext2 is supported at
+	  this time, and not ext3 or ext4.
+
 config PATH_MAX
 	int "maximum path length"
 	default 1024
