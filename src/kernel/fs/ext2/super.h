@@ -11,8 +11,6 @@
 
 #include "ext2.h"
 #include "ext2structs.h"
-//#include "inodes.h"
-//#include "mkfs.h"
 
 #define EXT2_MAGIC				0xEF53
 
@@ -122,9 +120,11 @@ static int load_superblock(struct mount *mp)
 	mp->block_size = 1024 << super->super.log_block_size;
 	init_bufcache(&mp->bufcache, mp->dev, mp->block_size);
 
+	super->log_block_size = __builtin_ctz(mp->block_size);
 	super->log_inode_size = __builtin_ctz(super->super.major_version >= 1 ? super->super.extended.inode_size : 128);
 	super->log_inodes_per_block = __builtin_ctz(mp->block_size >> super->log_inode_size);
 	super->log_inodes_per_group = __builtin_ctz(super->super.inodes_per_group);
+	super->log_blocks_per_group = __builtin_ctz(super->super.blocks_per_group);
 	super->num_groups = num_groups;
 
 	// Load the block groups, starting with the first block after the superblock
@@ -176,22 +176,6 @@ struct inode_location {
 	ext2_block_t block;
 	int offset;
 };
-
-static inline struct inode_location get_inode_block_and_offset(struct mount *mp, inode_t ino)
-{
-	const struct ext2_super *super = EXT2_SUPER(mp->super);
-	const int group = (ino - 1) >> super->log_inodes_per_group;
-	if (group > super->num_groups) {
-		const struct inode_location result = { EINVAL };
-		return result;
-	}
-
-	const int group_inode = alignment_offset((ino - 1), 1 << super->log_inodes_per_group);
-	const block_t block = group_inode >> super->log_inodes_per_block;
-	const int byte_offset = alignment_offset(group_inode, 1 << super->log_inodes_per_block) << super->log_inode_size;
-	const struct inode_location result = { super->groups[group].inode_table + block, byte_offset };
-	return result;
-}
 
 #endif
 

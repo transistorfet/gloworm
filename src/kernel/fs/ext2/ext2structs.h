@@ -26,6 +26,15 @@
 #define EXT2_NEXT_DIRENT(current)		((struct ext2_dirent *) (((char *) (current)) + le16toh(((struct ext2_dirent *) current)->entry_len)))
 #define EXT2_DIRENT_FILENAME(current)		(((char *) (current)) + sizeof(struct ext2_dirent))
 
+#define EXT2_FT_UNKNOWN				0
+#define EXT2_FT_REG_FILE			1
+#define EXT2_FT_DIR				2
+#define EXT2_FT_CHRDEV				3
+#define EXT2_FT_BLKDEV				4
+#define EXT2_FT_FIFO				5
+#define EXT2_FT_SOCK				6
+#define EXT2_FT_SYMLINK				7
+
 typedef uint32_t ext2_block_t;
 typedef uint32_t ext2_inode_t;
 

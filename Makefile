@@ -63,7 +63,7 @@ output.txt: $(OUTPUT)src/monitor/monitor.bin
 	hexdump -v -e '/1 "0x%02X, "' $@ > output.txt
 
 # Make it possible to compile individual targets in src and tests
-src/% tests/%:
+src/% tests/%: FORCE
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@)) $@
 
 # Convenience targets

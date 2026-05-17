@@ -484,12 +484,14 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	}
 
 	// Verify that the file we're trying to delete is writable
-	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode))
+	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		error = EPERM;
+	}
 
-	if (!error)
+	if (!error) {
 		// unlink does not take ownership of vnode and must not call vfs_release_vnode
 		error = parent->ops->unlink(parent, vnode, filename);
+	}
 
 	vfs_release_vnode(parent);
 	vfs_release_vnode(vnode);
@@ -653,9 +655,9 @@ int vfs_write(struct vfile *file, struct iovec_iter *iter)
 	return file->ops->write(file, iter);
 }
 
-int vfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int vfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
-	return file->ops->ioctl(file, request, argp, uid);
+	return file->ops->ioctl(file, request, iter, uid);
 }
 
 int vfs_poll(struct vfile *file, int events)

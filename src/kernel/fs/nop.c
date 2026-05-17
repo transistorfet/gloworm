@@ -74,7 +74,7 @@ int nop_write(struct vfile *file, struct iovec_iter *iter)
 	return 0;
 }
 
-int nop_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int nop_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	return EPERM;
 }
