@@ -155,11 +155,23 @@ int vfs_sync(device_t dev)
 	int error = 0;
 
 	for (short i = 0; i < VFS_MOUNT_MAX; i++) {
-		if (mountpoints[i].dev && (!dev || mountpoints[i].dev == dev)) {
-			error = mountpoints[i].ops->sync(&mountpoints[i]);
-			if (error)
-				return error;
+		if (dev && mountpoints[i].dev != dev) {
+			continue;
 		}
+
+		if (mountpoints[i].dev == 0) {
+			// Virtual device, so there's nothing to sync
+			continue;
+		}
+
+		if (mountpoints[i].bits & VFS_MBF_READ_ONLY) {
+			log_warning("vfs: skipping sync of read-only filesystem dev=%x %x\n", mountpoints[i].dev, mountpoints[i].bits);
+			continue;
+		}
+
+		error = mountpoints[i].ops->sync(&mountpoints[i]);
+		if (error)
+			return error;
 	}
 	return 0;
 }
@@ -346,6 +358,10 @@ int vfs_chmod(struct vnode *cwd, const char *path, int mode, uid_t uid)
 	if (error)
 		return error;
 
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
+
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode))
 		return EPERM;
 
@@ -363,6 +379,10 @@ int vfs_chown(struct vnode *cwd, const char *path, uid_t owner, gid_t group, uid
 	error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
 	if (error)
 		return error;
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		vfs_release_vnode(vnode);
@@ -384,6 +404,10 @@ int vfs_mknod(struct vnode *cwd, const char *path, mode_t mode, device_t dev, ui
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &vnode);
 	if (error)
 		return error;
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		vfs_release_vnode(vnode);
@@ -415,6 +439,10 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 	struct vnode *tmpvnode = NULL;
 
 	// TODO We still don't check that there are no loops
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	error = vfs_lookup(cwd, oldpath, VLOOKUP_NORMAL, uid, &vnode);
 	if (error)
@@ -469,6 +497,10 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	if (error)
 		return error;
 
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
+
 	// Verify that parent directory is writable
 	if (!verify_mode_access(uid, W_OK, parent->uid, parent->gid, parent->mode)) {
 		vfs_release_vnode(parent);
@@ -507,6 +539,10 @@ static inline int _rename_find_parent(struct vnode *cwd, const char *path, uid_t
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &vnode);
 	if (error)
 		return error;
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	// Verify that the parent directory of the old location is writable and searchable
 	if (!verify_mode_access(uid, W_OK | X_OK, vnode->uid, vnode->gid, vnode->mode)) {
@@ -574,6 +610,10 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 	error = vfs_lookup(cwd, path, (flags & O_CREAT) ? VLOOKUP_PARENT_OF : VLOOKUP_NORMAL, uid, &vnode);
 	if (error)
 		return error;
+
+	if ((vnode->mp->bits & VFS_MBF_READ_ONLY) && ((flags & O_ACCMODE) != O_RDONLY || (flags & O_CREAT))) {
+		return EROFS;
+	}
 
 	if (flags & O_CREAT) {
 		const char *filename = path_last_component(path);

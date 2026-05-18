@@ -5917,3 +5917,26 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I'm chuggin' away at the ext2 implementation, going relatively smoothly since I've already implemented it once, and can look at
   that ruxpin impl to compare, as well as good documentation on ext2
 
+
+2026-05-17:
+
+- I ran into EMFILE error, -24, which is too many files open.  I was doing a lot of piping into files for testing, and it was
+  actually while testing on the minix disk that it came up, so it's probably a bug in the piping code or something common
+- maybe I should add a procfs file that lists the open file descriptors
+- I did a test where I enabled writing and sync'd to disk, and it wrote the changes, but there are some mistakes, for sure
+- first of all, there's a bug (probably common) where the first character of a file is dropped, but only when the file already
+  exists and is being overwritten
+- I put "ifferent test" into moved.txt, but it's displaying the contents for the linked files instead
+- the linked files are there, and I think have the right content
+- if I try to write to the linked files, or to moved.txt, it gives me an error that it can't edit linked files.  This happens for
+  all files, including the one I wrote from linux, so it might be filesystem specific?  Ah, it has "errors=remount-ro,emergency-ro"
+  so I linux is identifying something that's broken.  Maybe I'm not writing the superblock back?  I'm certainly not writing it to
+  each block group, which might be a problem
+
+
+2026-05-18:
+
+- looking at the syslogs from last night, when I mounted the ext2, it detected errors and mounted read-only, and in the logs it said
+  it was because block group 0's bitmap blocks free didn't match the the group descriptor's free block count
+- I should probably add some integrity checks like that to my impl, but mounting ro is probably the most important
+

@@ -15,6 +15,12 @@
 #include "super.h"
 #include "bitmaps.h"
 
+
+struct inode_location {
+	ext2_block_t block;
+	int offset;
+};
+
 static inline int get_inode_group(struct mount *mp, inode_t ino)
 {
 	const struct ext2_super *super = EXT2_SUPER(mp->super);
@@ -85,7 +91,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	if (S_ISCHR(mode))
 		inode->blocks[0] = htole16(rdev);
 
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 
 	return inodenum;
 }
@@ -164,7 +170,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	vnode->bits &= ~VBF_DIRTY;
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 	return 0;
 }
 

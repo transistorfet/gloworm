@@ -93,6 +93,7 @@ int ext2_unmount(struct mount *mp)
 int ext2_sync(struct mount *mp)
 {
 	sync_vnodes();
+	sync_superblock(mp);
 	sync_bufcache(&mp->bufcache);
 	return 0;
 }
@@ -128,7 +129,7 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
 
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
@@ -165,7 +166,7 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
 	// TODO need a way to distinguish between block and character devices
 	dir->filetype = EXT2_FT_CHRDEV;
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
@@ -204,7 +205,7 @@ int ext2_link(struct vnode *oldvnode, struct vnode *newparent, const char *filen
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole32((ext2_inode_t) oldvnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
 	return 0;
@@ -212,18 +213,14 @@ int ext2_link(struct vnode *oldvnode, struct vnode *newparent, const char *filen
 
 int ext2_unlink(struct vnode *parent, struct vnode *vnode, const char *filename)
 {
-	struct buf *buf;
-	struct ext2_dirent *dir;
+	int error;
 
 	if (S_ISDIR(vnode->mode) && !dir_is_empty(vnode))
 		return ENOTEMPTY;
 
-	dir = dir_find_entry_by_name(parent, filename, EXT2_AF_LOOKUP_BLOCK, &buf);
-	if (!dir)
+	error = dir_free_entry(parent, vnode, filename);
+	if (error < 0)
 		return ENOENT;
-
-	dir->inode = 0;
-	release_block(buf, BCF_DIRTY);
 
 	vnode->nlinks -= 1;
 	if (vnode->nlinks <= 0) {
@@ -261,8 +258,8 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 
 	newdir->inode = htole32((ext2_inode_t) vnode->ino);
 	olddir->inode = htole16(0);
-	release_block(newbuf, BCF_DIRTY);
-	release_block(oldbuf, BCF_DIRTY);
+	release_block(newbuf, BF_DIRTY);
+	release_block(oldbuf, BF_DIRTY);
 	vfs_update_time(oldparent, MTIME);
 	vfs_update_time(newparent, MTIME);
 	return 0;
@@ -391,7 +388,7 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 			zlen = nbytes;
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, BCF_DIRTY);
+		release_block(buf, BF_DIRTY);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -496,7 +493,7 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 	dir->d_ino = le32toh(current_entry->inode);
 	memcpy(dir->d_name, EXT2_DIRENT_FILENAME(current_entry), max);
 	dir->d_name[current_entry->name_len] = '\0';
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	return 1;
 }

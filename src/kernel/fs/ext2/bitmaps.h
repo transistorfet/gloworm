@@ -44,7 +44,7 @@ static inline int bitmap_init(struct bufcache *bufcache, block_t bitmap_blocknum
 		block[i] = 0xFF;
 	block[i] = bit_mask(reserve & 0x7);
 
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	return 0;
 }
 
@@ -66,7 +66,7 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, block_t bitmap_block
 		if ((char) ~data[i]) {
 			for (bit = 0; bit < 8 && ((0x01 << bit) & data[i]); bit++) { }
 			data[i] |= (0x01 << bit);
-			release_block(buf, BCF_DIRTY);
+			release_block(buf, BF_DIRTY);
 			return bit + (i * 8) + (block * block_size * 8);
 		}
 	}
@@ -83,7 +83,7 @@ static inline int bit_free(struct bufcache *bufcache, block_t bitmap_blocknum, b
 		return -1;
 
 	((char *) buf->block)[byte] &= ~(0x01 << bit);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	return 0;
 }
 

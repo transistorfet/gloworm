@@ -54,7 +54,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 		}
 		num_entries -= MINIX_V1_BITS_PER_ZONE;
 
-		release_block(buf, BCF_DIRTY);
+		release_block(buf, BF_DIRTY);
 	}
 
 	buf = get_block(bufcache, bitmap_start);
@@ -68,7 +68,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 		block[i] = 0xFF;
 	block[i] = bit_mask(reserve & 0x7);
 
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	return 0;
 }
 
@@ -90,7 +90,7 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 			if ((char) ~block[i]) {
 				for (bit = 0; bit < 8 && ((0x01 << bit) & block[i]); bit++) { }
 				block[i] |= (0x01 << bit);
-				release_block(buf, BCF_DIRTY);
+				release_block(buf, BF_DIRTY);
 				return bit + (i * 8) + (zone * MINIX_V1_ZONE_SIZE * 8);
 			}
 		}
@@ -112,7 +112,7 @@ static inline int bit_free(struct bufcache *bufcache, zone_t bitmap_start, bitnu
 	char *block = buf->block;
 
 	block[i] &= ~(0x01 << bit);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	return 0;
 }
 

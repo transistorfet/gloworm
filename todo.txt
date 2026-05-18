@@ -1,4 +1,7 @@
 
+* ran into a bug when piping text into a lot of files, where it ran out of open files, so they're not being closed for some reason, and it seems to be common between fs'
+* I need like an lsof command to list at least open files for the current process? or add it to procfs?
+
 * typing "ls .." from / caused a segfault on addr=27ED0208
 * should you store the log blocksize as well, inside the super?  looks like you convert the block size to log block size often
 * replace VFS_FILENAME_MAX?

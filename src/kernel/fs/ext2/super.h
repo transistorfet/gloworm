@@ -158,6 +158,10 @@ static int load_superblock(struct mount *mp)
 		release_block(buf, 0);
 	}
 
+	// TODO run some integrity checks on the groups
+	//		- check that the superblock free counts match the sum of all the group free counts
+	//		- count the bits in the bitmaps and check that they match the descriptor counts
+
 	// TODO this should actually modify the state value stored in the superblock and write it?
 	return 0;
 
@@ -172,10 +176,54 @@ static void free_superblock(struct ext2_super *super)
 	kmfree(super);
 }
 
-struct inode_location {
-	ext2_block_t block;
-	int offset;
-};
+void sync_superblock(struct mount *mp)
+{
+	struct buf *buf = NULL;
+	//struct ext2_superblock super_on_disk;
+	const struct ext2_super *const super = EXT2_SUPER(mp->super);
+
+	// TODO write the superblock back to disk
+	//memcpy(&super_on_disk, &super->super, sizeof(struct ext2_superblock));
+	//superblock_from_le(&super_on_disk);
+	buf = get_block(&mp->bufcache, 0);
+	if (!buf) {
+		// TODO what do if error?
+		return;
+	}
+	struct ext2_superblock *const super_on_disk = (struct ext2_superblock *) &((char *) buf->block)[EXT2_FIRST_SUPERBLOCK_BYTE_OFFSET];
+	super_on_disk->total_unalloc_blocks = htole32(super->super.total_unalloc_blocks);
+	super_on_disk->total_unalloc_inodes = htole32(super->super.total_unalloc_inodes);
+
+	struct ext2_group_descriptor *group_on_disk;
+	size_t offset = mp->block_size; // force an update on the first iteration
+	ext2_block_t descriptor_block_num = super->super.superblock_block; // start at the superblock, since it will be incremented on the first iteration
+	for (int group = 0; group < super->num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
+		if (offset >= mp->block_size) {
+			if (buf) {
+				release_block(buf, 0);
+			}
+
+			offset = 0;
+			descriptor_block_num += 1;
+			buf = get_block(&mp->bufcache, descriptor_block_num);
+			if (!buf) {
+				// TODO what do if error?
+				return;
+			}
+		}
+
+		group_on_disk = (struct ext2_group_descriptor *) &((char *) buf->block)[offset];
+		group_on_disk->block_bitmap = htole32(super->groups[group].block_bitmap);
+		group_on_disk->inode_bitmap = htole32(super->groups[group].inode_bitmap);
+		group_on_disk->inode_table = htole32(super->groups[group].inode_table);
+		group_on_disk->free_block_count = htole16(super->groups[group].free_block_count);
+		group_on_disk->free_inode_count = htole16(super->groups[group].free_inode_count);
+		group_on_disk->used_dirs_count = htole16(super->groups[group].used_dirs_count);
+	}
+	if (buf) {
+		release_block(buf, 0);
+	}
+}
 
 #endif
 

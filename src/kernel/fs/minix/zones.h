@@ -34,7 +34,7 @@ static zone_t minix_alloc_zone(struct mount *mp)
 		return NULL;
 
 	memset(buf->block, 0, MINIX_V1_ZONE_SIZE);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	return bit;
 }

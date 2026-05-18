@@ -43,7 +43,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	if (S_ISCHR(mode))
 		inode_table[inode_offset].zones[0] = htole16(rdev);
 
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 
 	return inode_num;
 }
@@ -113,7 +113,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 		inode_table[inode_offset].zones[j] = MINIX_DATA(vnode).zones[j];
 
 	vnode->bits &= ~VBF_DIRTY;
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 	return 0;
 }
 

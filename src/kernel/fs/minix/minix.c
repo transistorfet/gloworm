@@ -124,7 +124,7 @@ int minix_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t u
 	}
 
 	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	// TODO need to adjust the size of the directory size
 
@@ -154,7 +154,7 @@ int minix_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t
 	}
 
 	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
@@ -193,7 +193,7 @@ int minix_link(struct vnode *oldvnode, struct vnode *newparent, const char *file
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole16((minix_v1_inode_t) oldvnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
 	return 0;
@@ -212,7 +212,7 @@ int minix_unlink(struct vnode *parent, struct vnode *vnode, const char *filename
 		return ENOENT;
 
 	dir->inode = htole16(0);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	vnode->nlinks -= 1;
 	if (vnode->nlinks <= 0) {
@@ -248,8 +248,8 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 
 	newdir->inode = htole16((minix_v1_inode_t) vnode->ino);
 	olddir->inode = htole16(0);
-	release_block(newbuf, BCF_DIRTY);
-	release_block(oldbuf, BCF_DIRTY);
+	release_block(newbuf, BF_DIRTY);
+	release_block(oldbuf, BF_DIRTY);
 	vfs_update_time(oldparent, MTIME);
 	vfs_update_time(newparent, MTIME);
 	return 0;
@@ -374,7 +374,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 			zlen = nbytes;
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, BCF_DIRTY);
+		release_block(buf, BF_DIRTY);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -465,7 +465,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 	dir->d_ino = le16toh(entries[zpos].inode);
 	strncpy(dir->d_name, entries[zpos].filename, max);
 	dir->d_name[max - 1] = '\0';
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	return 1;
 }

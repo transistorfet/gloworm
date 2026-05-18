@@ -38,7 +38,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	current_entry->name_len = 2;
 	memcpy(EXT2_DIRENT_FILENAME(current_entry), "..", current_entry->name_len);
 
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	EXT2_DATA(vnode).blocks[0] = htole32(block);
 	// Set the initial directory size, which is always one whole block
@@ -163,6 +163,48 @@ static struct ext2_dirent *dir_alloc_entry(struct vnode *vnode, const char *file
 	dir->name_len = filename_len;
 
 	return dir;
+}
+
+static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char *filename)
+{
+	char *data;
+	block_t block;
+	struct buf *buf;
+	struct ext2_dirent *cur, *prev;
+	const int block_size = parent->mp->block_size;
+	const uint8_t filename_len = strlen(filename);
+
+	for (block_t znum = 0; (block = block_lookup(parent, znum, EXT2_AF_LOOKUP_BLOCK)) != 0; znum++) {
+		buf = get_block(&parent->mp->bufcache, block);
+		if (!buf)
+			return ENOENT;
+		data = buf->block;
+		prev = NULL;
+		for (int i = 0; i < block_size; i += le16toh(cur->entry_len)) {
+			cur = (struct ext2_dirent *) &data[i];
+			if (cur->inode && filename_len == cur->name_len && !memcmp(filename, EXT2_DIRENT_FILENAME(cur), cur->name_len)) {
+				cur->inode = 0;
+				if (prev) {
+					// If there's a previous entry, merge the deleted entry into that one
+					prev->entry_len += cur->entry_len;
+				} else if (i + cur->entry_len == block_size && vnode->size == (znum + 1) * block_size) {
+					// If it's both the first entry in the block, and the last block in the file, then delete the block
+					// TODO how do you actually truncate that block?
+					vnode->size = znum;
+					mark_vnode_dirty(vnode);
+				} else {
+					// If it's the first entry in the block, but there are other entries after it
+					// TODO then what?  Do I have to move the previous entry?
+				}
+
+				release_block(buf, BF_DIRTY);
+				return 0;
+			}
+			prev = cur;
+		}
+		release_block(buf, 0);
+	}
+	return ENOENT;
 }
 
 #endif

@@ -86,7 +86,7 @@ int release_block(struct buf *buf, short dirty)
 
 void mark_block_dirty(struct buf *buf)
 {
-	buf->flags |= BCF_DIRTY;
+	buf->flags |= BF_DIRTY;
 }
 
 static struct buf *_load_block(struct bufcache *cache, block_t num)
@@ -182,19 +182,22 @@ static inline int _write_entry(struct bufcache *cache, struct buf *entry)
 	struct kvec kvec;
 	struct iovec_iter iter;
 
-	if (!(entry->flags & BCF_DIRTY)) {
+	if (!(entry->flags & BF_DIRTY)) {
 		return 0;
 	}
+
+	if (cache->flags & BC_GF_DBG_NOWRITE) {
+		log_warning("bufcache: would have written dev %x block %d\n", cache->dev, entry->num);
+		return 0;
+	}
+
 	//printk("WRITING %x: %x <- %x x %x\n", entry->dev, (entry->num * cache->block_size), entry->block, cache->block_size);
 	iovec_iter_init_simple_kvec(&iter, &kvec, entry->block, cache->block_size);
-	/*
-	// TODO disable writing
 	int size = dev_write(cache->dev, (entry->num * cache->block_size), &iter);
 	if (size != cache->block_size) {
 		return -1;
 	}
-	*/
-	entry->flags &= ~BCF_DIRTY;
+	entry->flags &= ~BF_DIRTY;
 	return 1;
 }
 

@@ -51,7 +51,7 @@ static block_t ext2_alloc_block(struct mount *mp)
 		return NULL;
 
 	memset(buf->block, 0, block_size);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	return bit;
 }

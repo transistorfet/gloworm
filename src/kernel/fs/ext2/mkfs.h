@@ -44,7 +44,7 @@ static int ext2_mkfs(device_t dev)
 	super->magic = htole16(super_cached.magic);
 	super->state = htole16(super_cached.state);
 
-	release_block(super_buf, BCF_DIRTY);
+	release_block(super_buf, BF_DIRTY);
 
 	super = &super_cached;
 
@@ -58,7 +58,7 @@ static int ext2_mkfs(device_t dev)
 		if (!inode_buf)
 			return ENOMEM;
 		memset(inode_buf->block, 0x00, EXT2_BLOCK_SIZE);
-		release_block(inode_buf, BCF_DIRTY);
+		release_block(inode_buf, BF_DIRTY);
 	}
 
 	inode_t root_ino = 1;
@@ -76,7 +76,7 @@ static int ext2_mkfs(device_t dev)
 	inode_table[0].size = htole32(0);
 	inode_table[0].nlinks = htole16(1);
 	inode_table[0].blocks[0] = htole16(dir_block);
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 
 	// Initialize root directory
 	struct buf *dir_buf = get_block(&bufcache, dir_block);
@@ -90,7 +90,7 @@ static int ext2_mkfs(device_t dev)
 	entries[1].inode = htole32((ext2_inode_t) root_ino);
 	strcpy(entries[1].filename, "..");
 
-	release_block(dir_buf, BCF_DIRTY);
+	release_block(dir_buf, BF_DIRTY);
 
 	//sync_bufcache(&bufcache);
 	free_bufcache(&bufcache);

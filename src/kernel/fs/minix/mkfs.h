@@ -45,7 +45,7 @@ static int minix_mkfs(device_t dev)
 	super_v1->magic = htole16(super_v1_cached.magic);
 	super_v1->state = htole16(super_v1_cached.state);
 
-	release_block(super_buf, BCF_DIRTY);
+	release_block(super_buf, BF_DIRTY);
 
 	super_v1 = &super_v1_cached;
 
@@ -59,7 +59,7 @@ static int minix_mkfs(device_t dev)
 		if (!inode_buf)
 			return ENOMEM;
 		memset(inode_buf->block, 0x00, MINIX_V1_ZONE_SIZE);
-		release_block(inode_buf, BCF_DIRTY);
+		release_block(inode_buf, BF_DIRTY);
 	}
 
 	inode_t root_ino = 1;
@@ -77,8 +77,7 @@ static int minix_mkfs(device_t dev)
 	inode_table[0].size = htole32(0);
 	inode_table[0].nlinks = htole16(1);
 	inode_table[0].zones[0] = htole16(dir_zone);
-
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 
 	// Initialize root directory
 	struct buf *dir_buf = get_block(&bufcache, dir_zone);
@@ -92,7 +91,7 @@ static int minix_mkfs(device_t dev)
 	entries[1].inode = htole16((minix_v1_inode_t) root_ino);
 	strcpy(entries[1].filename, "..");
 
-	release_block(dir_buf, BCF_DIRTY);
+	release_block(dir_buf, BF_DIRTY);
 
 	sync_bufcache(&bufcache);
 	free_bufcache(&bufcache);
