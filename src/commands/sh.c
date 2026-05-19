@@ -502,7 +502,7 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 		}
 
 		if (main_func) {
-			status = (main)(argc, argv, envp);
+			status = (main_func)(argc, argv, envp);
 			exit(status);
 		} else {
 			status = execve(argv[0], argv, envp);
