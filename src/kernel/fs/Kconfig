@@ -9,17 +9,24 @@ config MSDOS_PARTITION
 	  will be reserved
 
 config MINIX_FS
-	bool "Minix file system"
+	bool "Minix file system support"
 	default y
 	help
 	  This enables the minix file system support.  Only v1 is supported
 
 config EXT2_FS
-	bool "ext2 file system"
+	bool "Ext2 file system support"
 	default n
 	help
 	  This enables the ext2 file system support.  Only ext2 is supported at
-	  this time, and not ext3 or ext4.
+	  this time (not ext3 or ext4).
+
+config NAME_MAX
+	int "maximum filename length"
+	default 256
+	help
+	  The maximum number of characters in a single filename or path
+	  segment.  This is used throughout the virtual file system
 
 config PATH_MAX
 	int "maximum path length"

@@ -2,8 +2,10 @@
 #ifndef _LIMITS_H
 #define _LIMITS_H
 
-#define NAME_MAX	14
-#define PATH_MAX	256
+#include <kconfig.h>
+
+#define NAME_MAX	CONFIG_NAME_MAX
+#define PATH_MAX	CONFIG_PATH_MAX
 
 #endif
 

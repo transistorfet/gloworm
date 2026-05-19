@@ -2,12 +2,19 @@
 #ifndef _SRC_KERNEL_FS_EXT2_EXT2_H
 #define _SRC_KERNEL_FS_EXT2_EXT2_H
 
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/utils/queue.h>
 
 #include "ext2structs.h"
+
+#if NAME_MAX < EXT2_MAX_FILENAME
+#define EXT2_GLOBAL_NAME_MAX	NAME_MAX
+#else
+#define EXT2_GLOBAL_NAME_MAX	EXT2_MAX_FILENAME
+#endif
 
 #define EXT2_SUPER(super)	((struct ext2_super *) (super))
 #define EXT2_BLOCK(block)	((struct ext2_block *) (block))

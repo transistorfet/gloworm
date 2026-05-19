@@ -183,7 +183,7 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 	int i = 0, j;
 	struct mount *mp;
 	struct vnode *cur;
-	char component[VFS_FILENAME_MAX];
+	char component[NAME_MAX];
 
 	if (!result)
 		return EINVAL;
@@ -223,13 +223,13 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 			return EPERM;
 		}
 
-		for (j = 0; j < VFS_FILENAME_MAX - 1 && path[i] && path[i] != VFS_SEP; i++, j++)
+		for (j = 0; j < NAME_MAX - 1 && path[i] && path[i] != VFS_SEP; i++, j++)
 			component[j] = path[i];
 		if (path[i] == VFS_SEP)
 			i += 1;
 		component[j] = '\0';
 
-		if (j >= VFS_FILENAME_MAX) {
+		if (j >= NAME_MAX) {
 			vfs_release_vnode(cur);
 			return ENAMETOOLONG;
 		}

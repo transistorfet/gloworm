@@ -33,7 +33,6 @@
 #endif
 
 #define VFS_SEP			'/'
-#define VFS_FILENAME_MAX	14
 
 // Mount bitflags
 #define VFS_MBF_READ_ONLY	0x0001

@@ -485,10 +485,8 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 	file->position = znum << EXT2_LOG_BLOCK_SIZE(block_size) | zpos;
 
 	max = current_entry->name_len;
-	if ((int) current_entry->name_len > EXT2_MAX_FILENAME)
-		max = EXT2_MAX_FILENAME;
-	if ((int) current_entry->name_len > VFS_FILENAME_MAX)
-		max = VFS_FILENAME_MAX;
+	if ((int) current_entry->name_len > EXT2_GLOBAL_NAME_MAX)
+		max = EXT2_GLOBAL_NAME_MAX;
 
 	dir->d_ino = le32toh(current_entry->inode);
 	memcpy(dir->d_name, EXT2_DIRENT_FILENAME(current_entry), max);

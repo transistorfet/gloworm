@@ -460,7 +460,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 
 	file->position = ((znum << MINIX_V1_LOG_DIRENTS_PER_ZONE) | zpos) + 1;
 
-	max = MINIX_V1_MAX_FILENAME < VFS_FILENAME_MAX ? MINIX_V1_MAX_FILENAME : VFS_FILENAME_MAX;
+	max = MINIX_V1_MAX_FILENAME;
 
 	dir->d_ino = le16toh(entries[zpos].inode);
 	strncpy(dir->d_name, entries[zpos].filename, max);

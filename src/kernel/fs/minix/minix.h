@@ -2,12 +2,17 @@
 #ifndef _SRC_KERNEL_FS_MINIX_MINIX_H
 #define _SRC_KERNEL_FS_MINIX_MINIX_H
 
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/utils/queue.h>
 
 #include "minix-v1.h"
+
+#if NAME_MAX < MINIX_V1_MAX_FILENAME
+#error "minixfs requires a maximum filename of at least 14 characters"
+#endif
 
 #define MINIX_SUPERBLOCK_SIZE	512
 

@@ -1,10 +1,13 @@
 
+* should you store the log blocksize as well, inside the super?  looks like you convert the block size to log block size often
+* fix syncing of ext2 so that it can be read by linux (currently an error with block count)
+* make pretty printing of device names based on the device number, and a driver name
+* add a filesystem name to filesystems for logging
+
+* bug where, when a file already exists, and you use truncate ">" in the shell, it drops the first letter for some reason (might also be quote parsing in echo)
+* typing "ls .." from / caused a segfault on addr=27ED0208
 * ran into a bug when piping text into a lot of files, where it ran out of open files, so they're not being closed for some reason, and it seems to be common between fs'
 * I need like an lsof command to list at least open files for the current process? or add it to procfs?
-
-* typing "ls .." from / caused a segfault on addr=27ED0208
-* should you store the log blocksize as well, inside the super?  looks like you convert the block size to log block size often
-* replace VFS_FILENAME_MAX?
 
 * normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 
