@@ -35,8 +35,7 @@ static void sync_vnodes(void)
 	for (struct queue_node *cur = cache.head; cur; cur = cur->next) {
 		vnode = EXT2_QUEUE_NODE_TO_VNODE(cur);
 		if (vnode->bits & VBF_DIRTY) {
-			// TODO uncomment when working
-			//write_inode(vnode, vnode->ino);
+			write_inode(vnode, vnode->ino);
 		}
 	}
 }
@@ -104,7 +103,7 @@ static struct vnode *alloc_vnode(struct mount *mp, mode_t mode, uid_t uid, gid_t
 
 	vnode = load_vnode(mp, ino);
 	if (!vnode) {
-		free_inode(mp, ino);;
+		free_inode(vnode, ino);
 		return NULL;
 	}
 
@@ -119,7 +118,7 @@ static void mark_vnode_dirty(struct vnode *vnode)
 
 static int delete_vnode(struct vnode *vnode)
 {
-	free_inode(vnode->mp, vnode->ino);
+	free_inode(vnode, vnode->ino);
 	vnode->ino = 0;
 	return 0;
 }

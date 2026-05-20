@@ -71,6 +71,8 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 		return ENOSPC;
 	super->groups[group].free_inode_count -= 1;
 	super->super.total_unalloc_inodes -= 1;
+	if (S_ISDIR(mode))
+		super->groups[group].used_dirs_count += 1;
 	const ext2_inode_t inodenum = (super->super.inodes_per_group * group) + group_inode_num + 1;
 
 	const block_t block_offset = group_inode_num >> super->log_inodes_per_block;
@@ -86,27 +88,31 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	inode->gid = (uint8_t) gid;
 	inode->nlinks = (uint8_t) 1;
 	inode->mtime = htole32(get_system_time());
-	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++)
+	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++) {
 		inode->blocks[j] = NULL;
-	if (S_ISCHR(mode))
+	}
+	if (S_ISCHR(mode)) {
 		inode->blocks[0] = htole16(rdev);
+	}
 
 	release_block(inode_buf, BF_DIRTY);
 
 	return inodenum;
 }
 
-static int free_inode(struct mount *mp, inode_t ino)
+static int free_inode(struct vnode *vnode, inode_t ino)
 {
 	int error;
 
-	const int group = get_inode_group(mp, ino);
-	struct ext2_super * const super = EXT2_SUPER(mp->super);
-	error = bit_free(&mp->bufcache, super->groups[group].inode_bitmap, ino);
+	const int group = get_inode_group(vnode->mp, ino);
+	struct ext2_super * const super = EXT2_SUPER(vnode->mp->super);
+	error = bit_free(&vnode->mp->bufcache, super->groups[group].inode_bitmap, ino);
 	if (error < 0)
 		return error;
 	super->groups[group].free_inode_count += 1;
 	super->super.total_unalloc_inodes += 1;
+	if (S_ISDIR(vnode->mode))
+		super->groups[group].used_dirs_count -= 1;
 	return 0;
 }
 
@@ -155,6 +161,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	inode->mode = htole16(vnode->mode);
 	inode->uid = htole16(vnode->uid);
 	inode->size = htole32(vnode->size);
+	inode->nblocks = htole16((vnode->size >> EXT2_LOG_BLOCK_SIZE(vnode->mp->block_size)) + (vnode->size & (vnode->mp->block_size - 1) ? 1 : 0));
 	inode->atime = htole32(vnode->atime);
 	inode->mtime = htole32(vnode->mtime);
 	inode->ctime = htole32(vnode->ctime);

@@ -44,16 +44,16 @@ static block_t ext2_alloc_block(struct mount *mp)
 	super->groups[group].free_block_count -= 1;
 	super->super.total_unalloc_blocks -= 1;
 
-	bit = (super->super.inodes_per_group * group) + bit;
+	const ext2_block_t blocknum = (super->super.inodes_per_group * group) + bit;
 
-	buf = get_block(&mp->bufcache, bit);
+	buf = get_block(&mp->bufcache, blocknum);
 	if (!buf)
 		return NULL;
 
 	memset(buf->block, 0, block_size);
 	release_block(buf, BF_DIRTY);
 
-	return bit;
+	return blocknum;
 }
 
 static void ext2_free_block(struct mount *mp, block_t blocknum)
@@ -173,7 +173,7 @@ static void block_free_table(struct mount *mp, ext2_block_t blocknum, uint8_t le
 		}
 	}
 
-	release_block(buf, 0);
+	release_block(buf, BF_DIRTY);
 
 	ext2_free_block(mp, blocknum);
 

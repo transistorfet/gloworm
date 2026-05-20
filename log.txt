@@ -5940,3 +5940,9 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   it was because block group 0's bitmap blocks free didn't match the the group descriptor's free block count
 - I should probably add some integrity checks like that to my impl, but mounting ro is probably the most important
 
+- I got really defeated when I updated the flash card and had strange behaviour where running a command would just reenter the
+  shell, printing the pseudoshell message. It also printed error no such file ""Running /etc/rc" which was espocially weird. It
+  turns out I had changed the 'main' variable in sh to 'main_func' to fix a warning about shadowing variables, but forgot to change
+  the actual function call, so when running a builtin command, it was jumping to main, but disk commands worked. This bug had been
+  around since April 29th, but i haven't updated the image since then =(
+

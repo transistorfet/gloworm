@@ -611,10 +611,6 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 	if (error)
 		return error;
 
-	if ((vnode->mp->bits & VFS_MBF_READ_ONLY) && ((flags & O_ACCMODE) != O_RDONLY || (flags & O_CREAT))) {
-		return EROFS;
-	}
-
 	if (flags & O_CREAT) {
 		const char *filename = path_last_component(path);
 		if (!path_valid_component(filename)) {
@@ -624,6 +620,10 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 
 		// Lookup the last path component, or create a new file if an error occurs during lookup
 		if (vnode->ops->lookup(vnode, filename, &vnode)) {
+			if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+				return EROFS;
+			}
+
 			// Verify that parent directory is writable
 			if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 				vfs_release_vnode(vnode);
@@ -690,6 +690,8 @@ int vfs_read(struct vfile *file, struct iovec_iter *iter)
 
 int vfs_write(struct vfile *file, struct iovec_iter *iter)
 {
+	if ((file->vnode->mp->bits & VFS_MBF_READ_ONLY) && (S_ISREG(file->vnode->mode) || S_ISDIR(file->vnode->mode)))
+		return EROFS;
 	if ((file->flags & O_ACCMODE) == O_RDONLY)
 		return EACCES;
 	return file->ops->write(file, iter);

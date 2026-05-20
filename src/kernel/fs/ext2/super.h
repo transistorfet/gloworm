@@ -120,7 +120,6 @@ static int load_superblock(struct mount *mp)
 	mp->block_size = 1024 << super->super.log_block_size;
 	init_bufcache(&mp->bufcache, mp->dev, mp->block_size);
 
-	super->log_block_size = __builtin_ctz(mp->block_size);
 	super->log_inode_size = __builtin_ctz(super->super.major_version >= 1 ? super->super.extended.inode_size : 128);
 	super->log_inodes_per_block = __builtin_ctz(mp->block_size >> super->log_inode_size);
 	super->log_inodes_per_group = __builtin_ctz(super->super.inodes_per_group);
@@ -200,7 +199,7 @@ void sync_superblock(struct mount *mp)
 	for (int group = 0; group < super->num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
 		if (offset >= mp->block_size) {
 			if (buf) {
-				release_block(buf, 0);
+				release_block(buf, BF_DIRTY);
 			}
 
 			offset = 0;
@@ -221,7 +220,7 @@ void sync_superblock(struct mount *mp)
 		group_on_disk->used_dirs_count = htole16(super->groups[group].used_dirs_count);
 	}
 	if (buf) {
-		release_block(buf, 0);
+		release_block(buf, BF_DIRTY);
 	}
 }
 

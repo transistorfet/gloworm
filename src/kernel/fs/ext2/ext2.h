@@ -35,7 +35,6 @@ struct ext2_block_group {
 };
 
 struct ext2_super {
-	size_t log_block_size;
 	size_t log_inode_size;
 	size_t log_inodes_per_block;
 	size_t log_inodes_per_group;
