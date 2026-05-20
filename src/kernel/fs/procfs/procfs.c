@@ -46,6 +46,7 @@ struct vnode_ops procfs_vnode_ops = {
 struct mount_ops procfs_mount_ops = {
 	"procfs",
 	procfs_init,
+	procfs_mkfs,
 	procfs_mount,
 	procfs_unmount,
 	nop_sync,
@@ -93,6 +94,15 @@ int procfs_init(void)
 		vnode_table[i].vn.refcount = 0;
 	}
 	return 0;
+}
+
+int procfs_mkfs(device_t dev)
+{
+	if (dev == 1) {
+		return 0;
+	} else {
+		return EINVAL;
+	}
 }
 
 int procfs_mount(struct mount *mp, struct vnode *parent)

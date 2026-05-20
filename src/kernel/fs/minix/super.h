@@ -53,13 +53,9 @@ static int load_superblock(struct mount *mp)
 		return error;
 	super_v1 = (struct minix_v1_superblock *) super_buf;
 
-	// TODO this is a temporary hack for cold starting a ram disk
 	if (le16toh(super_v1->magic) != 0x137F) {
-		log_notice("minixfs: initializing root disk\n");
-		error = minix_mkfs(mp->dev);
-		if (error < 0) {
-			return EINVAL;
-		}
+		log_error("%s: error reading magic, expected %x but got %x\n", mp->ops->fstype, 0x137F, le16toh(super_v1->magic));
+		return EINVAL;
 	}
 
 	super = kmalloc(sizeof(struct minix_super));

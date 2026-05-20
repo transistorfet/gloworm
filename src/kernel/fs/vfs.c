@@ -64,6 +64,8 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 	int error;
 	struct vnode *vnode;
 
+	log_info("%s: mounting (%x) at %s\n", ops->fstype, dev, path);
+
 	if (uid != SU_UID)
 		return EPERM;
 

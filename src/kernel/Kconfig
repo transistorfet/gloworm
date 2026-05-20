@@ -38,6 +38,14 @@ config SHELL_IN_KERNEL
 	  running the monitor from ROM, when no secondary storage is available
 	  or when it's not working correctly.
 
+config BOOTSTRAP_DISK
+	bool "Initialize the root disk if no filesystem detected"
+	depends on SHELL_IN_KERNEL
+	help
+	  This will attempt to bootstrap the root device, using mkfs.  It will
+	  then create the necessary device files and directories.  In order for
+	  this to work, the shell must be compiled into the kernel.
+
 choice
 	prompt "Log level"
 	default LOG_LEVEL_INFO

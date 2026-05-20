@@ -8,6 +8,7 @@
 
 static int ext2_mkfs(device_t dev)
 {
+/*
 	struct buf *super_buf;
 	struct bufcache bufcache;
 	struct ext2_superblock *super;
@@ -94,7 +95,7 @@ static int ext2_mkfs(device_t dev)
 
 	//sync_bufcache(&bufcache);
 	free_bufcache(&bufcache);
-
+*/
 	return 0;
 }
 

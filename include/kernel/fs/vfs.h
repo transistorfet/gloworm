@@ -59,7 +59,8 @@ struct iovec_iter;
 
 struct mount_ops {
 	char *fstype;								// Filesystem Type Name (used by mount syscall)
-	int (*init)();								// Initialize the filesystem at boot
+	int (*init)();								// Initialize the filesystem type at boot
+	int (*mkfs)(device_t dev);						// Create a new filesystem on the given device
 	int (*mount)(struct mount *mp, struct vnode *parent);			// Mount the filesystem using the pre-allocated struct mount
 	int (*unmount)(struct mount *mp);					// Unmount the filesystem
 	int (*sync)(struct mount *mp);						// Sync data to disk

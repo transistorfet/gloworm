@@ -21,6 +21,7 @@
 #include "blocks.h"
 #include "super.h"
 #include "dir.h"
+#include "mkfs.h"
 
 
 struct vfile_ops ext2_vfile_ops = {
@@ -50,6 +51,7 @@ struct vnode_ops ext2_vnode_ops = {
 struct mount_ops ext2_mount_ops = {
 	"ext2fs",
 	ext2_init,
+	ext2_mkfs,
 	ext2_mount,
 	ext2_unmount,
 	ext2_sync,
@@ -119,14 +121,12 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 	}
 
 	if (S_ISDIR(mode)) {
-		dir->filetype = EXT2_FT_DIR;
 		if (!dir_setup(newnode, vnode)) {
 			goto fail;
 		}
-	} else {
-		dir->filetype = EXT2_FT_REG_FILE;
 	}
 
+	dir_set_filetype(dir, vnode->mode);
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
 
 	release_block(buf, BF_DIRTY);
@@ -164,8 +164,8 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 	}
 
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
-	// TODO need a way to distinguish between block and character devices
-	dir->filetype = EXT2_FT_CHRDEV;
+	dir_set_filetype(dir, vnode->mode);
+
 	release_block(buf, BF_DIRTY);
 
 	*result = newnode;

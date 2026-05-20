@@ -89,14 +89,9 @@ static int load_superblock(struct mount *mp)
 		return error;
 	super_on_disk = (struct ext2_superblock *) super_buf;
 
-	// TODO this is a temporary hack for cold starting a ram disk
 	if (le16toh(super_on_disk->magic) != EXT2_MAGIC) {
-		log_error("ext2fs: error reading magic, expected %x but got %x\n", EXT2_MAGIC, le16toh(super_on_disk->magic));
+		log_error("%s: error reading magic, expected %x but got %x\n", mp->ops->fstype, EXT2_MAGIC, le16toh(super_on_disk->magic));
 		return EINVAL;
-		//log_notice("ext2fs: initializing root disk\n");
-		//if (ext2_mkfs(mp->dev)) {
-		//	return EINVAL;
-		//}
 	}
 
 	num_groups = le32toh(super_on_disk->total_blocks) / le32toh(super_on_disk->blocks_per_group);
@@ -107,12 +102,12 @@ static int load_superblock(struct mount *mp)
 	super->groups = (struct ext2_block_group *) (super + 1);	// the area just after the superblock, allocated along with it
 
 	if (1024 << super->super.log_block_size != 1024 << super->super.log_fragment_size) {
-		log_error("ext2: block size and fragment size don't match");
+		log_error("%s: block size and fragment size don't match", mp->ops->fstype);
 		goto fail;
 	}
 
 	if ((super->super.extended.incompat_features & ~EXT2_INCOMPAT_SUPPORTED) != 0) {
-		log_error("ext2: this filesystem has incompatible features than aren't supported: %x", super->super.extended.incompat_features & ~EXT2_INCOMPAT_SUPPORTED);
+		log_error("%s: this filesystem has incompatible features than aren't supported: %x", mp->ops->fstype, super->super.extended.incompat_features & ~EXT2_INCOMPAT_SUPPORTED);
 		goto fail;
 	}
 

@@ -10,6 +10,25 @@
 #include "blocks.h"
 
 
+void dir_set_filetype(struct ext2_dirent *dir, short mode)
+{
+	if (S_ISREG(mode)) {
+		dir->filetype = EXT2_FT_REG_FILE;
+	} else if (S_ISDIR(mode)) {
+		dir->filetype = EXT2_FT_DIR;
+	} else if (S_ISCHR(mode)) {
+		dir->filetype = EXT2_FT_CHRDEV;
+	} else if (S_ISBLK(mode)) {
+		dir->filetype = EXT2_FT_BLKDEV;
+	} else if (S_ISFIFO(mode)) {
+		dir->filetype = EXT2_FT_FIFO;
+	} else if (S_ISSOCK(mode)) {
+		dir->filetype = EXT2_FT_SOCK;
+	} else {
+		dir->filetype = EXT2_FT_UNKNOWN;
+	}
+}
+
 static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 {
 	char *data;
