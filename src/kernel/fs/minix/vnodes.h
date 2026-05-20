@@ -34,8 +34,9 @@ static void sync_vnodes(void)
 
 	for (struct queue_node *cur = cache.head; cur; cur = cur->next) {
 		vnode = MINIX_QUEUE_NODE_TO_VNODE(cur);
-		if (vnode->bits & VBF_DIRTY)
+		if (vnode->bits & VBF_DIRTY) {
 			write_inode(vnode, vnode->ino);
+		}
 	}
 }
 
@@ -56,8 +57,9 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 	_queue_insert(&cache, &MINIX_DATA(vnode).node);
 
 	vfs_init_vnode(vnode, &minix_vnode_ops, mp, 0, 1, 0, 0, 0, ino, 0, 0, 0, 0);
-	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++)
+	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++) {
 		MINIX_DATA(vnode).zones[j] = NULL;
+	}
 
 	error = read_inode(vnode, ino);
 	if (error) {
@@ -124,8 +126,9 @@ static int delete_vnode(struct vnode *vnode)
 
 static int release_vnode(struct vnode *vnode)
 {
-	if (vnode->ino && vnode->bits & VBF_DIRTY)
+	if (vnode->ino && vnode->bits & VBF_DIRTY) {
 		write_inode(vnode, vnode->ino);
+	}
 	_queue_remove(&cache, &MINIX_DATA(vnode).node);
 	kmfree(vnode);
 	nodes_in_cache -= 1;

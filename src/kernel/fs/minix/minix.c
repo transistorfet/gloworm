@@ -323,8 +323,9 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 			break;
 
 		zlen = MINIX_V1_ZONE_SIZE - zpos;
-		if (zlen > nbytes)
+		if (zlen > nbytes) {
 			zlen = nbytes;
+		}
 
 		memcpy_into_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		release_block(buf, 0);
@@ -370,8 +371,9 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 		}
 
 		zlen = MINIX_V1_ZONE_SIZE - zpos;
-		if (zlen > nbytes)
+		if (zlen > nbytes) {
 			zlen = nbytes;
+		}
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		release_block(buf, BF_DIRTY);
@@ -417,8 +419,9 @@ offset_t minix_seek(struct vfile *file, offset_t position, int whence)
 	}
 
 	// TODO this is a hack for now so I don't have to deal with gaps in files
-	if (position > file->vnode->size)
+	if (position > file->vnode->size) {
 		position = file->vnode->size;
+	}
 
 	file->position = position;
 	return file->position;

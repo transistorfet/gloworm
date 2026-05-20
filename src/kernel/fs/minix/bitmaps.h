@@ -7,22 +7,14 @@
 
 #include "minix.h"
 
-/*
-struct bitmap {
-	device_t dev;
-	minix_zone_t start;
-	minix_zone_t end;
-	short words_per_zone;
-};
-*/
-
 typedef int bitnum_t;
 
 static inline char bit_mask(char bits)
 {
 	char byte = 0x00;
-	for (short j = 0; j < bits; j++)
+	for (short j = 0; j < bits; j++) {
 		byte = (byte << 1) | 0x01;
+	}
 	return byte;
 }
 
@@ -42,11 +34,13 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 			int bytes = (num_entries >> 3);
 			char bits = (num_entries & 0x07);
 
-			if (bits)
+			if (bits) {
 				bytes += 1;
+			}
 			memset(block, 0x00, bytes);
-			if (bits)
+			if (bits) {
 				block[bytes - 1] = ~bit_mask(bits);
+			}
 			memset(&block[bytes], 0xFF, MINIX_V1_ZONE_SIZE - bytes);
 			break;
 		} else {
@@ -64,8 +58,9 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 
 	// Reserve entries at the beginning of table
 	short i = 0;
-	for (; i < (reserve >> 3); i++)
+	for (; i < (reserve >> 3); i++) {
 		block[i] = 0xFF;
+	}
 	block[i] = bit_mask(reserve & 0x7);
 
 	release_block(buf, BF_DIRTY);
