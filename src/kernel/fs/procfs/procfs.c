@@ -96,7 +96,7 @@ int procfs_init(void)
 	return 0;
 }
 
-int procfs_mkfs(device_t dev)
+int procfs_mkfs(device_t dev, const struct mkfs_options *opts)
 {
 	if (dev == 1) {
 		return 0;

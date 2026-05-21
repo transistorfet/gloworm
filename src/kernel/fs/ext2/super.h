@@ -20,7 +20,7 @@
 
 #define EXT2_INCOMPAT_SUPPORTED			EXT2_INCOMPAT_FILE_TYPE_IN_DIRS
 
-static inline void superblock_from_le(struct ext2_superblock *super)
+static inline void superblock_to_from_le(struct ext2_superblock *super)
 {
 	super->total_inodes = le32toh(super->total_inodes);
 	super->total_blocks = le32toh(super->total_blocks);
@@ -79,7 +79,6 @@ static inline int read_superblock(device_t dev, char *buffer)
 static int load_superblock(struct mount *mp)
 {
 	int error;
-	int num_groups;
 	struct ext2_super *super = NULL;
 	struct ext2_superblock *super_on_disk;
 	char super_buf[EXT2_SUPERBLOCK_SIZE];
@@ -94,14 +93,15 @@ static int load_superblock(struct mount *mp)
 		return EINVAL;
 	}
 
-	num_groups = le32toh(super_on_disk->total_blocks) / le32toh(super_on_disk->blocks_per_group);
+	const int num_groups = le32toh(super_on_disk->total_blocks) / le32toh(super_on_disk->blocks_per_group);
 
 	super = kmalloc(sizeof(struct ext2_super) + (num_groups * sizeof(struct ext2_block_group)));
-	memcpy(&super->super, super_on_disk, sizeof(struct ext2_superblock));
-	superblock_from_le(&super->super);
 	super->groups = (struct ext2_block_group *) (super + 1);	// the area just after the superblock, allocated along with it
 
-	if (1024 << super->super.log_block_size != 1024 << super->super.log_fragment_size) {
+	memcpy(&super->super, super_on_disk, sizeof(struct ext2_superblock));
+	superblock_to_from_le(&super->super);
+
+	if (super->super.log_block_size != super->super.log_fragment_size) {
 		log_error("%s: block size and fragment size don't match", mp->ops->fstype);
 		goto fail;
 	}
@@ -170,39 +170,39 @@ static void free_superblock(struct ext2_super *super)
 	kmfree(super);
 }
 
-void sync_superblock(struct mount *mp)
+static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 {
 	struct buf *buf = NULL;
-	//struct ext2_superblock super_on_disk;
-	const struct ext2_super *const super = EXT2_SUPER(mp->super);
 
 	// TODO write the superblock back to disk
-	//memcpy(&super_on_disk, &super->super, sizeof(struct ext2_superblock));
-	//superblock_from_le(&super_on_disk);
-	buf = get_block(&mp->bufcache, 0);
+
+	buf = get_block(bufcache, 0);
 	if (!buf) {
 		// TODO what do if error?
-		return;
+		return EIO;
 	}
-	struct ext2_superblock *const super_on_disk = (struct ext2_superblock *) &((char *) buf->block)[EXT2_FIRST_SUPERBLOCK_BYTE_OFFSET];
-	super_on_disk->total_unalloc_blocks = htole32(super->super.total_unalloc_blocks);
-	super_on_disk->total_unalloc_inodes = htole32(super->super.total_unalloc_inodes);
+	struct ext2_superblock *super_on_disk = (struct ext2_superblock *) &((char *) buf->block)[EXT2_FIRST_SUPERBLOCK_BYTE_OFFSET];
+	//super_on_disk->total_unalloc_blocks = htole32(super->super.total_unalloc_blocks);
+	//super_on_disk->total_unalloc_inodes = htole32(super->super.total_unalloc_inodes);
+
+	memcpy(super_on_disk, &super->super, sizeof(struct ext2_superblock));
+	superblock_to_from_le(super_on_disk);
 
 	struct ext2_group_descriptor *group_on_disk;
-	size_t offset = mp->block_size; // force an update on the first iteration
+	size_t offset = bufcache->block_size; // force an update on the first iteration
 	ext2_block_t descriptor_block_num = super->super.superblock_block; // start at the superblock, since it will be incremented on the first iteration
 	for (int group = 0; group < super->num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
-		if (offset >= mp->block_size) {
+		if (offset >= bufcache->block_size) {
 			if (buf) {
 				release_block(buf, BF_DIRTY);
 			}
 
 			offset = 0;
 			descriptor_block_num += 1;
-			buf = get_block(&mp->bufcache, descriptor_block_num);
+			buf = get_block(bufcache, descriptor_block_num);
 			if (!buf) {
 				// TODO what do if error?
-				return;
+				return EIO;
 			}
 		}
 
@@ -217,6 +217,7 @@ void sync_superblock(struct mount *mp)
 	if (buf) {
 		release_block(buf, BF_DIRTY);
 	}
+	return 0;
 }
 
 #endif

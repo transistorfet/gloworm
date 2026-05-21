@@ -95,7 +95,7 @@ int ext2_unmount(struct mount *mp)
 int ext2_sync(struct mount *mp)
 {
 	sync_vnodes();
-	sync_superblock(mp);
+	sync_superblock(&mp->bufcache, EXT2_SUPER(mp->super));
 	sync_bufcache(&mp->bufcache);
 	return 0;
 }

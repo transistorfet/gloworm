@@ -4,27 +4,35 @@
 
 #include <errno.h>
 
-#include "dir.h"
+#include "super.h"
+#include "minix.h"
 
-static int minix_mkfs(device_t dev)
+extern struct mount_ops minix_mount_ops;
+
+static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 {
 	struct buf *super_buf;
 	struct bufcache bufcache;
 	struct minix_v1_superblock *super_v1;
 	struct minix_v1_superblock super_v1_cached;
 
+	if (opts->block_size && opts->block_size != MINIX_V1_ZONE_SIZE) {
+		log_error("%s: block size must be %d\n", minix_mount_ops.fstype, MINIX_V1_ZONE_SIZE);
+		return EINVAL;
+	}
+
 	init_bufcache(&bufcache, dev, MINIX_V1_ZONE_SIZE);
 
 	super_v1 = &super_v1_cached;
 
 	super_v1->num_inodes = 0x40;
-	super_v1->num_zones = 0x64;
+	super_v1->num_zones = opts->blocks;
 	super_v1->imap_blocks = 1;
 	super_v1->zmap_blocks = 1;
 	super_v1->first_zone = 6;
 	super_v1->log_zone_size = MINIX_V1_LOG_ZONE_SIZE - 10;
 	super_v1->max_file_size = 67108864;
-	super_v1->magic = 0x137F;
+	super_v1->magic = MINIX_MAGIC;
 	super_v1->state = 0x0001;
 
 	// Write the superblock

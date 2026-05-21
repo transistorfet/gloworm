@@ -144,9 +144,13 @@ int create_special_or_panic(const char *path, device_t rdev)
 int bootstrap_disk(device_t dev, struct mount_ops *filesystem)
 {
 	int error;
+	const struct mkfs_options opts = {
+		.block_size = 1024,
+		.blocks = 0x64,
+	};
 
 	log_notice("%s: initializing root disk\n", filesystem->fstype);
-	error = (filesystem->mkfs)(dev);
+	error = (filesystem->mkfs)(dev, &opts);
 	if (error < 0) {
 		return error;
 	}
@@ -267,6 +271,7 @@ int main(void)
 	#endif
 
 	create_init_task();
+
 
 	#if defined(CONFIG_EXT2_FS)
 	device_t extra_dev = DEVNUM(DEVMAJOR_ATA, 1);

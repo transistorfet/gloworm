@@ -56,6 +56,10 @@ struct ext2_extended_superblock {
 	uint32_t compat_features;
 	uint32_t incompat_features;
 	uint32_t ro_compat_features;
+	uint8_t uuid[16];
+	uint8_t name[16];
+	uint8_t last_mounted[64];
+	uint32_t algo_bitmap;
 };
 
 struct ext2_superblock {

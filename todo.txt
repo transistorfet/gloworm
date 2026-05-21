@@ -1,19 +1,19 @@
 
+* finish implementing ext2
 * why does procfs use dev=1?  Can I avoid that hack somehow?
-* make pretty printing of device names based on the device number, and a driver name
 
 * bug where, when a file already exists, and you use truncate ">" in the shell, it drops the first letter for some reason (might also be quote parsing in echo)
 * typing "ls .." from / caused a segfault on addr=27ED0208
 * ran into a bug when piping text into a lot of files, where it ran out of open files, so they're not being closed for some reason, and it seems to be common between fs'
-* I need like an lsof command to list at least open files for the current process? or add it to procfs?
 
+* make pretty printing of device names based on the device number, and a driver name
+* should you add a name to the driver struct?
+* I need like an lsof command to list at least open files for the current process? or add it to procfs?
 * normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
-* finish implementing ext2
 
-* should you add a name to the driver struct?
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
 
 * refactor queue and ringbuffer, try not inlining everything to see if significantly reduces the size

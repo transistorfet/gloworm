@@ -10,7 +10,8 @@
 
 #include "minix.h"
 #include "inodes.h"
-#include "mkfs.h"
+
+#define MINIX_MAGIC				0x137F
 
 static inline void superblock_from_le(struct minix_v1_superblock *super_v1)
 {
@@ -53,8 +54,8 @@ static int load_superblock(struct mount *mp)
 		return error;
 	super_v1 = (struct minix_v1_superblock *) super_buf;
 
-	if (le16toh(super_v1->magic) != 0x137F) {
-		log_error("%s: error reading magic, expected %x but got %x\n", mp->ops->fstype, 0x137F, le16toh(super_v1->magic));
+	if (le16toh(super_v1->magic) != MINIX_MAGIC) {
+		log_error("%s: error reading magic, expected %x but got %x\n", mp->ops->fstype, MINIX_MAGIC, le16toh(super_v1->magic));
 		return EINVAL;
 	}
 

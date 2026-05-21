@@ -19,6 +19,7 @@
 #include "zones.h"
 #include "super.h"
 #include "dir.h"
+#include "mkfs.h"
 
 
 struct vfile_ops minix_vfile_ops = {

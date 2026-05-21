@@ -22,7 +22,7 @@ static inline int _write_entry(struct bufcache *cache, struct buf *entry);
 void init_bufcache(struct bufcache *cache, device_t dev, int block_size)
 {
 	cache->dev = dev;
-	cache->flags = 0;
+	cache->flags = BC_GF_DBG_NOWRITE;
 	cache->block_size = block_size;
 	_queue_init(&cache->blocks);
 }
