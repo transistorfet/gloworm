@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <kconfig.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>
@@ -21,7 +22,15 @@
 #include "blocks.h"
 #include "super.h"
 #include "dir.h"
+
+#if defined(CONFIG_EXT2_FS_MKFS)
 #include "mkfs.h"
+#else
+static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
+{
+	return ENOENT;
+}
+#endif
 
 
 struct vfile_ops ext2_vfile_ops = {
@@ -73,7 +82,7 @@ int ext2_mount(struct mount *mp, struct vnode *parent)
 	if (error < 0)
 		return error;
 
-	struct vnode *root = get_vnode(mp, EXT2_ROOT_INODE_NUM);
+	struct vnode *root = get_vnode(mp, EXT2_ROOT_INO);
 	if (!root) {
 		free_superblock((struct ext2_super *) mp->super);
 		return ENOMEM;
@@ -311,8 +320,8 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 
 	short zpos;
 	short zlen;
-	block_t znum;
-	block_t block;
+	ext2_block_t znum;
+	ext2_block_t block;
 	struct buf *buf;
 	size_t nbytes;
 	size_t wbytes = 0;
@@ -359,8 +368,8 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 	short zpos;
 	short zlen;
 	int error = 0;
-	block_t znum;
-	block_t block;
+	ext2_block_t znum;
+	ext2_block_t block;
 	struct buf *buf;
 	size_t nbytes;
 	size_t wbytes = 0;
@@ -444,8 +453,8 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 {
 	int max;
 	short zpos;
-	block_t znum;
-	block_t block;
+	ext2_block_t znum;
+	ext2_block_t block;
 	struct buf *buf;
 	struct ext2_dirent *current_entry;
 	struct vnode *vnode = file->vnode;
@@ -485,8 +494,10 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 	file->position = znum << EXT2_LOG_BLOCK_SIZE(block_size) | zpos;
 
 	max = current_entry->name_len;
-	if ((int) current_entry->name_len > EXT2_GLOBAL_NAME_MAX)
-		max = EXT2_GLOBAL_NAME_MAX;
+	#if NAME_MAX < EXT2_MAX_FILENAME
+	if ((int) current_entry->name_len > NAME_MAX)
+		max = NAME_MAX;
+	#endif
 
 	dir->d_ino = le32toh(current_entry->inode);
 	memcpy(dir->d_name, EXT2_DIRENT_FILENAME(current_entry), max);

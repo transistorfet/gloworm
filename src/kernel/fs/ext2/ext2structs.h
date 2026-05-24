@@ -21,7 +21,6 @@
 
 #define EXT2_FIRST_SUPERBLOCK_BYTE_OFFSET	1024
 #define EXT2_SUPERBLOCK_SIZE			512
-#define EXT2_ROOT_INODE_NUM			2
 
 #define EXT2_NEXT_DIRENT(current)		((struct ext2_dirent *) (((char *) (current)) + le16toh(((struct ext2_dirent *) current)->entry_len)))
 #define EXT2_DIRENT_FILENAME(current)		(((char *) (current)) + sizeof(struct ext2_dirent))
@@ -34,6 +33,13 @@
 #define EXT2_FT_FIFO				5
 #define EXT2_FT_SOCK				6
 #define EXT2_FT_SYMLINK				7
+
+#define EXT2_BAD_INO				1
+#define EXT2_ROOT_INO				2
+#define EXT2_ACL_INDEX_INO			3
+#define EXT2_ACL_DATA_INO			4
+#define EXT2_BOOT_LOADER_INO			5
+#define EXT2_UNDEL_DIR_INO			6
 
 typedef uint32_t ext2_block_t;
 typedef uint32_t ext2_inode_t;

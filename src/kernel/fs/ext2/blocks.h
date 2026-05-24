@@ -19,7 +19,7 @@
 #define EXT2_AF_CREATE_BLOCK		1
 
 
-static block_t ext2_alloc_block(struct mount *mp)
+static ext2_block_t ext2_alloc_block(struct mount *mp)
 {
 	int group;
 	bitnum_t bit;
@@ -56,7 +56,7 @@ static block_t ext2_alloc_block(struct mount *mp)
 	return blocknum;
 }
 
-static void ext2_free_block(struct mount *mp, block_t blocknum)
+static void ext2_free_block(struct mount *mp, ext2_block_t blocknum)
 {
 	struct ext2_super *super = EXT2_SUPER(mp->super);
 	const int group = blocknum >> super->log_blocks_per_group;
@@ -68,7 +68,7 @@ static void ext2_free_block(struct mount *mp, block_t blocknum)
 }
 
 
-static inline char block_calculate_tier(block_t *tiers, block_t znum, int block_size)
+static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, int block_size)
 {
 	if (znum < EXT2_DIRECT_BLOCKNUMS_IN_INODE) {
 		tiers[0] = znum;
@@ -102,13 +102,13 @@ static inline char block_calculate_tier(block_t *tiers, block_t znum, int block_
 	return -1;
 }
 
-static block_t block_lookup(struct vnode *vnode, block_t znum, char create)
+static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char create)
 {
-	block_t ret;
+	ext2_block_t ret;
 	char ntiers;
 	ext2_block_t *block;
 	struct buf *buf = NULL;
-	block_t tiers[EXT2_TIERS];
+	ext2_block_t tiers[EXT2_TIERS];
 	const int block_size = vnode->mp->block_size;
 
 	ntiers = block_calculate_tier(tiers, znum, block_size);
@@ -142,7 +142,7 @@ static block_t block_lookup(struct vnode *vnode, block_t znum, char create)
 		}
 	}
 
-	ret = (block_t) le32toh(*block);
+	ret = (ext2_block_t) le32toh(*block);
 	if (buf)
 		release_block(buf, 0);
 	return ret;

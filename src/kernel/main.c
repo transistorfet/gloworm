@@ -276,6 +276,7 @@ int main(void)
 	#if defined(CONFIG_EXT2_FS)
 	device_t extra_dev = DEVNUM(DEVMAJOR_ATA, 1);
 	const char *extra_mountpoint = "/media";
+
 	error = vfs_mount(NULL, extra_mountpoint, extra_dev, &ext2_mount_ops, 0, SU_UID);
 	if (error < 0)
 		goto fail;

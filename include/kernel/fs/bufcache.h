@@ -19,6 +19,7 @@ struct bufcache {
 	device_t dev;
 	uint16_t flags;
 	int block_size;
+	int num_entries;
 	struct queue blocks;
 };
 

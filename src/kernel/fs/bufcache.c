@@ -22,8 +22,9 @@ static inline int _write_entry(struct bufcache *cache, struct buf *entry);
 void init_bufcache(struct bufcache *cache, device_t dev, int block_size)
 {
 	cache->dev = dev;
-	cache->flags = BC_GF_DBG_NOWRITE;
+	cache->flags = 0;
 	cache->block_size = block_size;
+	cache->num_entries = 0;
 	_queue_init(&cache->blocks);
 }
 
@@ -118,13 +119,12 @@ static struct buf *_load_block(struct bufcache *cache, block_t num)
 
 static inline struct buf *_find_free_entry(struct bufcache *cache)
 {
-	int count = 0;
 	struct buf *last;
 
 	// Recycle the last used entry
-	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node), count++) { }
+	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node)) { }
 
-	if (count < BUFCACHE_MAX) {
+	if (cache->num_entries < BUFCACHE_MAX) {
 		// We haven't reached the limit, so create a new entry instead
 		last = _create_entry(cache);
 		if (!last)
@@ -134,12 +134,12 @@ static inline struct buf *_find_free_entry(struct bufcache *cache)
 		return NULL;
 	}
 
-	_queue_remove(&cache->blocks, &last->node);
-	_queue_insert(&cache->blocks, &last->node);
 	if (last->num != 0 && last->block) {
-		log_warning("recycling cached block %d\n", last->num);
+		log_trace("recycling cached block %d\n", last->num);
 		_write_entry(cache, last);
 	}
+	_queue_remove(&cache->blocks, &last->node);
+	_queue_insert(&cache->blocks, &last->node);
 	return last;
 }
 
@@ -160,6 +160,7 @@ static inline struct buf *_create_entry(struct bufcache *cache)
 	buf->num = 0;
 	buf->block = block;
 	_queue_insert(&cache->blocks, &buf->node);
+	cache->num_entries += 1;
 	return buf;
 }
 

@@ -13,7 +13,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
-	zone = minix_alloc_zone(vnode->mp->super);
+	zone = minix_alloc_zone(vnode->mp);
 	buf = get_block(&vnode->mp->bufcache, zone);
 	if (!buf)
 		return 0;

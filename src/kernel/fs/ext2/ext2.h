@@ -10,12 +10,6 @@
 
 #include "ext2structs.h"
 
-#if NAME_MAX < EXT2_MAX_FILENAME
-#define EXT2_GLOBAL_NAME_MAX	NAME_MAX
-#else
-#define EXT2_GLOBAL_NAME_MAX	EXT2_MAX_FILENAME
-#endif
-
 #define EXT2_SUPER(super)	((struct ext2_super *) (super))
 #define EXT2_BLOCK(block)	((struct ext2_block *) (block))
 #define EXT2_VNODE(vnode)	((struct ext2_vnode *) (vnode))
@@ -23,12 +17,10 @@
 
 #define EXT2_BF_DIRTY		0x0001
 
-typedef uint32_t block_t;
-
 struct ext2_block_group {
-	block_t block_bitmap;
-	block_t inode_bitmap;
-	block_t inode_table;
+	ext2_block_t block_bitmap;
+	ext2_block_t inode_bitmap;
+	ext2_block_t inode_table;
 	uint16_t free_block_count;
 	uint16_t free_inode_count;
 	uint16_t used_dirs_count;

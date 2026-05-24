@@ -4,6 +4,11 @@
 #include <kernel/fs/vfs.h>
 
 
+int nop_mkfs(device_t dev, const struct mkfs_options *opts)
+{
+	return ENOENT;
+}
+
 int nop_sync(struct mount *mp)
 {
 	return 0;

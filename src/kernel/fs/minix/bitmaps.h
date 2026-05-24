@@ -71,10 +71,9 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 {
 	char bit;
 	char *block;
-	int zone = 0;
 	struct buf *buf;
 
-	for (; zone < bitmap_size; zone++) {
+	for (int zone = 0; zone < bitmap_size; zone++) {
 		buf = get_block(bufcache, bitmap_start + zone);
 		if (!buf)
 			return 0;

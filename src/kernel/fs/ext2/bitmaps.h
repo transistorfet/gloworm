@@ -18,7 +18,7 @@ static inline char bit_mask(char bits)
 	return byte;
 }
 
-static inline int bitmap_init(struct bufcache *bufcache, block_t bitmap_blocknum, int num_entries, short reserve)
+static inline int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, int num_entries, short reserve)
 {
 	char *block;
 	struct buf *buf;
@@ -51,12 +51,12 @@ static inline int bitmap_init(struct bufcache *bufcache, block_t bitmap_blocknum
 	return 0;
 }
 
-static inline bitnum_t bit_alloc(struct bufcache *bufcache, block_t bitmap_blocknum, block_t near)
+static inline bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, ext2_block_t near)
 {
 	char bit;
 	char *data;
 	struct buf *buf;
-	block_t block = 0;
+	ext2_block_t block = 0;
 	const int block_size = bufcache->block_size;
 
 	buf = get_block(bufcache, bitmap_blocknum);
@@ -77,7 +77,7 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, block_t bitmap_block
 	return 0;
 }
 
-static inline int bit_free(struct bufcache *bufcache, block_t bitmap_blocknum, bitnum_t bitnum)
+static inline int bit_free(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, bitnum_t bitnum)
 {
 	int byte = (bitnum >> 3);
 	char bit = (bitnum & 0x7);

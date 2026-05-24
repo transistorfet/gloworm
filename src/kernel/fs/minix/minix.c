@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <kconfig.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>
@@ -19,7 +20,15 @@
 #include "zones.h"
 #include "super.h"
 #include "dir.h"
+
+#if defined(CONFIG_MINIX_FS_MKFS)
 #include "mkfs.h"
+#else
+static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
+{
+	return ENOENT;
+}
+#endif
 
 
 struct vfile_ops minix_vfile_ops = {

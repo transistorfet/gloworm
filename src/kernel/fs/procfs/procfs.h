@@ -41,7 +41,6 @@ struct procfs_vnode {
 
 
 int procfs_init(void);
-int procfs_mkfs(device_t dev, const struct mkfs_options *opts);
 int procfs_mount(struct mount *mp, struct vnode *parent);
 int procfs_unmount(struct mount *mp);
 

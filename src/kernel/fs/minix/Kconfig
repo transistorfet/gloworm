@@ -1,0 +1,18 @@
+
+config MINIX_FS
+	bool "Minix file system"
+	default y
+	help
+	  This enables the minix file system support.  Only v1 is supported
+
+if MINIX_FS
+
+config MINIX_FS_MKFS
+	bool "mkfs for Minix"
+	default y
+	help
+	  This option will include support for making new filesystems of the
+	  minix type
+
+endif
+

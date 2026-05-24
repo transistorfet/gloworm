@@ -5946,3 +5946,46 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   the actual function call, so when running a builtin command, it was jumping to main, but disk commands worked. This bug had been
   around since April 29th, but i haven't updated the image since then =(
 
+
+2026-05-21:
+
+- I implemented mkfs, and then had it initialize the disk without actually writing.  I left the options as 0x64 blocks and 1024
+  block size, copied from the minix init code, but it seems like when I use those settings, it causes an error in kmfree when the
+  bufcache is freed after the mkfs
+- it seems like the kmalloc free list is corrupted, with the `next` of one block set to 0x64000000 which is suspiciously like the
+  block size I'm using.  I wonder if I have a memory bug where it's writing beyond the allocated block, which then causes this
+  corruption
+- now that I think about it, the superblock is at blocknum 1 if the blocksize is 1024, so maybe I have a bug where it puts the
+  superblock at block+1024, which is of course beyond the end of that block
+- oh it's relying on sync to write the superblock, so maybe that's where the problem is
+- that was definitely part of the problem, but it failed later on, the sh (pid 3) died after multitasking began
+- I may not have any protections against going past the end of a disk?  Or maybe there's there but since it's created a filesystem
+  smaller than the disk, it isn't caught
+- second bug was because the number of groups wasn't rounded up, so it was creating no groups
+- but now it seems to hang when creating?! wtf
+- was zeroing too many inode blocks
+- many bugs with the numbers, but it's starting to come together
+- fixed a bug in bufcache where it wasn't actually recycling any bufs because the count was wrong, so now I have a count inside the
+  bufcache itself, so it can keep track the whole time
+- I have something else causing the same bug where kmfree's next point is 0x64000000 which messes everything up
+- I also have an issue where kmfree seems to be called during the inode zeroing, which doesn't make any sense
+
+- hmm.... that's a bit odd but kind of checks out.  The reason the kmfree function is being called is because it's allocating new
+  blocks in the bufcache, and it uses kmfree to actually insert the new block into the list, so it looks like it's freeing things,
+  but it's actually allocating things.  It only does this when it's not recycling bufs
+- found the last bug, the kmfree corruption, which was caused by the offset used by sync_superblock, which didn't account for the
+  superblock being at block 1 instead of 0 when 1024 byte blocks were used.  It boots now
+
+- it ran out of memory when initializing the ext2 fs... wtf  It did seem to mount it though
+
+
+2026-05-24:
+
+- bunch of bugs still with mkfs for ext2.  I ran into some which where caused by a combination of using a shift when it wasn't
+  needed, which then made a number larger than 16-bits, which then got truncated because there was no warning when assigning it to a
+  struct field that was only 16 bits, which made the number be 0, which then made the offset calculated for the inode be 1 instead
+  of 0, causing an invalid root inode to be created
+- I have gloworm booting and `ls`ing the new filesystem in /media now, but it was hanging when I tried to create a new directory
+  (even though that would have created one on the old minix root disk), and linux still doesn't like it because of a problem with
+  the root inode/inodes
+

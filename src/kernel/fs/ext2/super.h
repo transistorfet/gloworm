@@ -36,7 +36,7 @@ static inline void superblock_to_from_le(struct ext2_superblock *super)
 	super->inodes_per_group = le32toh(super->inodes_per_group);
 
 	super->last_mount_time = le32toh(super->last_mount_time);
-	super->mounts_before_check = le32toh(super->mounts_before_check);
+	super->last_write_time = le32toh(super->last_write_time);
 
 	super->mounts_since_check = le16toh(super->mounts_since_check);
 	super->mounts_before_check = le16toh(super->mounts_before_check);
@@ -176,14 +176,13 @@ static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 
 	// TODO write the superblock back to disk
 
-	buf = get_block(bufcache, 0);
+	buf = get_block(bufcache, super->super.superblock_block);
 	if (!buf) {
 		// TODO what do if error?
 		return EIO;
 	}
-	struct ext2_superblock *super_on_disk = (struct ext2_superblock *) &((char *) buf->block)[EXT2_FIRST_SUPERBLOCK_BYTE_OFFSET];
-	//super_on_disk->total_unalloc_blocks = htole32(super->super.total_unalloc_blocks);
-	//super_on_disk->total_unalloc_inodes = htole32(super->super.total_unalloc_inodes);
+	const int super_offset = (super->super.superblock_block == 0) ? EXT2_FIRST_SUPERBLOCK_BYTE_OFFSET : 0;
+	struct ext2_superblock *super_on_disk = (struct ext2_superblock *) &((char *) buf->block)[super_offset];
 
 	memcpy(super_on_disk, &super->super, sizeof(struct ext2_superblock));
 	superblock_to_from_le(super_on_disk);
