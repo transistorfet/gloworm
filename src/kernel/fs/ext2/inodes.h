@@ -151,6 +151,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 {
 	struct buf *inode_buf;
 	struct ext2_inode *inode;
+	const int block_size = vnode->mp->block_size;
 
 	const struct inode_location result = get_inode_block_and_offset(vnode->mp, ino);
 
@@ -162,7 +163,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	inode->mode = htole16(vnode->mode);
 	inode->uid = htole16(vnode->uid);
 	inode->size = htole32(vnode->size);
-	inode->nblocks = htole16((vnode->size >> EXT2_LOG_BLOCK_SIZE(vnode->mp->block_size)) + (vnode->size & (vnode->mp->block_size - 1) ? 1 : 0));
+	inode->nblocks = htole16((vnode->size >> EXT2_LOG_BLOCK_SIZE(block_size)) + (vnode->size & (block_size - 1) ? 1 : 0));
 	inode->atime = htole32(vnode->atime);
 	inode->mtime = htole32(vnode->mtime);
 	inode->ctime = htole32(vnode->ctime);

@@ -4,10 +4,13 @@
 
 #include <string.h>
 #include <kernel/fs/bufcache.h>
+#include <kernel/utils/macros.h>
 
 #include "ext2.h"
 
 typedef int bitnum_t;
+
+static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, ext2_block_t near);
 
 static inline char bit_mask(char bits)
 {
@@ -18,45 +21,44 @@ static inline char bit_mask(char bits)
 	return byte;
 }
 
-static inline int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, int num_entries, short reserve)
+static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, int num_entries, int reserve)
 {
 	char *block;
 	struct buf *buf;
-	const int block_size = bufcache->block_size;
 
 	buf = get_block(bufcache, bitmap_blocknum);
 	if (!buf)
 		return -1;
 	block = buf->block;
 
-	int bytes = (num_entries >> 3);
-	char bits = (num_entries & 0x07);
-
-	if (bits)
-		bytes += 1;
-	memset(block, 0x00, bytes);
-	if (bits) {
-		block[bytes - 1] = ~bit_mask(bits);
+	const int last_byte = num_entries >> 3;
+	const int last_bits = num_entries & 0x07;
+	memset(block, 0x00, last_byte);
+	if (last_byte < bufcache->block_size) {
+		block[last_byte] = ~bit_mask(last_bits);
+		memset(&block[last_byte + 1], 0xFF, bufcache->block_size - last_byte - 1);
 	}
-	memset(&block[bytes], 0xFF, block_size - bytes);
 
-	// Reserve entries at the beginning of table
-	short i = 0;
-	for (; i < (reserve >> 3); i++) {
-		block[i] = 0xFF;
+	int bit = 0;
+	while (bit < reserve) {
+		if (reserve - bit > 8) {
+			block[bit >> 3] = 0xFF;
+			bit += 8;
+		} else {
+			block[bit >> 3] = ~bit_mask(bit & 0x07);
+			break;
+		}
 	}
-	block[i] = bit_mask(reserve & 0x7);
 
 	release_block(buf, BF_DIRTY);
 	return 0;
 }
 
-static inline bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, ext2_block_t near)
+static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, ext2_block_t near)
 {
 	char bit;
 	char *data;
 	struct buf *buf;
-	ext2_block_t block = 0;
 	const int block_size = bufcache->block_size;
 
 	buf = get_block(bufcache, bitmap_blocknum);
@@ -65,12 +67,11 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_
 	data = buf->block;
 
 	for (int i = 0; i < block_size; i++) {
-		//printk("Bitsearch %d: %x\n", i, block[i]);
 		if ((char) ~data[i]) {
 			for (bit = 0; bit < 8 && ((0x01 << bit) & data[i]); bit++) { }
 			data[i] |= (0x01 << bit);
 			release_block(buf, BF_DIRTY);
-			return bit + (i * 8) + (block * block_size * 8);
+			return bit + (i * 8);
 		}
 	}
 	release_block(buf, 0);

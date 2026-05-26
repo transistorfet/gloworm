@@ -5989,3 +5989,98 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   (even though that would have created one on the old minix root disk), and linux still doesn't like it because of a problem with
   the root inode/inodes
 
+- it will mount as read-only now, which is an improvement, but it's running into error (linux 6.19):
+    ```
+    EXT4-fs error (device sdc2): ext4_map_blocks:793: inode #2: block 1025: comm Trash Worker Th: lblock 0 mapped to illegal pblock 1025 (length 1)
+    EXT4-fs (sdc2): Remounting filesystem read-only
+    EXT4-fs warning (device sdc2): htree_dirblock_to_tree:1051: inode #2: lblock 0: comm gvfs-udisks2-vo: error -117 reading directory block
+    ```
+- I'm not sure what's causing this error.  The kernel has a check that the block is not before the start or past the end, but that
+  doesn't seem to be the case here?
+
+- I was stumped on finding the problem above, and then used `fsck` to check it, and it's giving me much more helpful errors
+    ```
+    sudo fsck -n -v /dev/sdc2 
+    fsck from util-linux 2.42
+    e2fsck 1.47.4 (6-Mar-2025)
+    Warning!  /dev/sdc2 is mounted.
+    /dev/sdc2 contains a file system with errors, check forced.
+    Resize inode not valid.  Recreate? no
+
+    Pass 1: Checking inodes, blocks, and sizes
+    Inode 2, i_blocks is 65536, should be 8.  Fix? no
+
+
+    Running additional passes to resolve blocks claimed by more than one inode...
+    Pass 1B: Rescanning for multiply-claimed blocks
+    Multiply-claimed block(s) in inode 2: 513
+    Pass 1C: Scanning directories for inodes with multiply-claimed blocks
+    Pass 1D: Reconciling multiply-claimed blocks
+    (There are 1 inodes containing multiply-claimed blocks.)
+
+    File <2892>/<2> (inode #2, mod time Wed Dec 31 16:00:00 1969) 
+      has 1 multiply-claimed block(s), shared with 1 file(s):
+            <filesystem metadata>
+    Clone multiply-claimed blocks? no
+
+    Delete file? no
+
+    Pass 2: Checking directory structure
+    Entry '..' in <2892>/<2> (2) has deleted/unused inode 2892.  Clear? no
+
+    Entry '..' in <2892>/<2> (2) has an incorrect filetype (was 2, should be 0).
+    Fix? no
+
+    Pass 3: Checking directory connectivity
+    '..' in <2892>/<2> (2) is <2892> (2892), should be <2892>/<2> (2).
+    Fix? no
+
+    Pass 4: Checking reference counts
+    Pass 5: Checking group summary information
+    Block bitmap differences:  +(514--515) -(32256--32767)
+    Fix? no
+
+    Free blocks count wrong for group #0 (32254, counted=31742).
+    Fix? no
+
+    Free blocks count wrong (32254, counted=31742).
+    Fix? no
+
+    Inode bitmap differences:  -11 +(8129--8144) -(8182--8192)
+    Fix? no
+
+    Free inodes count wrong for group #0 (8181, counted=8170).
+    Fix? no
+
+    Directories count wrong for group #0 (0, counted=1).
+    Fix? no
+
+    Free inodes count wrong (8181, counted=8170).
+    Fix? no
+
+
+    /dev/sdc2: ********** WARNING: Filesystem still has errors **********
+
+
+              11 inodes used (0.13%, out of 8192)
+               0 non-contiguous files (0.0%)
+               0 non-contiguous directories (0.0%)
+                 # of inodes with ind/dind/tind blocks: 0/0/0
+             514 blocks used (1.57%, out of 32768)
+               1 bad block
+               0 large files
+
+               0 regular files
+               1 directory
+               0 character device files
+               0 block device files
+               0 fifos
+      4294967295 links
+               0 symbolic links (0 fast symbolic links)
+               0 sockets
+    ------------
+               1 file
+
+    ```
+
+

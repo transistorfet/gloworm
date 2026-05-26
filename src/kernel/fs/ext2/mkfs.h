@@ -18,7 +18,8 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 	const int reserved_inodes = 11;
 	const int block_size = opts->block_size ? opts->block_size : 4096;
 
-	const int log_blocks_per_inode = 13 - __builtin_ctz(block_size);	// 1 inode per 8192 bytes
+	//const int log_blocks_per_inode = 13 - __builtin_ctz(block_size);	// 1 inode per 8192 bytes
+	const int log_blocks_per_inode = 14 - __builtin_ctz(block_size);	// 1 inode per 16384 bytes
 	const uint32_t total_blocks = opts->blocks;
 	const uint32_t total_inodes = roundup_power_of_2(log_blocks_per_inode > 0 ? total_blocks >> log_blocks_per_inode : total_blocks << -log_blocks_per_inode);
 	// A block group's bitmap must be one block, so the most blocks per group is block_size * 8
@@ -52,9 +53,9 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	super.super.total_blocks = total_blocks;
 	super.super.total_inodes = total_inodes;
-	super.super.reserved_su_blocks = 0x1999;
+	super.super.reserved_su_blocks = super.super.total_blocks / 20;		// reserve 5% of the blocks
 	super.super.total_unalloc_blocks = super.super.total_blocks;
-	super.super.total_unalloc_inodes = super.super.total_inodes - reserved_inodes;
+	super.super.total_unalloc_inodes = super.super.total_inodes;
 	super.super.superblock_block = superblock_blocknum;
 	super.super.log_block_size = __builtin_ctz(block_size) - 10;
 	super.super.log_fragment_size = super.super.log_block_size;
@@ -95,7 +96,7 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	for (int group = 0; group < num_groups; group++) {
 		const int group_start = group * super.super.blocks_per_group;
-		const int group_reserved_blocks = (groups[group].inode_table + inode_table_blocks) - group_start;
+		const int group_reserved_blocks = superblock_blocknum + 1 + group_descriptor_blocks + 2 + inode_table_blocks;
 		const int group_reserved_inodes = group == 0 ? super.super.extended.first_non_reserved_inode : 0;
 
 		groups[group].block_bitmap = group_start + superblock_blocknum + 1 + group_descriptor_blocks;
@@ -105,27 +106,29 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 		groups[group].free_inode_count = super.super.inodes_per_group - group_reserved_inodes;
 		groups[group].used_dirs_count = 0;
 
+		if (group_start + super.super.blocks_per_group < super.super.total_blocks) {
+			groups[group].free_block_count = super.super.total_blocks - group_start - group_reserved_blocks;
+		}
+
+		super.super.total_unalloc_blocks -= group_reserved_blocks;
+		super.super.total_unalloc_inodes -= group_reserved_inodes;
+
 		if (groups[group].inode_table + inode_table_blocks > super.super.total_blocks) {
 			log_error("last block group is too small\n");
 			error = ENOSPC;
 			goto fail;
 		}
 
-		if (group_start + super.super.blocks_per_group < super.super.total_blocks) {
-			groups[group].free_block_count = super.super.total_blocks - group_start - group_reserved_blocks;
-		}
-
 		// Initialize bitmap blocks
-		error = bitmap_init(&mp.bufcache, groups[group].block_bitmap, groups[group].free_block_count, group_reserved_blocks);
+		error = bitmap_init(&mp.bufcache, groups[group].block_bitmap, super.super.blocks_per_group, group_reserved_blocks);
 		if (error < 0) {
 			goto fail;
 		}
-		error = bitmap_init(&mp.bufcache, groups[group].inode_bitmap, groups[group].free_inode_count, group_reserved_inodes);
+		error = bitmap_init(&mp.bufcache, groups[group].inode_bitmap, super.super.inodes_per_group, group_reserved_inodes);
 		if (error < 0) {
 			goto fail;
 		}
 
-		/*
 		// Zero the inode table
 		for (int i = 0; i < inode_table_blocks; i++) {
 			struct buf *inode_buf = get_block(&mp.bufcache, groups[group].inode_table + i);
@@ -133,10 +136,18 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 				error = EIO;
 				goto fail;
 			}
-			memset(inode_buf->block, 0x00, block_size);
-			release_block(inode_buf, BF_DIRTY);
+			char *data = inode_buf->block;
+			char state = 0;
+
+			// If the whole buf is *not* zero, then set to zero
+			for (int j = 0; j < block_size; j++) {
+				if (data[j]) {
+					data[j] = 0;
+					state = BF_DIRTY;
+				}
+			}
+			release_block(inode_buf, state);
 		}
-		*/
 	}
 
 	super.num_groups = num_groups;
@@ -162,7 +173,7 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 	root_node.vn.mp = &mp;
 	root_node.vn.refcount = 1;
 	root_node.vn.mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-	root_node.vn.nlinks = 1;
+	root_node.vn.nlinks = 3;
 	root_node.vn.ino = EXT2_ROOT_INO;
 
 	dir_setup(&root_node.vn, NULL);
@@ -176,6 +187,8 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 			release_block(buf, BF_DIRTY);
 		}
 	}
+
+	super.groups[0].used_dirs_count += 2;
 
 	// Write the superblock and group descriptors to disk
 	error = sync_superblock(&mp.bufcache, &super);

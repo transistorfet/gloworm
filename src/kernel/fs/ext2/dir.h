@@ -36,6 +36,9 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	struct buf *buf;
 	struct ext2_dirent *current_entry;
 
+	if (!parent)
+		parent = vnode->mp->root_node;
+
 	block = ext2_alloc_block(vnode->mp);
 	buf = get_block(&vnode->mp->bufcache, block);
 	if (!buf)
@@ -51,13 +54,17 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	memcpy(EXT2_DIRENT_FILENAME(current_entry), ".", current_entry->name_len);
 
 	current_entry = (struct ext2_dirent *) &data[dot_entry_len];
-	current_entry->inode = htole32(parent ? (ext2_inode_t) parent->ino : EXT2_ROOT_INO);
+	current_entry->inode = htole32(parent->ino);
 	current_entry->filetype = EXT2_FT_DIR;
 	current_entry->entry_len = htole16(vnode->mp->block_size - dot_entry_len);
 	current_entry->name_len = 2;
 	memcpy(EXT2_DIRENT_FILENAME(current_entry), "..", current_entry->name_len);
 
 	release_block(buf, BF_DIRTY);
+
+	// Increment the link count for the parent directory
+	parent->nlinks += 1;
+	mark_vnode_dirty(parent);
 
 	EXT2_DATA(vnode).blocks[0] = htole32(block);
 	// Set the initial directory size, which is always one whole block
@@ -214,9 +221,16 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 				} else {
 					// If it's the first entry in the block, but there are other entries after it
 					// TODO then what?  Do I have to move the previous entry?
+					log_error("!!! ext2 unimplemented unlink case, first in block but not last entry\n");
+					return EFBIG;
+				}
+				release_block(buf, BF_DIRTY);
+
+				if (S_ISDIR(vnode->mode)) {
+					parent->nlinks -= 1;
+					mark_vnode_dirty(parent);
 				}
 
-				release_block(buf, BF_DIRTY);
 				return 0;
 			}
 			prev = cur;
