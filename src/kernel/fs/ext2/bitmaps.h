@@ -35,20 +35,18 @@ static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, 
 	const int last_bits = num_entries & 0x07;
 	memset(block, 0x00, last_byte);
 	if (last_byte < bufcache->block_size) {
-		block[last_byte] = ~bit_mask(last_bits);
+		block[last_byte] = bit_mask(last_bits);
+	}
+	if (last_byte + 1 < bufcache->block_size) {
 		memset(&block[last_byte + 1], 0xFF, bufcache->block_size - last_byte - 1);
 	}
 
-	int bit = 0;
-	while (bit < reserve) {
-		if (reserve - bit > 8) {
-			block[bit >> 3] = 0xFF;
-			bit += 8;
-		} else {
-			block[bit >> 3] = ~bit_mask(bit & 0x07);
-			break;
-		}
+	int i = 0;
+	while (reserve > 8) {
+		block[i++] = 0xFF;
+		reserve -= 8;
 	}
+	block[i++] = bit_mask(reserve);
 
 	release_block(buf, BF_DIRTY);
 	return 0;

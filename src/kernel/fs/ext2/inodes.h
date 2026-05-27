@@ -85,8 +85,8 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	inode->mode = htole16(mode);
 	inode->uid = htole16(uid);
 	inode->size = 0;
-	inode->gid = (uint8_t) gid;
-	inode->nlinks = (uint8_t) 1;
+	inode->gid = gid;
+	inode->nlinks = 1;
 	inode->mtime = htole32(get_system_time());
 	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++) {
 		inode->blocks[j] = NULL;
@@ -106,7 +106,7 @@ static int free_inode(struct vnode *vnode, inode_t ino)
 
 	const int group = get_inode_group(vnode->mp, ino);
 	struct ext2_super * const super = EXT2_SUPER(vnode->mp->super);
-	error = bit_free(&vnode->mp->bufcache, super->groups[group].inode_bitmap, ino);
+	error = bit_free(&vnode->mp->bufcache, super->groups[group].inode_bitmap, ino - (super->super.inodes_per_group * group) - 1);
 	if (error < 0)
 		return error;
 	super->groups[group].free_inode_count += 1;
@@ -135,7 +135,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	vnode->ctime = le32toh(inode->ctime);
 	vnode->gid = le16toh(inode->gid);
 	vnode->nlinks = le16toh(inode->nlinks);
-	vnode->rdev = le16toh(S_ISDEV(vnode->mode) ? inode->blocks[0] : 0);
+	vnode->rdev = (device_t) le32toh(S_ISDEV(vnode->mode) ? inode->blocks[0] : 0);
 	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++) {
 		// NOTE: the block numbers are not converted, and instead kept in
 		// fs-native little endian to make block lookups easier
@@ -163,14 +163,14 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	inode->mode = htole16(vnode->mode);
 	inode->uid = htole16(vnode->uid);
 	inode->size = htole32(vnode->size);
-	inode->nblocks = htole16((vnode->size >> EXT2_LOG_BLOCK_SIZE(block_size)) + (vnode->size & (block_size - 1) ? 1 : 0));
+	inode->nblocks = htole32((vnode->size >> EXT2_LOG_BLOCK_SIZE(block_size)) + (vnode->size & (block_size - 1) ? 1 : 0));
 	inode->atime = htole32(vnode->atime);
 	inode->mtime = htole32(vnode->mtime);
 	inode->ctime = htole32(vnode->ctime);
 	inode->gid = htole16(vnode->gid);
 	inode->nlinks = htole16(vnode->nlinks);
-	if (S_ISCHR(vnode->mode)) {
-		EXT2_DATA(vnode).blocks[0] = htole16(vnode->rdev);
+	if (S_ISCHR(vnode->mode) || S_ISBLK(vnode->mode)) {
+		EXT2_DATA(vnode).blocks[0] = htole32(vnode->rdev);
 	}
 	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++) {
 		// NOTE: the block numbers are not converted, and instead kept in

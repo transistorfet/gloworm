@@ -77,6 +77,9 @@ void do_syscall(void)
 
 void do_exit(int exitcode)
 {
+	if (current_proc->pid == INIT_PID) {
+		log_error("init process exiting with error code %d\n", exitcode);
+	}
 	exit_proc(current_proc, exitcode);
 }
 
@@ -345,7 +348,6 @@ int do_setuid(uid_t uid)
 int do_mount(const char __user *source, const char __user *target, struct mount_opts __user *opts)
 {
 	extern struct mount_ops *filesystems[];
-	extern struct mount_ops minix_mount_ops;
 
 	struct vnode *vnode;
 	struct mount_ops *fsptr = NULL;
@@ -361,12 +363,19 @@ int do_mount(const char __user *source, const char __user *target, struct mount_
 			return EINVAL;
 		}
 	}
-	#if defined(CONFIG_MINIX_FS)
 	// Set the default file system if none was given
 	if (!fsptr) {
+		#if defined(CONFIG_MINIX_FS)
+		extern struct mount_ops minix_mount_ops;
 		fsptr = &minix_mount_ops;
+		#elif defined(CONFIG_EXT2_FS)
+		extern struct mount_ops ext2_mount_ops;
+		fsptr = &ext2_mount_ops;
+		#else
+		log_error("no filesystem type given, and no default enabled\n");
+		return ENOFS;
+		#endif
 	}
-	#endif
 
 	COPY_USER_STRING(source, CONFIG_PATH_MAX);
 	COPY_USER_STRING(target, CONFIG_PATH_MAX);

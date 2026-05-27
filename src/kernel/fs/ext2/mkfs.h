@@ -155,6 +155,9 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	// Initialize the root inode
 
+	struct ext2_vnode root_node;
+	mp.root_node = &root_node.vn;
+
 	struct ext2_vnode bad_node;
 	memset(&bad_node, 0, sizeof(struct ext2_vnode));
 	bad_node.vn.ops = &ext2_vnode_ops;
@@ -167,13 +170,12 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 	dir_setup(&bad_node.vn, NULL);
 	write_inode(&bad_node.vn, bad_node.vn.ino);
 
-	struct ext2_vnode root_node;
 	memset(&root_node, 0, sizeof(struct ext2_vnode));
 	root_node.vn.ops = &ext2_vnode_ops;
 	root_node.vn.mp = &mp;
 	root_node.vn.refcount = 1;
 	root_node.vn.mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-	root_node.vn.nlinks = 3;
+	root_node.vn.nlinks = 1;
 	root_node.vn.ino = EXT2_ROOT_INO;
 
 	dir_setup(&root_node.vn, NULL);

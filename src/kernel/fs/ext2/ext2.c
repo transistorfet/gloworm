@@ -135,7 +135,7 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 		}
 	}
 
-	dir_set_filetype(dir, vnode->mode);
+	dir_set_filetype(dir, mode);
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
 
 	release_block(buf, BF_DIRTY);
@@ -173,7 +173,7 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 	}
 
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
-	dir_set_filetype(dir, vnode->mode);
+	dir_set_filetype(dir, mode);
 
 	release_block(buf, BF_DIRTY);
 
