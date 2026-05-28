@@ -76,7 +76,7 @@ libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
 targets			:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOALS)
 
 PHONY += all
-all: $(targets) $(config-h)
+all: $(config-h) $(targets)
 
 # Include the testing rules if there are any tests to build & run
 ifneq ($(tests-y),)
