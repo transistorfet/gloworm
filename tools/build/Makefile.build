@@ -5,6 +5,7 @@ MAKEFLAGS		+= -rR --no-print-directory
 
 src-root		:= $(if $(src-root),$(src-root),$(realpath $(shell pwd)))
 kconfig-file		:= $(if $(C),$(src-root)/$(C),$(src-root)/.config)
+config-dir      := $(src-root)/include/generated
 
 always-y		:=	# targets that are always built
 obj-y			:=	# targets to be built and included in the in-target
@@ -138,8 +139,12 @@ $(OUTPUT)%.o: %.c
 $(OUTPUT)%.o: %.S
 	$(cmd_as_o)
 
-$(src-root)/include/generated/config.h: $(kconfig-file)
+$(src-root)/include/generated/config.h: $(kconfig-file) | $(config-dir)
 	$(cmd_gen_config)
+
+# create config directory
+$(config-dir):
+	mkdir -p $@
 
 DEPFLAGS = -Wp,-MT,$(OUTPUT)$(patsubst %.c,%.o,$@) -Wp,-MMD,$(OUTPUT)$(basename $<).d
 
