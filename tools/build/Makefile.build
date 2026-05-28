@@ -139,7 +139,8 @@ $(OUTPUT)%.o: %.c
 $(OUTPUT)%.o: %.S
 	$(cmd_as_o)
 
-$(src-root)/include/generated/config.h: $(kconfig-file) | $(config-dir)
+# create config file from kconfig
+$(config-h): $(kconfig-file) | $(config-dir)
 	$(cmd_gen_config)
 
 # create config directory
