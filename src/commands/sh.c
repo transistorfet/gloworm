@@ -27,6 +27,7 @@
 
 int f_interactive = 1;
 
+// NOTE: When compiling without utils, MAIN(sh_task) will expand to main, so this extra main is not needed.
 #if !defined(IN_KERNEL) && defined(CONFIG_SHELL_WITH_UTILS)
 int sh_task(int argc, char **argv, char **env);
 
