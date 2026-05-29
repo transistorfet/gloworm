@@ -13,7 +13,7 @@ static int minix_mkfs(device_t dev)
 	struct minix_v1_superblock *super_v1;
 	struct minix_v1_superblock super_v1_cached;
 
-	init_bufcache(&bufcache, dev, 1 << MINIX_V1_LOG_INODES_PER_ZONE);
+	init_bufcache(&bufcache, dev, MINIX_V1_ZONE_SIZE);
 
 	super_v1 = &super_v1_cached;
 
@@ -22,7 +22,7 @@ static int minix_mkfs(device_t dev)
 	super_v1->imap_blocks = 1;
 	super_v1->zmap_blocks = 1;
 	super_v1->first_zone = 6;
-	super_v1->log_zone_size = MINIX_V1_LOG_ZONE_SIZE;
+	super_v1->log_zone_size = MINIX_V1_LOG_ZONE_SIZE - 10;
 	super_v1->max_file_size = 67108864;
 	super_v1->magic = 0x137F;
 	super_v1->state = 0x0001;
@@ -77,6 +77,7 @@ static int minix_mkfs(device_t dev)
 	inode_table[0].size = htole32(0);
 	inode_table[0].nlinks = htole16(1);
 	inode_table[0].zones[0] = htole16(dir_zone);
+
 	release_block(inode_buf, BCF_DIRTY);
 
 	// Initialize root directory
@@ -93,7 +94,7 @@ static int minix_mkfs(device_t dev)
 
 	release_block(dir_buf, BCF_DIRTY);
 
-	//sync_bufcache(&bufcache);
+	sync_bufcache(&bufcache);
 	free_bufcache(&bufcache);
 
 	return 0;
