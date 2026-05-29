@@ -5,7 +5,6 @@ MAKEFLAGS		+= -rR --no-print-directory
 
 src-root		:= $(if $(src-root),$(src-root),$(realpath $(shell pwd)))
 kconfig-file		:= $(if $(C),$(src-root)/$(C),$(src-root)/.config)
-config-dir      := $(src-root)/include/generated
 
 always-y		:=	# targets that are always built
 obj-y			:=	# targets to be built and included in the in-target
