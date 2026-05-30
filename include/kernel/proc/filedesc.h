@@ -21,7 +21,7 @@ int find_unused_fd(struct fd_table *table);
 struct vfile *get_fd(struct fd_table *table, int fd);
 void set_fd(struct fd_table *table, int fd, struct vfile *file);
 void dup_fd(struct fd_table *table, int fd, struct vfile *file);
-void unset_fd(struct fd_table *table, int fd);
+void free_fd(struct fd_table *table, int fd);
 
 static inline struct fd_table *make_ref_fd_table(struct fd_table *table)
 {

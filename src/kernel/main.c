@@ -98,7 +98,7 @@ struct protocol_ops *protocols[] = {
 const char boot_args[32] = "";
 
 #if defined(CONFIG_ATA)
-device_t root_dev = DEVNUM(DEVMAJOR_ATA, 1);
+device_t root_dev = DEVNUM(DEVMAJOR_ATA, 0);
 #else
 device_t root_dev = DEVNUM(DEVMAJOR_MEM, 0);
 #endif
@@ -149,7 +149,6 @@ int bootstrap_disk(device_t dev, struct mount_ops *filesystem)
 		.blocks = 0x64,
 	};
 
-	log_notice("%s: initializing root disk\n", filesystem->fstype);
 	error = (filesystem->mkfs)(dev, &opts);
 	if (error < 0) {
 		return error;
@@ -249,7 +248,9 @@ int main(void)
 	error = vfs_mount(NULL, "/", root_dev, root_filesystem_type, 0, SU_UID);
 	if (error < 0) {
 		#if defined(CONFIG_BOOTSTRAP_DISK)
-		bootstrap_disk(root_dev, root_filesystem_type);
+		error = bootstrap_disk(root_dev, root_filesystem_type);
+		if (error < 0)
+			goto fail;
 		#else
 		goto fail;
 		#endif
@@ -272,26 +273,15 @@ int main(void)
 	create_init_task();
 
 
-	/*
 	#if defined(CONFIG_EXT2_FS)
 	device_t extra_dev = DEVNUM(DEVMAJOR_ATA, 1);
 	const char *extra_mountpoint = "/media";
-
-	//const struct mkfs_options opts = {
-	//	.block_size = 4096,
-	//	.blocks = 0x8000,
-	//};
-	//error = (ext2_mount_ops.mkfs)(extra_dev, &opts);
-	//if (error < 0) {
-	//	return error;
-	//}
 
 	error = vfs_mount(NULL, extra_mountpoint, extra_dev, &ext2_mount_ops, 0, SU_UID);
 	if (error < 0) {
 		log_error("error mounting /media: %d\n", error);
 	}
 	#endif
-	*/
 
 	log_debug("begin multitasking...\n");
 	begin_multitasking();

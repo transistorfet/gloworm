@@ -44,10 +44,10 @@ struct vfile *dup_fileptr(struct vfile *file)
 
 void free_fileptr(struct vfile *file)
 {
-	--file->refcount;
+	file->refcount -= 1;
 	if (file->refcount < 0) {
-		log_warning("error: double free of file pointer, %x\n", file);
-	} else if (file->refcount <= 0) {
+		log_warning("warning: double free of file pointer, %x\n", file);
+	} else if (file->refcount == 0) {
 		vfs_release_vnode(file->vnode);
 		file->vnode = NULL;
 	}

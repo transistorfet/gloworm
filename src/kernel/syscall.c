@@ -498,10 +498,8 @@ int do_close(int fd)
 		return EBADF;
 	}
 
-	vfs_close(file);
-
-	unset_fd(current_proc->fd_table, fd);
-	//free_fd(current_proc->fd_table, fd);
+	// Close the file and set the file descriptor to NULL
+	free_fd(current_proc->fd_table, fd);
 	return 0;
 }
 

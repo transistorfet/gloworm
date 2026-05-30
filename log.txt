@@ -6204,4 +6204,28 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - having trouble getting it to boot from ext2, and bunch of little issues.  One is that the device file is giving a 0, and then
   crashing, essentially.  I should put NULL checks in driver.c, but also I think this is a 16/32 bit conversion issue.
 - put null checks and fixed conversion issue (htole16/le16toh instead of 32, when converting the block)
+- sizes in bytes:
+    (nominix), ext2 (nomkfs)      66744
+    (nominix), ext2 + mkfs        68436
+    minix + mkfs, (noext2)        65428
+    minix (nomkfs), (noext2)      64628
+- ext2 support is 3008 bytes bigger than minix support, including the mkfs of both
+- the ext2 mkfs support alone is 1692.  Minix mkfs support is only 800 bytes
+- without mkfs support, ext2 is 2116 bytes larger than minix, which is still a fair amount, but not a dealbreaker?
+
+
+2026-05-29:
+
+- the issue where it was running out of files is because the fd table's refcount was not set, so it was 0, and the table didn't get
+  freed.  Now that I've fixed that, there's a new problem of a double free on a file pointer
+- the problem was that I just added vfs_close to unset_fd, but it was already closing the file.  I changed the function to free_fd
+  and kept the close in there rather than in syscall.c, because all the other refcounting things are in fd
+
+- I tried writing a bunch of data to the file, and eventually I got an EIO, and the shell exited, so something to do with large
+  files?  I must have entered this command 100 or more times:
+  ```
+  /bin/echo "I have to enter a bunch of data repeatedly in order to make a file that's big enough, but it will take a lot of work to get to the size I need\n" >> more.txt
+  ```
+- I entered it 226 times, and it's 144 bytes, which would be 8 blocks?  There are 12 direct blocks, so it shouldn't have gone into
+  the indirect table yet.  It would have if I had used 1024 byte blocks though
 

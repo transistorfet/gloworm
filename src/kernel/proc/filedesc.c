@@ -18,7 +18,10 @@ struct fd_table *alloc_fd_table(void)
 
 void free_fd_table(struct fd_table *table)
 {
-	if (--table->refcount == 0) {
+	table->refcount -= 1;
+	if (table->refcount < 0) {
+		log_warning("warning: double free of fd table, %x\n", table);
+	} else if (table->refcount == 0) {
 		release_fd_table(table);
 		kmfree(table);
 	}
@@ -29,6 +32,7 @@ void free_fd_table(struct fd_table *table)
 /// Usually called by alloc_fd_table() to initialize a newly allocated table
 void init_fd_table(struct fd_table *table)
 {
+	table->refcount = 1;
 	for (short i = 0; i < OPEN_MAX; i++) {
 		table->files[i] = NULL;
 	}
@@ -42,6 +46,7 @@ void release_fd_table(struct fd_table *table)
 	for (short i = 0; i < OPEN_MAX; i++) {
 		if (table->files[i]) {
 			vfs_close(table->files[i]);
+			table->files[i] = NULL;
 		}
 	}
 }
@@ -94,8 +99,11 @@ void dup_fd(struct fd_table *table, int fd, struct vfile *file)
 	table->files[fd] = vfs_clone_fileptr(file);
 }
 
-void unset_fd(struct fd_table *table, int fd)
+void free_fd(struct fd_table *table, int fd)
 {
+	if (table->files[fd]) {
+		vfs_close(table->files[fd]);
+	}
 	set_fd(table, fd, NULL);
 }
 

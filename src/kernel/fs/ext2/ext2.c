@@ -169,7 +169,7 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, dev);
 	if (!newnode) {
 		release_block(buf, 0);
-		return EMFILE;
+		return ENOVNODE;
 	}
 
 	dir->inode = htole32((ext2_inode_t) newnode->ino);

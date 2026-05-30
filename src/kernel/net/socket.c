@@ -65,7 +65,7 @@ int net_socket_create(int domain, int type, int protocol, uid_t uid, struct vfil
 	*file = new_fileptr(&vnode->vn, 0);
 	if (!*file) {
 		kmfree(vnode);
-		return EMFILE;
+		return ENFILE;
 	}
 
 	vnode->sock.domain = domain;

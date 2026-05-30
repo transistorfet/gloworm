@@ -116,12 +116,12 @@ struct memory_map {
 #if defined(CONFIG_MMU)
 #define MEMORY_OBJECT_T				struct vfile
 #define MEMORY_OBJECT_ACCESS(cur)		((cur)->file)
-#define MEMORY_OBJECT_MAKE_REF(object)		vfs_clone_fileptr((object))
+#define MEMORY_OBJECT_MAKE_REF(object)		((object) ? vfs_clone_fileptr((object)) : NULL)
 #define MEMORY_OBJECT_FREE(object)		vfs_close((object))
 #else
 #define MEMORY_OBJECT_T				struct memory_region
 #define MEMORY_OBJECT_ACCESS(cur)		((cur)->region)
-#define MEMORY_OBJECT_MAKE_REF(object)		memory_region_make_ref((object))
+#define MEMORY_OBJECT_MAKE_REF(object)		((object) ? memory_region_make_ref((object)) : NULL)
 #define MEMORY_OBJECT_FREE(object)		memory_region_free((object))
 #endif
 

@@ -654,7 +654,7 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 
 	*file = new_fileptr(vnode, flags);
 	if (!*file)
-		return EMFILE;
+		return ENFILE;
 
 	if (flags & O_TRUNC && S_ISREG(vnode->mode))
 		vnode->ops->truncate(vnode);
@@ -730,7 +730,7 @@ int vfs_release_vnode(struct vnode *vnode)
 		return 0;
 	vnode->refcount--;
 	if (vnode->refcount < 0) {
-		printk("Error: double free of vnode, %x\n", vnode);
+		log_warning("warning: double free of vnode, %x\n", vnode);
 	} else if (vnode->refcount == 0) {
 		return vnode->ops->release(vnode);
 	}

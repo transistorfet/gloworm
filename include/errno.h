@@ -54,5 +54,6 @@ extern int errno;
 #define ENOTCONN	-47	/* No connection */
 
 #define	EKILL		-1000	/* Fatal error, kill the current running process */
+#define	ENOVNODE	-1001	/* Too many vnodes in use */
 
 #endif
