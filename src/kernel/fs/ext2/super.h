@@ -174,8 +174,6 @@ static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 {
 	struct buf *buf = NULL;
 
-	// TODO write the superblock back to disk
-
 	buf = get_block(bufcache, super->super.superblock_block);
 	if (!buf) {
 		// TODO what do if error?

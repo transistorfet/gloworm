@@ -151,7 +151,9 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 					dir->size = i;
 					mark_vnode_dirty(dir);
 				}
+			}
 
+			if (current_entry->inode == 0 && current_entry->entry_len >= new_entry_len) {
 				*result = buf;
 				return current_entry;
 			}
@@ -213,16 +215,6 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 				if (prev) {
 					// If there's a previous entry, merge the deleted entry into that one
 					prev->entry_len += cur->entry_len;
-				} else if (i + cur->entry_len == block_size && vnode->size == (znum + 1) * block_size) {
-					// If it's both the first entry in the block, and the last block in the file, then delete the block
-					// TODO how do you actually truncate that block?
-					vnode->size = znum;
-					mark_vnode_dirty(vnode);
-				} else {
-					// If it's the first entry in the block, but there are other entries after it
-					// TODO then what?  Do I have to move the previous entry?
-					log_error("!!! ext2 unimplemented unlink case, first in block but not last entry\n");
-					return EFBIG;
 				}
 				release_block(buf, BF_DIRTY);
 
@@ -230,7 +222,6 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 					parent->nlinks -= 1;
 					mark_vnode_dirty(parent);
 				}
-
 				return 0;
 			}
 			prev = cur;

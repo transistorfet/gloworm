@@ -252,8 +252,6 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 		release_block(newbuf, 0);
 		return EEXIST;
 	} else {
-		// TODO this won't work now because the dir entry length is variable
-
 		newdir = dir_alloc_entry(newparent, newname, &newbuf);
 		if (!newdir)
 			return ENOSPC;
