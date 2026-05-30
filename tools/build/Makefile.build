@@ -75,7 +75,7 @@ libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
 targets			:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOALS)
 
 PHONY += all
-all: $(targets) $(config-h)
+all: $(config-h) $(targets)
 
 # Include the testing rules if there are any tests to build & run
 ifneq ($(tests-y),)
@@ -138,8 +138,13 @@ $(OUTPUT)%.o: %.c
 $(OUTPUT)%.o: %.S
 	$(cmd_as_o)
 
-$(src-root)/include/generated/config.h: $(kconfig-file)
+# create config file from kconfig
+$(config-h): $(kconfig-file) | $(config-dir)
 	$(cmd_gen_config)
+
+# create config directory
+$(config-dir):
+	mkdir -p $@
 
 DEPFLAGS = -Wp,-MT,$(OUTPUT)$(patsubst %.c,%.o,$@) -Wp,-MMD,$(OUTPUT)$(basename $<).d
 

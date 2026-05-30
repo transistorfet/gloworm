@@ -38,3 +38,7 @@ hardware/**/*-backups
 
 # Miscellaneous
 /junk/
+
+# generated configs
+/.config
+/.config.old

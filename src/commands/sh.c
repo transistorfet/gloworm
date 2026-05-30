@@ -27,7 +27,8 @@
 
 int f_interactive = 1;
 
-#if !defined(IN_KERNEL)
+// NOTE: When compiling without utils, MAIN(sh_task) will expand to main, so this extra main is not needed.
+#if !defined(IN_KERNEL) && defined(CONFIG_SHELL_WITH_UTILS)
 int sh_task(int argc, char **argv, char **env);
 
 int main(int argc, char **argv, char **env)
@@ -35,6 +36,7 @@ int main(int argc, char **argv, char **env)
 	return sh_task(argc, argv, env);
 }
 #endif
+
 
 void delay(int count) {
 	while (--count > 0) { asm volatile(""); }
