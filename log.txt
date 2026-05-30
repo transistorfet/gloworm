@@ -5911,3 +5911,321 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   as block data, so yes, it can be like that.  I don't yet know how it differentiates though.  It mentioning tagging but I'm not
   sure if that's related
 
+
+2026-05-15:
+
+- I'm chuggin' away at the ext2 implementation, going relatively smoothly since I've already implemented it once, and can look at
+  that ruxpin impl to compare, as well as good documentation on ext2
+
+
+2026-05-17:
+
+- I ran into EMFILE error, -24, which is too many files open.  I was doing a lot of piping into files for testing, and it was
+  actually while testing on the minix disk that it came up, so it's probably a bug in the piping code or something common
+- maybe I should add a procfs file that lists the open file descriptors
+- I did a test where I enabled writing and sync'd to disk, and it wrote the changes, but there are some mistakes, for sure
+- first of all, there's a bug (probably common) where the first character of a file is dropped, but only when the file already
+  exists and is being overwritten
+- I put "ifferent test" into moved.txt, but it's displaying the contents for the linked files instead
+- the linked files are there, and I think have the right content
+- if I try to write to the linked files, or to moved.txt, it gives me an error that it can't edit linked files.  This happens for
+  all files, including the one I wrote from linux, so it might be filesystem specific?  Ah, it has "errors=remount-ro,emergency-ro"
+  so I linux is identifying something that's broken.  Maybe I'm not writing the superblock back?  I'm certainly not writing it to
+  each block group, which might be a problem
+
+
+2026-05-18:
+
+- looking at the syslogs from last night, when I mounted the ext2, it detected errors and mounted read-only, and in the logs it said
+  it was because block group 0's bitmap blocks free didn't match the the group descriptor's free block count
+- I should probably add some integrity checks like that to my impl, but mounting ro is probably the most important
+
+- I got really defeated when I updated the flash card and had strange behaviour where running a command would just reenter the
+  shell, printing the pseudoshell message. It also printed error no such file ""Running /etc/rc" which was espocially weird. It
+  turns out I had changed the 'main' variable in sh to 'main_func' to fix a warning about shadowing variables, but forgot to change
+  the actual function call, so when running a builtin command, it was jumping to main, but disk commands worked. This bug had been
+  around since April 29th, but i haven't updated the image since then =(
+
+
+2026-05-21:
+
+- I implemented mkfs, and then had it initialize the disk without actually writing.  I left the options as 0x64 blocks and 1024
+  block size, copied from the minix init code, but it seems like when I use those settings, it causes an error in kmfree when the
+  bufcache is freed after the mkfs
+- it seems like the kmalloc free list is corrupted, with the `next` of one block set to 0x64000000 which is suspiciously like the
+  block size I'm using.  I wonder if I have a memory bug where it's writing beyond the allocated block, which then causes this
+  corruption
+- now that I think about it, the superblock is at blocknum 1 if the blocksize is 1024, so maybe I have a bug where it puts the
+  superblock at block+1024, which is of course beyond the end of that block
+- oh it's relying on sync to write the superblock, so maybe that's where the problem is
+- that was definitely part of the problem, but it failed later on, the sh (pid 3) died after multitasking began
+- I may not have any protections against going past the end of a disk?  Or maybe there's there but since it's created a filesystem
+  smaller than the disk, it isn't caught
+- second bug was because the number of groups wasn't rounded up, so it was creating no groups
+- but now it seems to hang when creating?! wtf
+- was zeroing too many inode blocks
+- many bugs with the numbers, but it's starting to come together
+- fixed a bug in bufcache where it wasn't actually recycling any bufs because the count was wrong, so now I have a count inside the
+  bufcache itself, so it can keep track the whole time
+- I have something else causing the same bug where kmfree's next point is 0x64000000 which messes everything up
+- I also have an issue where kmfree seems to be called during the inode zeroing, which doesn't make any sense
+
+- hmm.... that's a bit odd but kind of checks out.  The reason the kmfree function is being called is because it's allocating new
+  blocks in the bufcache, and it uses kmfree to actually insert the new block into the list, so it looks like it's freeing things,
+  but it's actually allocating things.  It only does this when it's not recycling bufs
+- found the last bug, the kmfree corruption, which was caused by the offset used by sync_superblock, which didn't account for the
+  superblock being at block 1 instead of 0 when 1024 byte blocks were used.  It boots now
+
+- it ran out of memory when initializing the ext2 fs... wtf  It did seem to mount it though
+
+
+2026-05-24:
+
+- bunch of bugs still with mkfs for ext2.  I ran into some which where caused by a combination of using a shift when it wasn't
+  needed, which then made a number larger than 16-bits, which then got truncated because there was no warning when assigning it to a
+  struct field that was only 16 bits, which made the number be 0, which then made the offset calculated for the inode be 1 instead
+  of 0, causing an invalid root inode to be created
+- I have gloworm booting and `ls`ing the new filesystem in /media now, but it was hanging when I tried to create a new directory
+  (even though that would have created one on the old minix root disk), and linux still doesn't like it because of a problem with
+  the root inode/inodes
+
+- it will mount as read-only now, which is an improvement, but it's running into error (linux 6.19):
+    ```
+    EXT4-fs error (device sdc2): ext4_map_blocks:793: inode #2: block 1025: comm Trash Worker Th: lblock 0 mapped to illegal pblock 1025 (length 1)
+    EXT4-fs (sdc2): Remounting filesystem read-only
+    EXT4-fs warning (device sdc2): htree_dirblock_to_tree:1051: inode #2: lblock 0: comm gvfs-udisks2-vo: error -117 reading directory block
+    ```
+- I'm not sure what's causing this error.  The kernel has a check that the block is not before the start or past the end, but that
+  doesn't seem to be the case here?
+
+- I was stumped on finding the problem above, and then used `fsck` to check it, and it's giving me much more helpful errors
+    ```
+    sudo fsck -n -v /dev/sdc2 
+    fsck from util-linux 2.42
+    e2fsck 1.47.4 (6-Mar-2025)
+    Warning!  /dev/sdc2 is mounted.
+    /dev/sdc2 contains a file system with errors, check forced.
+    Resize inode not valid.  Recreate? no
+
+    Pass 1: Checking inodes, blocks, and sizes
+    Inode 2, i_blocks is 65536, should be 8.  Fix? no
+
+
+    Running additional passes to resolve blocks claimed by more than one inode...
+    Pass 1B: Rescanning for multiply-claimed blocks
+    Multiply-claimed block(s) in inode 2: 513
+    Pass 1C: Scanning directories for inodes with multiply-claimed blocks
+    Pass 1D: Reconciling multiply-claimed blocks
+    (There are 1 inodes containing multiply-claimed blocks.)
+
+    File <2892>/<2> (inode #2, mod time Wed Dec 31 16:00:00 1969) 
+      has 1 multiply-claimed block(s), shared with 1 file(s):
+            <filesystem metadata>
+    Clone multiply-claimed blocks? no
+
+    Delete file? no
+
+    Pass 2: Checking directory structure
+    Entry '..' in <2892>/<2> (2) has deleted/unused inode 2892.  Clear? no
+
+    Entry '..' in <2892>/<2> (2) has an incorrect filetype (was 2, should be 0).
+    Fix? no
+
+    Pass 3: Checking directory connectivity
+    '..' in <2892>/<2> (2) is <2892> (2892), should be <2892>/<2> (2).
+    Fix? no
+
+    Pass 4: Checking reference counts
+    Pass 5: Checking group summary information
+    Block bitmap differences:  +(514--515) -(32256--32767)
+    Fix? no
+
+    Free blocks count wrong for group #0 (32254, counted=31742).
+    Fix? no
+
+    Free blocks count wrong (32254, counted=31742).
+    Fix? no
+
+    Inode bitmap differences:  -11 +(8129--8144) -(8182--8192)
+    Fix? no
+
+    Free inodes count wrong for group #0 (8181, counted=8170).
+    Fix? no
+
+    Directories count wrong for group #0 (0, counted=1).
+    Fix? no
+
+    Free inodes count wrong (8181, counted=8170).
+    Fix? no
+
+
+    /dev/sdc2: ********** WARNING: Filesystem still has errors **********
+
+
+              11 inodes used (0.13%, out of 8192)
+               0 non-contiguous files (0.0%)
+               0 non-contiguous directories (0.0%)
+                 # of inodes with ind/dind/tind blocks: 0/0/0
+             514 blocks used (1.57%, out of 32768)
+               1 bad block
+               0 large files
+
+               0 regular files
+               1 directory
+               0 character device files
+               0 block device files
+               0 fifos
+      4294967295 links
+               0 symbolic links (0 fast symbolic links)
+               0 sockets
+    ------------
+               1 file
+
+    ```
+
+
+2026-05-25:
+
+- part of that was the inodes not being zeroed out, and then it had many fewer errors in fsck
+- got it working, I seem to have fixed the bitmap issue, and also wasn't subtracting the reserved blocks/inodes from the total
+  counts, so now the block count and bitmap match.  Also some bugs with nlinks and used dir count
+- fsck shows no errors, all clean, and the disk mounts 
+
+- with everything compiled in, networking, minix, and ext2, the kernel is
+    everything:     74452 bytes
+    minix only:     65328
+    ext2 only:      68328
+
+- aaaaaw I was testing some other things, then went to mount the disk again on linux, and it's mounted read only, so something got
+  messed up again
+- I suspect it's something about the card having had files on it, and mkfs not writing some critical blocks
+
+
+2026-05-26:
+
+- it seems like it was because the hacky mount point struct created during mkfs had the root node set to NULL, and I had changed the
+  dir setup to use that instead just setting the inode to 2, so that it could increment the nlinks field in the root node.  It seems
+  to work now, although I still don't trust it
+- I booted into gloworm without it initializing the disk, wrote a directory, and two files, and then mounted it on my desktop, and
+  it looked ok (it had the green bar instead of the red bar under the disk in dolphin), but it was actually read-only.  There was an
+  error in the syslogs that the bitmap didn't match the number of blocks in the group descriptor, 32243 vs 32247 free clusters
+- yeah, lots of errors now with fsck.  refcounts are 256 instead of 1 or 2 (which doesn't make much sense...), filetypes are wrong
+  for the text files, etc
+    ```
+    fsck from util-linux 2.42
+    e2fsck 1.47.4 (6-Mar-2025)
+    /dev/sdc2 contains a file system with errors, check forced.
+    Resize inode not valid.  Recreate? no
+
+    Pass 1: Checking inodes, blocks, and sizes
+    Inode 2, i_blocks is 65536, should be 8.  Fix? no
+
+    Inode 17, i_blocks is 65536, should be 8.  Fix? no
+
+    Inode 18, i_blocks is 65536, should be 8.  Fix? no
+
+    Inode 19, i_blocks is 65536, should be 8.  Fix? no
+
+    Pass 2: Checking directory structure
+    Entry 'more.txt' in / (2) has an incorrect filetype (was 2, should be 1).
+    Fix? no
+
+    Entry 'hey.txt' in /test (17) has an incorrect filetype (was 2, should be 1).
+    Fix? no
+
+    Pass 3: Checking directory connectivity
+    Pass 4: Checking reference counts
+    Inode 17 ref count is 256, should be 2.  Fix? no
+
+    Inode 18 ref count is 256, should be 1.  Fix? no
+
+    Inode 19 ref count is 256, should be 1.  Fix? no
+
+    Pass 5: Checking group summary information
+    Block bitmap differences:  -(516--519)
+    Fix? no
+
+    Free blocks count wrong for group #0 (32247, counted=32243).
+    Fix? no
+
+    Free blocks count wrong (32247, counted=32243).
+    Fix? no
+
+    Inode bitmap differences:  -(11--16)
+    Fix? no
+
+    Free inodes count wrong for group #0 (8178, counted=8173).
+    Fix? no
+
+    Directories count wrong for group #0 (3, counted=2).
+    Fix? no
+
+    Free inodes count wrong (8178, counted=8173).
+    Fix? no
+
+
+    /dev/sdc2: ********** WARNING: Filesystem still has errors **********
+
+
+              14 inodes used (0.17%, out of 8192)
+               0 non-contiguous files (0.0%)
+               0 non-contiguous directories (0.0%)
+                 # of inodes with ind/dind/tind blocks: 0/0/0
+             521 blocks used (1.59%, out of 32768)
+               1 bad block
+               0 large files
+
+               2 regular files
+               2 directories
+               0 character device files
+               0 block device files
+               0 fifos
+               0 links
+               0 symbolic links (0 fast symbolic links)
+               0 sockets
+    ------------
+               4 files
+    ```
+
+- ok, the filetype was wrong because I was passing the mode of the parent vnode, and not the new file's mode
+- the nlinks being 256 is weird.  It looks like I'm converting it correctly when I read and write the inode, but it's definitely
+  wrong on disk.  And it was the files that were created only that are a problem, not the mkfs root and bad nodes
+- Ah! I had some bad casts.  I was forcing that and gid to be 8 bit numbers because that's what minix used (copied code) and on a
+  big endian system, that changes the value
+- nblocks being wrong is also a bad cast, but during conversion between host and disk byte order
+- I think the rest are block and bitmap errors
+- I think I was using a ~ when I should have used just bit_mask() directly, and that fixed the bitmap.  No errors (atm)
+
+- weird, fsck doesn't find errors, and then I mount it and it goes read-only!?
+- the block size is incorrect.  I deleted a file, and also overwrote a file, so it's probably with that code
+- when it's mounted, and I fsck, it says it has a bunch of errors, but it seems to mount cleanly, and when it's unmounted and
+  fsck'd, it's clean
+
+- having trouble getting it to boot from ext2, and bunch of little issues.  One is that the device file is giving a 0, and then
+  crashing, essentially.  I should put NULL checks in driver.c, but also I think this is a 16/32 bit conversion issue.
+- put null checks and fixed conversion issue (htole16/le16toh instead of 32, when converting the block)
+- sizes in bytes:
+    (nominix), ext2 (nomkfs)      66744
+    (nominix), ext2 + mkfs        68436
+    minix + mkfs, (noext2)        65428
+    minix (nomkfs), (noext2)      64628
+- ext2 support is 3008 bytes bigger than minix support, including the mkfs of both
+- the ext2 mkfs support alone is 1692.  Minix mkfs support is only 800 bytes
+- without mkfs support, ext2 is 2116 bytes larger than minix, which is still a fair amount, but not a dealbreaker?
+
+
+2026-05-29:
+
+- the issue where it was running out of files is because the fd table's refcount was not set, so it was 0, and the table didn't get
+  freed.  Now that I've fixed that, there's a new problem of a double free on a file pointer
+- the problem was that I just added vfs_close to unset_fd, but it was already closing the file.  I changed the function to free_fd
+  and kept the close in there rather than in syscall.c, because all the other refcounting things are in fd
+
+- I tried writing a bunch of data to the file, and eventually I got an EIO, and the shell exited, so something to do with large
+  files?  I must have entered this command 100 or more times:
+  ```
+  /bin/echo "I have to enter a bunch of data repeatedly in order to make a file that's big enough, but it will take a lot of work to get to the size I need\n" >> more.txt
+  ```
+- I entered it 226 times, and it's 144 bytes, which would be 8 blocks?  There are 12 direct blocks, so it shouldn't have gone into
+  the indirect table yet.  It would have if I had used 1024 byte blocks though
+

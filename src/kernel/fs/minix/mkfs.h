@@ -4,27 +4,37 @@
 
 #include <errno.h>
 
-#include "dir.h"
+#include "super.h"
+#include "minix.h"
 
-static int minix_mkfs(device_t dev)
+extern struct mount_ops minix_mount_ops;
+
+static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 {
 	struct buf *super_buf;
 	struct bufcache bufcache;
 	struct minix_v1_superblock *super_v1;
 	struct minix_v1_superblock super_v1_cached;
 
+	log_notice("%s: initializing disk %x\n", minix_mount_ops.fstype, dev);
+
+	if (opts->block_size && opts->block_size != MINIX_V1_ZONE_SIZE) {
+		log_error("%s: block size must be %d\n", minix_mount_ops.fstype, MINIX_V1_ZONE_SIZE);
+		return EINVAL;
+	}
+
 	init_bufcache(&bufcache, dev, MINIX_V1_ZONE_SIZE);
 
 	super_v1 = &super_v1_cached;
 
 	super_v1->num_inodes = 0x40;
-	super_v1->num_zones = 0x64;
+	super_v1->num_zones = opts->blocks;
 	super_v1->imap_blocks = 1;
 	super_v1->zmap_blocks = 1;
 	super_v1->first_zone = 6;
 	super_v1->log_zone_size = MINIX_V1_LOG_ZONE_SIZE - 10;
 	super_v1->max_file_size = 67108864;
-	super_v1->magic = 0x137F;
+	super_v1->magic = MINIX_MAGIC;
 	super_v1->state = 0x0001;
 
 	// Write the superblock
@@ -45,7 +55,7 @@ static int minix_mkfs(device_t dev)
 	super_v1->magic = htole16(super_v1_cached.magic);
 	super_v1->state = htole16(super_v1_cached.state);
 
-	release_block(super_buf, BCF_DIRTY);
+	release_block(super_buf, BF_DIRTY);
 
 	super_v1 = &super_v1_cached;
 
@@ -59,7 +69,7 @@ static int minix_mkfs(device_t dev)
 		if (!inode_buf)
 			return ENOMEM;
 		memset(inode_buf->block, 0x00, MINIX_V1_ZONE_SIZE);
-		release_block(inode_buf, BCF_DIRTY);
+		release_block(inode_buf, BF_DIRTY);
 	}
 
 	inode_t root_ino = 1;
@@ -77,8 +87,7 @@ static int minix_mkfs(device_t dev)
 	inode_table[0].size = htole32(0);
 	inode_table[0].nlinks = htole16(1);
 	inode_table[0].zones[0] = htole16(dir_zone);
-
-	release_block(inode_buf, BCF_DIRTY);
+	release_block(inode_buf, BF_DIRTY);
 
 	// Initialize root directory
 	struct buf *dir_buf = get_block(&bufcache, dir_zone);
@@ -92,7 +101,7 @@ static int minix_mkfs(device_t dev)
 	entries[1].inode = htole16((minix_v1_inode_t) root_ino);
 	strcpy(entries[1].filename, "..");
 
-	release_block(dir_buf, BCF_DIRTY);
+	release_block(dir_buf, BF_DIRTY);
 
 	sync_bufcache(&bufcache);
 	free_bufcache(&bufcache);

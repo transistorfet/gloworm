@@ -13,7 +13,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
-	zone = minix_alloc_zone(vnode->mp->super);
+	zone = minix_alloc_zone(vnode->mp);
 	buf = get_block(&vnode->mp->bufcache, zone);
 	if (!buf)
 		return 0;
@@ -26,7 +26,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	entries[1].inode = htole16(parent ? (minix_v1_inode_t) parent->ino : 1);
 	strcpy(entries[1].filename, "..");
 
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	MINIX_DATA(vnode).zones[0] = htole16(zone);
 	// Set the initial directory size to include the two default entries

@@ -3,27 +3,30 @@
 #define _KERNEL_FS_BLOCKCACHE_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <asm/addresses.h>
 #include <kernel/utils/iovec.h>
 #include <kernel/utils/queue.h>
 
+#define BC_GF_DBG_NOWRITE	0x1000
 
-#define BCF_DIRTY	0x01
+#define BF_DIRTY		0x0001
 
 typedef unsigned int block_t;
 
 struct bufcache {
 	device_t dev;
-	short flags;
+	uint16_t flags;
 	int block_size;
+	int num_entries;
 	struct queue blocks;
 };
 
 struct buf {
 	struct queue_node node;
 	int refcount;
-	short flags;
+	uint16_t flags;
 	//device_t dev;
 	block_t num;
 	void *block;

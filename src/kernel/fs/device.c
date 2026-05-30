@@ -50,9 +50,9 @@ int device_ops_write(struct vfile *file, struct iovec_iter *iter)
 	return nbytes;
 }
 
-int device_ops_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int device_ops_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
-	return dev_ioctl(file->vnode->rdev, request, argp, uid);
+	return dev_ioctl(file->vnode->rdev, request, iter, uid);
 }
 
 int device_ops_poll(struct vfile *file, int events)

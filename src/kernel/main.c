@@ -54,13 +54,17 @@ struct driver *drivers[] = {
 	NULL	// Null Termination
 };
 
-extern struct mount_ops minix_mount_ops;
 extern struct mount_ops procfs_mount_ops;
+extern struct mount_ops minix_mount_ops;
+extern struct mount_ops ext2_mount_ops;
 
 struct mount_ops *filesystems[] = {
 	&procfs_mount_ops,
 	#if defined(CONFIG_MINIX_FS)
 	&minix_mount_ops,
+	#endif
+	#if defined(CONFIG_EXT2_FS)
+	&ext2_mount_ops,
 	#endif
 	NULL	// Null Termination
 };
@@ -99,8 +103,16 @@ device_t root_dev = DEVNUM(DEVMAJOR_ATA, 0);
 device_t root_dev = DEVNUM(DEVMAJOR_MEM, 0);
 #endif
 
+#if defined(CONFIG_MINIX_FS)
+struct mount_ops *root_filesystem_type = &minix_mount_ops;
+#elif defined(CONFIG_EXT2_FS)
+struct mount_ops *root_filesystem_type = &ext2_mount_ops;
+#else
+struct mount_ops *root_filesystem_type = NULL;
+#endif
 
-void create_dir_or_panic(const char *path)
+#if defined(CONFIG_BOOTSTRAP_DISK)
+int create_dir_or_panic(const char *path)
 {
 	struct vfile *file;
 	struct vnode *vnode;
@@ -113,9 +125,10 @@ void create_dir_or_panic(const char *path)
 		}
 		vfs_close(file);
 	}
+	return 0;
 }
 
-void create_special_or_panic(const char *path, device_t rdev)
+int create_special_or_panic(const char *path, device_t rdev)
 {
 	struct vnode *vnode;
 
@@ -125,7 +138,39 @@ void create_special_or_panic(const char *path, device_t rdev)
 		}
 	}
 	vfs_release_vnode(vnode);
+	return 0;
 }
+
+int bootstrap_disk(device_t dev, struct mount_ops *filesystem)
+{
+	int error;
+	const struct mkfs_options opts = {
+		.block_size = 1024,
+		.blocks = 0x64,
+	};
+
+	error = (filesystem->mkfs)(dev, &opts);
+	if (error < 0) {
+		return error;
+	}
+
+	error = vfs_mount(NULL, "/", dev, filesystem, 0, SU_UID);
+	if (error < 0) {
+		return error;
+	}
+
+	create_dir_or_panic("/bin");
+	create_dir_or_panic("/dev");
+	create_dir_or_panic("/proc");
+	create_dir_or_panic("/media");
+
+	create_special_or_panic("/dev/tty0", DEVNUM(DEVMAJOR_TTY, 0));
+	create_special_or_panic("/dev/tty1", DEVNUM(DEVMAJOR_TTY, 1));
+	create_special_or_panic("/dev/mem0", DEVNUM(DEVMAJOR_MEM, 0));
+	create_special_or_panic("/dev/ata0", DEVNUM(DEVMAJOR_ATA, 0));
+	return 0;
+}
+#endif
 
 void parse_boot_args(void)
 {
@@ -199,33 +244,22 @@ int main(void)
 	}
 	#endif
 
-	#if defined(CONFIG_MINIX_FS)
-	printk("minixfs: mounting (%x) at %s\n", root_dev, "/");
-	error = vfs_mount(NULL, "/", root_dev, &minix_mount_ops, 0, SU_UID);
-	if (error < 0)
+	// TODO should you make the filesystem module configurable?  It would remove a lot of functionality, but might be helpful in some cases
+	error = vfs_mount(NULL, "/", root_dev, root_filesystem_type, 0, SU_UID);
+	if (error < 0) {
+		#if defined(CONFIG_BOOTSTRAP_DISK)
+		error = bootstrap_disk(root_dev, root_filesystem_type);
+		if (error < 0)
+			goto fail;
+		#else
 		goto fail;
-	#endif
-
-
-	// TODO this would be moved elsewhere
-	create_dir_or_panic("/bin");
-	create_dir_or_panic("/dev");
-	create_dir_or_panic("/proc");
-	create_dir_or_panic("/media");
-
-	create_special_or_panic("/dev/tty0", DEVNUM(DEVMAJOR_TTY, 0));
-	create_special_or_panic("/dev/tty1", DEVNUM(DEVMAJOR_TTY, 1));
-	create_special_or_panic("/dev/mem0", DEVNUM(DEVMAJOR_MEM, 0));
-	create_special_or_panic("/dev/ata0", DEVNUM(DEVMAJOR_ATA, 0));
+		#endif
+	}
 
 	// TODO device number here is an issue because 0 is used to indicated a mount slot is not used, which when mounting after this causes a /proc error
-	printk("procfs: mounting at /proc\n");
 	error = vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
 	if (error < 0)
 		goto fail;
-
-	//vfs_mount(NULL, "/media", DEVNUM(DEVMAJOR_ATA, 0), &minix_mount_ops, SU_UID);
-
 
 	#if defined(CONFIG_NET)
 	// TODO this is a temporary hack.  The ifup should be done through ifconfig
@@ -237,6 +271,17 @@ int main(void)
 	#endif
 
 	create_init_task();
+
+
+	#if defined(CONFIG_EXT2_FS)
+	device_t extra_dev = DEVNUM(DEVMAJOR_ATA, 1);
+	const char *extra_mountpoint = "/media";
+
+	error = vfs_mount(NULL, extra_mountpoint, extra_dev, &ext2_mount_ops, 0, SU_UID);
+	if (error < 0) {
+		log_error("error mounting /media: %d\n", error);
+	}
+	#endif
 
 	log_debug("begin multitasking...\n");
 	begin_multitasking();

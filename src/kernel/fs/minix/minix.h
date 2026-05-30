@@ -2,12 +2,17 @@
 #ifndef _SRC_KERNEL_FS_MINIX_MINIX_H
 #define _SRC_KERNEL_FS_MINIX_MINIX_H
 
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/utils/queue.h>
 
 #include "minix-v1.h"
+
+#if NAME_MAX < MINIX_V1_MAX_FILENAME
+#error "minixfs requires a maximum filename of at least 14 characters"
+#endif
 
 #define MINIX_SUPERBLOCK_SIZE	512
 
@@ -59,7 +64,7 @@ int minix_open(struct vfile *file, int flags);
 int minix_close(struct vfile *file);
 int minix_read(struct vfile *file, struct iovec_iter *iter);
 int minix_write(struct vfile *file, struct iovec_iter *iter);
-int minix_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
+int minix_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 offset_t minix_seek(struct vfile *file, offset_t position, int whence);
 int minix_readdir(struct vfile *file, struct dirent *dir);
 

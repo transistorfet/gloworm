@@ -54,7 +54,13 @@ void memory_region_free(struct memory_region *region)
 	if (!region)
 		return;
 
-	if (--region->refcount == 0) {
+	region->refcount -= 1;
+	if (region->refcount < 0) {
+		log_warning("warning: double free of memory region, %x\n", region);
+	} else if (region->refcount == 0) {
+		if (region->file) {
+			vfs_close(region->file);
+		}
 		page_free((uintptr_t) region->mem_start, region->mem_length);
 		kmfree(region);
 	}
@@ -258,8 +264,11 @@ void memory_segment_free(struct memory_segment *segment)
 	}
 
 	#else
+
 	memory_region_free(segment->region);
+
 	#endif
+
 	kmfree(segment);
 }
 
@@ -294,7 +303,10 @@ void memory_map_free(struct memory_map *map)
 		return;
 	}
 
-	if (--map->refcount == 0) {
+	map->refcount -= 1;
+	if (map->refcount < 0) {
+		log_warning("warning: double free of memory map, %x\n", map);
+	} else if (map->refcount == 0) {
 		#if defined(CONFIG_MMU)
 		int error;
 

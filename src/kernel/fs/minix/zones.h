@@ -34,7 +34,7 @@ static zone_t minix_alloc_zone(struct mount *mp)
 		return NULL;
 
 	memset(buf->block, 0, MINIX_V1_ZONE_SIZE);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	return bit;
 }
@@ -90,8 +90,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 		if (tier == 0) {
 			zone = &MINIX_DATA(vnode).zones[tiers[0]];
 		} else {
-			if (buf)
+			if (buf) {
 				release_block(buf, 0);
+			}
 			buf = get_block(&vnode->mp->bufcache, le16toh(*zone));
 			if (!buf)
 				return 0;
@@ -102,8 +103,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 		if (!*zone) {
 			if (create) {
 				*zone = htole16(minix_alloc_zone(vnode->mp));
-				if (buf)
+				if (buf) {
 					mark_block_dirty(buf);
+				}
 			} else {
 				if (buf)
 					release_block(buf, 0);
@@ -113,8 +115,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 	}
 
 	ret = (zone_t) le16toh(*zone);
-	if (buf)
+	if (buf) {
 		release_block(buf, 0);
+	}
 	return ret;
 }
 
@@ -129,8 +132,9 @@ static void zone_free_all(struct vnode *vnode)
 		return;
 
 	// Traverse all zones and free each
-	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++)
+	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
 		minix_free_zone(vnode->mp, zone);
+	}
 
 	// Go through the tier 2 zonenum tables and free each
 	if (MINIX_DATA(vnode).zones[8]) {
@@ -138,8 +142,9 @@ static void zone_free_all(struct vnode *vnode)
 		if (buf) {
 			minix_v1_zone_t *entries = buf->block;
 			for (zone_t i = 0; i < MINIX_V1_ZONENUMS_PER_ZONE; i++) {
-				if (entries[i])
+				if (entries[i]) {
 					minix_free_zone(vnode->mp, le16toh(entries[i]));
+				}
 			}
 			release_block(buf, 0);
 		}
@@ -147,13 +152,15 @@ static void zone_free_all(struct vnode *vnode)
 
 	// Go through the tier 1 zonenum tables and free each
 	for (short i = MINIX_V1_TIER1_ZONENUMS; i < MINIX_V1_TOTAL_ZONENUMS; i++) {
-		if (MINIX_DATA(vnode).zones[i])
+		if (MINIX_DATA(vnode).zones[i]) {
 			minix_free_zone(vnode->mp, le16toh(MINIX_DATA(vnode).zones[i]));
+		}
 	}
 
 	// Go through the tier 0 zonenum tables (the inode zones) and free each
-	for (short i = 0; i < MINIX_V1_TOTAL_ZONENUMS; i++)
+	for (short i = 0; i < MINIX_V1_TOTAL_ZONENUMS; i++) {
 		MINIX_DATA(vnode).zones[i] = 0;
+	}
 
 	mark_vnode_dirty(vnode);
 }

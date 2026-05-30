@@ -1,28 +1,28 @@
 
-#ifndef _SRC_KERNEL_FS_MINIX_VNODES_H
-#define _SRC_KERNEL_FS_MINIX_VNODES_H
+#ifndef _SRC_KERNEL_FS_EXT2_VNODES_H
+#define _SRC_KERNEL_FS_EXT2_VNODES_H
 
 #include <string.h>
 #include <sys/stat.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/mm/kmalloc.h>
 
-#include "minix.h"
+#include "ext2.h"
 #include "inodes.h"
 
 #define MAX_VNODES	20
 
 // The queue_node is not at the start of the vnode, so we need to adjust the address to point to the start of the vnode struct
-#define MINIX_QUEUE_NODE_TO_VNODE(node) \
+#define EXT2_QUEUE_NODE_TO_VNODE(node) \
 			((struct vnode *) (((char *) node) - sizeof(struct vnode)))
 
 static int nodes_in_cache;
 static struct queue cache;
-extern struct vnode_ops minix_vnode_ops;
+extern struct vnode_ops ext2_vnode_ops;
 
 static void release_unused_vnodes(void);
 
-static void init_minix_vnodes(void)
+static void init_ext2_vnodes(void)
 {
 	nodes_in_cache = 0;
 	_queue_init(&cache);
@@ -33,7 +33,7 @@ static void sync_vnodes(void)
 	struct vnode *vnode;
 
 	for (struct queue_node *cur = cache.head; cur; cur = cur->next) {
-		vnode = MINIX_QUEUE_NODE_TO_VNODE(cur);
+		vnode = EXT2_QUEUE_NODE_TO_VNODE(cur);
 		if (vnode->bits & VBF_DIRTY) {
 			write_inode(vnode, vnode->ino);
 		}
@@ -49,16 +49,16 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 
 	// TODO this should recycle a cached vnode if it doesn't have a reference and there are more than a certain number of vnodes already loaded
 	//entry = _find_free_entry();
-	vnode = kmalloc(sizeof(struct minix_vnode));
+	vnode = kmalloc(sizeof(struct ext2_vnode));
 	if (!vnode)
 		return NULL;
 
 	//printk("L:%x;%d;%d\n", vnode, mp->dev, ino);
-	_queue_insert(&cache, &MINIX_DATA(vnode).node);
+	_queue_insert(&cache, &EXT2_DATA(vnode).node);
 
-	vfs_init_vnode(vnode, &minix_vnode_ops, mp, 0, 1, 0, 0, 0, ino, 0, 0, 0, 0);
-	for (short j = 0; j < MINIX_V1_INODE_ZONENUMS; j++) {
-		MINIX_DATA(vnode).zones[j] = NULL;
+	vfs_init_vnode(vnode, &ext2_vnode_ops, mp, 0, 1, 0, 0, 0, ino, 0, 0, 0, 0);
+	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++) {
+		EXT2_DATA(vnode).blocks[j] = NULL;
 	}
 
 	error = read_inode(vnode, ino);
@@ -77,15 +77,15 @@ static struct vnode *get_vnode(struct mount *mp, inode_t ino)
 	struct vnode *vnode;
 
 	for (struct queue_node *cur = cache.head; cur; cur = cur->next) {
-		vnode = MINIX_QUEUE_NODE_TO_VNODE(cur);
+		vnode = EXT2_QUEUE_NODE_TO_VNODE(cur);
 		//printk("S:%x;%d;%d\n", vnode, vnode->mp->dev, vnode->ino);
 		if (vnode->mp->dev == mp->dev && vnode->ino == ino) {
 			//printk("G:%x;%d;%d\n", vnode, mp->dev, ino);
 			vfs_clone_vnode(vnode);
 
 			// Move to the front of the cache list
-			_queue_remove(&cache, &MINIX_DATA(vnode).node);
-			_queue_insert(&cache, &MINIX_DATA(vnode).node);
+			_queue_remove(&cache, &EXT2_DATA(vnode).node);
+			_queue_insert(&cache, &EXT2_DATA(vnode).node);
 			return vnode;
 		}
 	}
@@ -97,14 +97,13 @@ static struct vnode *alloc_vnode(struct mount *mp, mode_t mode, uid_t uid, gid_t
 {
 	struct vnode *vnode;
 
-	// TODO this should pass in the mp or superblock, but that would mean alloc_inode couldn't be used by the hacky mkfs function
-	bitnum_t ino = alloc_inode(mp, mode, uid, gid, device);
+	const ext2_inode_t ino = alloc_inode(mp, mode, uid, gid, device);
 	if (!ino)
 		return NULL;
 
 	vnode = load_vnode(mp, ino);
 	if (!vnode) {
-		free_inode(mp, ino);;
+		free_inode(vnode, ino);
 		return NULL;
 	}
 
@@ -119,7 +118,7 @@ static void mark_vnode_dirty(struct vnode *vnode)
 
 static int delete_vnode(struct vnode *vnode)
 {
-	free_inode(vnode->mp, vnode->ino);
+	free_inode(vnode, vnode->ino);
 	vnode->ino = 0;
 	return 0;
 }
@@ -129,7 +128,7 @@ static int release_vnode(struct vnode *vnode)
 	if (vnode->ino && vnode->bits & VBF_DIRTY) {
 		write_inode(vnode, vnode->ino);
 	}
-	_queue_remove(&cache, &MINIX_DATA(vnode).node);
+	_queue_remove(&cache, &EXT2_DATA(vnode).node);
 	kmfree(vnode);
 	nodes_in_cache -= 1;
 	return 0;
@@ -140,10 +139,11 @@ static void release_unused_vnodes(void)
 	struct queue_node *last;
 
 	while (nodes_in_cache - 1 >= MAX_VNODES) {
-		for (last = cache.tail; last && MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) { }
-		if (!last || MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0)
+		for (last = cache.tail; last && EXT2_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) { }
+		if (!last || EXT2_QUEUE_NODE_TO_VNODE(last)->refcount > 0) {
 			break;
-		release_vnode(MINIX_QUEUE_NODE_TO_VNODE(last));
+		}
+		release_vnode(EXT2_QUEUE_NODE_TO_VNODE(last));
 	}
 }
 

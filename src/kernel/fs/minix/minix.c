@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <kconfig.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>
@@ -19,6 +20,15 @@
 #include "zones.h"
 #include "super.h"
 #include "dir.h"
+
+#if defined(CONFIG_MINIX_FS_MKFS)
+#include "mkfs.h"
+#else
+static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
+{
+	return ENOENT;
+}
+#endif
 
 
 struct vfile_ops minix_vfile_ops = {
@@ -48,6 +58,7 @@ struct vnode_ops minix_vnode_ops = {
 struct mount_ops minix_mount_ops = {
 	"minixfs",
 	minix_init,
+	minix_mkfs,
 	minix_mount,
 	minix_unmount,
 	minix_sync,
@@ -124,7 +135,7 @@ int minix_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t u
 	}
 
 	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	// TODO need to adjust the size of the directory size
 
@@ -150,11 +161,11 @@ int minix_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, dev);
 	if (!newnode) {
 		release_block(buf, 0);
-		return EMFILE;
+		return ENOVNODE;
 	}
 
 	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
@@ -193,7 +204,7 @@ int minix_link(struct vnode *oldvnode, struct vnode *newparent, const char *file
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole16((minix_v1_inode_t) oldvnode->ino);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
 	return 0;
@@ -212,7 +223,7 @@ int minix_unlink(struct vnode *parent, struct vnode *vnode, const char *filename
 		return ENOENT;
 
 	dir->inode = htole16(0);
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	vnode->nlinks -= 1;
 	if (vnode->nlinks <= 0) {
@@ -248,8 +259,8 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 
 	newdir->inode = htole16((minix_v1_inode_t) vnode->ino);
 	olddir->inode = htole16(0);
-	release_block(newbuf, BCF_DIRTY);
-	release_block(oldbuf, BCF_DIRTY);
+	release_block(newbuf, BF_DIRTY);
+	release_block(oldbuf, BF_DIRTY);
 	vfs_update_time(oldparent, MTIME);
 	vfs_update_time(newparent, MTIME);
 	return 0;
@@ -323,8 +334,9 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 			break;
 
 		zlen = MINIX_V1_ZONE_SIZE - zpos;
-		if (zlen > nbytes)
+		if (zlen > nbytes) {
 			zlen = nbytes;
+		}
 
 		memcpy_into_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		release_block(buf, 0);
@@ -370,11 +382,12 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 		}
 
 		zlen = MINIX_V1_ZONE_SIZE - zpos;
-		if (zlen > nbytes)
+		if (zlen > nbytes) {
 			zlen = nbytes;
+		}
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, BCF_DIRTY);
+		release_block(buf, BF_DIRTY);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -396,7 +409,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 	return wbytes;
 }
 
-int minix_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int minix_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
 	return EINVAL;
 }
@@ -417,8 +430,9 @@ offset_t minix_seek(struct vfile *file, offset_t position, int whence)
 	}
 
 	// TODO this is a hack for now so I don't have to deal with gaps in files
-	if (position > file->vnode->size)
+	if (position > file->vnode->size) {
 		position = file->vnode->size;
+	}
 
 	file->position = position;
 	return file->position;
@@ -460,12 +474,12 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 
 	file->position = ((znum << MINIX_V1_LOG_DIRENTS_PER_ZONE) | zpos) + 1;
 
-	max = MINIX_V1_MAX_FILENAME < VFS_FILENAME_MAX ? MINIX_V1_MAX_FILENAME : VFS_FILENAME_MAX;
+	max = MINIX_V1_MAX_FILENAME;
 
 	dir->d_ino = le16toh(entries[zpos].inode);
 	strncpy(dir->d_name, entries[zpos].filename, max);
 	dir->d_name[max - 1] = '\0';
-	release_block(buf, BCF_DIRTY);
+	release_block(buf, BF_DIRTY);
 
 	return 1;
 }

@@ -4,6 +4,7 @@
 
 #include <kernel/fs/vfs.h>
 
+int nop_mkfs(device_t dev, const struct mkfs_options *opts);
 int nop_sync(struct mount *mp);
 int nop_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t uid, struct vnode **result);
 int nop_mknod(struct vnode *vnode, const char *name, mode_t mode, device_t dev, uid_t uid, struct vnode **result);
@@ -17,9 +18,9 @@ int nop_release(struct vnode *vnode);
 
 int nop_open(struct vfile *file, int flags);
 int nop_close(struct vfile *file);
-int nop_read(struct vfile *file, char *buf, size_t nbytes);
-int nop_write(struct vfile *file, const char *buf, size_t nbytes);
-int nop_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid);
+int nop_read(struct vfile *file, struct iovec_iter *iter);
+int nop_write(struct vfile *file, struct iovec_iter *iter);
+int nop_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int nop_poll(struct vfile *file, int events);
 offset_t nop_seek(struct vfile *file, offset_t position, int whence);
 int nop_readdir(struct vfile *file, struct dirent *dir);

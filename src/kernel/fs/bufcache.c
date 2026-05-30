@@ -10,7 +10,7 @@
 #include <kernel/utils/iovec.h>
 
 
-#define BUFCACHE_MAX		20
+#define BUFCACHE_MAX		100
 
 
 static inline struct buf *_find_free_entry(struct bufcache *cache);
@@ -24,6 +24,7 @@ void init_bufcache(struct bufcache *cache, device_t dev, int block_size)
 	cache->dev = dev;
 	cache->flags = 0;
 	cache->block_size = block_size;
+	cache->num_entries = 0;
 	_queue_init(&cache->blocks);
 }
 
@@ -74,19 +75,20 @@ int release_block(struct buf *buf, short dirty)
 		mark_block_dirty(buf);
 	}
 
-	if (--buf->refcount == 0) {
+	buf->refcount -= 1;
+	if (buf->refcount == 0) {
 		// TODO we actually maybe don't want to write until this entry is recycled, or else any bit changes will require an immediate writeback
 		//_write_entry(cache->dev, buf);
 	} else if (buf->refcount < 0) {
 		buf->refcount = 0;
-		log_warning("error: possible double free for block %d\n", buf->num);
+		log_warning("warning: possible double free for block %d\n", buf->num);
 	}
 	return 0;
 }
 
 void mark_block_dirty(struct buf *buf)
 {
-	buf->flags |= BCF_DIRTY;
+	buf->flags |= BF_DIRTY;
 }
 
 static struct buf *_load_block(struct bufcache *cache, block_t num)
@@ -118,28 +120,27 @@ static struct buf *_load_block(struct bufcache *cache, block_t num)
 
 static inline struct buf *_find_free_entry(struct bufcache *cache)
 {
-	int count = 0;
 	struct buf *last;
 
 	// Recycle the last used entry
-	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node), count++) { }
+	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node)) { }
 
-	if (!last) {
-		if (count < BUFCACHE_MAX) {
-			last = _create_entry(cache);
-			if (!last)
-				return NULL;
-		} else {
-			panic("Error: ran out of bufcache entries\n");
+	if (cache->num_entries < BUFCACHE_MAX) {
+		// We haven't reached the limit, so create a new entry instead
+		last = _create_entry(cache);
+		if (!last)
 			return NULL;
-		}
+	} else if (!last) {
+		panic("Error: ran out of bufcache entries\n");
+		return NULL;
 	}
 
-	_queue_remove(&cache->blocks, &last->node);
-	_queue_insert(&cache->blocks, &last->node);
 	if (last->num != 0 && last->block) {
+		log_trace("recycling cached block %d\n", last->num);
 		_write_entry(cache, last);
 	}
+	_queue_remove(&cache->blocks, &last->node);
+	_queue_insert(&cache->blocks, &last->node);
 	return last;
 }
 
@@ -160,6 +161,7 @@ static inline struct buf *_create_entry(struct bufcache *cache)
 	buf->num = 0;
 	buf->block = block;
 	_queue_insert(&cache->blocks, &buf->node);
+	cache->num_entries += 1;
 	return buf;
 }
 
@@ -182,16 +184,22 @@ static inline int _write_entry(struct bufcache *cache, struct buf *entry)
 	struct kvec kvec;
 	struct iovec_iter iter;
 
-	if (!(entry->flags & BCF_DIRTY)) {
+	if (!(entry->flags & BF_DIRTY)) {
 		return 0;
 	}
+
+	if (cache->flags & BC_GF_DBG_NOWRITE) {
+		log_warning("bufcache: would have written dev %x block %d\n", cache->dev, entry->num);
+		return 0;
+	}
+
 	//printk("WRITING %x: %x <- %x x %x\n", entry->dev, (entry->num * cache->block_size), entry->block, cache->block_size);
 	iovec_iter_init_simple_kvec(&iter, &kvec, entry->block, cache->block_size);
 	int size = dev_write(cache->dev, (entry->num * cache->block_size), &iter);
 	if (size != cache->block_size) {
 		return -1;
 	}
-	entry->flags &= ~BCF_DIRTY;
+	entry->flags &= ~BF_DIRTY;
 	return 1;
 }
 

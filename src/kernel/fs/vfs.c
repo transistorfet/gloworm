@@ -64,6 +64,8 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 	int error;
 	struct vnode *vnode;
 
+	log_info("%s: mounting (%x) at %s\n", ops->fstype, dev, path);
+
 	if (uid != SU_UID)
 		return EPERM;
 
@@ -155,11 +157,23 @@ int vfs_sync(device_t dev)
 	int error = 0;
 
 	for (short i = 0; i < VFS_MOUNT_MAX; i++) {
-		if (mountpoints[i].dev && (!dev || mountpoints[i].dev == dev)) {
-			error = mountpoints[i].ops->sync(&mountpoints[i]);
-			if (error)
-				return error;
+		if (dev && mountpoints[i].dev != dev) {
+			continue;
 		}
+
+		if (mountpoints[i].dev == 0) {
+			// Virtual device, so there's nothing to sync
+			continue;
+		}
+
+		if (mountpoints[i].bits & VFS_MBF_READ_ONLY) {
+			log_warning("vfs: skipping sync of read-only filesystem dev=%x %x\n", mountpoints[i].dev, mountpoints[i].bits);
+			continue;
+		}
+
+		error = mountpoints[i].ops->sync(&mountpoints[i]);
+		if (error)
+			return error;
 	}
 	return 0;
 }
@@ -171,7 +185,7 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 	int i = 0, j;
 	struct mount *mp;
 	struct vnode *cur;
-	char component[VFS_FILENAME_MAX];
+	char component[NAME_MAX];
 
 	if (!result)
 		return EINVAL;
@@ -211,13 +225,13 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 			return EPERM;
 		}
 
-		for (j = 0; j < VFS_FILENAME_MAX - 1 && path[i] && path[i] != VFS_SEP; i++, j++)
+		for (j = 0; j < NAME_MAX - 1 && path[i] && path[i] != VFS_SEP; i++, j++)
 			component[j] = path[i];
 		if (path[i] == VFS_SEP)
 			i += 1;
 		component[j] = '\0';
 
-		if (j >= VFS_FILENAME_MAX) {
+		if (j >= NAME_MAX) {
 			vfs_release_vnode(cur);
 			return ENAMETOOLONG;
 		}
@@ -346,6 +360,10 @@ int vfs_chmod(struct vnode *cwd, const char *path, int mode, uid_t uid)
 	if (error)
 		return error;
 
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
+
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode))
 		return EPERM;
 
@@ -363,6 +381,10 @@ int vfs_chown(struct vnode *cwd, const char *path, uid_t owner, gid_t group, uid
 	error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
 	if (error)
 		return error;
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		vfs_release_vnode(vnode);
@@ -384,6 +406,10 @@ int vfs_mknod(struct vnode *cwd, const char *path, mode_t mode, device_t dev, ui
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &vnode);
 	if (error)
 		return error;
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		vfs_release_vnode(vnode);
@@ -415,6 +441,10 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 	struct vnode *tmpvnode = NULL;
 
 	// TODO We still don't check that there are no loops
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	error = vfs_lookup(cwd, oldpath, VLOOKUP_NORMAL, uid, &vnode);
 	if (error)
@@ -469,6 +499,10 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	if (error)
 		return error;
 
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
+
 	// Verify that parent directory is writable
 	if (!verify_mode_access(uid, W_OK, parent->uid, parent->gid, parent->mode)) {
 		vfs_release_vnode(parent);
@@ -484,12 +518,14 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	}
 
 	// Verify that the file we're trying to delete is writable
-	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode))
+	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		error = EPERM;
+	}
 
-	if (!error)
+	if (!error) {
 		// unlink does not take ownership of vnode and must not call vfs_release_vnode
 		error = parent->ops->unlink(parent, vnode, filename);
+	}
 
 	vfs_release_vnode(parent);
 	vfs_release_vnode(vnode);
@@ -505,6 +541,10 @@ static inline int _rename_find_parent(struct vnode *cwd, const char *path, uid_t
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &vnode);
 	if (error)
 		return error;
+
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+		return EROFS;
+	}
 
 	// Verify that the parent directory of the old location is writable and searchable
 	if (!verify_mode_access(uid, W_OK | X_OK, vnode->uid, vnode->gid, vnode->mode)) {
@@ -582,6 +622,10 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 
 		// Lookup the last path component, or create a new file if an error occurs during lookup
 		if (vnode->ops->lookup(vnode, filename, &vnode)) {
+			if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
+				return EROFS;
+			}
+
 			// Verify that parent directory is writable
 			if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 				vfs_release_vnode(vnode);
@@ -610,7 +654,7 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 
 	*file = new_fileptr(vnode, flags);
 	if (!*file)
-		return EMFILE;
+		return ENFILE;
 
 	if (flags & O_TRUNC && S_ISREG(vnode->mode))
 		vnode->ops->truncate(vnode);
@@ -648,14 +692,16 @@ int vfs_read(struct vfile *file, struct iovec_iter *iter)
 
 int vfs_write(struct vfile *file, struct iovec_iter *iter)
 {
+	if ((file->vnode->mp->bits & VFS_MBF_READ_ONLY) && (S_ISREG(file->vnode->mode) || S_ISDIR(file->vnode->mode)))
+		return EROFS;
 	if ((file->flags & O_ACCMODE) == O_RDONLY)
 		return EACCES;
 	return file->ops->write(file, iter);
 }
 
-int vfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int vfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
-	return file->ops->ioctl(file, request, argp, uid);
+	return file->ops->ioctl(file, request, iter, uid);
 }
 
 int vfs_poll(struct vfile *file, int events)
@@ -684,7 +730,7 @@ int vfs_release_vnode(struct vnode *vnode)
 		return 0;
 	vnode->refcount--;
 	if (vnode->refcount < 0) {
-		printk("Error: double free of vnode, %x\n", vnode);
+		log_warning("warning: double free of vnode, %x\n", vnode);
 	} else if (vnode->refcount == 0) {
 		return vnode->ops->release(vnode);
 	}

@@ -134,9 +134,9 @@ int devfs_write(struct vfile *file, struct iovec_iter *iter)
 	return dev_write(DEVFS_DATA(file->vnode).device, 0, iter);
 }
 
-int devfs_ioctl(struct vfile *file, unsigned int request, void *argp, uid_t uid)
+int devfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
-	return dev_ioctl(DEVFS_DATA(file->vnode).device, request, argp, uid);
+	return dev_ioctl(DEVFS_DATA(file->vnode).device, request, iter, uid);
 }
 
 offset_t devfs_seek(struct vfile *file, offset_t position, int whence)

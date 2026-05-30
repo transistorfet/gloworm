@@ -1,14 +1,25 @@
 
-* if you make a separate bufcache for each device, then it can store the block size there
-* the alternotive seems to be possing in the block size every time you get or set a block or sync, but you still need a lookup either way
+* should you move the reference increment to inside memory_map_mmap?
+
+* running echo a bunch of times eventually caused the too many files open error
+* also fsck got a bunch of errors this time
+* test writing a big disk to extra, and see if it will load and be editable in linux
+
+* add -Wextra, even though it doesn't seem to catch all the type size issues.  I have to specifically request -Wconversion in order to get the warning I want, but it's over zealous
+
+* bug where, when a file already exists, and you use truncate ">" in the shell, it drops the first letter for some reason (might also be quote parsing in echo)
+* typing "ls .." from / caused a segfault on addr=27ED0208
+* ran into a bug when piping text into a lot of files, where it ran out of open files, so they're not being closed for some reason, and it seems to be common between fs'
+
+* make pretty printing of device names based on the device number, and a driver name
+* should you add a name to the driver struct?
+* I need like an lsof command to list at least open files for the current process? or add it to procfs?
+* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
-* finish implementing ext2
 
-* should you add a name to the driver struct?
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
-* normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 
 * refactor queue and ringbuffer, try not inlining everything to see if significantly reduces the size
 * for queue, make it possible/easier to have multiple nodes in the same struct
@@ -22,9 +33,12 @@
 * fix docker config
 * make a dockerfile that can also compile the entire project
 
+* is there a better name than alignment_offset?  lower_bits()?  bitwise_modulus()?  bitwise_remainder()?
+
 ----
 
 
+* why does procfs use dev=1?  Can I avoid that hack somehow?
 * make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
 * make the slip's tty device configurable
 * send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
@@ -59,7 +73,6 @@
 
 ----
 
-* is there a better name than alignment_offset?
 * separate access control paramater (rwx) to mmu_table_mmap, and map_memory_mmap??
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
 
@@ -89,10 +102,8 @@
 
 Overview
 
-    * add ext2 support
     * add new types of locks
     * add multi-cpu support
-    * support minixfs 2 and 3?
     * add dynamic linking
     * add additional architectures?
 
@@ -101,6 +112,7 @@ Overview
 
 Operating System:
 
+    * support minixfs 2 and 3?
     * should you support large pages?
     * add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
 

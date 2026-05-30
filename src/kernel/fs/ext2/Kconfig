@@ -1,0 +1,19 @@
+
+config EXT2_FS
+	bool "Ext2 file system"
+	default n
+	help
+	  This enables the ext2 file system support.  Only ext2 is supported at
+	  this time (not ext3 or ext4).
+
+if EXT2_FS
+
+config EXT2_FS_MKFS
+	bool "mkfs for Ext2"
+	default y
+	help
+	  This option will include support for making new filesystems of the
+	  ext2 type
+
+endif
+
