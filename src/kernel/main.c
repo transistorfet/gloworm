@@ -178,8 +178,8 @@ extern size_t __pages_start, __pages_end;
 #define PAGES_START __pages_start
 #define PAGES_END   __pages_end
 #else
-#define PAGES_START CONF_PAGES_START;
-#define PAGES_END   CONF_PAGES_END;
+#define PAGES_START CONFIG_PAGES_START
+#define PAGES_END   CONFIG_PAGES_END
 #endif
 
 void parse_boot_args(void)
