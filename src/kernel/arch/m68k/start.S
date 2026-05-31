@@ -6,6 +6,7 @@
 	.global boot_args
 	.global __bss_start
 	.global __bss_end
+	.global __stack_top
 
 /**
  * Image Start
@@ -18,7 +19,7 @@ _start:
 
 	/* Zero out the BSS section of the kernel */
 	lea.l	__bss_start, %a0
-	move.l	__bss_end, %d0
+	move.l	#__bss_end, %d0
 	sub.l	%a0, %d0
 	lsr.l	#2, %d0
     5:
@@ -31,7 +32,7 @@ _start:
     S1: move.b	(%a0)+, (%a1)+
 	bne	S1
 
-	move.l	#0x120000, %sp		/* re-initialize the stack pointer to the top of the kernel space (lower 64KB of RAM) */
+	move.l	#__stack_top, %sp	/* re-initialize the stack pointer to the top of the kernel space */
 	jsr	main
 	stop	#0x2700			/* halt, since we clobbered the stack on entry */
 

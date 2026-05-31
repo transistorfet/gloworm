@@ -22,6 +22,7 @@ libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 always-y			+= kernel.elf kernel.bin kernel.load
 
 ldflags-y 			+= -Wl,--entry=_start -Tsrc/kernel/arch/$(SRCARCH)/kernel.ld
+extra-y 			+= arch/$(SRCARCH)/kernel.ld
 
 # Set these flags for all subdirectories instead of just the current Makefile
 CFLAGS				+= $(kernel-ccflags-y)

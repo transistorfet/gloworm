@@ -1,0 +1,60 @@
+
+#include <generated/config.h>
+
+ENTRY(_start)
+EXTERN(_start)
+
+MEMORY
+{
+  ram : ORIGIN = CONFIG_KERNEL_BASE, LENGTH = CONFIG_KERNEL_MEM_SIZE
+}
+
+SECTIONS
+{
+  .text : {
+    __kernel_start = .;
+
+    *(.text.start)
+    *(.text)
+  } > ram
+
+  .rodata : {
+    *(.rodata)
+  } > ram
+
+  .data : {
+    *(.data)
+  } > ram
+
+  __bss_start = .;
+  .bss : {
+    *(.bss)
+  } > ram
+  __bss_end = .;
+
+  .stack (NOLOAD) : {
+    . = ALIGN(4);
+    FILL(0x00);
+    . = . + CONFIG_STACK_SIZE;
+  } > ram
+  __stack_top = .;
+  __kernel_end = .;
+
+#if defined(CONFIG_MEM_LAYOUT_AUTO)
+#if defined(CONFIG_MEM)
+  /* TODO: fill this area with actual image file */
+  __memdev_start = .;
+  .memdev (NOLOAD) : {
+    . = ALIGN(4);
+    FILL(0x00);
+    . = . + CONFIG_MEM_DEV_SIZE;
+  } > ram
+  /* Just for debug reasons, not used in code */
+  __memdev_end = .;
+#endif
+
+  __pages_start = .;
+  __pages_end = ORIGIN(ram) + LENGTH(ram);
+
+#endif
+}

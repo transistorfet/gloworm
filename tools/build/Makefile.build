@@ -112,6 +112,10 @@ $(OUTPUT)%.load: $(OUTPUT)%.bin
 $(OUTPUT)%.send: $(OUTPUT)%.bin
 	tools/make-send-file $< $@
 
+# Pre-process the linker script templates
+%.ld: %.ld.in
+	$(HOST_CPP) $(host-ccflags-y) -P -x c $< -o $@
+
 $(OUTPUT)%.bin: $(OUTPUT)%.elf
 	$(cmd_ld_bin)
 

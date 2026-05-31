@@ -172,6 +172,16 @@ int bootstrap_disk(device_t dev, struct mount_ops *filesystem)
 }
 #endif
 
+#if defined(CONFIG_MEM_LAYOUT_AUTO)
+// Get start and end of page memory from symbols
+extern size_t __pages_start, __pages_end;
+#define PAGES_START __pages_start
+#define PAGES_END   __pages_end
+#else
+#define PAGES_START CONF_PAGES_START;
+#define PAGES_END   CONF_PAGES_END;
+#endif
+
 void parse_boot_args(void)
 {
 	if (!strncmp(boot_args, "mem", 3)) {
@@ -189,7 +199,7 @@ int main(void)
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	error = init_pages(CONFIG_PAGES_START, CONFIG_PAGES_END - CONFIG_PAGES_START);
+	error = init_pages(PAGES_START, PAGES_END);
 	if (error < 0)
 		goto fail;
 	error = init_kernel_heap();

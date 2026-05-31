@@ -52,6 +52,7 @@ export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS k
 HOST_ARCH			= testapp
 HOST_LD				?= gcc
 HOST_CC				?= gcc
+HOST_CPP            ?= gcc -E
 HOST_CFLAGS			?=
 HOST_LDFLAGS			?=
 
