@@ -76,6 +76,11 @@ plan to support other computers in future.
 Configuring & Building
 ----------------------
 
+A summary of the build targets and options can be printed using:
+```sh
+make help
+```
+
 To configure the system, you can either install the Debian `kconfig-frontends` package, or use the
 provided Dockerfile to run them from a container, or hand-edit one of the existing configs.  Default
 config files for the 68k-SBC/SMT, k30-SBC, and k30p-VME are provided in `config/`.  Copy one to the
@@ -104,20 +109,20 @@ make menuconfig from=config/k30p.config
 ##### Building a specific configuration file
 
 ```sh
-make O=build/config-68k C=config/68k.config
-make O=build/config-k30 C=config/k30.config
+make O=build/config-68k C=build/config-68k.config
+make O=build/config-k30 C=build/config-k30.config
 ```
 
 ##### Make a default configuration
 
 ```sh
-make defconfig
+make olddefconfig
 ```
 
 ##### Make a default configuration based on an existing config
 
 ```sh
-make defconfig from=config/68k.config
+make olddefconfig from=config/68k.config
 ```
 
 ##### Configure using kconfig inside a docker container

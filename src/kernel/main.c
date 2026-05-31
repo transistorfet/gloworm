@@ -189,7 +189,7 @@ int main(void)
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	error = init_pages(CONFIG_PAGES_START, CONFIG_PAGES_END);
+	error = init_pages(CONFIG_PAGES_START, CONFIG_PAGES_END - CONFIG_PAGES_START);
 	if (error < 0)
 		goto fail;
 	error = init_kernel_heap();

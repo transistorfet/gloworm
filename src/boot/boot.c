@@ -12,6 +12,10 @@
 
 #include "../kernel/fs/minix/minix-v1.h"
 
+#if !(CONFIG_ATA_BASE + 0)
+#error "Error: CONFIG_ATA_BASE must be set to the memory-mapped address of the ATA controller"
+#endif
+
 #define PARTITION_OFFSET	0x1BE
 
 struct partition_entry {

@@ -5,7 +5,7 @@ GCC_PREFIX			:= $(patsubst "%",%,$(CONFIG_GCC_PREFIX))
 build-file			:= $(dir)/Makefile
 include-dir			:= $(src-root)/include
 config-h			:= $(src-root)/include/generated/config.h
-config-dir          := $(dir $(config-h))
+config-dir			:= $(dir $(config-h))
 
 AR				?= $(GCC_PREFIX)ar
 AS				?= $(GCC_PREFIX)gcc
@@ -42,6 +42,10 @@ ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
 # TODO these remove too much, such that the kernel won't boot with them
 #ccflags-$(CONFIG_GC_SECTIONS)	+= -ffunction-sections -fdata-sections
 #ldflags-$(CONFIG_GC_SECTIONS)	+= -Wl,--gc-sections -Wl,--print-gc-sections
+
+ifeq ($(strict), y)
+	ccflags-y += -Werror
+endif
 
 export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 

@@ -82,15 +82,15 @@ ifneq ($(tests-y),)
 include $(src-root)/tools/build/Makefile.test
 endif
 
-$(in-target): $(libex-y) $(obj-y) $(extra-y) $(build-file)
+$(in-target): $(config-h) $(libex-obj-y) $(obj-y) $(extra-y) $(build-file)
 	$(LD) -r -o $@ $(obj-y) $(libex-obj-y)
 
 PHONY += $(subdir-y)
 $(subdir-y):
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$@ $(MAKECMDGOALS)
 
-$(libex-y):
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst %/,%,$(dir $@))
+$(libex-obj-y):
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst $(OUTPUT)%/,%,$(dir $@))
 
 
 

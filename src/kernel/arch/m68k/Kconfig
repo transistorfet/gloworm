@@ -40,7 +40,7 @@ endchoice
 
 config M68K_USER_MODE
 	bool "enable user mode"
-	default n
+	default y
 	help
 	  If this option is true, then all programs except the kernel itself
 	  will be run in the m68k processor's user mode, and the kernel will be
@@ -62,7 +62,8 @@ config MMU
 
 choice
 	prompt "Page size"
-	default PAGE_SIZE_4K
+	default PAGE_SIZE_256 if M68010
+	default PAGE_SIZE_4K if M68030
 	help
 	  Select the size used by the MMU-based paged memory management system
 	  for the size in bytes of a single page of memory, which is the

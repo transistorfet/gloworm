@@ -41,4 +41,5 @@ hardware/**/*-backups
 
 # generated configs
 /.config
-/.config.old
+*.old
+defaults.config
