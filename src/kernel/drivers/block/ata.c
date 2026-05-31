@@ -25,6 +25,7 @@ offset_t ata_seek(devminor_t minor, offset_t position, int whence, offset_t offs
 
 
 struct driver ata_driver = {
+	"ata",
 	ata_init,
 	ata_open,
 	ata_close,

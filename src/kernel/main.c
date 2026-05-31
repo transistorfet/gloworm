@@ -277,6 +277,15 @@ int main(void)
 	device_t extra_dev = DEVNUM(DEVMAJOR_ATA, 1);
 	const char *extra_mountpoint = "/media";
 
+	//const struct mkfs_options opts = {
+	//	.block_size = 4096,
+	//	.blocks = 0x8000,
+	//};
+	//error = (ext2_mount_ops.mkfs)(extra_dev, &opts);
+	//if (error < 0) {
+	//	return error;
+	//}
+
 	error = vfs_mount(NULL, extra_mountpoint, extra_dev, &ext2_mount_ops, 0, SU_UID);
 	if (error < 0) {
 		log_error("error mounting /media: %d\n", error);

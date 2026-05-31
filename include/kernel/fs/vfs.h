@@ -63,7 +63,7 @@ struct mkfs_options {
 };
 
 struct mount_ops {
-	char *fstype;								// Filesystem Type Name (used by mount syscall)
+	const char *fstype;							// Filesystem Type Name (used by mount syscall)
 	int (*init)();								// Initialize the filesystem type at boot
 	int (*mkfs)(device_t dev, const struct mkfs_options *opts);		// Create a new filesystem on the given device
 	int (*mount)(struct mount *mp, struct vnode *parent);			// Mount the filesystem using the pre-allocated struct mount

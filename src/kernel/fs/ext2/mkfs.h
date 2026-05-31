@@ -37,7 +37,7 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 		return -1;
 	}
 
-	log_notice("%s: initializing %x disk\n", ext2_mount_ops.fstype, dev);
+	log_notice("%s: initializing disk %s%d\n", ext2_mount_ops.fstype, get_driver_name(dev), DEVMINOR(dev));
 
 	struct mount mp = {
 		.ops = &ext2_mount_ops,

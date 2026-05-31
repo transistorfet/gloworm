@@ -16,7 +16,7 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 	struct minix_v1_superblock *super_v1;
 	struct minix_v1_superblock super_v1_cached;
 
-	log_notice("%s: initializing disk %x\n", minix_mount_ops.fstype, dev);
+	log_notice("%s: initializing disk %s%d\n", minix_mount_ops.fstype, get_driver_name(dev), DEVMINOR(dev));
 
 	if (opts->block_size && opts->block_size != MINIX_V1_ZONE_SIZE) {
 		log_error("%s: block size must be %d\n", minix_mount_ops.fstype, MINIX_V1_ZONE_SIZE);

@@ -68,6 +68,7 @@ int tty_poll(devminor_t minor, int events);
 offset_t tty_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
 
 struct driver tty_driver = {
+	"tty",
 	tty_init,
 	tty_open,
 	tty_close,

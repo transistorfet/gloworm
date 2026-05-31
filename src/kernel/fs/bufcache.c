@@ -96,7 +96,7 @@ static struct buf *_load_block(struct bufcache *cache, block_t num)
 	struct buf *entry;
 
 	if (!cache->dev) {
-		log_error("bufcache: device is set to %d\n", cache->dev);
+		log_error("bufcache: device is set to %s%d\n", get_driver_name(cache->dev), DEVMINOR(cache->dev));
 		return NULL;
 	}
 
@@ -189,7 +189,7 @@ static inline int _write_entry(struct bufcache *cache, struct buf *entry)
 	}
 
 	if (cache->flags & BC_GF_DBG_NOWRITE) {
-		log_warning("bufcache: would have written dev %x block %d\n", cache->dev, entry->num);
+		log_warning("bufcache: would have written %s%d block %d\n", get_driver_name(cache->dev), DEVMINOR(cache->dev), entry->num);
 		return 0;
 	}
 

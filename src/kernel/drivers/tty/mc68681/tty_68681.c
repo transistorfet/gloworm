@@ -34,6 +34,7 @@ int tty_68681_poll(devminor_t minor, int events);
 offset_t tty_68681_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
 
 struct driver tty_68681_driver = {
+	"mc68681",
 	tty_68681_init,
 	tty_68681_open,
 	tty_68681_close,

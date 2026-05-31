@@ -13,11 +13,14 @@ struct iovec_iter;
 #define DEVMAJOR_ATA		4
 
 #define DEVNUM(major, minor)	((major) << 8 | (minor))
+#define DEVMAJOR(dev)		((dev) >> 8)
+#define DEVMINOR(dev)		((devminor_t) ((dev) & 0xFF))
 
 typedef unsigned char devmajor_t;
 typedef unsigned char devminor_t;
 
 struct driver {
+	const char *name;
 	int (*init)();
 	int (*open)(devminor_t minor, int mode);
 	int (*close)(devminor_t minor);
@@ -30,6 +33,7 @@ struct driver {
 
 
 int register_driver(devmajor_t major, struct driver *driver);
+struct driver *get_driver(devmajor_t major);
 
 int dev_open(device_t dev, int access);
 int dev_close(device_t dev);
@@ -39,5 +43,10 @@ int dev_ioctl(device_t dev, unsigned int request, struct iovec_iter *iter, uid_t
 int dev_poll(device_t dev, int events);
 offset_t dev_seek(device_t dev, offset_t position, int whence, offset_t offset);
 
+static inline const char *get_driver_name(device_t dev)
+{
+	const struct driver *drv = get_driver(DEVMAJOR(dev));
+	return drv ? drv->name : "unknown";
+}
 
 #endif

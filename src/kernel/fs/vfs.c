@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <kernel/printk.h>
+#include <kernel/drivers.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/fileptr.h>
 #include <kernel/fs/bufcache.h>
@@ -64,7 +65,7 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 	int error;
 	struct vnode *vnode;
 
-	log_info("%s: mounting (%x) at %s\n", ops->fstype, dev, path);
+	log_info("%s: mounting (%s%d) at %s\n", ops->fstype, get_driver_name(dev), DEVMINOR(dev), path);
 
 	if (uid != SU_UID)
 		return EPERM;
@@ -108,6 +109,8 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 				vnode->bits |= VBF_MOUNTED;
 			} else {
 				root_fs = &mountpoints[i];
+				if (!mountpoints[i].mount_node && mountpoints[i].root_node)
+					mountpoints[i].mount_node = vfs_clone_vnode(mountpoints[i].root_node);
 			}
 			return 0;
 		}
@@ -141,12 +144,13 @@ int vfs_unmount(device_t dev, uid_t uid)
 	if (error)
 		return error;
 
-	if (mp->mount_node) {
+	if (mp->mount_node->bits & VBF_MOUNTED) {
 		mp->mount_node->bits &= ~VBF_MOUNTED;
-		vfs_release_vnode(mp->mount_node);
 	} else {
 		root_fs = NULL;
 	}
+	if (mp->mount_node)
+		vfs_release_vnode(mp->mount_node);
 	mp->ops = NULL;
 	mp->dev = 0;
 	return 0;
@@ -167,7 +171,7 @@ int vfs_sync(device_t dev)
 		}
 
 		if (mountpoints[i].bits & VFS_MBF_READ_ONLY) {
-			log_warning("vfs: skipping sync of read-only filesystem dev=%x %x\n", mountpoints[i].dev, mountpoints[i].bits);
+			log_warning("vfs: skipping sync of read-only filesystem on /dev/%s%d %x\n", get_driver_name(mountpoints[i].dev), DEVMINOR(mountpoints[i].dev), mountpoints[i].bits);
 			continue;
 		}
 

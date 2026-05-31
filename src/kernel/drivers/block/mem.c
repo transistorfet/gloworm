@@ -23,6 +23,7 @@ offset_t mem_seek(devminor_t minor, offset_t position, int whence, offset_t offs
 
 
 struct driver mem_driver = {
+	"mem",
 	mem_init,
 	mem_open,
 	mem_close,
