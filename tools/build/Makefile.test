@@ -2,14 +2,14 @@
 bare-tests-load		:= $(patsubst %,%.test.load, $(tests-obj-y))
 host-tests-run		:= $(patsubst %,%.test.run, $(tests-obj-y))
 
-bare-tests-common-deps	:= tests/entry.o src/monitor/tty_68681.o src/libc/libc-$(SRCARCH)-none.a
+bare-tests-common-deps	:= tests/entry.o tests/printk.o src/monitor/tty_68681.o $(bare-tests-extra-y)
 bare-tests-common-deps	:= $(addprefix $(OUTPUT),$(bare-tests-common-deps))
 
 PHONY += tests
-tests: $(host-tests-run) $(tests-subdir-y) $(config-h)
+tests: $(config-h) $(tests-subdir-y) $(host-tests-run)
 
 PHONY += bare-tests
-bare-tests: $(bare-tests-load) $(tests-subdir-y) $(config-h)
+bare-tests: $(config-h) $(tests-subdir-y) $(bare-tests-load)
 
 %.test.run: %.test.host
 	./$<

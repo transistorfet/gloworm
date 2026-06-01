@@ -82,7 +82,7 @@ int test_page_contiguous_allocation(void)
 }
 
 #define run(test) \
-	printf("Running %s\n", #test); \
+	printk("Running %s\n", #test); \
 	assert(test() == 0);
 
 int main()
@@ -90,5 +90,5 @@ int main()
 	run(test_page_single_allocation);
 	run(test_page_contiguous_allocation);
 
-	printf("pages tests passed\n");
+	printk("pages tests passed\n");
 }
