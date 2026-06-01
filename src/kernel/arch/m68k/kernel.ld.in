@@ -37,23 +37,23 @@ SECTIONS
   __boot_stack_bottom = .;
   .stack (NOLOAD) : {
     FILL(0x00);
-    . = . + CONFIG_STACK_SIZE;
+    . = . + CONFIG_BOOT_STACK_SIZE;
   } > ram
   __boot_stack_top = .;
   __kernel_end = .;
 
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
 
-#if defined(CONFIG_MEM)
+#if defined(CONFIG_MEMDISK)
   /* Memdisk must be page-aligned */
   . = ALIGN(CONFIG_PAGE_SIZE);
-  __memdev_start = .;
+  __memdisk0_start = .;
   
   /* TODO: implement actual memdisk section filled with memdisk image if wanted */
-  . = . + CONFIG_MEM_DEV_SIZE;
+  . = . + CONFIG_MEMDISK0_SIZE;
 
   /* Just for debug reasons, not used in code */
-  __memdev_end = .;
+  __memdisk0_end = .;
 #endif
 
   /* Pages themself must be page-aligned */

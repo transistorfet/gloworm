@@ -15,7 +15,7 @@ config ATA_BASE
 
 endif
 
-config MEM
+config MEMDISK
 	bool "Ramdisk support"
 	default y
 	help

@@ -6,7 +6,7 @@
 	.global boot_args
 	.global __bss_start
 	.global __bss_end
-	.global __stack_top
+	.global __boot_stack_top
 
 /**
  * Image Start
@@ -32,7 +32,7 @@ _start:
     S1: move.b	(%a0)+, (%a1)+
 	bne	S1
 
-	move.l	#__stack_top, %sp	/* re-initialize the stack pointer to the top of the kernel space */
+	move.l	#__boot_stack_top, %sp	/* re-initialize the stack pointer to the top of the kernel space */
 	jsr	main
 	stop	#0x2700			/* halt, since we clobbered the stack on entry */
 

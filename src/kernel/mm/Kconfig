@@ -16,8 +16,8 @@ config KERNEL_MEM_SIZE
 	  This is the amount of memory available after the Kernel base address, used as the ram size in the linker
 	  script. If automatic memory layout is enabled the rest of this memory block will be filled with the page memory.
 
-config STACK_SIZE
-	hex "Kernel stack size"
+config BOOT_STACK_SIZE
+	hex "Kernel boot stack size"
 	default 0x100
 	help
 	  This is the amount of memory initially reserved for the kernel stack. Should be at least 4k (0x100).
@@ -28,19 +28,19 @@ config MEM_LAYOUT_AUTO
 	  This will make the linker calculate the addresses for the memdisk and the page memory assigning
 	  the available memory as page memory.
 
-config MEM_DEV_START
+config MEMDISK0_START
 	hex "Memdisk start address"
-	depends on (MEM && !MEM_LAYOUT_AUTO)
+	depends on (MEMDISK && !MEM_LAYOUT_AUTO)
 	default 0x1E0000
 	help
-	  This is the memory start address for the memdisk which can be used as an initial RAM fs.
+	  This is the memory start address for the first memdisk which can be used as an initial RAM fs.
 
-config MEM_DEV_SIZE
+config MEMDISK0_SIZE
 	hex "Memdisk size"
-	depends on MEM
+	depends on MEMDISK
 	default 0x20000
 	help
-	  This is the amount of memory used for the memdisk.
+	  This is the amount of memory used for the first memdisk.
 
 if !MEM_LAYOUT_AUTO
 

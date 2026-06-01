@@ -41,11 +41,13 @@ struct mem_geometry {
 
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
 // Get start of memdisk area from linker
-extern size_t __memdev_start;
-#define MEM_DEV_START __memdev_start
+extern size_t __memdisk0_start;
+#define MEMDISK0_START __memdisk0_start
 #else
-#define MEM_DEV_START CONFIG_MEM_DEV_START
+#define MEMDISK0_START CONFIG_MEMDISK0_START
 #endif
+
+#define MEMDISK0_SIZE  CONFIG_MEMDISK0_SIZE
 
 #define NUM_DEVICES 1
 static struct mem_geometry devices[NUM_DEVICES];
@@ -59,9 +61,9 @@ int mem_init(void)
 	if (error < 0)
 		return error;
 
-	// necessary because __memdev_start is a symbol only resolved during linking
-	devices[0].base = (char *) MEM_DEV_START;
-	devices[0].size = CONFIG_MEM_DEV_SIZE;
+	// necessary because __memdisk0_start is a symbol only resolved during linking
+	devices[0].base = (char *) MEMDISK0_START;
+	devices[0].size = 		   MEMDISK0_SIZE;
 
 	for (short i = 0; i < NUM_DEVICES; i++)
 		log_notice("mem%d: ram disk of %d bytes\n", i, devices[i].size);
