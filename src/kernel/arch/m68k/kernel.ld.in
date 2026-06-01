@@ -1,5 +1,5 @@
 
-#include <generated/config.h>
+#include <kconfig.h>
 
 ENTRY(_start)
 EXTERN(_start)
@@ -32,27 +32,32 @@ SECTIONS
   } > ram
   __bss_end = .;
 
+  /* Stack must be page aligned */
+  . = ALIGN(CONFIG_PAGE_SIZE);
+  __boot_stack_bottom = .;
   .stack (NOLOAD) : {
-    . = ALIGN(4);
     FILL(0x00);
     . = . + CONFIG_STACK_SIZE;
   } > ram
-  __stack_top = .;
+  __boot_stack_top = .;
   __kernel_end = .;
 
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
+
 #if defined(CONFIG_MEM)
-  /* TODO: fill this area with actual image file */
+  /* Memdisk must be page-aligned */
+  . = ALIGN(CONFIG_PAGE_SIZE);
   __memdev_start = .;
-  .memdev (NOLOAD) : {
-    . = ALIGN(4);
-    FILL(0x00);
-    . = . + CONFIG_MEM_DEV_SIZE;
-  } > ram
+  
+  /* TODO: implement actual memdisk section filled with memdisk image if wanted */
+  . = . + CONFIG_MEM_DEV_SIZE;
+
   /* Just for debug reasons, not used in code */
   __memdev_end = .;
 #endif
 
+  /* Pages themself must be page-aligned */
+  . = ALIGN(CONFIG_PAGE_SIZE);
   __pages_start = .;
   __pages_end = ORIGIN(ram) + LENGTH(ram);
 
