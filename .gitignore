@@ -18,7 +18,7 @@ session*.vim
 *.load
 *.send
 output.txt
-/src/kernel/arch/m68k/kernel.ld
+/src/kernel/arch/*/kernel.ld
 
 # EDA Output Files
 *.gbr

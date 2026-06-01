@@ -144,8 +144,7 @@ otherfiles:
 # TODO need a better clean rule
 clean:
 	rm -f $(config-h)
-# TODO: find a better way to delete only the generated linker scripts and not the ones in the repo
-	rm -f src/kernel/arch/m68k/kernel.ld
+	rm -f src/kernel/arch/*/kernel.ld
 	#ifneq ($(OUTPUT),)
 	#	rm -f $(OUTPUT)
 	#endif
