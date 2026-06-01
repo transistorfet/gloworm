@@ -2,8 +2,16 @@
 bare-tests-load		:= $(patsubst %,%.test.load, $(tests-obj-y))
 host-tests-run		:= $(patsubst %,%.test.run, $(tests-obj-y))
 
-bare-tests-common-deps	:= tests/entry.o tests/printk.o src/monitor/tty_68681.o $(bare-tests-extra-y)
-bare-tests-common-deps	:= $(addprefix $(OUTPUT),$(bare-tests-common-deps))
+host-tests-extra-y	+= $(patsubst %.o,%.host.o, $(tests-extra-y))
+bare-tests-extra-y	+= $(tests-extra-y)
+
+host-tests-auto-extra	:= tests/printk.host.o
+host-tests-auto-extra	:= $(addprefix $(OUTPUT),$(host-tests-auto-extra))
+host-tests-common-deps	:= $(host-tests-auto-extra) $(host-tests-extra-y)
+
+bare-tests-auto-extra	:= tests/entry.o tests/printk.o src/monitor/tty_68681.o
+bare-tests-auto-extra	:= $(addprefix $(OUTPUT),$(bare-tests-auto-extra))
+bare-tests-common-deps	:= $(bare-tests-auto-extra) $(bare-tests-extra-y) $(libex-obj-y)
 
 PHONY += tests
 tests: $(config-h) $(tests-subdir-y) $(host-tests-run)
@@ -15,7 +23,7 @@ bare-tests: $(config-h) $(tests-subdir-y) $(bare-tests-load)
 	./$<
 
 %.test.host: HOST_CFLAGS += -DHOST_TARGET -DHOST_TEST
-%.test.host: %.host.o $(tests-extra-y)
+%.test.host: %.host.o $(host-tests-common-deps)
 	$(cmd_host_ld_elf)
 
 %.host.o: %.c

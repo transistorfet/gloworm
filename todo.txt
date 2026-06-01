@@ -18,11 +18,8 @@
 * could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one;  you need a way to have two queues in a struct, by doing pointer arithmetic
 * change LF to CR+LF (or make it configurable) in the TTY driver.  The computer should send CR+LF whenever an LF is sent by a user program (unless raw enabled), and CR characters should be ignored, so the terminal could send CR+LF or LF
 
-* make a script or rule to run all tests, build all bare-tests, and compile the kernel for each of the test configs, and throw an error if any errors or warnings are encountered
-* add a github action to run the verification script on all PRs and commits to main
-* add an emulator that can run the bare tests
 * fix docker config
-* make a dockerfile that can also compile the entire project
+* make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
 
 * is there a better name than alignment_offset?  lower_bits()?  bitwise_modulus()?  bitwise_remainder()?
 
@@ -60,7 +57,7 @@
 
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
-* make tests have tests-extra-y, tests-extra-host-y and tests-extra-bare-y
+* make a dockerfile that can also compile the entire project
 
 ----
 
@@ -90,6 +87,7 @@
 * is there value in making the code conform to a particular C standard?
 * add configuration for base address in linker script
 * make it so the ata device will time out and fail instead of hanging when it doesn't work
+* add an emulator that can run the bare tests
 
 
 Overview
