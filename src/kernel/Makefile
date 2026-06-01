@@ -21,8 +21,8 @@ obj-$(CONFIG_SHELL_IN_KERNEL)	+= cmd-sh.o
 libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 always-y			+= kernel.elf kernel.bin kernel.load
 
-ldflags-y 			+= -Wl,--entry=_start -Tsrc/kernel/arch/$(SRCARCH)/kernel.ld
-extra-y 			+= arch/$(SRCARCH)/kernel.ld
+ldflags-y 			+= -Wl,--entry=_start -Tsrc/kernel/$(linker-file)
+extra-y 			+= $(linker-file)
 
 # Set these flags for all subdirectories instead of just the current Makefile
 CFLAGS				+= $(kernel-ccflags-y)
