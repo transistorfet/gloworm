@@ -199,7 +199,7 @@ int main(void)
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	error = init_pages(PAGES_START, PAGES_END);
+	error = init_pages(PAGES_START, PAGES_END - PAGES_START);
 	if (error < 0)
 		goto fail;
 	error = init_kernel_heap();

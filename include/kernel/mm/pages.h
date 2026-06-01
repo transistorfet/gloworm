@@ -84,7 +84,7 @@ static inline void zero_page(physical_address_t ptr)
 }
 
 extern struct page_block pages;
-#define init_pages(start, end)					init_page_block(&pages, (void *) start, end - start)
+#define init_pages(start, size)					init_page_block(&pages, (void *) start, size)
 #define page_alloc(contiguous_pages)				page_block_alloc(&pages, contiguous_pages)
 #define page_free(page, size)					page_block_free(&pages, page, size)
 #if defined(CONFIG_MMU)
