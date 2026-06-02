@@ -12,8 +12,9 @@ subdir-y		:=	# subdirectories to be built recursively
 #lib-y			:=
 libex-y			:=	# external libraries to include when linking (absolute path)
 extra-y			:=	# extra files needed to build, but which aren't included in the output
-tests-subdir-y		:=	# test targets to build (each directory listed is its own binary)
-tests-obj-y		:=	# test targets to build (each file listed is its own binary)
+tests-obj-y		:=	# additional objects to be included in every test target
+host-tests-obj-y	:=	# additional objects to be included in every host test target (but not bare test targets)
+bare-tests-obj-y	:=	# additional objects to be included in every bare test target (but not host test targets)
 userprogs		:=	# user programs to compile
 ccflags-y		:=
 asflags-y		:=
@@ -45,10 +46,6 @@ include $(build-file)
 #subdir-y		+= $(patsubst %/,%, $(filter %/, $(obj-y)))
 obj-y			:= $(patsubst %/,%/built-in.o, $(obj-y))
 #subdir-obj-y		:= $(filter %/built-in.o, $(obj-y))
-subdir-y		+= $(patsubst %/,%, $(filter %/,$(tests-y)))
-tests-subdir-y		:= $(addprefix $(dir)/, $(patsubst %/,%, $(filter %/,$(tests-y))))
-tests-obj-y		:= $(addprefix $(dir)/, $(patsubst %.o,%,$(filter %.o, $(tests-y))))
-tests-y			:= $(tests-obj-y) $(tests-subdir-y)
 
 # Executables compiled from a single .c file
 user-csingle		:= $(foreach m, $(userprogs), $(if $($(m)-objs),,$(m)))
@@ -69,6 +66,7 @@ subdir-y		:= $(addprefix $(srcprefix),$(subdir-y))
 extra-y			:= $(addprefix $(srcprefix),$(extra-y))
 
 libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
+subdir-y		+= $(patsubst %/,%,$(dir $(libex-y)))
 
 ### Rules
 
@@ -82,16 +80,12 @@ ifneq ($(tests-y),)
 include $(src-root)/tools/build/Makefile.test
 endif
 
-$(in-target): $(config-h) $(libex-obj-y) $(obj-y) $(extra-y) $(build-file)
+$(in-target): $(config-h) $(subdir-y) $(obj-y) $(extra-y) $(build-file)
 	$(LD) -r -o $@ $(obj-y) $(libex-obj-y)
 
 PHONY += $(subdir-y)
 $(subdir-y):
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$@ $(MAKECMDGOALS)
-
-$(libex-obj-y):
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst $(OUTPUT)%/,%,$(dir $@))
-
 
 
 # Build Rules for User Programs

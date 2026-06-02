@@ -1,38 +1,56 @@
 
-bare-tests-load		:= $(patsubst %,%.test.load, $(tests-obj-y))
-host-tests-run		:= $(patsubst %,%.test.run, $(tests-obj-y))
+### Modify the inputs before path expansion
 
-host-tests-extra-y	+= $(patsubst %.o,%.host.o, $(tests-extra-y))
-bare-tests-extra-y	+= $(tests-extra-y)
+# NOTE this file is included after normal prefix additions, so any modifications to non-test variables
+#      must manually add the appropriate prefix
+subdir-y		+= $(addprefix $(srcprefix),$(patsubst %/,%, $(filter %/,$(tests-y))))
+tests-main-subdir-y	:= $(addprefix $(srcprefix),$(patsubst %/,%, $(filter %/,$(tests-y))))
+tests-main-obj-y	:= $(addprefix $(objprefix),$(patsubst %.o,%,$(filter %.o, $(tests-y))))
 
-host-tests-auto-extra	:= tests/printk.host.o
-host-tests-auto-extra	:= $(addprefix $(OUTPUT),$(host-tests-auto-extra))
-host-tests-common-deps	:= $(host-tests-auto-extra) $(host-tests-extra-y)
+bare-tests-load		:= $(patsubst %,%.test.load, $(tests-main-obj-y))
+host-tests-run		:= $(patsubst %,%.test.run, $(tests-main-obj-y))
 
-bare-tests-auto-extra	:= tests/entry.o tests/printk.o src/monitor/tty_68681.o
-bare-tests-auto-extra	:= $(addprefix $(OUTPUT),$(bare-tests-auto-extra))
-bare-tests-common-deps	:= $(bare-tests-auto-extra) $(bare-tests-extra-y) $(libex-obj-y)
+host-tests-obj-y	+= $(patsubst %.o,%.host.o, $(tests-obj-y))
+bare-tests-obj-y	+= $(tests-obj-y)
+
+host-tests-auto-obj	:= tests/printk.host.o
+host-tests-common-deps	:= $(host-tests-auto-obj) $(host-tests-obj-y)
+
+bare-tests-auto-obj	:= tests/entry.o tests/printk.o src/monitor/tty_68681.o
+bare-tests-common-deps	:= $(bare-tests-auto-obj) $(bare-tests-obj-y)
+
+
+### Add prefix to all applicable targets
+host-tests-common-deps	:= $(addprefix $(OUTPUT),$(host-tests-common-deps))
+bare-tests-common-deps	:= $(addprefix $(OUTPUT),$(bare-tests-common-deps))
+
+### Rules
 
 PHONY += tests
-tests: $(config-h) $(tests-subdir-y) $(host-tests-run)
+tests: $(config-h) $(tests-main-subdir-y) $(host-tests-run)
 
 PHONY += bare-tests
-bare-tests: $(config-h) $(tests-subdir-y) $(bare-tests-load)
+bare-tests: $(config-h) $(tests-main-subdir-y) $(bare-tests-load)
 
-%.test.run: %.test.host
+$(OUTPUT)%.test.run: $(OUTPUT)%.test.host
 	./$<
 
-%.test.host: HOST_CFLAGS += -DHOST_TARGET -DHOST_TEST
-%.test.host: %.host.o $(host-tests-common-deps)
+$(OUTPUT)%.test.host: HOST_CFLAGS += -DHOST_TARGET -DHOST_TEST
+$(OUTPUT)%.test.host: $(OUTPUT)%.host.o $(host-tests-common-deps) $(libex-obj-y)
 	$(cmd_host_ld_elf)
 
-%.host.o: %.c
+$(OUTPUT)%.host.o: %.c
 	$(cmd_host_cc_o)
 
 %.test.load: ccflags-y += $(firmware-ccflags-y)
 %.test.load: %.bin
 	tools/make-load-file $< $@ $(LOAD_ARGS)
 
-%.test.bin: %.o $(bare-tests-common-deps)
+%.test.bin: %.o $(bare-tests-common-deps) $(libex-obj-y)
 	$(cmd_ld_bin)
+
+obj-dirs := $(sort $(patsubst %/,%, $(dir $(tests-main-subdir-y) $(tests-main-obj-y))))
+ifneq ($(obj-dirs),)
+$(shell mkdir -p $(obj-dirs))
+endif
 
