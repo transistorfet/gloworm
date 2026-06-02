@@ -147,7 +147,7 @@ clean:
 	#ifneq ($(OUTPUT),)
 	#	rm -f $(OUTPUT)
 	#endif
-	find $(OUTPUT)src/ tests/ \( -name "*.o" -or -name "*.d" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
+	find $(OUTPUT)src/ $(OUTPUT)tests/ \( -name "*.o" -or -name "*.d" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
 
 
 ##############>>--------------------------------------------------------------------------------<< 80 char limit (line wrap at 97 chars)
