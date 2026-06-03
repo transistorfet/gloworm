@@ -18,7 +18,7 @@ config KERNEL_MEM_SIZE
 
 config BOOT_STACK_SIZE
 	hex "Kernel boot stack size"
-	default 0x100
+	default 0x1000
 	help
 	  This is the amount of memory initially reserved for the kernel stack. Should be at least 4k (0x100).
 
