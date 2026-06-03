@@ -61,12 +61,10 @@ in-target		:= $(objprefix)built-in.o
 user-csingle		:= $(addprefix $(objprefix),$(user-csingle))
 user-cmulti		:= $(addprefix $(objprefix),$(user-cmulti))
 always-y		:= $(addprefix $(objprefix),$(always-y))
+libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
 
 subdir-y		:= $(addprefix $(srcprefix),$(subdir-y))
 extra-y			:= $(addprefix $(srcprefix),$(extra-y))
-
-libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
-subdir-y		+= $(patsubst %/,%,$(dir $(libex-y)))
 
 ### Rules
 
@@ -75,18 +73,23 @@ targets			:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOA
 PHONY += all
 all: $(config-h) $(targets)
 
-# Include the testing rules if there are any tests to build & run
-ifneq ($(tests-y),)
+# Include the testing rules if there are any tests to build & run, or it's traversing the tests/ directory
+has-tests = $(filter tests%,$(dir))$(tests-y)
+ifneq ($(has-tests),)
 include $(src-root)/tools/build/Makefile.test
 endif
 
-$(in-target): $(config-h) $(subdir-y) $(obj-y) $(extra-y) $(build-file)
+$(in-target): $(config-h) $(libex-obj-y) $(obj-y) $(extra-y) $(build-file)
 	$(LD) -r -o $@ $(obj-y) $(libex-obj-y)
 
 PHONY += $(subdir-y)
 $(subdir-y):
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$@ $(MAKECMDGOALS)
 
+$(libex-obj-y):
+	# NOTE this doesn't have the $(MAKECMDGOALS) so that it always builds the default goal
+	#      The target also needs to be the object file to avoid unnecessarily recompiling the lib
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst $(OUTPUT)%/,%,$(dir $@))
 
 # Build Rules for User Programs
 $(user-csingle): ccflags-y += $(userprog-ccflags-y)
