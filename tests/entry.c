@@ -20,7 +20,14 @@ void _start(void)
 
 void __assert_fail(const char * assertion, const char * file, unsigned int line, const char * function)
 {
-	printf("%s:%d: %s: %s\n", file, line, function, assertion);
+	printf("%s:%d: %s: Assertion failed `%s`\n", file, line, function, assertion);
+
+	while (1) {}
+}
+
+void exit(int exit_code)
+{
+	printf("exiting test with %d\n", exit_code);
 
 	while (1) {}
 }

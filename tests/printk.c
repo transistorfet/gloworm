@@ -54,7 +54,7 @@ void printk_dump(void *ptr, size_t length)
 
 	length >>= 1; // Adjust the dump size from bytes to words
 	while (length > 0) {
-		printk("%x: ", (unsigned int) data);
+		printk("%x: ", (uintptr_t) data);
 		for (short i = 0; i < 8 && length > 0; i++, length--) {
 			printk("%04x ", data[i]);
 		}

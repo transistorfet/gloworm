@@ -6229,3 +6229,11 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I entered it 226 times, and it's 144 bytes, which would be 8 blocks?  There are 12 direct blocks, so it shouldn't have gone into
   the indirect table yet.  It would have if I had used 1024 byte blocks though
 
+
+2026-06-01:
+
+- I'm trying to get the bare-tests working after changing a bunch of things with Makefile.test, and I kept struggling to get the
+  libex-y target to build, but I think I see what's wrong now.  When I add the subdir as a dependency, it builds less, and I mistook
+  that for being worse, but actually, it's trying to build the `bare-tests` goal when it recurses into the src/libc/ subdir, which
+  is why it fails earlier
+

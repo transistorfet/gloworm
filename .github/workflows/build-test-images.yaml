@@ -1,0 +1,27 @@
+name: build-images
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  test-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y kconfig-frontends gcc-m68k-linux-gnu
+
+      - name: Build all tests images
+        run: |
+          tools/testing/build-all.sh
+

@@ -13,6 +13,11 @@
 #include <kernel/utils/iovec.h>
 
 
+#if !(CONFIG_ATA_BASE + 0)
+#error "Error: CONFIG_ATA_BASE must be set to the memory-mapped address of the ATA controller"
+#endif
+
+
 // Driver Definition
 int ata_init(void);
 int ata_open(devminor_t minor, int access);

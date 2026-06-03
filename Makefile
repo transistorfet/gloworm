@@ -31,6 +31,7 @@ menuconfig:
 		if [ -f "$(kconfig-file)" && ! "$(overwrite)" ]; then				\
 			echo "WARNING: a config named $(kconfig-file) already exists. Use the overwrite=y flag to copy anyways";	\
 		else										\
+			mkdir -p $(dir $(kconfig-file));					\
 			cp $(from) $(kconfig-file);						\
 			KCONFIG_CONFIG=$(kconfig-file) kconfig-mconf $(src-root)/Kconfig;	\
 		fi										\
@@ -38,21 +39,25 @@ menuconfig:
 		KCONFIG_CONFIG=$(kconfig-file) kconfig-mconf $(src-root)/Kconfig;		\
 	fi
 
-PHONY += defconfig
-defconfig: FORCE
+PHONY += oldconfig
+oldconfig:
+	KCONFIG_CONFIG=$(kconfig-file) kconfig-conf --oldconfig $(src-root)/Kconfig
+
+PHONY += olddefconfig
+olddefconfig: FORCE
 	@if [ -f "$(kconfig-file)" ] && [ ! "$(overwrite)" ]; then					\
 		echo "WARNING: a config named $(kconfig-file) already exists. Use the overwrite=y flag to copy anyways";	\
 	else											\
 		if [ "$(from)" ]; then								\
+			mkdir -p $(dir $(kconfig-file));					\
 			cp $(from) $(kconfig-file);						\
 		fi;										\
-		KCONFIG_CONFIG=$(kconfig-file) kconfig-conf --alldefconfig $(src-root)/Kconfig;	\
+		KCONFIG_CONFIG=$(kconfig-file) kconfig-conf --olddefconfig $(src-root)/Kconfig;	\
 	fi
 
 PHONY += defaults.config
 defaults.config:
 	KCONFIG_CONFIG=$@ kconfig-conf --alldefconfig $(src-root)/Kconfig
-
 
 PHONY += decend
 decend:
@@ -142,22 +147,29 @@ clean:
 	#ifneq ($(OUTPUT),)
 	#	rm -f $(OUTPUT)
 	#endif
-	find src/ tests/ \( -name "*.o" -or -name "*.d" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
+	find $(OUTPUT)src/ $(OUTPUT)tests/ \( -name "*.o" -or -name "*.d" -or -name "*.a" -or -name "*.bin" -or -name "*.elf" -or -name "*.load" -or -name "*.send" \) -delete -print
 
 
+##############>>--------------------------------------------------------------------------------<< 80 char limit (line wrap at 97 chars)
 PHONY += help
 help:
 	@echo  'Cleaning targets:'
 	@echo  '  clean            - Remove most generated files but keep the config'
 	@echo  ''
 	@echo  'Configuration targets:'
-	@echo  '  config        - Update current config using a terminal program'
-	@echo  '  menuconfig    - Update current config using a ncurses menu'
-	@echo  '  dockerconfig  - Update current config using a ncurses menu inside a'
-	@echo  '                  docker container, if you do not have the'
-	@echo  '                  `kconfig-frontends` debian package installed'
+	@echo  '  menuconfig    - Update current config using an ncurses menu'
+	@echo  '  olddefconfig  - Update current config by selecting defaults for new values'
+	@echo  '  oldconfig     - Update current config by prompting for new values'
+	@echo  '  config        - Start new config by prompting for every value'
+	@echo  '  dockerconfig  - Update current config using an ncurses menu inside a docker'
+	@echo  '                  container (if the `kconfig-frontends` debian package is not'
+	@echo  '                  installed'
 	@echo  ''
-	@echo  'Other generic targets:'
+	@echo  '  > Configuration target options:'
+	@echo  '    from=<file> - Copy <file> to config location before starting'
+	@echo  '    overwrite=y - When using `from`, overwrite the existing config'
+	@echo  ''
+	@echo  'Build targets:'
 	@echo  '  all           - Build all targets marked with [*]'
 	@echo  '* kernel.bin    - Build the kernel'
 	@echo  '* monitor.bin   - Build the monitor (loaded into the ROM)'
@@ -165,6 +177,9 @@ help:
 	@echo  '  src/<dir>/    - Build all files in dir and below'
 	@echo  '  output.txt    - Build the file included by 68kSupervisor to boot from'
 	@echo  '                  the arduino'
+	@echo  ''
+	@echo  '  > Build target options:'
+	@echo  '    strict=y    - Turn all warnings into errors'
 	@echo  ''
 	@echo  'Test targets:'
 	@echo  '  tests         - Run all the tests that can run on the host machine'
@@ -177,7 +192,7 @@ help:
 	@echo  '  build-image   - Build `all` and copy the kernel, commands, /etc, and /dev'
 	@echo  '                  to the image mountpoint'
 	@echo  ''
-	@echo  'Additional settings as variables:'
+	@echo  'Global options:'
 	@echo  '  O=<dir>       - put all build artifacts and outputs into <dir>'
 	@echo  '  C=<file>      - use <file> as the config file for this build'
 
