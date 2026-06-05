@@ -59,6 +59,6 @@ int release_block(struct buf *buf, short dirty)
 
 void mark_block_dirty(struct buf *buf)
 {
-	buf->flags |= BCF_DIRTY;
+	buf->flags |= BF_DIRTY;
 }
 
