@@ -10,6 +10,14 @@
 #include <kernel/fs/vfs.h>
 #include <kernel/utils/iovec.h>
 
+// Address calculations
+extern void* __kernel_end;
+#if defined(CONFIG_MEM_LAYOUT_AUTO)
+#define MEMDISK0_START	__kernel_end
+#else
+#define MEMDISK0_START	CONFIG_MEMDISK0_START
+#endif
+
 
 // Driver Definition
 int mem_init(void);
@@ -43,7 +51,6 @@ struct mem_geometry {
 static int num_devices = 0;
 static struct mem_geometry devices[MAX_DEVICES];
 
-// Must only be called before mem_init
 int mem_add_geometry(char *base, size_t size) {
 	if(num_devices == MAX_DEVICES)
 		return EINVAL;
@@ -58,6 +65,10 @@ int mem_add_geometry(char *base, size_t size) {
 int mem_init(void)
 {
 	int error;
+
+	error = mem_add_geometry((char *) MEMDISK0_START, CONFIG_MEMDISK0_SIZE);
+	if (error < 0)
+		return error;
 
 	error = register_driver(DEVMAJOR_MEM, &mem_driver);
 	if (error < 0)

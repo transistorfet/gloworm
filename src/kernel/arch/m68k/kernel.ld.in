@@ -39,5 +39,5 @@ SECTIONS
   __boot_stack_top = .;
 
   __kernel_end = .;
-  __mem_end = ORIGIN(ram) + LENGTH(ram);
+  __ram_end = ORIGIN(ram) + LENGTH(ram);
 }
