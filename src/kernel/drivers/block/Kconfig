@@ -15,10 +15,26 @@ config ATA_BASE
 
 endif
 
-config MEM
-	bool "Ramdisk support"
+menuconfig MEMDISK
+	bool "Memdisk support"
 	default y
 	help
-	  This enables the ramdisk device, which requires a fixed size that
+	  This enables the Memdisk device driver, which requires a fixed size that
 	  will be reserved
 
+if MEMDISK
+
+config MEMDISK0_START
+	hex "Memdisk start address"
+	depends on !MEM_LAYOUT_AUTO
+	default 0x1E0000
+	help
+	  This is the memory start address for the first memdisk which can be used as an initial RAM fs.
+
+config MEMDISK0_SIZE
+	hex "Memdisk size"
+	default 0x20000
+	help
+	  This is the amount of memory used for the first memdisk.
+
+endif

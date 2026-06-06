@@ -144,6 +144,7 @@ otherfiles:
 # TODO need a better clean rule
 clean:
 	rm -f $(config-h)
+	rm -f src/kernel/arch/*/kernel.ld
 	#ifneq ($(OUTPUT),)
 	#	rm -f $(OUTPUT)
 	#endif

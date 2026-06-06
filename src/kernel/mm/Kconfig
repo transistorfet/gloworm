@@ -9,6 +9,27 @@ config KERNEL_BASE
 	  This is also used when linking because the kernel is not relocatable,
 	  so make sure it's set correctly.
 
+config KERNEL_RAM_SIZE
+	hex "Amount of available memory"
+	default 0x100000
+	help
+	  This is the amount of memory available after the Kernel base address, used as the ram size in the linker
+	  script. If automatic memory layout is enabled the rest of this memory block will be filled with the page memory.
+
+config BOOT_STACK_SIZE
+	hex "Kernel boot stack size"
+	default 0x1000
+	help
+	  This is the amount of memory initially reserved for the kernel stack. Should be at least 4k (0x100).
+
+config MEM_LAYOUT_AUTO
+	bool "Automatic memory layout"
+	help
+	  This will make the linker calculate the addresses for the memdisk and the page memory assigning
+	  the available memory as page memory.
+
+if !MEM_LAYOUT_AUTO
+
 # TODO these could move to Kconfig.machine, such that the default is set conditionally, but otherwise appears in the machine menu
 config PAGES_START
 	hex "Page memory start address"
@@ -26,6 +47,8 @@ config PAGES_END
 	  This is the address at the top end of installed memory where the
 	  kernel memory will allocate from.  Currently only one contiguous
 	  chunk of memory is supported.
+
+endif
 
 config PAGE_SIZE
 	hex

@@ -33,6 +33,24 @@ extern int arch_init_mm(void);
 
 extern void tty_68681_preinit(void);
 
+extern void* __kernel_end;
+extern void* __ram_end;
+
+// Memory calculations
+#if defined(CONFIG_MEMDISK)
+#define RESERVED_SPACE		CONFIG_MEMDISK0_SIZE
+#else
+#define RESERVED_SPACE		0
+#endif
+
+#if defined(CONFIG_MEM_LAYOUT_AUTO)
+#define PAGES_START		(__kernel_end + RESERVED_SPACE)
+#define PAGES_END		__ram_end
+#else
+#define PAGES_START		CONFIG_PAGES_START
+#define PAGES_END		CONFIG_PAGES_END
+#endif
+
 extern struct driver tty_68681_driver;
 extern struct driver tty_driver;
 extern struct driver mem_driver;
@@ -45,7 +63,7 @@ struct driver *drivers[] = {
 	#endif
 	&tty_driver,
 	#endif
-	#if defined(CONFIG_MEM)
+	#if defined(CONFIG_MEMDISK)
 	&mem_driver,
 	#endif
 	#if defined(CONFIG_ATA)
@@ -189,9 +207,10 @@ int main(void)
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	error = init_pages(CONFIG_PAGES_START, CONFIG_PAGES_END - CONFIG_PAGES_START);
+	error = init_pages(PAGES_START, PAGES_END - PAGES_START);
 	if (error < 0)
 		goto fail;
+
 	error = init_kernel_heap();
 	if (error < 0)
 		goto fail;
