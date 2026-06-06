@@ -43,7 +43,7 @@ int get_data_cmdline(struct process *proc, char *buffer, int max)
 			}
 
 			// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
-			length = roundup((uintptr_t) argstr, PAGE_SIZE) - (uintptr_t) argstr;
+			length = align_up((uintptr_t) argstr, PAGE_SIZE) - (uintptr_t) argstr;
 			result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) argstr, length, 0);
 			if (result < 0) {
 				return result;
@@ -102,7 +102,7 @@ int get_data_stat(struct process *proc, char *buffer, int max)
 		}
 
 		// TODO this is a hacky way of avoiding requesting pages beyond the end of the stack
-		length = roundup(arg, PAGE_SIZE) - arg;
+		length = align_up(arg, PAGE_SIZE) - arg;
 		result = memory_map_load_pages_into_kvec(proc->map, kvec, 10, (virtual_address_t) arg, length, 0);
 		if (result < 0) {
 			return result;

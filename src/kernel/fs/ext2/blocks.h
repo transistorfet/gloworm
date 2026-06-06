@@ -61,7 +61,7 @@ static void ext2_free_block(struct mount *mp, ext2_block_t blocknum)
 	struct ext2_super *super = EXT2_SUPER(mp->super);
 	const int group = blocknum >> super->log_blocks_per_group;
 
-	blocknum = rounddown(blocknum, super->super.blocks_per_group);
+	blocknum = align_down(blocknum, super->super.blocks_per_group);
 	bit_free(&mp->bufcache, super->groups[group].block_bitmap, blocknum);
 	super->groups[group].free_block_count += 1;
 	super->super.total_unalloc_blocks += 1;

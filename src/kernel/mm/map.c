@@ -24,7 +24,7 @@ struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile 
 	struct memory_region *region;
 
 	// Round the size up to the nearest page
-	size = roundup(size, PAGE_SIZE);
+	size = align_up(size, PAGE_SIZE);
 
 	region = kzalloc(sizeof(struct memory_region));
 	if (!region)
@@ -83,7 +83,7 @@ physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, 
 	}
 	zero_page(page);
 
-	file_offset = rounddown(vaddr - segment->start, PAGE_SIZE) + rounddown(segment->offset, PAGE_SIZE);
+	file_offset = align_down(vaddr - segment->start, PAGE_SIZE) + align_down(segment->offset, PAGE_SIZE);
 	//printk("file offset: %x vaddr %x start %x end %x offset into segment %x, offset %x\n", file_offset, vaddr, segment->start, segment->end, (vaddr - segment->start), segment->offset);
 	error = vfs_seek(segment->file, file_offset, SEEK_SET);
 	if (error < 0) {
@@ -159,7 +159,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 	}
 
 	if (segment->ops && segment->ops->load_page_at) {
-		page_address = rounddown(vaddr, PAGE_SIZE);
+		page_address = align_down(vaddr, PAGE_SIZE);
 		error = mmu_table_get_page(map->root_table, page_address, &result);
 		if (!error) {
 			if (write_error && (segment->flags & SEG_WRITE)) {
@@ -199,7 +199,7 @@ int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, i
 	struct get_page_result page;
 	virtual_address_t page_start;
 
-	page_start = rounddown(start, PAGE_SIZE);
+	page_start = align_down(start, PAGE_SIZE);
 	for (i = 0; i < max_segs; i++) {
 		error = mmu_table_get_page(map->root_table, page_start, &page);
 		if (error < 0) {
@@ -214,7 +214,7 @@ int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, i
 			}
 		}
 
-		page_offset = alignment_offset(start, page.size);
+		page_offset = align_remainder(start, page.size);
 		page_remaining = page.size - page_offset;
 		kvec[i].buf = (char *) page.phys + page_offset;
 		if (length > page_remaining) {
@@ -389,12 +389,12 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 	struct memory_segment *segment;
 
 	// Check that the length is a multiple of the page size, or raise an error
-	if (alignment_offset(length, PAGE_SIZE)) {
+	if (align_remainder(length, PAGE_SIZE)) {
 		return EINVAL;
 	}
 
 	// Check that the virtual address given is aligned to a page, and raise an error if it's not
-	if (alignment_offset(start, PAGE_SIZE)) {
+	if (align_remainder(start, PAGE_SIZE)) {
 		return EINVAL;
 	}
 
@@ -660,7 +660,7 @@ int memory_map_move_sbrk(struct memory_map *map, int diff)
 	}
 
 	// Require an alignment to page size bytes
-	if (alignment_offset((diff > 0 ? diff : -diff), PAGE_SIZE)) {
+	if (align_remainder((diff > 0 ? diff : -diff), PAGE_SIZE)) {
 		return ENOMEM;
 	}
 

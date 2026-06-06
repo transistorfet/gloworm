@@ -94,7 +94,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 	uintptr_t user_mem_start;
 
 	// The extra data is for the bss segment, which we don't know the proper size of
-	mem_size = roundup(file->vnode->size + 0x200, PAGE_SIZE);
+	mem_size = align_up(file->vnode->size + 0x200, PAGE_SIZE);
 
 	#if defined(CONFIG_MMU)
 
@@ -201,8 +201,8 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 
 			if (prog_headers[i].p_vaddr > mem_size)
 				mem_size = prog_headers[i].p_vaddr;
-			segment_size = alignment_offset(prog_headers[i].p_vaddr, PAGE_SIZE) + prog_headers[i].p_memsz;
-			mem_size += roundup(segment_size, PAGE_SIZE);
+			segment_size = align_remainder(prog_headers[i].p_vaddr, PAGE_SIZE) + prog_headers[i].p_memsz;
+			mem_size += align_up(segment_size, PAGE_SIZE);
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
 			preload = 1;
 		}
@@ -236,8 +236,8 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 		if (prog_headers[i].p_type == PT_LOAD && prog_headers[i].p_filesz > 0) {
 			file_segment_start = user_mem_start + prog_headers[i].p_vaddr;
 			file_segment_end = file_segment_start + prog_headers[i].p_filesz;
-			memory_segment_start = rounddown(file_segment_start, PAGE_SIZE);
-			memory_segment_end = roundup(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
+			memory_segment_start = align_down(file_segment_start, PAGE_SIZE);
+			memory_segment_end = align_up(file_segment_start + prog_headers[i].p_memsz, PAGE_SIZE);
 
 			#if defined(CONFIG_MMU)
 			int flags = preload ? SEG_POPULATE : 0;
@@ -300,7 +300,7 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	memory_region_free(object);
 	#endif
 
-	error = memory_map_insert_heap_stack(map, roundup(user_mem_start + mem_size, PAGE_SIZE), CONFIG_USER_STACK_SIZE);
+	error = memory_map_insert_heap_stack(map, align_up(user_mem_start + mem_size, PAGE_SIZE), CONFIG_USER_STACK_SIZE);
 	if (error < 0) {
 		goto fail;
 	}

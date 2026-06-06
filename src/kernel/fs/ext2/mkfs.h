@@ -21,14 +21,14 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 	//const int log_blocks_per_inode = 13 - __builtin_ctz(block_size);	// 1 inode per 8192 bytes
 	const int log_blocks_per_inode = 14 - __builtin_ctz(block_size);	// 1 inode per 16384 bytes
 	const uint32_t total_blocks = opts->blocks;
-	const uint32_t total_inodes = roundup_power_of_2(log_blocks_per_inode > 0 ? total_blocks >> log_blocks_per_inode : total_blocks << -log_blocks_per_inode);
+	const uint32_t total_inodes = roundup_next_pow2(log_blocks_per_inode > 0 ? total_blocks >> log_blocks_per_inode : total_blocks << -log_blocks_per_inode);
 	// A block group's bitmap must be one block, so the most blocks per group is block_size * 8
-	const uint32_t blocks_per_group = total_blocks >= (block_size << 3) ? block_size << 3 : roundup_power_of_2(total_blocks);
+	const uint32_t blocks_per_group = total_blocks >= (block_size << 3) ? block_size << 3 : roundup_next_pow2(total_blocks);
 	const uint32_t inodes_per_group = log_blocks_per_inode > 0 ? blocks_per_group >> log_blocks_per_inode : blocks_per_group << -log_blocks_per_inode;
 	const int superblock_blocknum = (block_size == 1024) ? 1 : 0;
 	const int num_groups = total_blocks / blocks_per_group + ((total_blocks % blocks_per_group) ? 1 : 0);
 	const int inode_table_blocks = (inodes_per_group * inode_size) / block_size;
-	const int group_descriptor_blocks = roundup(sizeof(struct ext2_group_descriptor) * num_groups, block_size) >> __builtin_ctz(block_size);
+	const int group_descriptor_blocks = align_up(sizeof(struct ext2_group_descriptor) * num_groups, block_size) >> __builtin_ctz(block_size);
 
 	// The total size is must enough to contain twice the number of blocks needed for the block group info, bitmaps, and inode table
 	const uint32_t minimum_blocks = (superblock_blocknum + 1 + group_descriptor_blocks + 2 + inode_table_blocks) << 1;

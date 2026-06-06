@@ -71,7 +71,7 @@ void *kmalloc(uintptr_t size)
 	struct block *cur = main_heap.free_blocks;
 
 	// Align the size to the size of a pointer
-	size = roundup(size, sizeof(uintptr_t));
+	size = align_up(size, sizeof(uintptr_t));
 	uintptr_t block_size = size + sizeof(struct block);
 
 	for (; cur; prev = cur, cur = cur->next) {
@@ -102,7 +102,7 @@ void *kmalloc(uintptr_t size)
 
 	// We're out of free blocks, so attempt to allocate a new page of memory, and panic
 	// if we've run out of pages
-	uintptr_t page_size = roundup(block_size, PAGE_SIZE);
+	uintptr_t page_size = align_up(block_size, PAGE_SIZE);
 	cur = (struct block *) page_block_alloc(kmem_page_block, page_size);
 	if (!cur) {
 		// Out Of Memory
@@ -197,7 +197,7 @@ void kernel_heap_compact(void)
 	for (; cur; prev = cur, cur = cur->next) {
 		// If this is a page-aligned block that's an even number of pages in size,
 		// then free the pages instead of re-inserting it
-		if (alignment_offset((uintptr_t) cur, PAGE_SIZE) == 0 && alignment_offset(cur->size, PAGE_SIZE) == 0) {
+		if (align_remainder((uintptr_t) cur, PAGE_SIZE) == 0 && align_remainder(cur->size, PAGE_SIZE) == 0) {
 			if (prev) {
 				prev->next = cur->next;
 			} else {

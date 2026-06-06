@@ -222,7 +222,7 @@ int do_brk(void __user *addr)
 	int diff;
 
 	// Round up to the nearest page size
-	addr = (void *) roundup((uintptr_t) addr, PAGE_SIZE);
+	addr = (void *) align_up((uintptr_t) addr, PAGE_SIZE);
 
 	// TODO fix the address translation??  Maybe this isn't needed
 	diff = (uintptr_t) addr - current_proc->map->sbrk;
@@ -237,7 +237,7 @@ void *do_sbrk(intptr_t diff)
 {
 	if (diff) {
 		// Round up to the nearest page size
-		diff = roundup(diff, PAGE_SIZE);
+		diff = align_up(diff, PAGE_SIZE);
 
 		if (current_proc->map->heap_start + diff >= (uintptr_t) arch_get_user_stackp(current_proc)) {
 			return NULL;

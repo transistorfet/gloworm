@@ -1,9 +1,8 @@
 
-#include <sys/param.h>
-
 #include <asm/addresses.h>
 
 #include <kernel/utils/iovec.h>
+#include <kernel/utils/macros.h>
 #include <kernel/utils/usercopy.h>
 #include <kernel/utils/strarray.h>
 
@@ -49,7 +48,7 @@ int string_array_copy(struct string_array *array, const char __user *const src_w
 		used += result + 1;
 	}
 	array->strings[i] = 0;
-	array->used = roundup(used, sizeof(uintptr_t));
+	array->used = align_up(used, sizeof(uintptr_t));
 	return len;
 }
 

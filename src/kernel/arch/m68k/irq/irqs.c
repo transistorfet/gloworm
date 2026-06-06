@@ -231,7 +231,7 @@ static void page_fault_handler(struct exception_frame *frame)
 			// An instruction fault has occurred, and if there's already a page mapped to that address,
 			// it will be returned when we RTE.  It's being recorded in a Program Space function codes, and
 			// was previously only recorded in the Data Space function codes
-			error = mmu_table_get_page(current_proc->map->root_table, rounddown(fault_addr, PAGE_SIZE), NULL);
+			error = mmu_table_get_page(current_proc->map->root_table, align_down(fault_addr, PAGE_SIZE), NULL);
 			if (!error) {
 				return;
 			}

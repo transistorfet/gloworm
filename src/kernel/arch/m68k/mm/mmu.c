@@ -404,7 +404,7 @@ int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virt
 		int error;
 		struct get_table_result result;
 
-		error = get_table(root_table, rounddown(virtual_addr, PAGE_SIZE), PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
+		error = get_table(root_table, align_down(virtual_addr, PAGE_SIZE), PAGE_SIZE, GET_TABLE_RETURN_ANY_SIZE, &result);
 		return error >= 0;
 	}
 }

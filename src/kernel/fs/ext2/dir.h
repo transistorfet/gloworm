@@ -134,7 +134,7 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 	struct buf *buf;
 	struct ext2_dirent *current_entry;
 	const int block_size = dir->mp->block_size;
-	const short new_entry_len = roundup(sizeof(struct ext2_dirent) + filename_len, 4);
+	const short new_entry_len = align_up(sizeof(struct ext2_dirent) + filename_len, 4);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, EXT2_AF_CREATE_BLOCK)) != 0; znum++) {
 		buf = get_block(&dir->mp->bufcache, block);
@@ -159,7 +159,7 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 			}
 
 			const uint16_t entry_len = le16toh(current_entry->entry_len);
-			const uint16_t entry_min_len = roundup(sizeof(struct ext2_dirent) + current_entry->name_len, 4);
+			const uint16_t entry_min_len = align_up(sizeof(struct ext2_dirent) + current_entry->name_len, 4);
 			if (entry_len >= entry_min_len + new_entry_len) {
 				// Split the directory entry in two
 				current_entry->entry_len = htole16(entry_min_len);

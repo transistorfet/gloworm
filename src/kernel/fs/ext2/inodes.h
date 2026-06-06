@@ -40,9 +40,9 @@ static inline struct inode_location get_inode_block_and_offset(struct mount *mp,
 		return result;
 	}
 
-	const int group_inode = alignment_offset((ino - 1), 1 << super->log_inodes_per_group);
+	const int group_inode = align_remainder((ino - 1), 1 << super->log_inodes_per_group);
 	const ext2_block_t block_offset = group_inode >> super->log_inodes_per_block;
-	const int byte_offset = alignment_offset(group_inode, 1 << super->log_inodes_per_block) << super->log_inode_size;
+	const int byte_offset = align_remainder(group_inode, 1 << super->log_inodes_per_block) << super->log_inode_size;
 	const struct inode_location result = { super->groups[group].inode_table + block_offset, byte_offset };
 
 	return result;
@@ -77,7 +77,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	const ext2_inode_t inodenum = (super->super.inodes_per_group * group) + group_inode_num + 1;
 
 	const ext2_block_t block_offset = group_inode_num >> super->log_inodes_per_block;
-	const int byte_offset = alignment_offset(group_inode_num, 1 << super->log_inodes_per_block) << super->log_inode_size;
+	const int byte_offset = align_remainder(group_inode_num, 1 << super->log_inodes_per_block) << super->log_inode_size;
 	inode_buf = get_block(&mp->bufcache, super->groups[group].inode_table + block_offset);
 	if (!inode_buf)
 		return EIO;

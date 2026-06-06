@@ -298,7 +298,7 @@ int main(void)
 
 	//const struct mkfs_options opts = {
 	//	.block_size = 4096,
-	//	.blocks = 0x8000,
+	//	.blocks = 0x7000,
 	//};
 	//error = (ext2_mount_ops.mkfs)(extra_dev, &opts);
 	//if (error < 0) {

@@ -1,11 +1,11 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <sys/param.h>
 
 #include <kconfig.h>
-#include <kernel/mm/pages.h>
 #include <kernel/printk.h>
+#include <kernel/mm/pages.h>
+#include <kernel/utils/macros.h>
 
 struct page_block pages = { 0 };
 
@@ -46,12 +46,12 @@ int init_page_block(struct page_block *block, void *addr, size_t size)
 
 	total_pages = size >> PAGE_ADDR_BITS;
 
-	bitmap_size = roundup(total_pages >> LOG_OF_PAGES_PER_INDEX, PAGES_PER_INDEX);
-	bitmap_pages = roundup(bitmap_size, PAGE_SIZE) >> PAGE_ADDR_BITS;
+	bitmap_size = align_up(total_pages >> LOG_OF_PAGES_PER_INDEX, PAGES_PER_INDEX);
+	bitmap_pages = align_up(bitmap_size, PAGE_SIZE) >> PAGE_ADDR_BITS;
 
 	#if defined(CONFIG_MMU)
 	descriptors_size = (total_pages - bitmap_pages) * sizeof(struct page_descriptor);
-	descriptors_pages = roundup(descriptors_size, PAGE_SIZE) >> PAGE_ADDR_BITS;
+	descriptors_pages = align_up(descriptors_size, PAGE_SIZE) >> PAGE_ADDR_BITS;
 	descriptors_addr = &((page_t *) addr)[bitmap_pages];
 	#endif
 
