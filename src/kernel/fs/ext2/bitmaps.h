@@ -27,8 +27,9 @@ static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, 
 	struct buf *buf;
 
 	buf = get_block(bufcache, bitmap_blocknum);
-	if (!buf)
+	if (!buf) {
 		return -1;
+	}
 	block = buf->block;
 
 	const int last_byte = num_entries >> 3;

@@ -6,13 +6,14 @@
 
 #define MAX_TEST_BUFS		100
 
-int mock_block_size = 0;
 struct buf mock_bufs[MAX_TEST_BUFS];
 
 void init_bufcache(struct bufcache *cache, device_t dev, int block_size)
 {
-	mock_block_size = block_size;
-
+	cache->dev = dev;
+	cache->flags = 0;
+	cache->block_size = block_size;
+	cache->num_entries = MAX_TEST_BUFS;
 	for (int i = 0; i < MAX_TEST_BUFS; i++) {
 		_queue_node_init(&mock_bufs[i].node);
 		mock_bufs[i].refcount = 0;

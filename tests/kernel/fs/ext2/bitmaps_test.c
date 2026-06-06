@@ -17,7 +17,7 @@ int test_bitmap_alloc_free(void)
 	struct bufcache bufcache;
 	const block_t bitmap_blocknum = 0;
 
-	init_bufcache(&bufcache, 0, TEST_BLOCK_SIZE);
+	init_bufcache(&bufcache, 101, TEST_BLOCK_SIZE);
 	uint8_t *bitmap_data = mock_bufs[bitmap_blocknum].block;
 
 	// Initialize bitmap and verify it's correct
@@ -62,5 +62,7 @@ int main()
 {
 	run(test_bitmap_alloc_free);
 
-	printf("bitmap tests passed\n");
+	printf("%s tests passed\n", __FILE_NAME__);
+
+	return 0;
 }

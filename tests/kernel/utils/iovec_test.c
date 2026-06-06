@@ -136,7 +136,7 @@ int main(void)
 	run(test_iovec_kvec_seek);
 	run(test_iovec_kvec_copy);
 
-	printf("All tests completed\n");
+	printf("%s tests passed\n", __FILE_NAME__);
 
 	return 0;
 }
