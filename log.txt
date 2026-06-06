@@ -6237,3 +6237,29 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   that for being worse, but actually, it's trying to build the `bare-tests` goal when it recurses into the src/libc/ subdir, which
   is why it fails earlier
 
+- when I start poking a bit, I find a ton of bugs.  The issue that broke the bare-tests when the if condition around the test rules
+  include wasn't working was that the fs test directory had no tests, which caused it to fail because the test rules weren't
+  included, so there was no bare-tests rule
+- when I fixed that, I realized the bitmap unit test wasn't working, and it was because the last block group was 0x8000 blocks,
+  which wasn't noticed because I was created a disk 0x8000 blocks in size
+- It was because the conditional check was backwards.  Once I fixed that, it was still giving problems with a smaller disk
+- the whole time, if the disk wasn't 0x8000 blocks, when I `ls /media` it would fail with -1 permissions, and `cd`ing to it would
+  give -20 no dir, which means the inode's mode is 0
+- when I mounted the disk in linux, it reported fine, but when I tried to transfer a file, in then said it was read only, and after
+  unmounting, only then did fsck report an error
+- It said that thing about the number of size in blocks of a file being wrong, and I saw *again* that it was supposed to be 512-byte
+  sectors, and not fs blocks, so I fixed the calculation
+
+- other fsck errors reported are: dirs count wrong (2: counted=1), padding at end of block and inode bitmaps, and inode bitmap
+  differences: -11
+
+
+2026-06-04:
+
+- the issue with a drive that was 0x7000 blocks was that, when it loaded the superblock, it was dividing the total blocks by the
+  blocks_per_group value, which gave 1 fewer groups (ie. 0 groups), which then made it fail
+- perhaps troublesomely, it was still trying to read group 0 despite there being no groups, which should be a problem.  Either I
+  need to have an error if there's 0 groups when mounting, or else I need to have better checks, or both.  Not sure if it's an edge
+  case with 0 groups, or if it would try to read group 1 if there was only 1 group.
+- oh, I do have a check for num_groups in inodes, but it's a > instead of >= so it wasn't catching the off by one error
+

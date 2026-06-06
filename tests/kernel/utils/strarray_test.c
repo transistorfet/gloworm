@@ -6,7 +6,7 @@
 #include <kernel/utils/strarray.h>
 
 
-int main(void)
+int test_strarray_init_copy(void)
 {
 	int num_args = 3;
 	struct string_array array;
@@ -43,6 +43,19 @@ int main(void)
 	assert(((uintptr_t *) buffer)[0] == (uintptr_t) &buffer[arg0_start]);
 	assert(((uintptr_t *) buffer)[1] == (uintptr_t) &buffer[arg0_start + 5]);
 	assert(((uintptr_t *) buffer)[2] == (uintptr_t) &buffer[arg0_start + 10]);
+
+	return 0;
+}
+
+#define run(test) \
+	printf("Running %s\n", #test); \
+	assert(test() == 0);
+
+int main(void)
+{
+	run(test_strarray_init_copy);
+
+	printf("%s tests passed\n", __FILE_NAME__);
 
 	return 0;
 }

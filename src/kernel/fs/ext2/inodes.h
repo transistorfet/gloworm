@@ -25,7 +25,7 @@ static inline int get_inode_group(struct mount *mp, inode_t ino)
 {
 	const struct ext2_super *super = EXT2_SUPER(mp->super);
 	const int group = (ino - 1) >> super->log_inodes_per_group;
-	if (group > super->num_groups) {
+	if (group >= super->num_groups) {
 		return EINVAL;
 	}
 	return group;
@@ -35,7 +35,7 @@ static inline struct inode_location get_inode_block_and_offset(struct mount *mp,
 {
 	const struct ext2_super *super = EXT2_SUPER(mp->super);
 	const int group = (ino - 1) >> super->log_inodes_per_group;
-	if (group > super->num_groups) {
+	if (group >= super->num_groups) {
 		const struct inode_location result = { EINVAL, 0 };
 		return result;
 	}
@@ -44,6 +44,7 @@ static inline struct inode_location get_inode_block_and_offset(struct mount *mp,
 	const ext2_block_t block_offset = group_inode >> super->log_inodes_per_block;
 	const int byte_offset = alignment_offset(group_inode, 1 << super->log_inodes_per_block) << super->log_inode_size;
 	const struct inode_location result = { super->groups[group].inode_table + block_offset, byte_offset };
+
 	return result;
 }
 
@@ -163,7 +164,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	inode->mode = htole16(vnode->mode);
 	inode->uid = htole16(vnode->uid);
 	inode->size = htole32(vnode->size);
-	inode->nblocks = htole32((vnode->size >> EXT2_LOG_BLOCK_SIZE(block_size)) + (vnode->size & (block_size - 1) ? 1 : 0));
+	inode->nblocks = htole32(((vnode->size >> 9) + (vnode->size & (block_size - 1) ? 1 : 0)));	// total number of 512-byte blocks
 	inode->atime = htole32(vnode->atime);
 	inode->mtime = htole32(vnode->mtime);
 	inode->ctime = htole32(vnode->ctime);

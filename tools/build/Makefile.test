@@ -16,12 +16,14 @@ bare-tests-obj-y	+= $(tests-obj-y)
 host-tests-auto-obj	:= tests/printk.host.o
 host-tests-common-deps	:= $(host-tests-auto-obj) $(host-tests-obj-y)
 
-bare-tests-auto-obj	:= tests/entry.o tests/printk.o src/monitor/tty_68681.o
+bare-tests-start	:= tests/entry.o
+bare-tests-auto-obj	:= tests/printk.o src/monitor/tty_68681.o
 bare-tests-common-deps	:= $(bare-tests-auto-obj) $(bare-tests-obj-y)
 
 ### Add prefix to all applicable targets
 host-tests-common-deps	:= $(addprefix $(OUTPUT),$(host-tests-common-deps))
 bare-tests-common-deps	:= $(addprefix $(OUTPUT),$(bare-tests-common-deps))
+bare-tests-start	:= $(addprefix $(OUTPUT),$(bare-tests-start))
 
 ### Rules
 
@@ -34,7 +36,8 @@ bare-tests: $(config-h) $(tests-main-subdir-y) $(bare-tests-load)
 $(OUTPUT)%.test.run: $(OUTPUT)%.test.host
 	./$<
 
-$(OUTPUT)%.test.host: HOST_CFLAGS += -DHOST_TARGET -DHOST_TEST
+#PRECIOUS += $(OUTPUT)%.test.host
+$(OUTPUT)%.test.host: HOST_CFLAGS += -DHOST_TARGET -DHOST_TEST -DTEST
 $(OUTPUT)%.test.host: $(OUTPUT)%.host.o $(host-tests-common-deps)
 	$(cmd_host_ld_elf)
 
@@ -45,10 +48,13 @@ $(OUTPUT)%.test.load: ccflags-y += $(firmware-ccflags-y)
 $(OUTPUT)%.test.load: $(OUTPUT)%.bin
 	tools/make-load-file $< $@ $(LOAD_ARGS)
 
-$(OUTPUT)%.test.bin: $(OUTPUT)%.o $(bare-tests-common-deps) $(libex-obj-y)
+$(OUTPUT)%.test.bin: CFLAGS += -DTEST
+$(OUTPUT)%.test.bin: $(bare-tests-start) $(OUTPUT)%.o $(bare-tests-common-deps) $(libex-obj-y)
 	$(cmd_ld_bin)
+	# build an identical elf file for easier test debugging
+	$(patsubst %.bin,%.elf,$(cmd_ld_elf))
 
-obj-dirs := $(sort $(patsubst %/,%, $(dir $(tests-main-subdir-y) $(tests-main-obj-y))))
+obj-dirs := $(sort $(patsubst %/,%, $(dir $(tests-main-subdir-y) $(tests-main-obj-y) $(host-tests-common-deps) $(bare-tests-common-deps))))
 ifneq ($(obj-dirs),)
 $(shell mkdir -p $(obj-dirs))
 endif

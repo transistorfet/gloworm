@@ -90,5 +90,7 @@ int main()
 	run(test_page_single_allocation);
 	run(test_page_contiguous_allocation);
 
-	printf("pages tests passed\n");
+	printf("%s tests passed\n", __FILE_NAME__);
+
+	return 0;
 }

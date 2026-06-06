@@ -17,7 +17,7 @@ void print_queue(struct queue *queue)
 	printf("\n");
 }
 
-int main()
+int test_queue_insert_remove(void)
 {
 	struct queue_node node1;
 	struct queue_node node2;
@@ -52,6 +52,19 @@ int main()
 	printf("done\n");
 
 	print_queue(&queue2);
+
+	return 0;
+}
+
+#define run(test) \
+	printf("Running %s\n", #test); \
+	assert(test() == 0);
+
+int main(void)
+{
+	run(test_queue_insert_remove);
+
+	printf("%s tests passed\n", __FILE_NAME__);
 
 	return 0;
 }

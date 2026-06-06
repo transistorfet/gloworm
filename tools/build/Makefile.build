@@ -119,7 +119,6 @@ $(OUTPUT)%.send: $(OUTPUT)%.bin
 $(OUTPUT)%.bin: $(OUTPUT)%.elf
 	$(cmd_ld_bin)
 
-#.PRECIOUS: $(OUTPUT)%.elf
 $(OUTPUT)%/$(notdir $(dir)).elf: $(OUTPUT)%/built-in.o
 	$(cmd_ld_elf)
 

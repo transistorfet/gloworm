@@ -1,4 +1,6 @@
 
+* you should probably modify roundup to be more standard, and make new versions in macros.h just for the kernel, that do the more specific non-dividing functions you need for addresses
+
 * should you move the reference increment to inside memory_map_mmap?  It would be a bit weird in that a file/region passed into mmap would not have the reference captured, but
   instead expect the caller to still free their own reference.  Most other functions don't operate like that
 

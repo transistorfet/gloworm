@@ -6,7 +6,7 @@
 
 #define BUF_SIZE	16
 
-int main()
+int test_ringbuffer_insert_wrap_around(void)
 {
 	struct ringbuffer buffer;
 
@@ -82,6 +82,19 @@ int main()
 		//assert(array[i] == array2[i]);
 	}
 	printf("\n");
+
+	return 0;
+}
+
+#define run(test) \
+	printf("Running %s\n", #test); \
+	assert(test() == 0);
+
+int main(void)
+{
+	run(test_ringbuffer_insert_wrap_around);
+
+	printf("%s tests passed\n", __FILE_NAME__);
 
 	return 0;
 }

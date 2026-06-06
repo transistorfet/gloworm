@@ -93,7 +93,13 @@ static int load_superblock(struct mount *mp)
 		return EINVAL;
 	}
 
-	const int num_groups = le32toh(super_on_disk->total_blocks) / le32toh(super_on_disk->blocks_per_group);
+	const int total_blocks = le32toh(super_on_disk->total_blocks);
+	const int blocks_per_group = le32toh(super_on_disk->blocks_per_group);
+	const int num_groups = (total_blocks / blocks_per_group) + (total_blocks & (blocks_per_group - 1) ? 1 : 0);
+
+	if (num_groups <= 0) {
+		log_error("%s: error mounting filesystem, calculated 0 block groups\n", mp->ops->fstype);
+	}
 
 	super = kmalloc(sizeof(struct ext2_super) + (num_groups * sizeof(struct ext2_block_group)));
 	super->groups = (struct ext2_block_group *) (super + 1);	// the area just after the superblock, allocated along with it
@@ -147,6 +153,7 @@ static int load_superblock(struct mount *mp)
 		super->groups[group].free_block_count = le16toh(group_on_disk->free_block_count);
 		super->groups[group].free_inode_count = le16toh(group_on_disk->free_inode_count);
 		super->groups[group].used_dirs_count = le16toh(group_on_disk->used_dirs_count);
+
 	}
 	if (buf) {
 		release_block(buf, 0);

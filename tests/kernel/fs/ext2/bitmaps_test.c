@@ -14,17 +14,16 @@ extern struct buf mock_bufs[];
 int test_bitmap_alloc_free(void)
 {
 	bitnum_t bit;
-	uint32_t bits_value;
 	struct bufcache bufcache;
 	const block_t bitmap_blocknum = 0;
 
-	init_bufcache(&bufcache, 0, TEST_BLOCK_SIZE);
+	init_bufcache(&bufcache, 101, TEST_BLOCK_SIZE);
 	uint8_t *bitmap_data = mock_bufs[bitmap_blocknum].block;
 
 	// Initialize bitmap and verify it's correct
 	bitmap_init(&bufcache, bitmap_blocknum, 20, 1);
 	printk_dump_bytes(bitmap_data, 4);
-	assert(!memcmp(bitmap_data, "\x01\x00\xF0\xFF", 4));
+	assert(!memcmp(bitmap_data, "\x01\x00\x0F\xFF", 4));
 
 	bit = bit_alloc(&bufcache, bitmap_blocknum, 0);
 	assert(bit != 0);
@@ -39,18 +38,18 @@ int test_bitmap_alloc_free(void)
 	printk("allocated %d\n", bit);
 
 	printk_dump_bytes(bitmap_data, 4);
-	assert(!memcmp(bitmap_data, "\x0F\x00\xF0\xFF", 4));
+	assert(!memcmp(bitmap_data, "\x0F\x00\x0F\xFF", 4));
 
 	printk("freeing 1\n");
 	bit_free(&bufcache, bitmap_blocknum, 1);
 	printk_dump_bytes(bitmap_data, 4);
-	assert(!memcmp(bitmap_data, "\x0D\x00\xF0\xFF", 4));
+	assert(!memcmp(bitmap_data, "\x0D\x00\x0F\xFF", 4));
 
 	bit = bit_alloc(&bufcache, bitmap_blocknum, 0);
 	assert(bit != 0);
 	printk("allocated %d\n", bit);
 	printk_dump_bytes(bitmap_data, 4);
-	assert(!memcmp(bitmap_data, "\x0F\x00\xF0\xFF", 4));
+	assert(!memcmp(bitmap_data, "\x0F\x00\x0F\xFF", 4));
 
 	return 0;
 }
@@ -63,5 +62,7 @@ int main()
 {
 	run(test_bitmap_alloc_free);
 
-	printf("bitmap tests passed\n");
+	printf("%s tests passed\n", __FILE_NAME__);
+
+	return 0;
 }
