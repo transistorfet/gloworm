@@ -113,7 +113,7 @@ $(OUTPUT)%.send: $(OUTPUT)%.bin
 	tools/make-send-file $< $@
 
 # Pre-process the linker script templates
-%.ld: %.ld.in
+%.ld: %.ld.in $(config-h)
 	$(cmd_cc_ldin)
 
 $(OUTPUT)%.bin: $(OUTPUT)%.elf
