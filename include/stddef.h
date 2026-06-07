@@ -8,7 +8,7 @@ typedef signed long ssize_t;
 typedef unsigned long size_t;
 
 #define offsetof(type, member)	\
-	((size_t) &(((type *) NULL)->(member)))
+	((size_t) &(((type *) NULL)->member))
 
 #endif
 

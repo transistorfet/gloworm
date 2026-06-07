@@ -1,9 +1,12 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
-#include "../include/kernel/utils/queue.h"
+#include <kernel/utils/macros.h>
+
+#include <kernel/utils/queue.h>
 
 struct queue queue1;
 struct queue queue2;
@@ -56,6 +59,66 @@ int test_queue_insert_remove(void)
 	return 0;
 }
 
+struct test_item {
+	uint32_t some_data;
+	uint32_t some_more_data;
+	struct queue_node list1_node;
+	struct queue_node list2_node;
+};
+
+int test_queue_container_of(void)
+{
+	struct queue queue1;
+	struct queue queue2;
+
+	struct test_item item1 = { 1 };
+	struct test_item item2 = { 2 };
+	struct test_item item3 = { 3 };
+	struct test_item item4 = { 4 };
+
+	_queue_init(&queue1);
+	_queue_init(&queue2);
+
+	_queue_insert(&queue1, &item1.list1_node);
+	assert(_queue_head(&queue1) == &item1.list1_node);
+	assert(_queue_head(&queue1) != &item1);
+
+	_queue_insert_after(&queue1, &item2.list1_node, _queue_tail(&queue1));
+	_queue_insert_after(&queue1, &item3.list1_node, _queue_tail(&queue1));
+	_queue_insert_after(&queue1, &item4.list1_node, _queue_tail(&queue1));
+
+	_queue_insert(&queue2, &item4.list2_node);
+	assert(_queue_head(&queue2) == &item4.list2_node);
+	assert(_queue_head(&queue2) != &item4);
+
+	struct queue_node *node = _queue_head(&queue1);
+	struct test_item *item = container_of(struct test_item, node, list1_node);
+	printf("item %lx with data %d\n", (uintptr_t) item, item->some_data);
+	assert(item == &item1);
+
+	node = _queue_next(node);
+	item = container_of(struct test_item, node, list1_node);
+	printf("item %lx with data %d\n", (uintptr_t) item, item->some_data);
+	assert(item == &item2);
+
+	node = _queue_next(node);
+	item = container_of(struct test_item, node, list1_node);
+	printf("item %lx with data %d\n", (uintptr_t) item, item->some_data);
+	assert(item == &item3);
+
+	node = _queue_next(node);
+	item = container_of(struct test_item, node, list1_node);
+	printf("item %lx with data %d\n", (uintptr_t) item, item->some_data);
+	assert(item == &item4);
+
+	node = _queue_head(&queue2);
+	item = container_of(struct test_item, node, list2_node);
+	printf("item %lx with data %d\n", (uintptr_t) item, item->some_data);
+	assert(item == &item4);
+
+	return 0;
+}
+
 #define run(test) \
 	printf("Running %s\n", #test); \
 	assert(test() == 0);
@@ -63,6 +126,7 @@ int test_queue_insert_remove(void)
 int main(void)
 {
 	run(test_queue_insert_remove);
+	run(test_queue_container_of);
 
 	printf("%s tests passed\n", __FILE_NAME__);
 
