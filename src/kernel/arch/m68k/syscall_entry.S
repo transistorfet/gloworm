@@ -38,9 +38,9 @@
 	.equ	SHORT_CONTEXT_SIZE, 24		// The size of the syscall registers on the stack (not including the interrupt return)
 	.equ	FULL_CONTEXT_SIZE, 64		// The size of the saved registers on the stack (not including the interrupt return)
 	.equ	SIGNAL_CONTEXT_SIZE,256		// The reserved size on the stack before calling do_signal to allow space for the signal and task contexts
-	.equ	PROC_RETURN_OFFSET, 8		// The offset into struct process where the return_value is located
-	.equ	PROC_SIG_PEND_OFFSET, 12	// The offset into struct process where the signal_pending value is located
-	.equ	PROC_SP_OFFSET, 16		// The offset into struct process where the stack pointer is located
+	.equ	PROC_RETURN_OFFSET, 0		// The offset into struct process where the return_value is located
+	.equ	PROC_SIG_PEND_OFFSET, 4		// The offset into struct process where the signal_pending value is located
+	.equ	PROC_SP_OFFSET, 8		// The offset into struct process where the stack pointer is located
 
 	.section .text
 

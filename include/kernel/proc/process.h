@@ -39,12 +39,13 @@ struct vnode;
 struct process;
 
 struct process {
-	struct queue_node node;
 	/// The value that will be returned to the user process when the kernel returns
 	uintptr_t return_value;
 	uintptr_t signal_pending;
 	/// Architecture-specific task state
 	struct arch_task_info task_info;
+
+	struct queue_node run_node;
 
 	int state;
 	pid_t tid;

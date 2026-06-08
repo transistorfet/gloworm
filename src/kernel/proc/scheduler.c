@@ -42,12 +42,12 @@ void init_scheduler(void)
 	if (!idle_proc) {
 		panic("eternal slumber\n");
 	}
-	_queue_remove(&run_queue, &idle_proc->node);
+	_queue_remove(&run_queue, &idle_proc->run_node);
 }
 
 void insert_proc(struct process *proc)
 {
-	_queue_insert(&run_queue, &proc->node);
+	_queue_insert(&run_queue, &proc->run_node);
 }
 
 void exit_proc(struct process *proc, int status)
@@ -61,9 +61,9 @@ void exit_proc(struct process *proc, int status)
 
 	LOCK(saved_status);
 	if (proc->state == PS_BLOCKED) {
-		_queue_remove(&blocked_queue, &proc->node);
+		_queue_remove(&blocked_queue, &proc->run_node);
 	} else {
-		_queue_remove(&run_queue, &proc->node);
+		_queue_remove(&run_queue, &proc->run_node);
 	}
 
 	proc->state = PS_EXITED;
@@ -88,9 +88,9 @@ void stop_proc(struct process *proc)
 		UNLOCK(saved_status);
 		return;
 	} else if (proc->state == PS_RUNNING || proc->state == PS_RESUMING) {
-		_queue_remove(&run_queue, &proc->node);
+		_queue_remove(&run_queue, &proc->run_node);
 	} else if (proc->state == PS_BLOCKED) {
-		_queue_remove(&blocked_queue, &proc->node);
+		_queue_remove(&blocked_queue, &proc->run_node);
 	}
 	proc->state = PS_STOPPED;
 	need_reschedule = 1;
@@ -107,8 +107,8 @@ void suspend_proc(struct process *proc, int flags)
 		return;
 	}
 
-	_queue_remove(&run_queue, &proc->node);
-	_queue_insert(&blocked_queue, &proc->node);
+	_queue_remove(&run_queue, &proc->run_node);
+	_queue_insert(&blocked_queue, &proc->run_node);
 	proc->state = PS_BLOCKED;
 	proc->bits |= (flags & PB_BLOCK_CONDITIONS);
 	need_reschedule = 1;
@@ -124,9 +124,9 @@ void resume_proc(struct process *proc)
 		UNLOCK(saved_status);
 		return;
 	} else if (proc->state == PS_BLOCKED) {
-		_queue_remove(&blocked_queue, &proc->node);
+		_queue_remove(&blocked_queue, &proc->run_node);
 	}
-	_queue_insert(&run_queue, &proc->node);
+	_queue_insert(&run_queue, &proc->run_node);
 	proc->state = PS_RESUMING;
 	proc->wait_events = 0;
 	proc->wait_check = NULL;
@@ -155,15 +155,17 @@ void resume_waiting_parent(struct process *proc)
 void resume_blocked_procs(int events, struct vnode *vnode, device_t rdev)
 {
 	short saved_status;
-	struct process *cur, *next;
+	struct process *proc;
+	struct queue_node *cur, *next;
 
 	LOCK(saved_status);
-	cur = (struct process *) _queue_head(&blocked_queue);
+	cur = _queue_head(&blocked_queue);
 	for (; cur; cur = next) {
-		next = (struct process *) _queue_next(&cur->node);
+		next = _queue_next(cur);
+		proc = container_of(struct process, cur, run_node);
 		UNLOCK(saved_status);
-		if (cur->wait_check && (events & cur->wait_events) && cur->wait_check(cur, events, vnode, rdev)) {
-			resume_proc(cur);
+		if (proc->wait_check && (events & proc->wait_events) && proc->wait_check(proc, events, vnode, rdev)) {
+			resume_proc(proc);
 		}
 		LOCK(saved_status);
 	}
@@ -265,8 +267,8 @@ void reschedule_proc_to_now(struct process *proc)
 		return;
 	}
 
-	_queue_remove(&run_queue, &proc->node);
-	_queue_insert_after(&run_queue, &proc->node, &current_proc->node);
+	_queue_remove(&run_queue, &proc->run_node);
+	_queue_insert_after(&run_queue, &proc->run_node, &current_proc->run_node);
 	UNLOCK(saved_status);
 }
 
@@ -274,17 +276,20 @@ void schedule(void)
 {
 	short saved_status;
 	struct process *next;
+	struct queue_node *node;
 
 	LOCK(saved_status);
 	need_reschedule = 0;
-	if (!current_proc || !PROC_IS_RUNNING(current_proc) || !current_proc->node.next) {
-		next = (struct process *) run_queue.head;
+	if (!current_proc || !PROC_IS_RUNNING(current_proc) || !_queue_next(&current_proc->run_node)) {
+		node = _queue_head(&run_queue);
 	} else {
-		next = (struct process *) current_proc->node.next;
+		node = _queue_next(&current_proc->run_node);
 	}
 
-	// No processes to run, so run the idle process
-	if (!next) {
+	if (node) {
+		next = container_of(struct process, node, run_node);
+	} else {
+		// No processes to run, so run the idle process
 		next = idle_proc;
 	}
 

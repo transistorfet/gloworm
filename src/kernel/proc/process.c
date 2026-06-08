@@ -45,7 +45,7 @@ struct process *new_proc(pid_t pid, uid_t uid)
 			LOCK(saved_status);
 			memset(&table[i], 0, sizeof(struct process));
 
-			_queue_node_init(&table[i].node);
+			_queue_node_init(&table[i].run_node);
 
 			table[i].tid = pid;
 			table[i].tgid = pid;
