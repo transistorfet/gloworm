@@ -224,6 +224,7 @@ int main(void)
 	init_timer_list();
 	init_proc();
 	init_scheduler();
+	init_drivers();
 
 	// Initialize drivers before VFS
 	for (short i = 0; drivers[i]; i++) {

@@ -32,6 +32,7 @@ struct driver {
 };
 
 
+void init_drivers(void);
 int register_driver(devmajor_t major, struct driver *driver);
 struct driver *get_driver(devmajor_t major);
 

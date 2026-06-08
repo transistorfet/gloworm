@@ -8,6 +8,13 @@
 
 static struct driver *drv_table[MAX_DRIVERS];
 
+void init_drivers(void)
+{
+	for (int i = 0; i < MAX_DRIVERS; i++) {
+		drv_table[i] = NULL;
+	}
+}
+
 int register_driver(devmajor_t major, struct driver *driver)
 {
 	if (major >= MAX_DRIVERS) {

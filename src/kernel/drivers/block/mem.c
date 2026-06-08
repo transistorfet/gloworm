@@ -52,9 +52,11 @@ static int num_devices = 0;
 static struct mem_geometry devices[MAX_DEVICES];
 
 int mem_add_geometry(char *base, size_t size) {
-	if(num_devices == MAX_DEVICES)
+	if (num_devices >= MAX_DEVICES) {
+		log_error("%s: exceeded maximum number of disk devices\n", mem_driver.name);
 		return EINVAL;
-	
+	}
+
 	devices[num_devices].base = base;
 	devices[num_devices].size = size;
 	num_devices++;
@@ -65,6 +67,8 @@ int mem_add_geometry(char *base, size_t size) {
 int mem_init(void)
 {
 	int error;
+
+	num_devices = 0;
 
 	error = mem_add_geometry((char *) MEMDISK0_START, CONFIG_MEMDISK0_SIZE);
 	if (error < 0)
@@ -159,3 +163,4 @@ offset_t mem_seek(devminor_t minor, offset_t position, int whence, offset_t offs
 	return position;
 
 }
+

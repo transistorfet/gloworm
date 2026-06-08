@@ -81,22 +81,22 @@ static inline void _queue_remove(struct queue *queue, struct queue_node *node)
 
 static inline void *_queue_head(struct queue *queue)
 {
-       return queue->head;
+	return queue->head;
 }
 
 static inline void *_queue_tail(struct queue *queue)
 {
-       return queue->tail;
+	return queue->tail;
 }
 
 static inline void *_queue_next(struct queue_node *node)
 {
-       return node->next;
+	return node->next;
 }
 
 static inline void *_queue_prev(struct queue_node *node)
 {
-       return node->prev;
+	return node->prev;
 }
 
 #endif
