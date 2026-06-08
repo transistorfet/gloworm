@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 	}
 
 	if ((fd = open(argv[1], O_RDONLY, 0)) < 0) {
-		printf("Error opening %s\n", argv[1]);
+		fputs("Error opening ", stderr); fputs(argv[1], stderr); fputc('\n', stderr);
 		return fd;
 	}
 
@@ -76,8 +76,7 @@ int tar_read(int fd)
 
 		filesize = strtol(header->filesize, NULL, 8);
 		mode = strtol(header->mode, NULL, 8);
-		strcpy(filename, header->prefix);
-		strcat(filename, header->filename);
+		snprintf(filename, sizeof(filename), "%.*s%.*s", (int)sizeof(header->prefix), header->prefix, (int)sizeof(header->filename), header->filename);
 
 		// TODO this is a temporary hack because mkdir doesn't support trailing slashes
 		int len = strlen(filename);
