@@ -2,7 +2,7 @@
 menu "Process and thread options"
 
 config USER_STACK_SIZE
-	int "default user process stack size"
+	int "default user process stack size in bytes"
 	default 8192
 	help
 	  This is size of the stack that will be allocated for each user
@@ -10,7 +10,7 @@ config USER_STACK_SIZE
 	  aligned to CONFIG_PAGE_SIZE.
 
 config KERNEL_STACK_SIZE
-	int "default per-user-process kernel stack size in pages"
+	int "default per-user-process kernel stack size in bytes"
 	default 2048
 	help
 	  This is size of the stack that will be allocated for each user
@@ -23,5 +23,13 @@ config RESCHEDULE_PERIOD_MS
 	help
 	  This is time in milliseconds that a process will be run for before
 	  a reschedule is requested.
+
+config MAX_PROCESSES
+	int "maximum number of processes running"
+	default 100
+	help
+	  This is the maximum number of user processes that can be running at
+	  once.  It is mainly to prevent too many processes running and using
+	  up limited resources.
 
 endmenu

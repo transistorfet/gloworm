@@ -45,6 +45,7 @@ struct process {
 	/// Architecture-specific task state
 	struct arch_task_info task_info;
 
+	short slotnum;
 	struct queue_node run_node;
 
 	int state;
@@ -76,7 +77,9 @@ struct process {
 };
 
 struct process_iter {
-	short slot;
+	// NOTE this is used by procfs as part of the file position, so
+	// this should not be made bigger without also changing procfs
+	short slotnum;
 };
 
 void init_proc(void);

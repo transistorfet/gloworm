@@ -6263,3 +6263,39 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   case with 0 groups, or if it would try to read group 1 if there was only 1 group.
 - oh, I do have a check for num_groups in inodes, but it's a > instead of >= so it wasn't catching the off by one error
 
+
+2026-06-07:
+
+- I've been chasing issues with converting the process table to use a queue for the process list, and most of the bugs were actual
+  issues with the implementation, but the last bug I've got is that when I run `ps`, it fails because it tries to open an incorrect
+  process number (a very big number, likely a negative number).  As far as I can tell, the process iterator is working fine, but the
+  problem is that the list changes between invocations of it, which causes the iterator value to change, and then it gets the wrong
+  address.
+- I'm not sure this is a surmountable problem, but it would be nice to make the process table less unstable.  Another data structure
+  might be easier to traverse with (such as a crude hash table), but in some ways that's side-stepping the problem
+
+
+2026-06-08:
+
+- Ohhh!!! I see the problem.  I was kinda just thinking about it, and saw a "file->position += 1", and then thought about "well
+  where *is* the position being stored?  Isn't there also a `slot` number for adding the non-process files at the end?  and then
+  realized it was a carefully sized type as an integer, that fit two shorts into an int.  The slot number of the file, and the
+  process index into the fixed sized table previously used.  Now that it's a pointer, it can't fit, which is why it's preserving the
+  0x0012 part of the address, and cutting off the _4220 part in 0x124220
+- this is a hack and I hate it, but I don't know a better solution that squeezing the iterator into it.  It can't be stored in the
+  vnode, and I don't want to introduce a new bit of data associated with the file handle.  How do other systems solve this?
+
+- it looks like linux actually passes in an extended "dir_context" struct, but then it's globally defined, and for pos only contains
+  an loff_t value inside
+- I think I should use it as a counter only, not even split but just a number, each number being a different dir or file, and just
+  deal with it somehow, even if it's slower.  It's not often that you iterate.  I say that, but then I also use the iterator for
+  signals and stuff.  So I kind of can't use that iterator, and instead use a different one, or a different technique.  Like "get
+  the nth process" or something.  In that case, a table is better, but I could also have a crude hash table...  It would waste some
+  space though...
+- I just don't know
+
+
+2026-06-10:
+
+- I ended up going with a table of pointers, with the process struct allocated with kmalloc for each process.  It should work
+  alright, while being a bit more space conscious

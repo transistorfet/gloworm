@@ -10,23 +10,29 @@
 #include <kernel/proc/filedesc.h>
 #include <kernel/proc/scheduler.h>
 #include <kernel/utils/queue.h>
+#include <kernel/utils/macros.h>
 
 
 
 // Process Table and Queues
-#define PROCESS_MAX	10
+#define MAX_PROCESSES		CONFIG_MAX_PROCESSES
 static pid_t next_pid;
-static struct process table[PROCESS_MAX];
+static int num_processes;
+static int next_process_slot;
+static struct process *process_list[CONFIG_MAX_PROCESSES];
 
 extern struct process *current_proc;
 
+static int next_slotnum(void);
 
 void init_proc(void)
 {
 	next_pid = 2;
+	num_processes = 0;
+	next_process_slot = 0;
 
-	for (short i = 0; i < PROCESS_MAX; i++) {
-		table[i].pid = 0;
+	for (int i = 0; i < CONFIG_MAX_PROCESSES; i++) {
+		process_list[i] = NULL;
 	}
 
 	extern struct process *primordial_process;
@@ -35,53 +41,73 @@ void init_proc(void)
 
 struct process *new_proc(pid_t pid, uid_t uid)
 {
+	short slotnum;
 	short saved_status;
+	struct process *proc;
 
 	if (!pid)
 		pid = next_pid++;
 
-	for (short i = 0; i < PROCESS_MAX; i++) {
-		if (!table[i].pid) {
-			LOCK(saved_status);
-			memset(&table[i], 0, sizeof(struct process));
-
-			_queue_node_init(&table[i].run_node);
-
-			table[i].tid = pid;
-			table[i].tgid = pid;
-			table[i].pid = pid;
-			table[i].parent = INIT_PID;
-			table[i].pgid = table[i].pid;
-			table[i].session = table[i].pid;
-			table[i].ctty = 0;
-
-			table[i].state = PS_RUNNING;
-			table[i].map = NULL;
-			init_timer(&table[i].timer);
-			init_signal_data(&table[i]);
-
-			table[i].start_time = get_system_time();
-
-			table[i].uid = uid;
-			table[i].umask = PROC_DEFAULT_UMASK;
-			table[i].fd_table = NULL;
-
-			arch_init_task_info(&table[i]);
-			insert_proc(&table[i]);
-
-			UNLOCK(saved_status);
-			return &table[i];
-		}
+	if (num_processes >= MAX_PROCESSES) {
+		return NULL;
 	}
-	return NULL;
+
+	slotnum = next_slotnum();
+	if (slotnum < 0) {
+		return NULL;
+	}
+
+	proc = kzalloc(sizeof(struct process));
+	if (!proc) {
+		return NULL;
+	}
+
+	LOCK(saved_status);
+
+	proc->slotnum = slotnum;
+	process_list[proc->slotnum] = proc;
+	num_processes += 1;
+
+	_queue_node_init(&proc->run_node);
+
+	proc->tid = pid;
+	proc->tgid = pid;
+	proc->pid = pid;
+	proc->parent = INIT_PID;
+	proc->pgid = proc->pid;
+	proc->session = proc->pid;
+	proc->ctty = 0;
+
+	proc->state = PS_RUNNING;
+	proc->map = NULL;
+	init_timer(&proc->timer);
+	init_signal_data(proc);
+
+	proc->start_time = get_system_time();
+
+	proc->uid = uid;
+	proc->umask = PROC_DEFAULT_UMASK;
+	proc->fd_table = NULL;
+
+	arch_init_task_info(proc);
+	insert_proc(proc);
+
+	UNLOCK(saved_status);
+	return proc;
 }
 
 struct process *get_proc(pid_t pid)
 {
-	for (short i = 0; i < PROCESS_MAX; i++) {
-		if (table[i].pid == pid)
-			return &table[i];
+	short saved_status;
+
+	LOCK(saved_status);
+	for (int i = 0; i < CONFIG_MAX_PROCESSES; i++) {
+		if (process_list[i] && process_list[i]->pid == pid) {
+			UNLOCK(saved_status);
+			return process_list[i];
+		}
 	}
+	UNLOCK(saved_status);
 	return NULL;
 }
 
@@ -120,6 +146,7 @@ int reset_proc(struct process *proc)
 int close_proc(struct process *proc)
 {
 	short orphans = 0;
+	short saved_status;
 
 	// Set the previous process to NULL so that we skip over attempting to
 	// save the context during restore_context
@@ -136,14 +163,16 @@ int close_proc(struct process *proc)
 		proc->map = NULL;
 	}
 
+	LOCK(saved_status);
 	// Reassign any child procs' parent to be 1 (init), since we can't be sure this proc's
 	// parent is waiting, and the zombie proc wont get recycled
-	for (short i = 0; i < PROCESS_MAX; i++) {
-		if (table[i].pid && table[i].parent == proc->pid) {
+	for (int i = 0; i < CONFIG_MAX_PROCESSES; i++) {
+		if (process_list[i] && process_list[i]->parent == proc->pid) {
 			orphans += 1;
-			table[i].parent = 1;
+			process_list[i]->parent = INIT_PID;
 		}
 	}
+	UNLOCK(saved_status);
 
 	arch_release_task_info(proc);
 
@@ -153,14 +182,22 @@ int close_proc(struct process *proc)
 
 void cleanup_proc(struct process *proc)
 {
-	proc->pid = 0;
+	short saved_status;
+
+	LOCK(saved_status);
+	if (process_list[proc->slotnum] == proc) {
+		process_list[proc->slotnum] = NULL;
+		num_processes -= 1;
+	}
+	UNLOCK(saved_status);
+	kmfree(proc);
 }
 
 struct process *find_exited_child(pid_t parent, pid_t child)
 {
-	for (short i = 0; i < PROCESS_MAX; i++) {
-		if (table[i].pid && table[i].state == PS_EXITED && table[i].parent == parent && (child == -1 || table[i].pid == child)) {
-			return &table[i];
+	for (int i = 0; i < CONFIG_MAX_PROCESSES; i++) {
+		if (process_list[i] && process_list[i]->state == PS_EXITED && process_list[i]->parent == parent && (child == -1 || process_list[i]->pid == child)) {
+			return process_list[i];
 		}
 	}
 	return NULL;
@@ -189,7 +226,7 @@ int set_proc_alarm(struct process *proc, uint32_t seconds)
 
 void proc_iter_start(struct process_iter *iter)
 {
-	iter->slot = 0;
+	iter->slotnum = 0;
 }
 
 struct process *proc_iter_next(struct process_iter *iter)
@@ -197,10 +234,28 @@ struct process *proc_iter_next(struct process_iter *iter)
 	struct process *proc;
 
 	do {
-		if (iter->slot >= PROCESS_MAX)
-			return NULL;
-		proc = &table[iter->slot++];
-	} while (proc->pid == 0);
+	        if (iter->slotnum >= CONFIG_MAX_PROCESSES)
+	                return NULL;
+	        proc = process_list[iter->slotnum];
+		iter->slotnum += 1;
+	} while (!proc);
 	return proc;
+}
+
+static int next_slotnum(void)
+{
+	char once = 0;
+
+	while (process_list[next_process_slot]) {
+		next_process_slot += 1;
+		if (next_process_slot > CONFIG_MAX_PROCESSES) {
+			if (once) {
+				return -1;
+			}
+			next_process_slot = 0;
+			once = 1;
+		}
+	}
+	return next_process_slot++;
 }
 

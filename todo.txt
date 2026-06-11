@@ -9,9 +9,6 @@
 
 * bug where, when a file already exists, and you use truncate ">" in the shell, it drops the first letter for some reason (might also be quote parsing in echo)
 
-* make process.c use kmem or else use the allocated stack for storing the process struct?  and get rid of the static table of processes. The problem is we already have a queue node for the runlist, and queue doesn't handle two lists well
-* could you use the queue node to add procs to a free list, instead of iterating over all the procs when creating a new one;  you need a way to have two queues in a struct, by doing pointer arithmetic
-
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
 
