@@ -4,6 +4,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include <generated/config.h>
+
 #include <sys/stat.h>
 #include <kernel/printk.h>
 #include <kernel/drivers.h>
@@ -13,7 +15,7 @@
 // Address calculations
 extern void* __kernel_end;
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
-#define MEMDISK0_START	__kernel_end
+#define MEMDISK0_START	&__kernel_end
 #else
 #define MEMDISK0_START	CONFIG_MEMDISK0_START
 #endif
@@ -79,7 +81,7 @@ int mem_init(void)
 		return error;
 
 	for (short i = 0; i < num_devices; i++)
-		log_notice("mem%d: ram disk of %d bytes\n", i, devices[i].size);
+		log_notice("mem%d: ram disk of %d bytes @ 0x%p\n", i, devices[i].size, devices[i].base);
 	return 0;
 }
 
