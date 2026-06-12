@@ -44,8 +44,8 @@ extern void* __ram_end;
 #endif
 
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
-#define PAGES_START		(__kernel_end + RESERVED_SPACE)
-#define PAGES_END		__ram_end
+#define PAGES_START		(&__kernel_end + RESERVED_SPACE)
+#define PAGES_END		&__ram_end
 #else
 #define PAGES_START		CONFIG_PAGES_START
 #define PAGES_END		CONFIG_PAGES_END
