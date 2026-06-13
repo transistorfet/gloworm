@@ -325,12 +325,13 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 	size_t wbytes = 0;
 	struct vnode *vnode = file->vnode;
 	const int block_size = vnode->mp->bufcache.block_size;
+	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	nbytes = iovec_iter_remaining(iter);
 	if (nbytes > vnode->size - file->position)
 		nbytes = vnode->size - file->position;
 
-	znum = file->position >> EXT2_LOG_BLOCK_SIZE(block_size);
+	znum = file->position >> log_block_size;
 	zpos = file->position & (block_size - 1);
 
 	do {
@@ -373,9 +374,10 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 	size_t wbytes = 0;
 	struct vnode *vnode = file->vnode;
 	const int block_size = vnode->mp->bufcache.block_size;
+	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	nbytes = iovec_iter_remaining(iter);
-	znum = file->position >> EXT2_LOG_BLOCK_SIZE(block_size);
+	znum = file->position >> log_block_size;
 	zpos = file->position & (block_size - 1);
 
 	do {
@@ -457,12 +459,13 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 	struct ext2_dirent *current_entry;
 	struct vnode *vnode = file->vnode;
 	const int block_size = vnode->mp->bufcache.block_size;
+	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	if (!S_ISDIR(vnode->mode)) {
 		return ENOTDIR;
 	}
 
-	znum = file->position >> EXT2_LOG_BLOCK_SIZE(block_size);
+	znum = file->position >> log_block_size;
 	zpos = file->position & (block_size - 1);
 
 	while (1) {
@@ -489,7 +492,7 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 		znum++;
 	}
 
-	file->position = znum << EXT2_LOG_BLOCK_SIZE(block_size) | zpos;
+	file->position = znum << log_block_size | zpos;
 
 	max = current_entry->name_len;
 	#if NAME_MAX < EXT2_MAX_FILENAME

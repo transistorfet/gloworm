@@ -88,6 +88,7 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 	super.super.extended.incompat_features = 0x02;	// filetype in directory
 	super.super.extended.ro_compat_features = 0x03;	// large file, sparse superblock
 
+	super.log_block_size = super.super.log_block_size + 10;
 	super.log_inode_size = __builtin_ctz(super.super.extended.inode_size);
 	super.log_inodes_per_block = __builtin_ctz(block_size >> super.log_inode_size);
 	super.log_inodes_per_group = __builtin_ctz(super.super.inodes_per_group);

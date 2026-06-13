@@ -68,8 +68,10 @@ static void ext2_free_block(struct mount *mp, ext2_block_t blocknum)
 }
 
 
-static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, int block_size)
+static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, int block_size, int log_blocknums_per_block)
 {
+	const int blocknums_per_block = 1 << log_blocknums_per_block;
+
 	if (znum < EXT2_DIRECT_BLOCKNUMS_IN_INODE) {
 		tiers[0] = znum;
 		return 1;
@@ -77,25 +79,25 @@ static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, 
 
 	znum -= EXT2_DIRECT_BLOCKNUMS_IN_INODE;
 	tiers[0] = EXT2_DIRECT_BLOCKNUMS_IN_INODE;
-	if (znum < EXT2_BLOCKNUMS_PER_BLOCK(block_size)) {
+	if (znum < blocknums_per_block) {
 		tiers[1] = znum;
 		return 2;
 	}
 
-	znum -= EXT2_BLOCKNUMS_PER_BLOCK(block_size);
+	znum -= blocknums_per_block;
 	tiers[0]++;
-	if (znum < EXT2_BLOCKNUMS_PER_BLOCK(block_size) * EXT2_BLOCKNUMS_PER_BLOCK(block_size)) {
-		tiers[1] = (znum >> EXT2_LOG_BLOCKNUMS_PER_BLOCK(block_size));
-		tiers[2] = znum & (EXT2_BLOCKNUMS_PER_BLOCK(block_size) - 1);
+	if (znum < blocknums_per_block * blocknums_per_block) {
+		tiers[1] = (znum >> log_blocknums_per_block);
+		tiers[2] = znum & (blocknums_per_block - 1);
 		return 3;
 	}
 
-	znum -= EXT2_BLOCKNUMS_PER_BLOCK(block_size) << 2;
+	znum -= blocknums_per_block << 2;
 	tiers[0]++;
-	if (znum < EXT2_BLOCKNUMS_PER_BLOCK(block_size) * EXT2_BLOCKNUMS_PER_BLOCK(block_size)) {
-		tiers[1] = (znum >> (EXT2_LOG_BLOCKNUMS_PER_BLOCK(block_size) << 2));
-		tiers[2] = (znum >> EXT2_LOG_BLOCKNUMS_PER_BLOCK(block_size));
-		tiers[3] = znum & (EXT2_BLOCKNUMS_PER_BLOCK(block_size) - 1);
+	if (znum < blocknums_per_block * blocknums_per_block) {
+		tiers[1] = (znum >> (log_blocknums_per_block << 2));
+		tiers[2] = (znum >> log_blocknums_per_block);
+		tiers[3] = znum & (blocknums_per_block - 1);
 		return 4;
 	}
 
@@ -111,7 +113,7 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 	ext2_block_t tiers[EXT2_TIERS];
 	const int block_size = vnode->mp->block_size;
 
-	ntiers = block_calculate_tier(tiers, znum, block_size);
+	ntiers = block_calculate_tier(tiers, znum, block_size, EXT2_SUPER(vnode->mp->super)->log_blocknums_per_block);
 	if (ntiers < 0)
 		return 0;
 
@@ -158,16 +160,17 @@ static void block_free_table(struct mount *mp, ext2_block_t blocknum, uint8_t le
 		return;
 
 	const ext2_block_t *entries = buf->block;
+	const int blocks_per_group = 1 << EXT2_SUPER(mp->super)->log_blocknums_per_block;
 
 	if (levels_below > 0) {
-		for (short i = 0; i < EXT2_BLOCKNUMS_PER_BLOCK(mp->block_size); i++) {
+		for (short i = 0; i < blocks_per_group; i++) {
 			if (entries[i]) {
 				block_free_table(mp, le32toh(entries[i]), levels_below - 1);
 			}
 		}
 	}
 
-	for (short i = 0; i < EXT2_BLOCKNUMS_PER_BLOCK(mp->block_size); i++) {
+	for (short i = 0; i < blocks_per_group; i++) {
 		if (entries[i]) {
 			ext2_free_block(mp, le32toh(entries[i]));
 		}

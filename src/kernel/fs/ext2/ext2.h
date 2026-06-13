@@ -27,10 +27,12 @@ struct ext2_block_group {
 };
 
 struct ext2_super {
+	size_t log_block_size;
 	size_t log_inode_size;
-	size_t log_inodes_per_block;
 	size_t log_inodes_per_group;
+	size_t log_inodes_per_block;
 	size_t log_blocks_per_group;
+	size_t log_blocknums_per_block;
 	struct ext2_superblock super;
 	int num_groups;
 	struct ext2_block_group *groups;
