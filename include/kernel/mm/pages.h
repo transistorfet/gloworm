@@ -30,14 +30,12 @@
 
 #define PAGE_SIZE	(1 << PAGE_ADDR_BITS)
 
-#define PAGE_TYPE	0x0007		/// Bits that specify the type of page to allocate
-#define PAGE_KERNEL	0x0001		/// A page used by the kernel itself
-#define PAGE_USER	0x0002		/// A page used by a user process
-#define PAGE_LOCAL	0x0010		/// The page must be in local memory (fast access)
-#define PAGE_NOFAIL	0x8000		/// Always return a page (using pages allocated for emergencies)
-
-char *page_alloc(int pages);
-void page_free(char *ptr);
+#define PAGE_F_NOFAIL		0x8000		/// Always return a page (using pages allocated for emergencies)
+#define PAGE_F_SUPERVISOR	0x4000		/// A page used by the kernel itself
+#define PAGE_F_TYPE		0x000F		/// Bits that specify the type of page to allocate
+#define PAGE_F_LOCAL		0x0001		/// The page must be in local memory (fast access)
+#define PAGE_F_SHARED		0x0002		/// The page must be in shared memory (available to all cpus)
+#define PAGE_F_USER		0x0000		/// The default settings for user memory
 
 
 #define ALL_PAGES_AT_INDEX	((uint16_t) 0xffffffff)
@@ -59,18 +57,28 @@ struct page_domain {
 
 struct page_block {
 	struct queue_node node;
-	bitmap_t *bitmap;
+	uint32_t flags;
+	int total_pages;
+	int free_pages;
+	physical_address_t base;
+	size_t end;
 	int bitmap_size;
-	page_t *base;
-	int pages;
+	bitmap_t *bitmap;
 	#if defined(CONFIG_MMU)
 	struct page_descriptor *page_descriptors;
 	#endif
 };
 
+int init_pages(physical_address_t start, size_t size, uint32_t flags);
+physical_address_t page_alloc(size_t size, uint32_t flags);
+void page_free(physical_address_t ptr, size_t size);
+#if defined(CONFIG_MMU)
+physical_address_t page_make_ref(physical_address_t ptr, size_t size);
+int page_get_ref_single(physical_address_t ptr);
+#endif
 
-int init_page_block_with_bitmap(struct page_block *block, bitmap_t *bitmap, int bitmap_size, void *addr, size_t size, struct page_descriptor *descriptors);
-int init_page_block(struct page_block *block, void *addr, size_t size);
+int init_page_block_with_bitmap(struct page_block *block, size_t size, physical_address_t addr, bitmap_t *bitmap, int bitmap_size, struct page_descriptor *descriptors, uint32_t flags);
+int init_page_block(struct page_block *block, physical_address_t addr, size_t size, uint32_t flags);
 physical_address_t page_block_alloc(struct page_block *block, size_t size);
 void page_block_free(struct page_block *block, physical_address_t ptr, size_t size);
 #if defined(CONFIG_MMU)
@@ -84,13 +92,6 @@ static inline void zero_page(physical_address_t ptr)
 }
 
 extern struct page_block pages;
-#define init_pages(start, size)					init_page_block(&pages, (void *) start, size)
-#define page_alloc(contiguous_pages)				page_block_alloc(&pages, contiguous_pages)
-#define page_free(page, size)					page_block_free(&pages, page, size)
-#if defined(CONFIG_MMU)
-#define page_make_ref(page, size)				page_block_make_ref(&pages, page, size)
-#define page_get_ref_single(page)				page_block_get_ref_single(&pages, page)
-#endif
 
 #endif
 

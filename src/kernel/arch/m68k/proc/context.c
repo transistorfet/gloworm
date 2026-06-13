@@ -77,7 +77,7 @@ int arch_init_task_info(struct process *proc)
 	#if defined(CONFIG_M68K_USER_MODE)
 
 	if (!proc->task_info.kernel_stack_start) {
-		proc->task_info.kernel_stack_start = (char *) page_alloc(KERNEL_STACK_SIZE);
+		proc->task_info.kernel_stack_start = (char *) page_alloc(KERNEL_STACK_SIZE, PAGE_F_USER);
 		if (!proc->task_info.kernel_stack_start) {
 			return ENOMEM;
 		}

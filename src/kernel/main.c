@@ -207,7 +207,7 @@ int main(void)
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
 	parse_boot_args();
 
-	error = init_pages(PAGES_START, PAGES_END - PAGES_START);
+	error = init_pages(PAGES_START, PAGES_END - PAGES_START, PAGE_F_LOCAL | PAGE_F_SHARED);
 	if (error < 0)
 		goto fail;
 

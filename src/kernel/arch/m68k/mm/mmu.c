@@ -57,7 +57,7 @@ mmu_descriptor_t *mmu_table_alloc(void)
 {
 	mmu_descriptor_t *root_table;
 
-	root_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE);
+	root_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE, PAGE_F_SUPERVISOR);
 	init_mmu_table(root_table);
 
 	return root_table;
@@ -135,7 +135,7 @@ static inline int get_table(mmu_descriptor_t *root_table, virtual_address_t virt
 			if (MMU_DT(table[i]) == MMU_DT_INVALID) {
 				if (create_if_needed) {
 					// Create a new table since one hasn't already been created yet
-					next_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE);
+					next_table = (mmu_descriptor_t *) page_alloc(PAGE_SIZE, PAGE_F_USER);
 					init_mmu_table(next_table);
 
 					//printk("set new table %x [table: %x, i: %d, bits: %d]\n", next_table, table, i, bits);
@@ -225,7 +225,7 @@ int mmu_table_map(mmu_descriptor_t *root_table, uintptr_t virtual_addr, size_t l
 						break;
 					}
 					case MMU_TYPE_PREALLOCATED: {
-						physical_addr = (physical_address_t) page_alloc(PAGE_SIZE);
+						physical_addr = (physical_address_t) page_alloc(PAGE_SIZE, PAGE_F_USER);
 						status |= MMU_DT_PAGE_DESCRIPTOR;
 						break;
 					}
