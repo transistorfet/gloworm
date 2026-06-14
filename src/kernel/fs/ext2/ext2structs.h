@@ -4,9 +4,7 @@
 
 #include <stdint.h>
 
-#define EXT2_LOG_BLOCK_SIZE(bs)			__builtin_ctz((bs))
 #define EXT2_BLOCKNUMS_PER_BLOCK(bs)		((bs) / sizeof(ext2_block_t))
-#define EXT2_LOG_BLOCKNUMS_PER_BLOCK(bs)	__builtin_ctz(EXT2_BLOCKNUMS_PER_BLOCK(bs))
 #define	EXT2_BITS_PER_BLOCK(bs)			((bs) * 8)
 
 #define EXT2_MAX_FILENAME			256

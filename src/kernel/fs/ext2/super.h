@@ -121,10 +121,12 @@ static int load_superblock(struct mount *mp)
 	mp->block_size = 1024 << super->super.log_block_size;
 	init_bufcache(&mp->bufcache, mp->dev, mp->block_size);
 
+	super->log_block_size = super->super.log_block_size + 10;
 	super->log_inode_size = __builtin_ctz(super->super.major_version >= 1 ? super->super.extended.inode_size : 128);
-	super->log_inodes_per_block = __builtin_ctz(mp->block_size >> super->log_inode_size);
 	super->log_inodes_per_group = __builtin_ctz(super->super.inodes_per_group);
+	super->log_inodes_per_block = __builtin_ctz(mp->block_size >> super->log_inode_size);
 	super->log_blocks_per_group = __builtin_ctz(super->super.blocks_per_group);
+	super->log_blocknums_per_block = __builtin_ctz(EXT2_BLOCKNUMS_PER_BLOCK(mp->block_size));
 	super->num_groups = num_groups;
 
 	// Load the block groups, starting with the first block after the superblock
