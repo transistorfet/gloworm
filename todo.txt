@@ -1,65 +1,71 @@
 
-* add page_alloc flags, and convert the page alloc macros into functions that allocate from a block that matches the requested flags
-* make it possible to use membird memory card vs onboard cpu memory based on flags, and somehow make it possible to select that at runtime?  Is there a posix standard or something for that or just using different allocators?
+* make better use of the flags, so that it can run both on a single block system, and multi-block, with global offboard memory
+* add stats of some kind to the page allocator?  Where would the data be displayed, in procfs?
+* add flags to kmalloc too?
 
 * normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison
 * need to make language consistent, duplicate vs clone vs something better?  alloc vs ?  make_ref vs clone? free vs release?
+* should you rename vfs_clone_vnode/vfs_release_vnode to instead be vfs_clone_vnode_ref/vfs_drop_vnode_ref ??  The latter would make more sense, albeit be longer
 
 * add -Wextra, even though it doesn't seem to catch all the type size issues.  I have to specifically request -Wconversion in order to get the warning I want, but it's over zealous
 
 * bug where, when a file already exists, and you use truncate ">" in the shell, it drops the first letter for some reason (might also be quote parsing in echo)
+* when there's a trailing / to rm or mkdir, it will create something weird
 
 * add a page cache/file cache for file data
 * convert bufcache/disk blocks to use pages
 
 ----
 
-* refactor queue and ringbuffer, try not inlining everything to see if significantly reduces the size
-* for queue, make it possible/easier to have multiple nodes in the same struct
-* change LF to CR+LF (or make it configurable) in the TTY driver.  The computer should send CR+LF whenever an LF is sent by a user program (unless raw enabled), and CR characters should be ignored, so the terminal could send CR+LF or LF
-
-* why does procfs use dev=1?  Can I avoid that hack somehow?
-* make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
-* make the slip's tty device configurable
-* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
-
-* fix docker config
-
-* add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
-* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing
-
-* there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
-* you should put in a limit to the iterator size created for the stack, in exec, context, etc
-* should you move the reference increment to inside memory_map_mmap?  It would be a bit weird in that a file/region passed into mmap would not have the reference captured, but
-  instead expect the caller to still free their own reference.  Most other functions don't operate like that
-
-* make tracing logs module-selectable, so not all trace messages get activated
-
-* a bad user space address can crash the kernel with a page fault. Need to improve the MMU recovery mechanism, and also add address validation to no-MMU
-* the problem with making the user stack use all of memory is actually that it preallocates the tables which takes way too long, so maybe you need to
-  only allocate part of the stack at the top of memory, and grow the stack on demand, or else make it so that the entire tree isn't filled out until needed
-
-* add multiple blocks of pages to the page allocator, along with stats (have to also fix kmem alloc)
-* make everything that uses iters check for errors
-* make everything that uses usercopy functions check for errors
-* replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
-* add flags to kmalloc/page alloc?
-
 * I think there's a bug where if you start the httpd server (at least in daemon mode), and then kill it and run it again, it will fail with error -43, address in use
 * the error -43 address in use error also corresponds to ps no longer working.  I haven't verified if it's all fs functions, or just procfs
 * figure out why signals are broken, this is where `sh` will exit instead of supressing the signal with custom handler
   it seems to only affect some things, namely when sh is compiled into the kernel
 * why does malloc "out of memory" cause the OS to lock up instead of just terminating the process?
+* a bad user space address can crash the kernel with a page fault. Need to improve the MMU recovery mechanism, and also add address validation to no-MMU
+* the problem with making the user stack use all of memory is actually that it preallocates the tables which takes way too long, so maybe you need to
+  only allocate part of the stack at the top of memory, and grow the stack on demand, or else make it so that the entire tree isn't filled out until needed
+
+* fix docker config
+* make a dockerfile that can also compile the entire project
+* make tracing logs module-selectable, so not all trace messages get activated
 
 * [breaking change] re-adjust the syscall numbers, which will be a breaking change and I'll need to update my compactflash card
 
-* make a dockerfile that can also compile the entire project
+* need a function to convert a device number into a device name or device file path. (Could add another driver function pointer for getting the name of a devnum) (add to /proc/mounts)
+  this is partially implemented, but perhaps I need a way to ask the driver to write to a string, since right now, it's assuming the minor number will always be a diget.  For something
+  like procfs, it doesn't print correctly
+* you should put in a limit to the iterator size created for the stack, in exec, context, etc
+* change LF to CR+LF (or make it configurable) in the TTY driver.  The computer should send CR+LF whenever an LF is sent by a user program (unless raw enabled), and CR characters should be ignored, so the terminal could send CR+LF or LF
 
-----
+* refactor queue and ringbuffer, try not inlining everything to see if significantly reduces the size
+* go through things that use fixed-size tables and make them use kmalloc, or at least use kmalloc for the table itself, with resizing: drivers, bottom half, slip devices, tty devices, ata, mem, fileptr table, vnode tables
+
+* make the tty sub-drivers more integrated into the tty parent driver, to make it easier to swap out.  Put common stuff in kernel/drivers/tty.h
+* make the slip's tty device configurable
+* send doesn't work because when it switches to not ICANON and not ECHO, the process is suspended and never wakes up
+
+* there's a bug when running (nettest and then?) daemon when the MMU is enabled and the shell is compiled into the kernel
+* test the read-only filesystem mounting better
+
+* should you move the reference increment to inside memory_map_mmap?  It would be a bit weird in that a file/region passed into mmap would not have the reference captured, but
+  instead expect the caller to still free their own reference.  Most other functions don't operate like that
+
+* make everything that uses iters check for errors
+* make everything that uses usercopy functions check for errors
+* replace user_buf with iovec iter type? (and add syscalls for userland iovec read/write funcs?)
 
 * I need like an lsof command to list at least open files for the current process? or add it to procfs?
 * separate access control paramater (rwx) to mmu_table_mmap, and map_memory_mmap??
+
+----
+
+* why does procfs use dev=1?  Can I avoid that hack somehow?
+* the process should wait until all output is flushed before it can exit
+* make it so the ata device will time out and fail instead of hanging when it doesn't work
 * I'd like to make the ringbuffer use a better way of determining size, without a gotcha, perhaps by having multiple init functions?
+* add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry
+  like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
 
 * should you make each drivers/ subdir be its own subsystem with a common set of things, and then the specific drivers within directories
 * as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface
@@ -76,15 +82,6 @@
 * see if changing queues, ringbuffer, etc to non-inline functions reduces code size
 * make it possible to get a really small memory-usage kernel, at least with specific configurations
 
-* the process should wait until all output is flushed before it can exit
-* should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
-  much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
-
-* is there value in making the code conform to a particular C standard?
-* add configuration for base address in linker script
-* make it so the ata device will time out and fail instead of hanging when it doesn't work
-* add an emulator that can run the bare tests
-
 
 Overview
 
@@ -92,16 +89,22 @@ Overview
     * add multi-cpu support
     * add dynamic linking
     * add additional architectures?
+    * add dns support
 
     * omg write so much documentation.  This needs documentation, and autodoc building.  What's the C standard (ish, defacto?) for doc comments
 
 
 Operating System:
 
+    * is there value in making the code conform to a particular C standard?
+    * add an emulator that can run the bare tests
+
     * support minixfs 2 and 3?
     * should you support large pages?
     * add kernel threads?  the need to use only one stack might be troublesome, especially making it work in all possible configs (nouser, user, mmu)
 
+    * should you split the context switch so that it doesn't change the kernel stack unless needed, and then the full context switch can happen
+      much later inside the kernel?  I have a feeling I'd need to refactor how locks work in order to make this feasible
     * implement the shadow memory solution from Minix/Fuzix for the issue of forking processes without MMU, where the addresses are
       not patched and point to the old processes memory space.  Both OSes copy a shadow data segment into the parent process's
       memory segments so that the process will see its own data instead of sharing data with the parent.  Since most processes that
@@ -113,21 +116,17 @@ Operating System:
     * something is causing the SLIP serial port to mess up somehow which requires restarting the PC side the setup, It's probably a null characters when turning the device on or off
     * make the tty68681 driver partially write data... right now it'll suspend if the full request can't be buffered, but it should return the partial number, and the read/write syscalls should do
       the actual blocking, and then for writing it can rewrite the syscall during the suspend, so that it'll restart in the proper position.  You then need to add resuming to tty
-    * when there's a trailing / to rm or mkdir, it will create something weird
 
     * add dynamic linking so that you can have a shared libc
 
     * it's hacky, but the two create directory things work for now.  I'd like to fix the libc one, I guess by properly converting the whole thing to the new build system?
     * should you replace the libc makefile with subdirs like the kernel?
     * make a better clean rule?
-    * add select-config rule to copy existing config?
 
     * add timers and retransmissions to tcp
     * try transfering files over tcp, to test the stability of TCP (it should be possible to `nc -l 3904 > tar -x` or something to transfer data)
     * make checksum command for file integrity
-    * add a read only mounting mode, such that you know you wont need to sync while also not messing up the CF card
     * should there be something that periodically syncs data to disk?
-    * need a function to convert a device number into a device name or device file path. (Could add another driver function pointer for getting the name of a devnum) (add to /proc/mounts)
     * add calculating of cpu runtime
 
 
@@ -140,14 +139,12 @@ Operating System:
     * signals like SIGTTOU are supposed to be sent sometimes instead of returning success or failure
     * do you need to implement some internal network routing?
 
-    * should you rename vfs_clone_vnode/vfs_release_vnode to instead be vfs_clone_vnode_ref/vfs_drop_vnode_ref ??  The latter would make more sense, albeit be longer
     * you could possibly make an abstracted packet construction thing using an ioctl-like function defined for each protocol, which can intercept parts of
       the requests to fill in data in the packet headers (set src address, set dest address, add id, etc)
     * should you separate libc, kernel, and monitor into their own subproject directories with the include files separated?  Each could use the same build system and
       config system, maybe with some modifications so that CCFLAGS can be defined for a whole subdirectory for the project-specific includes.  It would make it easier
       to use only parts of it, like use libc in other projects, or take just the kernel (monitor doesn't have its own includes outside of itself, so it isn't so relevant)
 
-    * implement dns
     * add pipe setup to command evaluation
     * add the & (run in background) option to the shell
     * add support for * in shell
@@ -157,7 +154,7 @@ Operating System:
     * add stack guard protection
     * implement login system (setuid)
     * implement fcntl
-    * implement symlinks in minixfs
+    * implement symlinks
     * optionally implement ftell, fgetpos, fsetpos
     * can you implement some kind of terminal switching, like alt-F* keys... It would have to be more like `screen`
     * make a /dev/flash0 device or /dev/rom0 device in the mem.c driver, possibly even with a partition table and bootloader, that can be mounted read only
@@ -174,15 +171,11 @@ Operating System:
 
     * should you add timestamps to packets? (not currently a use for it)
     * rewrite the math functions to use fewer registers, and cover the 32 bit divide by 32 bit number case
-    * minixfs, implement versions 2 and 3
-    * should you refactor the header files in minixfs implementation into actual c files, with a common header to declare the functions?
-    * do you need to add variable sized buffers/blocks into bufcache? (yes)
     * can you change the fd allocator, such that calling it twice will return 2 different fds, even though they aren't reserved until set
       (ie. store the last allocated fd, but it has to be in the process struct)
 
     * there is an issue running the shell on linux related to the setting the process group
     * re-evaluate file permissions checks to make sure they're correct according to posix
-    * you need some tests, but ideally it would use a simple emulator.  Maybe easy68k or something could be used
 
     * as a note about terminology for pseudoterminals, pts/ptm (slave/master);  it would make more sense for them to be named process-end and device-end, which implies
       the expected interface to each.   A user process will open the process-end terminal device and communicate with it like any tty.  The emulator or whatever would
