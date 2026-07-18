@@ -252,7 +252,7 @@ static inline struct partition *ata_get_device(devminor_t minor)
 	short drive = minor >> 4;
 	minor &= 0xf;
 
-	if (drive >= ATA_MAX_DRIVES || minor > PARTITION_MAX || drives[drive].parts[minor].base == 0) {
+	if (drive >= ATA_MAX_DRIVES || minor > PARTITION_MAX || drives[drive].parts[minor].size == 0) {
 		return NULL;
 	}
 	return &drives[drive].parts[minor];

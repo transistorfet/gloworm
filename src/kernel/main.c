@@ -202,6 +202,8 @@ void parse_boot_args(void)
 int main(void)
 {
 	int error;
+	char stage = 0;
+	short driver_num = 0, filesystem_num = 0, interface_num = 0, protocol_num = 0;
 	tty_68681_preinit();
 
 	printk("\nBooting with \"%s\"...\n\n", boot_args);
@@ -227,8 +229,8 @@ int main(void)
 	init_drivers();
 
 	// Initialize drivers before VFS
-	for (short i = 0; drivers[i]; i++) {
-		error = drivers[i]->init();
+	for (driver_num = 0; drivers[driver_num]; driver_num++) {
+		error = drivers[driver_num]->init();
 		if (error < 0)
 			goto fail;
 	}
@@ -238,8 +240,8 @@ int main(void)
 		goto fail;
 
 	// Initialize specific filesystems
-	for (short i = 0; filesystems[i]; i++) {
-		error = filesystems[i]->init();
+	for (filesystem_num = 0; filesystems[filesystem_num]; filesystem_num++) {
+		error = filesystems[filesystem_num]->init();
 		if (error < 0)
 			goto fail;
 	}
@@ -250,19 +252,21 @@ int main(void)
 	init_net_protocol();
 
 	// Initialize specific network interfaces
-	for (short i = 0; interfaces[i]; i++) {
-		error = interfaces[i]->init();
+	for (interface_num = 0; interfaces[interface_num]; interface_num++) {
+		error = interfaces[interface_num]->init();
 		if (error < 0)
 			goto fail;
 	}
 
 	// Initialize specific network protocols
-	for (short i = 0; protocols[i]; i++) {
-		error = protocols[i]->init();
+	for (protocol_num = 0; protocols[protocol_num]; protocol_num++) {
+		error = protocols[protocol_num]->init();
 		if (error < 0)
 			goto fail;
 	}
 	#endif
+	log_debug("subsystem initialization complete\n");
+	stage++;
 
 	// TODO should you make the filesystem module configurable?  It would remove a lot of functionality, but might be helpful in some cases
 	error = vfs_mount(NULL, "/", root_dev, root_filesystem_type, 0, SU_UID);
@@ -280,9 +284,11 @@ int main(void)
 	error = vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
 	if (error < 0)
 		goto fail;
+	log_debug("configuring mounts complete\n");
 
 	#if defined(CONFIG_NET)
 	// TODO this is a temporary hack.  The ifup should be done through ifconfig
+	log_debug("configuring network\n");
 	struct if_device *ifdev = net_if_find("slip0", NULL);
 	memset(&ifdev->address, '\0', sizeof(struct sockaddr_in));
 	((struct sockaddr_in *) &ifdev->address)->sin_family = AF_INET;
@@ -290,6 +296,7 @@ int main(void)
 	net_if_change_state(ifdev, IFF_UP);
 	#endif
 
+	log_debug("creating init task\n");
 	create_init_task();
 
 
@@ -317,6 +324,10 @@ int main(void)
 
 fail:
 	printk("error while initializing kernel: %d\n", error);
+	printk("at stage %d\n", stage);
+	if (stage == 0) {
+		printk("at driver=%d filesystem=%d interface=%d protocol=%d\n", driver_num, filesystem_num, interface_num, protocol_num);
+	}
 	panic("halting after failure to initialize\n");
 }
 

@@ -39,8 +39,9 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	// Write the superblock
 	super_buf = get_block(&bufcache, MINIX_V1_SUPER_ZONE);
-	if (!super_buf)
+	if (!super_buf) {
 		return -1;
+	}
 	super_v1 = (struct minix_v1_superblock *) super_buf->block;
 
 	// TODO we assume this is not a disk yet, so manually initialize it

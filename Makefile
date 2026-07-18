@@ -93,7 +93,7 @@ bare-tests:
 # TODO 128 is just barely enough for 20 commands, kernel, devfiles
 #BLOCKS = 128
 BLOCKS := 20480
-IMAGE := minix-build.img
+IMAGE := $(if $(OUTPUT),$(OUTPUT)minix-build.img,minix-build.img)
 LOOPBACK := /dev/loop8
 MOUNTPOINT := $(if $(OUTPUT),$(OUTPUT)image,build/image)
 SUDO := sudo
@@ -101,11 +101,13 @@ SUDO := sudo
 PHONY += create-image build-image-files mount-image umount-image
 
 build-image: decend create-image-dir kernelfile commandfiles devicefiles otherfiles
+mount-and-build-image: mount-image build-image umount-image
+create-and-build-image: create-image insert-partition-table mount-and-build-image
 
 create-image-dir:
 	mkdir -p $(MOUNTPOINT)
 
-create-image:
+create-image: create-image-dir
 	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
 	$(SUDO) mkfs.minix -1 -n 14 $(LOOPBACK) $(BLOCKS)
@@ -116,8 +118,7 @@ mount-image:
 	$(SUDO) mount -t minix $(LOOPBACK) $(MOUNTPOINT)
 
 umount-image:
-	$(SUDO) umount $(LOOPBACK)
-	$(SUDO) losetup -d $(LOOPBACK)
+	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
 
 kernelfile:
 	$(SUDO) cp $(OUTPUT)src/kernel/kernel.bin $(MOUNTPOINT)
@@ -139,6 +140,9 @@ otherfiles:
 	$(SUDO) mkdir -p $(MOUNTPOINT)/home
 	$(SUDO) mkdir -p $(MOUNTPOINT)/media
 	$(SUDO) cp -r etc/* $(MOUNTPOINT)/etc
+
+insert-partition-table:
+	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
 
 
 # TODO need a better clean rule

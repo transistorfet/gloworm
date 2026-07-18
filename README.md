@@ -152,13 +152,19 @@ make umount-image
 ```
 Which will produce a 20MB disk image in `minix-build.img` using the `build/image/` directory as the
 mountpoint, and the minixv1 filesystem.  It does not include a partition table, so that needs to be
-created on the flash drive by other means.  It can be written to the partition-specific block device
-file using `dd` on a unix-like desktop.
+created on the flash drive by other means, although there is a crude makefile recipe for inserting
+one into the image that's built, using `make insert-partition-table`.  The image can be written to
+the partition-specific block device file using `dd` on a unix-like desktop.
 
 ```sh
 dd if=minix-build.img of=/dev/sdXX bs=1M
 ```
 For me, it would be `/dev/sdc1`
+
+A shortcut to create and build the complete image is
+```sh
+make create-and-build-image
+```
 
 In order to boot off the CompactFlash directly, the `boot.load` script can be loaded over serial and
 written to an alternate location such as `0x020000`.  It must be a location that is outside of the

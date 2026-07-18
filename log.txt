@@ -6308,3 +6308,11 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   LOCAL is kind of the opposite of SHARED, so it could be one flag, and then another one for FAST (ie. close to the cpu)?  What
   happens if no blocks can satisfy all the conditions?
 
+
+2026-07-16:
+
+- been tracing a bug with moa, where it won't boot, and have found a number of niggly little bugs in gloworm, like it fails when
+  creating a partition when booting without a root disk if the partition starts at 0
+- I also added some makefile recipes for inserting a partition table into the disk image to make it bootable.  I have to add a rule
+  as well to bundle the kernel and disk image into a single file that can be loaded
+

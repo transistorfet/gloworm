@@ -128,8 +128,9 @@ static inline struct buf *_find_free_entry(struct bufcache *cache)
 	if (cache->num_entries < BUFCACHE_MAX) {
 		// We haven't reached the limit, so create a new entry instead
 		last = _create_entry(cache);
-		if (!last)
+		if (!last) {
 			return NULL;
+		}
 	} else if (!last) {
 		panic("Error: ran out of bufcache entries\n");
 		return NULL;
