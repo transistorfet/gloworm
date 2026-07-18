@@ -30,7 +30,7 @@ struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile 
 	if (!region)
 		goto fail;
 
-	memory = (char *) page_alloc(size);
+	memory = (char *) page_alloc(size, PAGE_F_USER);
 	if (!memory)
 		goto fail;
 
@@ -77,7 +77,7 @@ physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, 
 	physical_address_t page;
 	struct iovec_iter iter;
 
-	page = page_alloc(PAGE_SIZE);
+	page = page_alloc(PAGE_SIZE, PAGE_F_USER);
 	if (!page) {
 		return NULL;
 	}
@@ -111,7 +111,7 @@ physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segm
 {
 	physical_address_t page;
 
-	page = page_alloc(PAGE_SIZE);
+	page = page_alloc(PAGE_SIZE, PAGE_F_USER);
 	if (!page) {
 		return NULL;
 	}
@@ -128,7 +128,7 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtu
 	int error;
 	physical_address_t page_copy;
 
-	page_copy = page_alloc(page_size);
+	page_copy = page_alloc(page_size, PAGE_F_USER);
 	if (!page_copy) {
 		return ENOMEM;
 	}

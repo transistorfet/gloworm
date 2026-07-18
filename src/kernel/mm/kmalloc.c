@@ -22,19 +22,14 @@ struct heap {
 	size_t bytes_allocated;
 };
 
-
-static struct page_block *kmem_page_block = &pages;
 static struct heap main_heap = { 0, 0, 0, 0 };
 
+#if defined(CONFIG_KMALLOC_PRIVATE)
 
-int init_kernel_heap(void)
-{
-	main_heap.free_blocks = NULL;
-	main_heap.total_pages = 0;
-	main_heap.bytes_free = 0;
-	main_heap.bytes_allocated = 0;
-	return 0;
-}
+#define kmalloc_page_alloc(size, flags)		page_block_alloc(&kmem_page_block, size, flags)
+#define kmalloc_page_free(ptr, size)		page_block_free(&kmem_page_block, ptr, size)
+
+static struct page_block *kmem_page_block = &pages;
 
 int kernel_heap_set_private_page_block(uintptr_t start, uintptr_t end)
 {
@@ -45,10 +40,26 @@ int kernel_heap_set_private_page_block(uintptr_t start, uintptr_t end)
 		return -1;
 	}
 
-	error = init_page_block(kmem_page_block, (char *) start, end - start);
+	error = init_page_block(kmem_page_block, 0, start, end - start);
 	if (error < 0) {
 		return error;
 	}
+	return 0;
+}
+
+#else
+
+#define kmalloc_page_alloc(size, flags)		page_alloc(size, flags)
+#define kmalloc_page_free(ptr, size)		page_free(ptr, size)
+
+#endif
+
+int init_kernel_heap(void)
+{
+	main_heap.free_blocks = NULL;
+	main_heap.total_pages = 0;
+	main_heap.bytes_free = 0;
+	main_heap.bytes_allocated = 0;
 	return 0;
 }
 
@@ -103,7 +114,7 @@ void *kmalloc(uintptr_t size)
 	// We're out of free blocks, so attempt to allocate a new page of memory, and panic
 	// if we've run out of pages
 	uintptr_t page_size = align_up(block_size, PAGE_SIZE);
-	cur = (struct block *) page_block_alloc(kmem_page_block, page_size);
+	cur = (struct block *) kmalloc_page_alloc(page_size, PAGE_F_SUPERVISOR);
 	if (!cur) {
 		// Out Of Memory
 		panic("Kernel out of memory!  Halting...\n");
@@ -160,8 +171,6 @@ void kmfree(void *ptr)
 		}
 
 		if (cur >= block) {
-
-
 			// Insert the free'd block into the list
 			if (prev) {
 				prev->next = block;
@@ -204,7 +213,7 @@ void kernel_heap_compact(void)
 				main_heap.free_blocks = cur->next;
 			}
 
-			page_block_free(kmem_page_block, (uintptr_t) cur, cur->size >> PAGE_ADDR_BITS);
+			kmalloc_page_free((uintptr_t) cur, cur->size >> PAGE_ADDR_BITS);
 
 			main_heap.bytes_free -= cur->size;
 			main_heap.total_pages -= cur->size;

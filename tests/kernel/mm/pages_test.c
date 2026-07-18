@@ -23,7 +23,7 @@ int test_page_single_allocation(void)
 
 	struct page_block block;
 
-	init_page_block(&block, (void *) base, SIZE);
+	init_page_block(&block, (physical_address_t) base, SIZE, 0);
 
 	// NOTE: ADDR(0x1000) should be the first non-bitmap page, and there should only be 7 available pages
 	assert(page_block_alloc(&block, PAGE_SIZE) == (physical_address_t) ADDR(1 * PAGE_SIZE));
@@ -59,7 +59,7 @@ int test_page_contiguous_allocation(void)
 
 	struct page_block block;
 
-	init_page_block(&block, (void *) base, SIZE);
+	init_page_block(&block, (physical_address_t) base, SIZE, 0);
 
 	// NOTE: ADDR(0x1000) should be the first non-bitmap page, and there should only be 7 available pages
 	assert(page_block_alloc(&block, 1 * PAGE_SIZE) == (physical_address_t) ADDR(1 * PAGE_SIZE));

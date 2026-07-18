@@ -6299,3 +6299,12 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 
 - I ended up going with a table of pointers, with the process struct allocated with kmalloc for each process.  It should work
   alright, while being a bit more space conscious
+
+
+2026-06-11:
+
+- I'm trying to decide on which flags to use, and was going to make one a mutually exclusive number for the type, but then realized
+  that LOCAL and SHARED (or maybe it should be FAST or SHARED), can be true at the same time?  Just writing that, I realized that
+  LOCAL is kind of the opposite of SHARED, so it could be one flag, and then another one for FAST (ie. close to the cpu)?  What
+  happens if no blocks can satisfy all the conditions?
+
