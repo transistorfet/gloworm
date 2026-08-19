@@ -13,9 +13,9 @@
 #include <kernel/utils/iovec.h>
 
 // Address calculations
-extern void* __kernel_end;
+extern void __kernel_end;
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
-#define MEMDISK0_START	&__kernel_end
+#define MEMDISK0_START	((physical_address_t) &__kernel_end)
 #else
 #define MEMDISK0_START	CONFIG_MEMDISK0_START
 #endif
@@ -45,7 +45,7 @@ struct driver mem_driver = {
 };
 
 struct mem_geometry {
-	char *base;
+	physical_address_t base;
 	size_t size;
 };
 
@@ -53,7 +53,7 @@ struct mem_geometry {
 static int num_devices = 0;
 static struct mem_geometry devices[MAX_DEVICES];
 
-int mem_add_geometry(char *base, size_t size) {
+int mem_add_geometry(physical_address_t base, size_t size) {
 	if (num_devices >= MAX_DEVICES) {
 		log_error("%s: exceeded maximum number of disk devices\n", mem_driver.name);
 		return EINVAL;
@@ -72,7 +72,7 @@ int mem_init(void)
 
 	num_devices = 0;
 
-	error = mem_add_geometry((char *) MEMDISK0_START, CONFIG_MEMDISK0_SIZE);
+	error = mem_add_geometry(MEMDISK0_START, CONFIG_MEMDISK0_SIZE);
 	if (error < 0)
 		return error;
 
@@ -110,7 +110,7 @@ int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 		return EINVAL;
 	if (offset + size > geo->size)
 		size = geo->size - offset;
-	memcpy_into_iter(iter, &geo->base[offset], size);
+	memcpy_into_iter(iter, ((uint8_t*) geo->base) + offset, size);
 	return size;
 }
 
@@ -125,7 +125,7 @@ int mem_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 		return EINVAL;
 	if (offset + size > geo->size)
 		size = geo->size - offset;
-	memcpy_out_of_iter(iter, &geo->base[offset], size);
+	memcpy_out_of_iter(iter, ((uint8_t*) geo->base) + offset, size);
 	return size;
 }
 
@@ -163,6 +163,5 @@ offset_t mem_seek(devminor_t minor, offset_t position, int whence, offset_t offs
 	if (position > geo->size)
 		position = geo->size;
 	return position;
-
 }
 
