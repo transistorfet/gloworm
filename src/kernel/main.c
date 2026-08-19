@@ -33,8 +33,10 @@ extern int arch_init_mm(void);
 
 extern void tty_68681_preinit(void);
 
-extern void* __kernel_end;
-extern void* __ram_end;
+// symbols from linker file pointing to certain locations,
+// actual content of these locations does not matter thus void
+extern void __kernel_end;
+extern void __ram_end;
 
 // Memory calculations
 #if defined(CONFIG_MEMDISK)
@@ -44,8 +46,8 @@ extern void* __ram_end;
 #endif
 
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
-#define PAGES_START		(&__kernel_end + RESERVED_SPACE)
-#define PAGES_END		&__ram_end
+#define PAGES_START		(((physical_address_t) &__kernel_end) + RESERVED_SPACE)
+#define PAGES_END		((physical_address_t) &__ram_end)
 #else
 #define PAGES_START		CONFIG_PAGES_START
 #define PAGES_END		CONFIG_PAGES_END
