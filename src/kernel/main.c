@@ -35,8 +35,8 @@ extern void tty_68681_preinit(void);
 
 // symbols from linker file pointing to certain locations,
 // actual content of these locations does not matter thus void
-extern void __kernel_end;
-extern void __ram_end;
+extern const void __kernel_end;
+extern const void __ram_end;
 
 // Memory calculations
 #if defined(CONFIG_MEMDISK)

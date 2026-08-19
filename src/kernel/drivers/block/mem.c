@@ -13,7 +13,7 @@
 #include <kernel/utils/iovec.h>
 
 // Address calculations
-extern void __kernel_end;
+extern const void __kernel_end;
 #if defined(CONFIG_MEM_LAYOUT_AUTO)
 #define MEMDISK0_START	((physical_address_t) &__kernel_end)
 #else
