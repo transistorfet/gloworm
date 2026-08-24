@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -y kconfig-frontends gcc-m68k-linux-gnu
+          sudo apt-get install -y kconfig-frontends gcc-m68k-linux-gnu e2fsprogs
 
       - name: Build all tests images
         run: |
