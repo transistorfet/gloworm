@@ -11,7 +11,7 @@ config KERNEL_BASE
 
 config KERNEL_RAM_SIZE
 	hex "Amount of available memory"
-	default 0x100000
+	default 0x400000
 	help
 	  This is the amount of memory available after the Kernel base address, used as the ram size in the linker
 	  script. If automatic memory layout is enabled the rest of this memory block will be filled with the page memory.
