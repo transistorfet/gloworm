@@ -97,6 +97,10 @@ IMAGE := $(if $(OUTPUT),$(OUTPUT)minix-build.img,minix-build.img)
 LOOPBACK := /dev/loop8
 MOUNTPOINT := $(if $(OUTPUT),$(OUTPUT)image,build/image)
 SUDO := sudo
+FILESYSTEM := ext2
+EXT2FLAGS := 
+MINIXFLAGS := -1 -n 14
+MKFSFLAGS := $(if ($(FILESYSTEM),ext2), $(EXT2FLAGS), $(MINIXFLAGS))
 
 PHONY += create-image build-image-files mount-image umount-image
 
@@ -110,12 +114,12 @@ create-image-dir:
 create-image: create-image-dir
 	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
-	$(SUDO) mkfs.minix -1 -n 14 $(LOOPBACK) $(BLOCKS)
+	$(SUDO) mkfs.$(FILESYSTEM) $(MKFSFLAGS) $(LOOPBACK) $(BLOCKS)
 	$(SUDO) losetup -d $(LOOPBACK)
 
 mount-image:
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
-	$(SUDO) mount -t minix $(LOOPBACK) $(MOUNTPOINT)
+	$(SUDO) mount -t $(FILESYSTEM) $(LOOPBACK) $(MOUNTPOINT)
 
 umount-image:
 	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
