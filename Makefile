@@ -10,8 +10,9 @@ export OUTPUT C
 this-makefile	:= $(lastword $(MAKEFILE_LIST))
 src-root	:= $(realpath $(dir $(this-makefile)))
 kconfig-file	:= $(if $(C),$(src-root)/$(C),$(src-root)/.config)
-config-h	:= $(src-root)/include/generated/config.h
 export src-root kconfig-file
+
+config-h	:= $(src-root)/include/generated/config.h
 
 
 PHONY += all
@@ -102,20 +103,20 @@ EXT2FLAGS :=
 MINIXFLAGS := -1 -n 14
 MKFSFLAGS := $(if ($(FILESYSTEM),ext2), $(EXT2FLAGS), $(MINIXFLAGS))
 
-PHONY += create-image build-image-files mount-image umount-image
+PHONY += create-image build-image mount-image umount-image
 
-build-image: decend create-image-dir kernelfile commandfiles devicefiles otherfiles
 mount-and-build-image: mount-image build-image umount-image
 create-and-build-image: create-image insert-partition-table mount-and-build-image
 
-create-image-dir:
-	mkdir -p $(MOUNTPOINT)
 
 create-image: create-image-dir
 	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
 	$(SUDO) mkfs.$(FILESYSTEM) $(MKFSFLAGS) $(LOOPBACK) $(BLOCKS)
 	$(SUDO) losetup -d $(LOOPBACK)
+
+insert-partition-table:
+	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
 
 mount-image:
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
@@ -124,29 +125,8 @@ mount-image:
 umount-image:
 	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
 
-kernelfile:
-	$(SUDO) cp $(OUTPUT)src/kernel/kernel.bin $(MOUNTPOINT)
-
-commandfiles:
-	$(SUDO) mkdir -p $(MOUNTPOINT)/bin
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src/commands SUDO=$(SUDO) LOCATION=$(MOUNTPOINT)/bin copy-commands
-
-devicefiles:
-	$(SUDO) mkdir -p $(MOUNTPOINT)/dev
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty0 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty1 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/mem0 && $(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/ata0 && $(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
-
-otherfiles:
-	$(SUDO) mkdir -p $(MOUNTPOINT)/etc
-	$(SUDO) mkdir -p $(MOUNTPOINT)/proc
-	$(SUDO) mkdir -p $(MOUNTPOINT)/home
-	$(SUDO) mkdir -p $(MOUNTPOINT)/media
-	$(SUDO) cp -r etc/* $(MOUNTPOINT)/etc
-
-insert-partition-table:
-	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
+build-image:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src diskimage
 
 
 # TODO need a better clean rule

@@ -12,6 +12,7 @@ subdir-y		:=	# subdirectories to be built recursively
 #lib-y			:=
 libex-y			:=	# external libraries to include when linking (absolute path)
 extra-y			:=	# extra files needed to build, but which aren't included in the output
+diskimage-y		:=	# files to copy to the disk image
 tests-obj-y		:=	# additional objects to be included in every test target
 host-tests-obj-y	:=	# additional objects to be included in every host test target (but not bare test targets)
 bare-tests-obj-y	:=	# additional objects to be included in every bare test target (but not host test targets)
@@ -24,7 +25,7 @@ srcprefix		:= $(dir)/
 
 targets			:=
 
-userprog-ccflags-y	:=	# CFLAGS for userprograms only
+userprogs-ccflags-y	:=	# CFLAGS for userprograms only
 firmware-ccflags-y	:=	# CFLAGS for firmwares only (monitor, boot)
 kernel-ccflags-y	:=	# CFLAGS for the kernel only
 
@@ -60,6 +61,7 @@ obj-y			:= $(addprefix $(objprefix),$(obj-y))
 in-target		:= $(objprefix)built-in.o
 user-csingle		:= $(addprefix $(objprefix),$(user-csingle))
 user-cmulti		:= $(addprefix $(objprefix),$(user-cmulti))
+userprogs-bare		:= $(addprefix $(objprefix),$(userprogs-bare))
 always-y		:= $(addprefix $(objprefix),$(always-y))
 libex-obj-y		:= $(addprefix $(OUTPUT),$(libex-y))
 
@@ -72,6 +74,13 @@ targets			:= $(subdir-y) $(always-y) $(user-csingle) $(user-cmulti) $(MAKECMDGOA
 
 PHONY += all
 all: $(config-h) $(targets)
+
+# Include the diskimage rules only if we're building the `diskimage` target
+ifneq ($(findstring diskimage,$(MAKECMDGOALS)),)
+# make sure we also visit every subdirectory to build the `diskimage` target
+subdir-y		+= $(patsubst %/built-in.o,%, $(filter %/built-in.o, $(obj-y)))
+include $(src-root)/tools/build/Makefile.diskimage
+endif
 
 # Include the testing rules if there are any tests to build & run, or it's traversing the tests/ directory
 has-tests = $(filter tests%,$(dir))$(tests-y)
@@ -92,13 +101,16 @@ $(libex-obj-y):
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=$(patsubst $(OUTPUT)%/,%,$(dir $@))
 
 # Build Rules for User Programs
-$(user-csingle): ccflags-y += $(userprog-ccflags-y)
+$(user-csingle): ccflags-y += $(userprogs-ccflags-y)
 $(user-csingle): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%.o $(libex-obj-y)
 	$(cmd_ld_elf)
 
-$(user-cmulti): ccflags-y += $(userprog-ccflags-y)
+$(user-cmulti): ccflags-y += $(userprogs-ccflags-y)
 $(user-cmulti): $(OUTPUT)$(dir)/%.elf: $(OUTPUT)$(dir)/%/built-in.o $(libex-obj-y)
 	$(cmd_ld_elf)
+
+$(userprogs-bare): $(OUTPUT)%: $(OUTPUT)%.strip
+	cp $< $@
 
 $(OUTPUT)%.strip: $(OUTPUT)%.elf
 	$(STRIP) $< -o $@

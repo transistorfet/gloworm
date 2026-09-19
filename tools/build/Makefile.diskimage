@@ -1,0 +1,31 @@
+
+diskimage-files		:= $(filter-out /dev/%,$(diskimage-y))
+diskimage-devices	:= $(filter /dev/%,$(diskimage-y))
+
+diskimage-dirs		+= $(foreach filename,$(diskimage-files),$(dir $(filename)))
+diskimage-dirs		+= $(foreach devname,$(diskimage-devices),$(dir $(subst /dev,dev,$(word 1,$(subst -, ,$(devname))))))
+diskimage-dirs		:= $(sort $(diskimage-dirs))
+
+diskimage-files		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-files))
+diskimage-dirs		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-dirs))
+
+### Rules
+
+# in order to use the double $$ early expansion feature, it has to be enabled here
+.SECONDEXPANSION:
+# in order to match a comma character in a makefile pattern, we need to reference it as a variable
+comma := ,
+
+PHONY += diskimage
+diskimage: $(config-h) $(subdir-y) $(diskimage-dirs) $(diskimage-files) $(diskimage-devices) 
+
+$(diskimage-dirs):
+	mkdir -p $@
+
+$(diskimage-files): $(DISKIMAGEDIR)%: $(srcprefix)$$(notdir $$*)
+	$(COPY_TO_DISKIMAGE) -r $< $@
+
+$(diskimage-devices):
+	$(eval DEVFILE := $(subst /dev,dev,$(word 1,$(subst -, ,$@))))
+	$(SUDO) rm -f $(DISKIMAGEDIR)$(DEVFILE) && $(SUDO) mknod $(DISKIMAGEDIR)$(DEVFILE) $(subst $(comma), ,$(word 2,$(subst -, ,$@)))
+

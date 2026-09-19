@@ -17,6 +17,7 @@ session*.vim
 *.sym
 *.load
 *.send
+*.strip
 output.txt
 /src/kernel/arch/*/kernel.ld
 

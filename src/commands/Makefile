@@ -34,28 +34,19 @@ commands-$(CONFIG_CMD_TESTS)	+= tcptest
 commands-$(CONFIG_CMD_TESTS)	+= tcpserv
 commands-$(CONFIG_CMD_TESTS)	+= threadtest
 
-#userprogs			:= $(commands-y)
-#userprogs			+= $(foreach name,$(commands-y),$(name).send)
-userprogs			+= $(foreach name,$(commands-y),$(name).elf)
-userprogs-stripped		+= $(addprefix $(objprefix),$(foreach name,$(commands-y),$(name).strip))
-
 libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 extra-y				+= echo.c cat.c ls.c mkdir.c pwd.c mv.c cp.c ln.c rm.c chmod.c date.c ps.c kill.c mount.c umount.c sync.c
 extra-$(CONFIG_CMD_TESTS)	+= daemontest.c hello.c nettest.c test.c pwd.c tcptest.c tcpserv.c threadtest.c
 
-
-userprog-ccflags-y		+= -Ttext=0x0000
+userprogs-ccflags-y		+= -Ttext=0x0000
 CFLAGS				+= -Isrc/kernel/arch/$(SRCARCH)/include
 CFLAGS				+= -Isrc/libc/arch/$(SRCARCH)/include
 
 # When other utilities are included into the shell, this flag will tell them not to include a main function
 $(objprefix)sh.o: CFLAGS += -DIN_SHELL
 
-# Strip and copy the user programs to the image
-userprogs-bare := $(addprefix $(LOCATION)/,$(commands-y))
-
-copy-commands: $(userprogs-bare)
-
-$(LOCATION)/%: $(objprefix)%.strip
-	$(SUDO) cp $< $(LOCATION)/$(notdir $@)
+userprogs			+= $(foreach name,$(commands-y),$(name).elf)
+userprogs-stripped		+= $(foreach name,$(commands-y),$(name).strip)
+userprogs-bare			+= $(foreach name,$(commands-y),$(name))
+diskimage-y			+= $(addprefix bin/,$(userprogs-bare))
 

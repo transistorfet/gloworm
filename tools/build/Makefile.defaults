@@ -5,17 +5,17 @@ GCC_PREFIX			:= $(patsubst "%",%,$(CONFIG_GCC_PREFIX))
 build-file			:= $(dir)/Makefile
 include-dir			:= $(src-root)/include
 config-h			:= $(src-root)/include/generated/config.h
-config-dir          := $(dir $(config-h))
+config-dir			:= $(dir $(config-h))
 linker-file			+= arch/$(SRCARCH)/kernel.ld
 
-AR				?= $(GCC_PREFIX)ar
-AS				?= $(GCC_PREFIX)gcc
-CC				?= $(GCC_PREFIX)gcc
-LD				?= $(GCC_PREFIX)gcc
-STRIP				?= $(GCC_PREFIX)strip
-OBJDUMP				?= $(GCC_PREFIX)objdump
-OBJCOPY				?= $(GCC_PREFIX)objcopy
-RANLIB				?= $(GCC_PREFIX)ranlib
+AR				:= $(GCC_PREFIX)ar
+AS				:= $(GCC_PREFIX)gcc
+CC				:= $(GCC_PREFIX)gcc
+LD				:= $(GCC_PREFIX)gcc
+STRIP				:= $(GCC_PREFIX)strip
+OBJDUMP				:= $(GCC_PREFIX)objdump
+OBJCOPY				:= $(GCC_PREFIX)objcopy
+RANLIB				:= $(GCC_PREFIX)ranlib
 
 asflags-y			+= -I$(include-dir)
 ccflags-y			+= -I$(include-dir) -g -Wall
@@ -32,7 +32,7 @@ asflags-$(CONFIG_MC68030) 	+= -m68030
 ccflags-$(CONFIG_MC68010) 	+= -m68010
 asflags-$(CONFIG_MC68010) 	+= -m68010
 
-userprog-ccflags-$(CONFIG_M68K)	+= -mpcrel
+userprogs-ccflags-$(CONFIG_M68K)+= -mpcrel
 firmware-ccflags-$(CONFIG_M68K)	+= -mpcrel
 
 # reduce the elf output size by reducing the alignment
@@ -51,10 +51,10 @@ endif
 export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
 
 HOST_ARCH			= testapp
-HOST_LD				?= gcc
-HOST_CC				?= gcc
-HOST_CFLAGS			?=
-HOST_LDFLAGS			?=
+HOST_LD				:= gcc
+HOST_CC				:= gcc
+HOST_CFLAGS			:=
+HOST_LDFLAGS			:=
 
 host-ccflags-y			+= -I$(include-dir) -g -Wall -O3
 host-ccflags-y			+= -Isrc/libc/arch/$(HOST_ARCH)/include -Isrc/kernel/arch/$(HOST_ARCH)/include
@@ -64,4 +64,10 @@ ifeq ($(strict), y)
 endif
 
 export HOST_ARCH HOST_LD HOST_CC HOST_GCC HOST_CFLAGS HOST_LDFLAGS
+
+SUDO				:= sudo
+COPY_TO_DISKIMAGE		:= $(SUDO) cp
+DISKIMAGEDIR			:= $(OUTPUT)diskimage/
+
+export SUDO COPY_TO_DISKIMAGE DISKIMAGEDIR
 
