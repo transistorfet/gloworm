@@ -1,0 +1,3 @@
+
+diskimage-y	:= etc/rc
+

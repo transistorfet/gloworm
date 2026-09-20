@@ -81,52 +81,27 @@ kernel.load: src/kernel/kernel.load
 kernel.bin: src/kernel/kernel.bin
 kernel.elf: src/kernel/kernel.elf
 
+
 # Test building and running targets
-PHONY += tests
-tests:
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests tests
-
-PHONY += bare-tests
-bare-tests:
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests bare-tests
+PHONY += tests bare-tests
+tests bare-tests:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests $@
 
 
-# TODO 128 is just barely enough for 20 commands, kernel, devfiles
-#BLOCKS = 128
-BLOCKS := 20480
-IMAGE := $(if $(OUTPUT),$(OUTPUT)minix-build.img,minix-build.img)
-LOOPBACK := /dev/loop8
-MOUNTPOINT := $(if $(OUTPUT),$(OUTPUT)image,build/image)
-SUDO := sudo
-FILESYSTEM := ext2
-EXT2FLAGS := 
-MINIXFLAGS := -1 -n 14
-MKFSFLAGS := $(if ($(FILESYSTEM),ext2), $(EXT2FLAGS), $(MINIXFLAGS))
+# Diskimage building targets
+use-diskimage-utils		:= mount
 
-PHONY += create-image build-image mount-image umount-image
+diskimage-aliases		:=
+diskimage-aliases		+= create-diskimage diskimage create-and-build-diskimage
+ifeq ($(use-diskimage-utils),mount)
+	diskimage-aliases	+= mount-diskimage umount-diskimage mount-and-build-diskimage
+else
+	diskimage-aliases	+= 
+endif
 
-mount-and-build-image: mount-image build-image umount-image
-create-and-build-image: create-image insert-partition-table mount-and-build-image
-
-
-create-image: create-image-dir
-	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
-	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
-	$(SUDO) mkfs.$(FILESYSTEM) $(MKFSFLAGS) $(LOOPBACK) $(BLOCKS)
-	$(SUDO) losetup -d $(LOOPBACK)
-
-insert-partition-table:
-	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
-
-mount-image:
-	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
-	$(SUDO) mount -t $(FILESYSTEM) $(LOOPBACK) $(MOUNTPOINT)
-
-umount-image:
-	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
-
-build-image:
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src diskimage
+PHONY += $(diskimage-aliases)
+$(diskimage-aliases):
+	$(MAKE) -f $(src-root)/tools/build/Makefile.$(use-diskimage-utils) $@
 
 
 # TODO need a better clean rule
@@ -175,11 +150,11 @@ help:
 	@echo  '  bare-tests    - Build all the baremetal tests that run on the target machine'
 	@echo  ''
 	@echo  'Disk image targets:'
-	@echo  '  create-image  - Create a new disk image file initialized with minix1 fs'
-	@echo  '  mount-image   - Mount the disk image file to the default location'
-	@echo  '  umount-image  - Unmount the disk image file'
-	@echo  '  build-image   - Build `all` and copy the kernel, commands, /etc, and /dev'
-	@echo  '                  to the image mountpoint'
+	@echo  '  create-diskimage - Create a new disk image file'
+	@echo  '  mount-diskimage  - Mount the disk image file to the default location'
+	@echo  '  umount-diskimage - Unmount the disk image file'
+	@echo  '  diskimage        - Build `all` and copy the kernel, commands, /etc, and /dev'
+	@echo  '                     to the image mountpoint'
 	@echo  ''
 	@echo  'Global options:'
 	@echo  '  O=<dir>       - put all build artifacts and outputs into <dir>'

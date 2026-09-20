@@ -34,8 +34,9 @@ hardware/**/*-backups
 # Binary files
 *.img
 
-# Build Directory
+# Build Directories
 /build/
+/diskimage/
 /include/generated/
 
 # Miscellaneous

@@ -1,0 +1,47 @@
+
+include $(src-root)/tools/build/Makefile.defaults
+
+include $(kconfig-file)
+
+EXT2FLAGS := 
+MINIXFLAGS := -1 -n 14
+LOOPBACK := /dev/loop8
+
+# TODO 128 is just barely enough for 20 commands, kernel, devfiles
+#BLOCKS = 128
+BLOCKS := 20480
+FILESYSTEM := $(if $(CONFIG_MINIX_FS),minix,ext2)
+MKFSFLAGS := $(if $(CONFIG_MINIX_FS), $(MINIXFLAGS), $(EXT2FLAGS))
+IMAGE := $(if $(OUTPUT),$(OUTPUT)$(FILESYSTEM)-build.img,$(FILESYSTEM)-build.img)
+
+
+PHONY += create-diskimage mount-diskimage umount-diskimage
+
+mount-and-build-diskimage: mount-diskimage diskimage umount-diskimage
+create-and-build-diskimage: create-diskimage insert-partition-table mount-and-build-diskimage
+
+create-diskimage: create-diskimage-dir
+	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
+	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
+	$(SUDO) mkfs.$(FILESYSTEM) $(MKFSFLAGS) $(LOOPBACK) $(BLOCKS)
+	$(SUDO) losetup -d $(LOOPBACK)
+
+insert-partition-table:
+	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
+
+mount-diskimage: create-diskimage-dir
+	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
+	$(SUDO) mount -t $(FILESYSTEM) $(LOOPBACK) $(DISKIMAGEDIR)
+
+umount-diskimage:
+	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
+
+PHONY += diskimage
+diskimage: create-diskimage-dir
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src diskimage
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=etc diskimage
+
+PHONY += create-diskimage-dir
+create-diskimage-dir: $(DISKIMAGEDIR)
+	mkdir -p $<
+
