@@ -42,6 +42,6 @@ diskimage: create-diskimage-dir
 	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=etc diskimage
 
 PHONY += create-diskimage-dir
-create-diskimage-dir: $(DISKIMAGEDIR)
-	mkdir -p $<
+create-diskimage-dir:
+	mkdir -p $(DISKIMAGEDIR)
 
