@@ -20,7 +20,7 @@ PHONY += diskimage
 diskimage: $(config-h) $(subdir-y) $(diskimage-dirs) $(diskimage-files) $(diskimage-devices) 
 
 $(diskimage-dirs):
-	mkdir -p $@
+	$(SUDO) mkdir -p $@
 
 $(diskimage-files): $(DISKIMAGEDIR)%: $(srcprefix)$$(notdir $$*)
 	$(COPY_TO_DISKIMAGE) -r $< $@

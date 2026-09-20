@@ -11,7 +11,7 @@ LOOPBACK := /dev/loop8
 #BLOCKS = 128
 BLOCKS := 20480
 FILESYSTEM := $(if $(CONFIG_MINIX_FS),minix,ext2)
-MKFSFLAGS := $(if $(CONFIG_MINIX_FS), $(MINIXFLAGS), $(EXT2FLAGS))
+MKFSFLAGS := $(if $(findstring minix,$(FILESYSTEM)), $(MINIXFLAGS), $(EXT2FLAGS))
 IMAGE := $(if $(OUTPUT),$(OUTPUT)$(FILESYSTEM)-build.img,$(FILESYSTEM)-build.img)
 
 
@@ -43,5 +43,5 @@ diskimage: create-diskimage-dir
 
 PHONY += create-diskimage-dir
 create-diskimage-dir:
-	mkdir -p $(DISKIMAGEDIR)
+	$(SUDO) mkdir -p $(DISKIMAGEDIR)
 
