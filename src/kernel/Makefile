@@ -20,6 +20,7 @@ obj-$(CONFIG_SHELL_IN_KERNEL)	+= cmd-sh.o
 
 libex-y				+= src/libc/libc-$(SRCARCH)-os.a
 always-y			+= kernel.elf kernel.bin kernel.load
+diskimage-y			+= kernel.bin
 
 ldflags-y 			+= -Wl,--entry=_start -Tsrc/kernel/$(linker-file)
 extra-y 			+= $(linker-file)

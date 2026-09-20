@@ -10,8 +10,9 @@ export OUTPUT C
 this-makefile	:= $(lastword $(MAKEFILE_LIST))
 src-root	:= $(realpath $(dir $(this-makefile)))
 kconfig-file	:= $(if $(C),$(src-root)/$(C),$(src-root)/.config)
-config-h	:= $(src-root)/include/generated/config.h
 export src-root kconfig-file
+
+config-h	:= $(src-root)/include/generated/config.h
 
 
 PHONY += all
@@ -80,73 +81,27 @@ kernel.load: src/kernel/kernel.load
 kernel.bin: src/kernel/kernel.bin
 kernel.elf: src/kernel/kernel.elf
 
+
 # Test building and running targets
-PHONY += tests
-tests:
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests tests
-
-PHONY += bare-tests
-bare-tests:
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests bare-tests
+PHONY += tests bare-tests
+tests bare-tests:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=tests $@
 
 
-# TODO 128 is just barely enough for 20 commands, kernel, devfiles
-#BLOCKS = 128
-BLOCKS := 20480
-IMAGE := $(if $(OUTPUT),$(OUTPUT)minix-build.img,minix-build.img)
-LOOPBACK := /dev/loop8
-MOUNTPOINT := $(if $(OUTPUT),$(OUTPUT)image,build/image)
-SUDO := sudo
-FILESYSTEM := ext2
-EXT2FLAGS := 
-MINIXFLAGS := -1 -n 14
-MKFSFLAGS := $(if ($(FILESYSTEM),ext2), $(EXT2FLAGS), $(MINIXFLAGS))
+# Diskimage building targets
+use-diskimage-utils		:= mount
 
-PHONY += create-image build-image-files mount-image umount-image
+diskimage-aliases		:=
+diskimage-aliases		+= create-diskimage diskimage create-and-build-diskimage
+ifeq ($(use-diskimage-utils),mount)
+	diskimage-aliases	+= mount-diskimage umount-diskimage mount-and-build-diskimage
+else
+	diskimage-aliases	+= 
+endif
 
-build-image: decend create-image-dir kernelfile commandfiles devicefiles otherfiles
-mount-and-build-image: mount-image build-image umount-image
-create-and-build-image: create-image insert-partition-table mount-and-build-image
-
-create-image-dir:
-	mkdir -p $(MOUNTPOINT)
-
-create-image: create-image-dir
-	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
-	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
-	$(SUDO) mkfs.$(FILESYSTEM) $(MKFSFLAGS) $(LOOPBACK) $(BLOCKS)
-	$(SUDO) losetup -d $(LOOPBACK)
-
-mount-image:
-	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
-	$(SUDO) mount -t $(FILESYSTEM) $(LOOPBACK) $(MOUNTPOINT)
-
-umount-image:
-	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
-
-kernelfile:
-	$(SUDO) cp $(OUTPUT)src/kernel/kernel.bin $(MOUNTPOINT)
-
-commandfiles:
-	$(SUDO) mkdir -p $(MOUNTPOINT)/bin
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src/commands SUDO=$(SUDO) LOCATION=$(MOUNTPOINT)/bin copy-commands
-
-devicefiles:
-	$(SUDO) mkdir -p $(MOUNTPOINT)/dev
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty0 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty0 c 2 0
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/tty1 && $(SUDO) mknod $(MOUNTPOINT)/dev/tty1 c 2 1
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/mem0 && $(SUDO) mknod $(MOUNTPOINT)/dev/mem0 c 3 0
-	$(SUDO) rm -f $(MOUNTPOINT)/dev/ata0 && $(SUDO) mknod $(MOUNTPOINT)/dev/ata0 c 4 0
-
-otherfiles:
-	$(SUDO) mkdir -p $(MOUNTPOINT)/etc
-	$(SUDO) mkdir -p $(MOUNTPOINT)/proc
-	$(SUDO) mkdir -p $(MOUNTPOINT)/home
-	$(SUDO) mkdir -p $(MOUNTPOINT)/media
-	$(SUDO) cp -r etc/* $(MOUNTPOINT)/etc
-
-insert-partition-table:
-	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
+PHONY += $(diskimage-aliases)
+$(diskimage-aliases):
+	$(MAKE) -f $(src-root)/tools/build/Makefile.$(use-diskimage-utils) $@
 
 
 # TODO need a better clean rule
@@ -195,11 +150,11 @@ help:
 	@echo  '  bare-tests    - Build all the baremetal tests that run on the target machine'
 	@echo  ''
 	@echo  'Disk image targets:'
-	@echo  '  create-image  - Create a new disk image file initialized with minix1 fs'
-	@echo  '  mount-image   - Mount the disk image file to the default location'
-	@echo  '  umount-image  - Unmount the disk image file'
-	@echo  '  build-image   - Build `all` and copy the kernel, commands, /etc, and /dev'
-	@echo  '                  to the image mountpoint'
+	@echo  '  create-diskimage - Create a new disk image file'
+	@echo  '  mount-diskimage  - Mount the disk image file to the default location'
+	@echo  '  umount-diskimage - Unmount the disk image file'
+	@echo  '  diskimage        - Build `all` and copy the kernel, commands, /etc, and /dev'
+	@echo  '                     to the image mountpoint'
 	@echo  ''
 	@echo  'Global options:'
 	@echo  '  O=<dir>       - put all build artifacts and outputs into <dir>'
