@@ -1,3 +1,3 @@
 
-diskimage-y	:= etc/rc
+diskimage-src-y			:= etc/rc
 

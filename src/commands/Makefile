@@ -48,5 +48,5 @@ $(objprefix)sh.o: CFLAGS += -DIN_SHELL
 userprogs			+= $(foreach name,$(commands-y),$(name).elf)
 userprogs-stripped		+= $(foreach name,$(commands-y),$(name).strip)
 userprogs-bare			+= $(foreach name,$(commands-y),$(name))
-diskimage-y			+= $(addprefix bin/,$(userprogs-bare))
+diskimage-obj-y			+= $(addprefix bin/,$(userprogs-bare))
 

@@ -1,6 +1,7 @@
 
 SRCARCH				:= $(patsubst "%",%,$(CONFIG_ARCH))
 GCC_PREFIX			:= $(patsubst "%",%,$(CONFIG_GCC_PREFIX))
+GCC_SUFFIX			:= $(patsubst "%",%,$(CONFIG_GCC_SUFFIX))
 
 build-file			:= $(dir)/Makefile
 include-dir			:= $(src-root)/include
@@ -9,9 +10,9 @@ config-dir			:= $(dir $(config-h))
 linker-file			+= arch/$(SRCARCH)/kernel.ld
 
 AR				:= $(GCC_PREFIX)ar
-AS				:= $(GCC_PREFIX)gcc
-CC				:= $(GCC_PREFIX)gcc
-LD				:= $(GCC_PREFIX)gcc
+AS				:= $(GCC_PREFIX)gcc$(GCC_SUFFIX)
+CC				:= $(GCC_PREFIX)gcc$(GCC_SUFFIX)
+LD				:= $(GCC_PREFIX)gcc$(GCC_SUFFIX)
 STRIP				:= $(GCC_PREFIX)strip
 OBJDUMP				:= $(GCC_PREFIX)objdump
 OBJCOPY				:= $(GCC_PREFIX)objcopy

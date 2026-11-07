@@ -12,11 +12,13 @@ subdir-y		:=	# subdirectories to be built recursively
 #lib-y			:=
 libex-y			:=	# external libraries to include when linking (absolute path)
 extra-y			:=	# extra files needed to build, but which aren't included in the output
-diskimage-y		:=	# files to copy to the disk image
 tests-obj-y		:=	# additional objects to be included in every test target
 host-tests-obj-y	:=	# additional objects to be included in every host test target (but not bare test targets)
 bare-tests-obj-y	:=	# additional objects to be included in every bare test target (but not host test targets)
 userprogs		:=	# user programs to compile
+diskimage-obj-y		:=	# files to copy to the disk image from the object tree
+diskimage-src-y		:=	# files to copy to the disk image from the source tree
+diskimage-new-y		:=	# files to create in the disk image
 ccflags-y		:=
 asflags-y		:=
 ldflags-y		:=
@@ -78,7 +80,7 @@ all: $(config-h) $(targets)
 # Include the diskimage rules only if we're building the `diskimage` target
 ifneq ($(findstring diskimage,$(MAKECMDGOALS)),)
 # make sure we also visit every subdirectory to build the `diskimage` target
-subdir-y		+= $(patsubst %/built-in.o,%, $(filter %/built-in.o, $(obj-y)))
+subdir-y		+= $(patsubst $(OUTPUT)%/built-in.o,%, $(filter %/built-in.o, $(obj-y)))
 include $(src-root)/tools/build/Makefile.diskimage
 endif
 
