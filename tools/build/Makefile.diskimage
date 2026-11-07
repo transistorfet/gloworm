@@ -11,6 +11,11 @@ diskimage-src-y		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-src-y))
 diskimage-obj-y		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-obj-y))
 diskimage-dirs		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-dirs))
 
+# split the object files into two lists so that we can copy `.strip` files to their equivalent bare filename
+diskimage-obj-strip	:= $(patsubst %.strip,%,$(filter %.strip,$(diskimage-obj-y)))
+diskimage-obj-y		:= $(filter-out %.strip,$(diskimage-obj-y))
+
+
 ### Rules
 
 # in order to use the double $$ early expansion feature, it has to be enabled here
@@ -19,10 +24,14 @@ diskimage-dirs		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-dirs))
 comma := ,
 
 PHONY += diskimage
-diskimage: $(config-h) $(DISKIMAGEDIR) $(subdir-y) $(diskimage-dirs) $(diskimage-obj-y) $(diskimage-src-y) $(diskimage-devices)
+diskimage: $(config-h) $(DISKIMAGEDIR) $(subdir-y) $(diskimage-dirs) $(diskimage-obj-y) $(diskimage-obj-strip) $(diskimage-src-y) $(diskimage-devices)
 
 $(diskimage-dirs):
 	$(SUDO) mkdir -p $@
+
+# special case: for binaries that end in `.strip`, copy them to their bare filename without creating an intermediate file
+$(diskimage-obj-strip): $(DISKIMAGEDIR)%: $(objprefix)$$(notdir $$*).strip
+	$(COPY_TO_DISKIMAGE) -r $< $@
 
 $(diskimage-obj-y): $(DISKIMAGEDIR)%: $(objprefix)$$(notdir $$*)
 	$(COPY_TO_DISKIMAGE) -r $< $@
