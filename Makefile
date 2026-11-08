@@ -92,7 +92,7 @@ tests bare-tests:
 use-diskimage-utils		:= mount
 
 diskimage-aliases		:=
-diskimage-aliases		+= create-diskimage diskimage create-and-build-diskimage
+diskimage-aliases		+= create-diskimage create-and-build-diskimage
 ifeq ($(use-diskimage-utils),mount)
 	diskimage-aliases	+= mount-diskimage umount-diskimage mount-and-build-diskimage
 else
@@ -102,6 +102,11 @@ endif
 PHONY += $(diskimage-aliases)
 $(diskimage-aliases):
 	$(MAKE) -f $(src-root)/tools/build/Makefile.$(use-diskimage-utils) $@
+
+PHONY += diskimage
+diskimage:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src diskimage
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=etc diskimage
 
 
 # TODO need a better clean rule

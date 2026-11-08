@@ -15,12 +15,12 @@ MKFSFLAGS := $(if $(findstring minix,$(FILESYSTEM)), $(MINIXFLAGS), $(EXT2FLAGS)
 IMAGE := $(if $(OUTPUT),$(OUTPUT)$(FILESYSTEM)-build.img,$(FILESYSTEM)-build.img)
 
 
-PHONY += create-diskimage mount-diskimage umount-diskimage
+PHONY += create-diskimage mount-diskimage umount-diskimage diskimage
 
 mount-and-build-diskimage: mount-diskimage diskimage umount-diskimage
 create-and-build-diskimage: create-diskimage insert-partition-table mount-and-build-diskimage
 
-create-diskimage: create-diskimage-dir
+create-diskimage: create-mount-dir
 	dd if=/dev/zero of=$(IMAGE) bs=1K count=$(BLOCKS)
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
 	$(SUDO) mkfs.$(FILESYSTEM) $(MKFSFLAGS) $(LOOPBACK) $(BLOCKS)
@@ -29,19 +29,18 @@ create-diskimage: create-diskimage-dir
 insert-partition-table:
 	/usr/bin/printf '\x00\x00\x00\x00\x83\x53\x02\x54\x00\x00\x00\x00\x00\xA0\x00\x00' | dd of=$(IMAGE) bs=1 seek=446 conv=notrunc
 
-mount-diskimage: create-diskimage-dir
+mount-diskimage: create-mount-dir
 	$(SUDO) losetup $(LOOPBACK) $(IMAGE)
 	$(SUDO) mount -t $(FILESYSTEM) $(LOOPBACK) $(DISKIMAGEDIR)
 
-umount-diskimage:
+umount-diskimage: create-mount-dir
 	$(SUDO) umount $(LOOPBACK); $(SUDO) losetup -d $(LOOPBACK)
 
-PHONY += diskimage
-diskimage: create-diskimage-dir
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src diskimage
-	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=etc diskimage
+create-mount-dir:
+	$(MAKE) -f $(src-root)/tools/build/Makefile.build dir=src $(DISKIMAGEDIR)/
 
-PHONY += create-diskimage-dir
-create-diskimage-dir:
-	$(SUDO) mkdir -p $(DISKIMAGEDIR)
+diskimage:
+	$(MAKE) diskimage
 
+.PHONY: $(PHONY)
+.PRECIOUS: $(PRECIOUS)
