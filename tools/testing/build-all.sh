@@ -9,7 +9,6 @@ for CONFIG in $CONFIGS; do
 	echo ""
 	echo ">>> Building $NAME"
 	echo ""
-	ls -l /dev/loop*
 	make O=build/tests/$NAME C=build/tests/$NAME.config olddefconfig from=config/tests/$CONFIG overwrite=y
 	make O=build/tests/$NAME C=build/tests/$NAME.config strict=y SUDO= create-and-build-diskimage
 done

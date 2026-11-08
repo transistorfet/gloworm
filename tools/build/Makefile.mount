@@ -5,7 +5,7 @@ include $(kconfig-file)
 
 EXT2FLAGS := 
 MINIXFLAGS := -1 -n 14
-LOOPBACK := /dev/loop8
+LOOPBACK := /dev/loop3
 
 # TODO 128 is just barely enough for 20 commands, kernel, devfiles
 #BLOCKS = 128
