@@ -10,6 +10,10 @@ config GCC_PREFIX
 	string "GCC compiler prefix"
 	default m68k-linux-gnu-
 
+config GCC_SUFFIX
+	string "GCC compiler suffix (version number)"
+	default ""
+
 config NUM_CPUS
 	int
 	default 1

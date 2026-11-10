@@ -17,6 +17,7 @@ session*.vim
 *.sym
 *.load
 *.send
+*.strip
 output.txt
 /src/kernel/arch/*/kernel.ld
 
@@ -33,8 +34,9 @@ hardware/**/*-backups
 # Binary files
 *.img
 
-# Build Directory
+# Build Directories
 /build/
+/diskimage/
 /include/generated/
 
 # Miscellaneous

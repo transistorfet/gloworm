@@ -6316,3 +6316,42 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - I also added some makefile recipes for inserting a partition table into the disk image to make it bootable.  I have to add a rule
   as well to bundle the kernel and disk image into a single file that can be loaded
 
+
+2026-09-20:
+
+- dasslefl wanted to change the build rules for images so that he can use kconfig values so that images can be more easily built for
+  other platforms based on the selected config values, instead of really only working for the computie systems.  That kind of
+  requires moving the rules out of the root Makefile, so I don't have to have multiple kconfig path resolutions, and don't have to
+  worry about including kconfig or defaults twice.  He also wanted to change to using genext2fs, which doesn't require root to build
+  an image, but I'd like it to be switchable, so I can still use the mount method, since there's no equivalent for minix file
+  systems
+- I've been working on this a bit, here and there, for the last few weeks, and have something that almost works
+- I separated the rules that build images from the rules that mount images, and have them in separate files, so that the mount rules
+  can be included conditionally based on whether genext2fs is selected in the defaults
+- one of the big things to resolve is how to copy etc/ files.  The binaries were somewhat easier, in that I made rules which assume
+  the current directory that make is running in will have the file, and the object path added to `diskimage-y` will contain the
+  destination path in the image, so it can figure out both the source path and destination path.  I didn't realize until later that
+  I have to assume the source path is the obj path and not the literal src path, so it copies the build artifact where files in the
+  current directory would end up in after build.  That is a problem for etc/ though which isn't built
+- So I'm thinking of adding a `diskimage-obj-y` and `diskimage-src-y` variable instead of just one variable, and that then begs the
+  question should I add `diskimage-dev-y` for device files instead of filtering them out of `diskimage-y`?
+
+
+2026-10-29:
+
+- I came back to this now that the next board revisions is out for printing, and I had updated my machine in the meantime, which
+  installed version 16 of gcc for m86k-linux-gnu, and it was causing it to not compile due to a bad assembly instruction.  I was
+  able to run the command with -S instead of -c, and the assembly showed the instruction it was hung up on was from the byteswap.h
+  header.  I had checked the instruction format, and was about to report a bug, but took another look and remembered that there are
+  two forms of the ROL instruction: one for registers and one for memory.  The memory version doesn't take a count, and can only
+  rotate by one bit.  The inline assembly had "+md" while also using #8 as the count, which is wrong.  Changing it to "+d" fixed the
+  problem and got it compiling again
+
+
+2026-11-07:
+
+- I tried to make the diskimage makefile automatically filter out the src and obj files, based on whether they existed in the src or
+  not, but only now did I realize that is only true if you haven't built with output going into the source directory...  So it won't
+  rebuild when using `make O=<something>`, even with a `make O=<something> clean`.  You'd have to do `make clean` as well
+- I'm not sure there's a solution without manually splitting the variable assignments
+

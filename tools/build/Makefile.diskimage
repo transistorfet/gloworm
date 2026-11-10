@@ -1,0 +1,49 @@
+
+diskimage-devices	:= $(filter /dev/%,$(diskimage-new-y))
+
+# collect the directory names for each diskimage target and dedup the list using $(sort)
+diskimage-dirs		:= $(filter %/,$(diskimage-new-y))
+diskimage-dirs		+= $(foreach filename,$(diskimage-obj-y) $(diskimage-src-y),$(dir $(filename)))
+diskimage-dirs		+= $(foreach devname,$(diskimage-devices),$(dir $(subst /dev,dev,$(word 1,$(subst -, ,$(devname))))))
+diskimage-dirs		:= $(sort $(diskimage-dirs))
+
+diskimage-src-y		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-src-y))
+diskimage-obj-y		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-obj-y))
+diskimage-dirs		:= $(addprefix $(DISKIMAGEDIR),$(diskimage-dirs))
+
+# split the object files into two lists so that we can copy `.strip` files to their equivalent bare filename
+diskimage-obj-strip	:= $(patsubst %.strip,%,$(filter %.strip,$(diskimage-obj-y)))
+diskimage-obj-y		:= $(filter-out %.strip,$(diskimage-obj-y))
+
+
+### Rules
+
+# in order to use the double $$ early expansion feature, it has to be enabled here
+.SECONDEXPANSION:
+# in order to match a comma character in a makefile pattern, we need to reference it as a variable
+comma := ,
+
+PHONY += diskimage
+diskimage: $(config-h) $(DISKIMAGEDIR) $(subdir-y) $(diskimage-dirs) $(diskimage-obj-y) $(diskimage-obj-strip) $(diskimage-src-y) $(diskimage-devices)
+
+$(diskimage-dirs):
+	$(SUDO) mkdir -p $@
+
+# special case: for binaries that end in `.strip`, copy them to their bare filename without creating an intermediate file
+$(diskimage-obj-strip): $(DISKIMAGEDIR)%: $(objprefix)$$(notdir $$*).strip
+	$(COPY_TO_DISKIMAGE) -r $< $@
+
+$(diskimage-obj-y): $(DISKIMAGEDIR)%: $(objprefix)$$(notdir $$*)
+	$(COPY_TO_DISKIMAGE) -r $< $@
+
+$(diskimage-src-y): $(DISKIMAGEDIR)%: $(srcprefix)$$(notdir $$*)
+	$(COPY_TO_DISKIMAGE) -r $< $@
+
+$(diskimage-devices):
+	$(eval DEVFILE := $(subst /dev,dev,$(word 1,$(subst -, ,$@))))
+	$(SUDO) rm -f $(DISKIMAGEDIR)$(DEVFILE) && $(SUDO) mknod $(DISKIMAGEDIR)$(DEVFILE) $(subst $(comma), ,$(word 2,$(subst -, ,$@)))
+
+# NOTE: this doesn't use $(SUDO) because it will create the parents of the disk image, which should be user-writeable
+$(DISKIMAGEDIR):
+	mkdir -p $(DISKIMAGEDIR)
+

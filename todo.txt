@@ -67,6 +67,8 @@
 * add a way of registering filesystem types instead of what you have now?  I mean, it would allow you to validate each filesystem entry
   like I'm doing now for drivers, but adds overhead when a static array works fine for now otherwise
 
+* improve interrupt latency by optimizing the kernel exit checks, and also removing the global kernel stack so no stack switching is necessary
+
 * should you make each drivers/ subdir be its own subsystem with a common set of things, and then the specific drivers within directories
 * as part of this, block drivers would have their own block-specific driver interface, and tty would be the character device interface
 * I don't know how the device driver interface in the file system would work with this
