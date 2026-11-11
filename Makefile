@@ -24,7 +24,7 @@ config:
 
 PHONY += dockerconfig
 dockerconfig:
-	cd tools/config && KCONFIG_CONFIG=$(kconfig-file) ./configure.sh
+	KCONFIG_CONFIG=$(kconfig-file) $(src-root)/tools/config/configure.sh
 
 PHONY += menuconfig
 menuconfig:
@@ -130,9 +130,8 @@ help:
 	@echo  '  olddefconfig  - Update current config by selecting defaults for new values'
 	@echo  '  oldconfig     - Update current config by prompting for new values'
 	@echo  '  config        - Start new config by prompting for every value'
-	@echo  '  dockerconfig  - Update current config using an ncurses menu inside a docker'
-	@echo  '                  container (if the `kconfig-frontends` debian package is not'
-	@echo  '                  installed'
+	@echo  '  dockerconfig  - Build a docker container with `kconfig-frontends` installed'
+	@echo  '                  and run it to update the current config using an ncurses menu'
 	@echo  ''
 	@echo  '  > Configuration target options:'
 	@echo  '    from=<file> - Copy <file> to config location before starting'

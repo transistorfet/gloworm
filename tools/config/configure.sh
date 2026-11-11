@@ -1,9 +1,12 @@
+#!/bin/sh
 #
 # Build the kconfig docker image and run it to configure the system before building
 #
 
-KCONFIG_CONFIG=${KCONFIG_CONFIG:-$(pwd)/.config}
+THISDIR=$(dirname "$0")
+SRCROOT=$(realpath "$THISDIR/../..")
+KCONFIG_CONFIG=${KCONFIG_CONFIG:-$SRCROOT/.config}
 
-docker build -t kconfig .
-docker run -it --rm --env "KCONFIG_CONFIG=$KCONFIG_CONFIG" --volume $(cd ../../ && pwd):/gloworm kconfig
+docker build -t kconfig $THISDIR
+docker run -it --rm --env "KCONFIG_CONFIG=$KCONFIG_CONFIG" --volume "$SRCROOT:/gloworm" kconfig
 

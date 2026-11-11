@@ -30,7 +30,6 @@
 * the problem with making the user stack use all of memory is actually that it preallocates the tables which takes way too long, so maybe you need to
   only allocate part of the stack at the top of memory, and grow the stack on demand, or else make it so that the entire tree isn't filled out until needed
 
-* fix docker config
 * make a dockerfile that can also compile the entire project
 * make tracing logs module-selectable, so not all trace messages get activated
 
