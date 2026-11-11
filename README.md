@@ -81,6 +81,15 @@ A summary of the build targets and options can be printed using:
 make help
 ```
 
+#### Quick Start / Build Everything
+
+The complete system can be configured and built using `make` (assuming the following Debian packages
+are installed: `make kconfig-frontends gcc-m68k-linux-gnu binutils-m68k-linux-gnu bsdextrautils`)
+```sh
+make menuconfig
+make
+```
+
 #### Using Docker (Optional)
 
 If you'd like to use docker to run any of the following `make` commands, then replace `make` in
@@ -112,18 +121,10 @@ missing options:
 make menuconfig from=<file>
 ```
 
-#### Build Everything
-
-The complete system can then be built using `make`.  An optional `O=<dir>` argument can be provided
-to `make` to store all build file outputs in a separate location.  By default, it will store object
-files in the `src/` tree.
-
-```sh
-make menuconfig
-make
-```
-
 #### Put build files in another directory
+
+An optional `O=<dir>` argument can be provided to `make` to store all build file outputs in a
+separate location.  By default, it will store object files in the `src/` tree.
 
 ```sh
 make O=build
