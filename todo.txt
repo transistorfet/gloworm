@@ -1,4 +1,8 @@
 
+* should you rename the Makefiles to Kbuild.  Linux now calls them Kbuild, but there's also a difference in how Kbuild and Makefile files are treated by kbuild (can't remember the details though)
+* should you document Kbuild better?
+* use makedevs.py instead of the Kbuild-based device file creator?
+
 * make better use of the flags, so that it can run both on a single block system, and multi-block, with global offboard memory
 * add stats of some kind to the page allocator?  Where would the data be displayed, in procfs?
 * add flags to kmalloc too?
