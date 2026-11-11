@@ -81,59 +81,96 @@ A summary of the build targets and options can be printed using:
 make help
 ```
 
-To configure the system, you can either install the Debian `kconfig-frontends` package, or use the
-provided Dockerfile to run them from a container, or hand-edit one of the existing configs.  Default
-config files for the 68k-SBC/SMT, k30-SBC, and k30p-VME are provided in `config/`.  Copy one to the
-root directory and rename it `.config` to make it active, or use `make menuconfig from=<file>` to
-automatically copy it to the config location.  The complete system can then be built using `make`.
-An optional argument can be provided to `make` to store all build file outputs in a separate
-location.  By default, it will store object files in the `src/` tree.
+#### Using Docker (Optional)
+
+If you'd like to use docker to run any of the following `make` commands, then replace `make` in
+the command with `tools/compile/m68k/make.sh`, which will build a docker container based on Debian,
+with an m68k cross-compiler, and other tools needed to build a binary or diskimage.  Command line
+arguments provided will be passed to `make` inside the container.  So for example, to run the
+`clean` target:
+
+```sh
+tools/compile/m68k/make.sh clean
+```
+
+#### Configuring
+
+Before building the system, a config file must be created using the Linux kernel's Kconfig program.
+It has been conveniently separated into a Debian package called `kconfig-frontends`, which can be
+installed directly, or run in a standalone docker container by running `make dockerconfig` or
+`tools/config/configure.sh`.  It can also be run with a cross-compiling docker container by running:
+```sh
+tools/compile/m68k/make.sh menuconfig
+```
+
+Base config files for the 68k-SBC/SMT, k30-SBC, and k30p-VME are provided in `config/`.  To complete
+the config, the `--olddefconfig` option should be passed to kconfig to set all missing options to
+their default values.  A build recipe is available to do this for you, using the following command
+to automatically copy the base config file to `.config` and run `--oldefconfig` on it to fill in the
+missing options:
+```sh
+make menuconfig from=<file>
+```
+
+#### Build Everything
+
+The complete system can then be built using `make`.  An optional `O=<dir>` argument can be provided
+to `make` to store all build file outputs in a separate location.  By default, it will store object
+files in the `src/` tree.
 
 ```sh
 make menuconfig
 make
 ```
 
-##### Put build files in another directory
+#### Put build files in another directory
 
 ```sh
 make O=build
 ```
 
-##### Make a new configuration based on an existing config and edit with menuconfig
+#### Make a new configuration based on an existing config and edit with menuconfig
 
 ```sh
 make menuconfig from=config/k30p.config
 ```
 
-##### Building a specific configuration file
+#### Building a specific configuration file in separate directory
 
 ```sh
 make O=build/config-68k C=build/config-68k.config
 make O=build/config-k30 C=build/config-k30.config
 ```
 
-##### Make a default configuration
+#### Make a default configuration
 
 ```sh
 make olddefconfig
 ```
 
-##### Make a default configuration based on an existing config
+#### Make a default configuration based on an existing config (without opening menuconfig)
 
 ```sh
 make olddefconfig from=config/68k.config
 ```
 
-##### Configure using kconfig inside a docker container
+#### Configure using kconfig inside a docker container
 
 ```sh
 make dockerconfig
 ```
+-OR-
+```sh
+tools/config/configure.sh
+```
+
+
+Booting the Kernel Over Serial
+------------------------------
 
 The `kernel.bin` file contains the complete kernel (and shell, if the option is selected).  The
 `kernel.load` file contains the bin file in a text format that can be sent over serial to the
-monitor program running on a board.  To send it, run:
+monitor program running on a compute-like board.  To send it, run:
 
 ```sh
 python3 tools/load.py build/src/kernel/kernel.load
@@ -150,11 +187,11 @@ make mount-image
 make build-system
 make umount-image
 ```
-Which will produce a 20MB disk image in `minix-build.img` using the `build/image/` directory as the
-mountpoint, and the minixv1 filesystem.  It does not include a partition table, so that needs to be
-created on the flash drive by other means, although there is a crude makefile recipe for inserting
-one into the image that's built, using `make insert-partition-table`.  The image can be written to
-the partition-specific block device file using `dd` on a unix-like desktop.
+Which will produce a 20MB disk image in `minix-build.img` or `ext2-build.img` using the
+`build/image/` directory as the mountpoint.  It does not include a partition table, so that needs to
+be created on the flash drive by other means, although there is a crude makefile recipe for
+inserting one into the image that's built, using `make insert-partition-table`.  The image can be
+written to the partition-specific block device file using `dd` on a unix-like desktop.
 
 ```sh
 dd if=minix-build.img of=/dev/sdXX bs=1M
