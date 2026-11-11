@@ -29,13 +29,13 @@ static struct heap main_heap = { 0, 0, 0, 0 };
 #define kmalloc_page_alloc(size, flags)		page_block_alloc(&kmem_page_block, size, flags)
 #define kmalloc_page_free(ptr, size)		page_block_free(&kmem_page_block, ptr, size)
 
-static struct page_block *kmem_page_block = &pages;
+static struct page_block kmem_page_block = { 0 };
 
 int kernel_heap_set_private_page_block(uintptr_t start, uintptr_t end)
 {
 	int error;
 
-	if (kmem_page_block != &pages) {
+	if (kmem_page_block.total_pages != 0) {
 		log_error("kmem: private page block was already set to %x\n", kmem_page_block);
 		return -1;
 	}
