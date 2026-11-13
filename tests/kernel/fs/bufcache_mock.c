@@ -36,7 +36,7 @@ void sync_bufcache(struct bufcache *cache)
 	log_info("sync_bufcache called\n");
 }
 
-struct buf *get_block(struct bufcache *cache, block_t num)
+struct buf *get_buf(struct bufcache *cache, block_t num)
 {
 	if (num > MAX_TEST_BUFS) {
 		log_error("error: invalid block number %d\n", num);
@@ -47,7 +47,7 @@ struct buf *get_block(struct bufcache *cache, block_t num)
 	return &mock_bufs[num];
 }
 
-int release_block(struct buf *buf, short dirty)
+int unref_buf(struct buf *buf, short dirty)
 {
 	if (--buf->refcount == 0) {
 		log_info("would write back block %d\n", buf->num);
@@ -58,7 +58,7 @@ int release_block(struct buf *buf, short dirty)
 	return 0;
 }
 
-void mark_block_dirty(struct buf *buf)
+void mark_buf_dirty(struct buf *buf)
 {
 	buf->flags |= BF_DIRTY;
 }
