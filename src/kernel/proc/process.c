@@ -174,7 +174,7 @@ int close_proc(struct process *proc)
 	}
 	UNLOCK(saved_status);
 
-	arch_release_task_info(proc);
+	arch_fini_task_info(proc);
 
 	return orphans;
 }

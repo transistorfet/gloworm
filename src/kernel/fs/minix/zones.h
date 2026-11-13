@@ -29,12 +29,12 @@ static zone_t minix_alloc_zone(struct mount *mp)
 	if (!bit)
 		return NULL;
 	bit += super->super_v1.first_zone - 1;
-	buf = get_block(&mp->bufcache, bit);
+	buf = get_buf(&mp->bufcache, bit);
 	if (!buf)
 		return NULL;
 
 	memset(buf->block, 0, MINIX_V1_ZONE_SIZE);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	return bit;
 }
@@ -91,9 +91,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 			zone = &MINIX_DATA(vnode).zones[tiers[0]];
 		} else {
 			if (buf) {
-				release_block(buf, 0);
+				unref_buf(buf, 0);
 			}
-			buf = get_block(&vnode->mp->bufcache, le16toh(*zone));
+			buf = get_buf(&vnode->mp->bufcache, le16toh(*zone));
 			if (!buf)
 				return 0;
 
@@ -104,11 +104,11 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 			if (create) {
 				*zone = htole16(minix_alloc_zone(vnode->mp));
 				if (buf) {
-					mark_block_dirty(buf);
+					mark_buf_dirty(buf);
 				}
 			} else {
 				if (buf)
-					release_block(buf, 0);
+					unref_buf(buf, 0);
 				return 0;
 			}
 		}
@@ -116,7 +116,7 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 
 	ret = (zone_t) le16toh(*zone);
 	if (buf) {
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return ret;
 }
@@ -138,7 +138,7 @@ static void zone_free_all(struct vnode *vnode)
 
 	// Go through the tier 2 zonenum tables and free each
 	if (MINIX_DATA(vnode).zones[8]) {
-		struct buf *buf = get_block(&vnode->mp->bufcache, le16toh(MINIX_DATA(vnode).zones[8]));
+		struct buf *buf = get_buf(&vnode->mp->bufcache, le16toh(MINIX_DATA(vnode).zones[8]));
 		if (buf) {
 			minix_v1_zone_t *entries = buf->block;
 			for (zone_t i = 0; i < MINIX_V1_ZONENUMS_PER_ZONE; i++) {
@@ -146,7 +146,7 @@ static void zone_free_all(struct vnode *vnode)
 					minix_free_zone(vnode->mp, le16toh(entries[i]));
 				}
 			}
-			release_block(buf, 0);
+			unref_buf(buf, 0);
 		}
 	}
 

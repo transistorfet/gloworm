@@ -319,7 +319,7 @@ int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, ui
 		dest_result.table[i] = src_result.table[i] | additional_status;
 		src_result.table[i] |= additional_status;
 		if (!((flags & MMU_FLAG_TYPE) == MMU_TYPE_FIXED) && MMU_TABLE_ADDRESS(src_result.table[i]) != 0) {
-			page_make_ref(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
+			page_ref(MMU_TABLE_ADDRESS(src_result.table[i]), 1 << src_result.bits);
 		}
 		//printk("%08x: %x (%x) [table: %x, i: %d]\n", virtual_addr, MMU_TABLE_ADDRESS(dest_result.table[i]), MMU_TABLE_STATUS(dest_result.table[i]), dest_result.table, i);
 

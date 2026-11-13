@@ -121,11 +121,11 @@ void page_free(physical_address_t ptr, size_t size)
 
 #if defined(CONFIG_MMU)
 
-physical_address_t page_make_ref(physical_address_t ptr, size_t size)
+physical_address_t page_ref(physical_address_t ptr, size_t size)
 {
 	for (int i = 0; i < num_global_blocks; i++) {
 		if (ptr >= global_blocks[i].base && ptr <= global_blocks[i].base + (global_blocks[i].total_pages * PAGE_SIZE)) {
-			page_block_make_ref(&global_blocks[i], ptr, size);
+			page_block_ref(&global_blocks[i], ptr, size);
 		}
 	}
 	return NULL;
@@ -214,7 +214,7 @@ void page_block_free(struct page_block *block, physical_address_t ptr, size_t si
 }
 
 #if defined(CONFIG_MMU)
-physical_address_t page_block_make_ref(struct page_block *block, physical_address_t ptr, size_t size)
+physical_address_t page_block_ref(struct page_block *block, physical_address_t ptr, size_t size)
 {
 	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 

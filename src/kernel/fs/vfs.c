@@ -79,7 +79,7 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 	}
 
 	if (vnode && (vnode->bits & VBF_MOUNTED)) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return EBUSY;
 	}
 
@@ -101,7 +101,7 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 			error = ops->mount(&mountpoints[i], vnode);
 			if (error) {
 				mountpoints[i].dev = 0;
-				vfs_release_vnode(vnode);
+				vfs_unref_vnode(vnode);
 				return error;
 			}
 
@@ -110,7 +110,7 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 			} else {
 				root_fs = &mountpoints[i];
 				if (!mountpoints[i].mount_node && mountpoints[i].root_node)
-					mountpoints[i].mount_node = vfs_clone_vnode(mountpoints[i].root_node);
+					mountpoints[i].mount_node = vfs_ref_vnode(mountpoints[i].root_node);
 			}
 			return 0;
 		}
@@ -150,7 +150,7 @@ int vfs_unmount(device_t dev, uid_t uid)
 		root_fs = NULL;
 	}
 	if (mp->mount_node)
-		vfs_release_vnode(mp->mount_node);
+		vfs_unref_vnode(mp->mount_node);
 	mp->ops = NULL;
 	mp->dev = 0;
 	return 0;
@@ -200,15 +200,15 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 		i += 1;
 	}
 
-	vfs_clone_vnode(cur);
+	vfs_ref_vnode(cur);
 	while (1) {
 		// If a filesystem is mounted on this node, replace the node with the mounted fs root node
 		if (cur->bits & VBF_MOUNTED) {
 			mp = _find_mount_by_vnode(cur);
-			vfs_release_vnode(cur);
+			vfs_unref_vnode(cur);
 			if (!mp)
 				return ENXIO;
-			cur = vfs_clone_vnode(mp->root_node);
+			cur = vfs_ref_vnode(mp->root_node);
 		}
 
 		// If we're at the end of the path, then return successfully with the result
@@ -219,13 +219,13 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 
 		// This is not the last component, so it must be directory in order to continue
 		if (!S_ISDIR(cur->mode)) {
-			vfs_release_vnode(cur);
+			vfs_unref_vnode(cur);
 			return ENOTDIR;
 		}
 
 		// TODO this seems to be wrong according to how linux behaves...
 		if (!verify_mode_access(uid, R_OK, cur->uid, cur->gid, cur->mode)) {
-			vfs_release_vnode(cur);
+			vfs_unref_vnode(cur);
 			return EPERM;
 		}
 
@@ -236,7 +236,7 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 		component[j] = '\0';
 
 		if (j >= NAME_MAX) {
-			vfs_release_vnode(cur);
+			vfs_unref_vnode(cur);
 			return ENAMETOOLONG;
 		}
 
@@ -247,14 +247,14 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 		// If we're at the root of a mounted fs and are accessing "..", then swap the root node for the mounted node before lookup
 		if (cur == cur->mp->root_node && !strcmp(component, "..")) {
 			mp = cur->mp;
-			vfs_release_vnode(cur);
-			cur = vfs_clone_vnode(mp->mount_node);
+			vfs_unref_vnode(cur);
+			cur = vfs_ref_vnode(mp->mount_node);
 		}
 
 		// Call the fs-specific lookup to get the referenced node
 		error = cur->ops->lookup(cur, component, &cur);
 		if (error) {
-			vfs_release_vnode(cur);
+			vfs_unref_vnode(cur);
 			return error;
 		}
 	}
@@ -281,18 +281,18 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 
 	j = size;
 	buf[--j] = '\0';
-	cur = vfs_clone_vnode(cwd);
+	cur = vfs_ref_vnode(cwd);
 	while (cur != root_fs->root_node) {
 		// If the current node is the fs root node, then switch to the vnode that it's mounted on, or else the inode number wont match
 		if (cur == cur->mp->root_node) {
 			mp = cur->mp;
-			vfs_release_vnode(cur);
-			cur = vfs_clone_vnode(mp->mount_node);
+			vfs_unref_vnode(cur);
+			cur = vfs_ref_vnode(mp->mount_node);
 		}
 
 		error = vfs_open(cur, "..", O_RDONLY, 0, uid, &file);
 		if (error) {
-			vfs_release_vnode(cur);
+			vfs_unref_vnode(cur);
 			return error;
 		}
 
@@ -300,7 +300,7 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 			error = vfs_readdir(file, &dir);
 			if (error < 0) {
 				vfs_close(file);
-				vfs_release_vnode(cur);
+				vfs_unref_vnode(cur);
 				return error;
 			} else if (error == 0) {
 				break;
@@ -310,7 +310,7 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 				len = strlen(dir.d_name);
 				if (j - len - 1 < 0) {
 					vfs_close(file);
-					vfs_release_vnode(cur);
+					vfs_unref_vnode(cur);
 					return -1;
 				}
 
@@ -321,12 +321,12 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 			}
 		}
 
-		vfs_release_vnode(cur);
-		cur = vfs_clone_vnode(file->vnode);
+		vfs_unref_vnode(cur);
+		cur = vfs_ref_vnode(file->vnode);
 
 		vfs_close(file);
 	}
-	vfs_release_vnode(cur);
+	vfs_unref_vnode(cur);
 
 	if (buf[j] != '/')
 		buf[--j] = VFS_SEP;
@@ -350,7 +350,7 @@ int vfs_access(struct vnode *cwd, const char *path, int mode, uid_t uid)
 	} else {
 		error = 0;
 	}
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -373,7 +373,7 @@ int vfs_chmod(struct vnode *cwd, const char *path, int mode, uid_t uid)
 
 	vnode->mode = (vnode->mode & ~07777) | (mode & 07777);
 	error = vnode->ops->update(vnode);
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -391,13 +391,13 @@ int vfs_chown(struct vnode *cwd, const char *path, uid_t owner, gid_t group, uid
 	}
 
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return EPERM;
 	}
 	vnode->uid = owner;
 	vnode->gid = group;
 	error = vnode->ops->update(vnode);
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -416,23 +416,23 @@ int vfs_mknod(struct vnode *cwd, const char *path, mode_t mode, device_t dev, ui
 	}
 
 	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return EPERM;
 	}
 
 	const char *filename = path_last_component(path);
 	error = vnode->ops->lookup(vnode, filename, &tmp);
-	vfs_release_vnode(tmp);
+	vfs_unref_vnode(tmp);
 	if (error == 0) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return EEXIST;
 	} else if (error != ENOENT) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return error;
 	}
 
 	error = vnode->ops->mknod(vnode, filename, mode, dev, uid, result);
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -456,7 +456,7 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 
 	error = vfs_lookup(cwd, newpath, VLOOKUP_PARENT_OF, uid, &parent);
 	if (error) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return error;
 	}
 
@@ -468,7 +468,7 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 		error = 0;
 	} else {
 		if (!error)
-			vfs_release_vnode(tmpvnode);
+			vfs_unref_vnode(tmpvnode);
 		error = EEXIST;
 	}
 
@@ -481,14 +481,14 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 		error = EXDEV;
 
 	if (error) {
-		vfs_release_vnode(vnode);
-		vfs_release_vnode(parent);
+		vfs_unref_vnode(vnode);
+		vfs_unref_vnode(parent);
 		return error;
 	}
 
 	error = parent->ops->link(vnode, parent, filename);
-	vfs_release_vnode(parent);
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(parent);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -509,7 +509,7 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 
 	// Verify that parent directory is writable
 	if (!verify_mode_access(uid, W_OK, parent->uid, parent->gid, parent->mode)) {
-		vfs_release_vnode(parent);
+		vfs_unref_vnode(parent);
 		return EACCES;
 	}
 
@@ -517,7 +517,7 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	filename = path_last_component(path);
 	error = parent->ops->lookup(parent, filename, &vnode);
 	if (error) {
-		vfs_release_vnode(parent);
+		vfs_unref_vnode(parent);
 		return error;
 	}
 
@@ -527,12 +527,12 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	}
 
 	if (!error) {
-		// unlink does not take ownership of vnode and must not call vfs_release_vnode
+		// unlink does not take ownership of vnode and must not call vfs_unref_vnode
 		error = parent->ops->unlink(parent, vnode, filename);
 	}
 
-	vfs_release_vnode(parent);
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(parent);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -552,7 +552,7 @@ static inline int _rename_find_parent(struct vnode *cwd, const char *path, uid_t
 
 	// Verify that the parent directory of the old location is writable and searchable
 	if (!verify_mode_access(uid, W_OK | X_OK, vnode->uid, vnode->gid, vnode->mode)) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return EACCES;
 	}
 
@@ -581,7 +581,7 @@ int vfs_rename(struct vnode *cwd, const char *oldpath, const char *newpath, uid_
 
 	error = _rename_find_parent(cwd, newpath, uid, &newparent);
 	if (error) {
-		vfs_release_vnode(oldparent);
+		vfs_unref_vnode(oldparent);
 		return error;
 	}
 
@@ -589,15 +589,15 @@ int vfs_rename(struct vnode *cwd, const char *oldpath, const char *newpath, uid_
 
 	error = oldparent->ops->lookup(oldparent, oldname, &vnode);
 	if (error) {
-		vfs_release_vnode(oldparent);
-		vfs_release_vnode(newparent);
+		vfs_unref_vnode(oldparent);
+		vfs_unref_vnode(newparent);
 		return error;
 	}
 
 	error = vnode->ops->rename(vnode, oldparent, oldname, newparent, newname);
-	vfs_release_vnode(oldparent);
-	vfs_release_vnode(newparent);
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(oldparent);
+	vfs_unref_vnode(newparent);
+	vfs_unref_vnode(vnode);
 	return error;
 }
 
@@ -620,7 +620,7 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 	if (flags & O_CREAT) {
 		const char *filename = path_last_component(path);
 		if (!path_valid_component(filename)) {
-			vfs_release_vnode(vnode);
+			vfs_unref_vnode(vnode);
 			return EINVAL;
 		}
 
@@ -632,15 +632,15 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 
 			// Verify that parent directory is writable
 			if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
-				vfs_release_vnode(vnode);
+				vfs_unref_vnode(vnode);
 				return EPERM;
 			}
 
 			struct vnode *parent = vnode;
 			error = parent->ops->create(parent, filename, mode, uid, &vnode);
-			vfs_release_vnode(parent);
+			vfs_unref_vnode(parent);
 			if (error) {
-				vfs_release_vnode(vnode);
+				vfs_unref_vnode(vnode);
 				return error;
 			}
 		}
@@ -652,7 +652,7 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 	if ((flags & O_ACCMODE) != O_RDONLY)
 		required_mode |= W_OK;
 	if (!verify_mode_access(uid, required_mode, vnode->uid, vnode->gid, vnode->mode)) {
-		vfs_release_vnode(vnode);
+		vfs_unref_vnode(vnode);
 		return EPERM;
 	}
 
@@ -723,12 +723,12 @@ int vfs_readdir(struct vfile *file, struct dirent *dir)
 	return file->ops->readdir(file, dir);
 }
 
-struct vfile *vfs_clone_fileptr(struct vfile *file)
+struct vfile *vfs_ref_fileptr(struct vfile *file)
 {
 	return dup_fileptr(file);
 }
 
-int vfs_release_vnode(struct vnode *vnode)
+int vfs_unref_vnode(struct vnode *vnode)
 {
 	if (!vnode)
 		return 0;

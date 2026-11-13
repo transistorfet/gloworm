@@ -104,7 +104,7 @@ int procfs_mount(struct mount *mp, struct vnode *parent)
 
 int procfs_unmount(struct mount *mp)
 {
-	vfs_release_vnode(mp->root_node);
+	vfs_unref_vnode(mp->root_node);
 	return 0;
 }
 
@@ -138,7 +138,7 @@ int procfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resu
 	}
 
 	if (*result) {
-		vfs_release_vnode(*result);
+		vfs_unref_vnode(*result);
 	}
 	*result = _find_vnode(pid, filenum, S_IFDIR | 0755, vnode->mp);
 	return 0;
@@ -284,7 +284,7 @@ static struct vnode *_find_vnode(pid_t pid, procfs_filenum_t filenum, mode_t mod
 {
 	for (short i = 0; i < MAX_VNODES; i++) {
 		if (vnode_table[i].vn.refcount > 0 && PROCFS_DATA(&vnode_table[i]).pid == pid && PROCFS_DATA(&vnode_table[i]).filenum == filenum) {
-			return vfs_clone_vnode(&vnode_table[i].vn);
+			return vfs_ref_vnode(&vnode_table[i].vn);
 		}
 	}
 	return _alloc_vnode(pid, filenum, mode, mp);

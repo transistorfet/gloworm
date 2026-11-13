@@ -14,7 +14,7 @@ struct fd_table {
 struct fd_table *alloc_fd_table(void);
 void free_fd_table(struct fd_table *table);
 void init_fd_table(struct fd_table *table);
-void release_fd_table(struct fd_table *table);
+void clear_fd_table(struct fd_table *table);
 void dup_fd_table(struct fd_table *dest, struct fd_table *source, int limit);
 
 int find_unused_fd(struct fd_table *table);
@@ -23,7 +23,7 @@ void set_fd(struct fd_table *table, int fd, struct vfile *file);
 void dup_fd(struct fd_table *table, int fd, struct vfile *file);
 void free_fd(struct fd_table *table, int fd);
 
-static inline struct fd_table *make_ref_fd_table(struct fd_table *table)
+static inline struct fd_table *ref_fd_table(struct fd_table *table)
 {
 	table->refcount++;
 	return table;

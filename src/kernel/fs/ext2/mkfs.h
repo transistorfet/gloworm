@@ -134,7 +134,7 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 
 		// Zero the inode table
 		for (int i = 0; i < inode_table_blocks; i++) {
-			struct buf *inode_buf = get_block(&mp.bufcache, groups[group].inode_table + i);
+			struct buf *inode_buf = get_buf(&mp.bufcache, groups[group].inode_table + i);
 			if (!inode_buf) {
 				error = EIO;
 				goto fail;
@@ -149,7 +149,7 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 					state = BF_DIRTY;
 				}
 			}
-			release_block(inode_buf, state);
+			unref_buf(inode_buf, state);
 		}
 	}
 
@@ -186,10 +186,10 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	// Clear the first few blocks in cache before syncing the superblock
 	for (int i = 0; i < 1 + group_descriptor_blocks; i++) {
-		struct buf *buf = get_block(&mp.bufcache, i);
+		struct buf *buf = get_buf(&mp.bufcache, i);
 		if (buf) {
 			memset(buf->block, 0, block_size);
-			release_block(buf, BF_DIRTY);
+			unref_buf(buf, BF_DIRTY);
 		}
 	}
 

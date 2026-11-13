@@ -40,7 +40,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 		parent = vnode->mp->root_node;
 
 	block = ext2_alloc_block(vnode->mp);
-	buf = get_block(&vnode->mp->bufcache, block);
+	buf = get_buf(&vnode->mp->bufcache, block);
 	if (!buf)
 		return 0;
 	data = buf->block;
@@ -60,7 +60,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	current_entry->name_len = 2;
 	memcpy(EXT2_DIRENT_FILENAME(current_entry), "..", current_entry->name_len);
 
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	// Increment the link count for the parent directory
 	parent->nlinks += 1;
@@ -83,7 +83,7 @@ static short dir_is_empty(struct vnode *vnode)
 	const int block_size = vnode->mp->block_size;
 
 	for (ext2_block_t znum = 0; (block = block_lookup(vnode, znum, EXT2_AF_LOOKUP_BLOCK)) != 0; znum++) {
-		buf = get_block(&vnode->mp->bufcache, block);
+		buf = get_buf(&vnode->mp->bufcache, block);
 		if (!buf)
 			return EIO;
 		data = buf->block;
@@ -92,11 +92,11 @@ static short dir_is_empty(struct vnode *vnode)
 			if (current_entry->inode
 			    && !(current_entry->name_len == 1 && !strcmp(EXT2_DIRENT_FILENAME(current_entry), "."))
 			    && !(current_entry->name_len == 2 && !strcmp(EXT2_DIRENT_FILENAME(current_entry), ".."))) {
-				release_block(buf, 0);
+				unref_buf(buf, 0);
 				return 0;
 			}
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return 1;
 }
@@ -111,7 +111,7 @@ static struct ext2_dirent *dir_find_entry_by_name(struct vnode *dir, const char 
 	const uint8_t filename_len = strlen(filename);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, create)) != 0; znum++) {
-		buf = get_block(&dir->mp->bufcache, block);
+		buf = get_buf(&dir->mp->bufcache, block);
 		if (!buf)
 			return NULL;
 		data = buf->block;
@@ -122,7 +122,7 @@ static struct ext2_dirent *dir_find_entry_by_name(struct vnode *dir, const char 
 				return current_entry;
 			}
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return NULL;
 }
@@ -137,7 +137,7 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 	const short new_entry_len = align_up(sizeof(struct ext2_dirent) + filename_len, 4);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, EXT2_AF_CREATE_BLOCK)) != 0; znum++) {
-		buf = get_block(&dir->mp->bufcache, block);
+		buf = get_buf(&dir->mp->bufcache, block);
 		if (!buf)
 			return NULL;
 		data = buf->block;
@@ -170,7 +170,7 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 				return current_entry;
 			}
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return NULL;
 }
@@ -203,7 +203,7 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 	const uint8_t filename_len = strlen(filename);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(parent, znum, EXT2_AF_LOOKUP_BLOCK)) != 0; znum++) {
-		buf = get_block(&parent->mp->bufcache, block);
+		buf = get_buf(&parent->mp->bufcache, block);
 		if (!buf)
 			return ENOENT;
 		data = buf->block;
@@ -216,7 +216,7 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 					// If there's a previous entry, merge the deleted entry into that one
 					prev->entry_len += cur->entry_len;
 				}
-				release_block(buf, BF_DIRTY);
+				unref_buf(buf, BF_DIRTY);
 
 				if (S_ISDIR(vnode->mode)) {
 					parent->nlinks -= 1;
@@ -226,7 +226,7 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 			}
 			prev = cur;
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return ENOENT;
 }

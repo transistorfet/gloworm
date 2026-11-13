@@ -73,7 +73,7 @@ int init_pages(physical_address_t start, size_t size, uint32_t flags);
 physical_address_t page_alloc(size_t size, uint32_t flags);
 void page_free(physical_address_t ptr, size_t size);
 #if defined(CONFIG_MMU)
-physical_address_t page_make_ref(physical_address_t ptr, size_t size);
+physical_address_t page_ref(physical_address_t ptr, size_t size);
 int page_get_ref_single(physical_address_t ptr);
 #endif
 
@@ -82,7 +82,7 @@ int init_page_block(struct page_block *block, physical_address_t addr, size_t si
 physical_address_t page_block_alloc(struct page_block *block, size_t size);
 void page_block_free(struct page_block *block, physical_address_t ptr, size_t size);
 #if defined(CONFIG_MMU)
-physical_address_t page_block_make_ref(struct page_block *block, physical_address_t ptr, size_t size);
+physical_address_t page_block_ref(struct page_block *block, physical_address_t ptr, size_t size);
 int page_block_get_ref_single(struct page_block *block, physical_address_t ptr);
 #endif
 

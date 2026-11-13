@@ -20,7 +20,7 @@ static int nodes_in_cache;
 static struct queue cache;
 extern struct vnode_ops ext2_vnode_ops;
 
-static void release_unused_vnodes(void);
+static void free_unused_vnodes(void);
 
 static void init_ext2_vnodes(void)
 {
@@ -45,7 +45,7 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 	int error;
 	struct vnode *vnode;
 
-	release_unused_vnodes();
+	free_unused_vnodes();
 
 	// TODO this should recycle a cached vnode if it doesn't have a reference and there are more than a certain number of vnodes already loaded
 	//entry = _find_free_entry();
@@ -81,7 +81,7 @@ static struct vnode *get_vnode(struct mount *mp, inode_t ino)
 		//printk("S:%x;%d;%d\n", vnode, vnode->mp->dev, vnode->ino);
 		if (vnode->mp->dev == mp->dev && vnode->ino == ino) {
 			//printk("G:%x;%d;%d\n", vnode, mp->dev, ino);
-			vfs_clone_vnode(vnode);
+			vfs_ref_vnode(vnode);
 
 			// Move to the front of the cache list
 			_queue_remove(&cache, &EXT2_DATA(vnode).node);
@@ -123,7 +123,7 @@ static int delete_vnode(struct vnode *vnode)
 	return 0;
 }
 
-static int release_vnode(struct vnode *vnode)
+static int free_vnode(struct vnode *vnode)
 {
 	if (vnode->ino && vnode->bits & VBF_DIRTY) {
 		write_inode(vnode, vnode->ino);
@@ -134,7 +134,7 @@ static int release_vnode(struct vnode *vnode)
 	return 0;
 }
 
-static void release_unused_vnodes(void)
+static void free_unused_vnodes(void)
 {
 	struct queue_node *last;
 
@@ -143,7 +143,7 @@ static void release_unused_vnodes(void)
 		if (!last || EXT2_QUEUE_NODE_TO_VNODE(last)->refcount > 0) {
 			break;
 		}
-		release_vnode(EXT2_QUEUE_NODE_TO_VNODE(last));
+		free_vnode(EXT2_QUEUE_NODE_TO_VNODE(last));
 	}
 }
 

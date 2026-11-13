@@ -18,7 +18,7 @@ struct socket {
 
 
 int net_socket_create(int domain, int type, int protocol, uid_t uid, struct vfile **file);
-int net_socket_release_vnode(struct vnode *vnode);
+int net_socket_unref_vnode(struct vnode *vnode);
 int net_socket_close(struct vfile *file);
 int net_socket_read(struct vfile *file, struct iovec_iter *iter);
 int net_socket_write(struct vfile *file, struct iovec_iter *iter);

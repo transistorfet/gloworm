@@ -106,7 +106,7 @@ int load_flat_binary(struct vfile *file, struct memory_map *map, void **entry)
 	#else
 
 	struct memory_region *object = NULL;
-	object = memory_region_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
+	object = memory_region_alloc_user_memory(mem_size, vfs_ref_fileptr(file));
 	if (!object) {
 		goto fail;
 	}
@@ -221,7 +221,7 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	#else
 
 	struct memory_region *object = NULL;
-	object = memory_region_alloc_user_memory(mem_size, vfs_clone_fileptr(file));
+	object = memory_region_alloc_user_memory(mem_size, vfs_ref_fileptr(file));
 	if (!object) {
 		error = ENOMEM;
 		goto fail;

@@ -46,12 +46,12 @@ static ext2_block_t ext2_alloc_block(struct mount *mp)
 
 	const ext2_block_t blocknum = (super->super.inodes_per_group * group) + bit;
 
-	buf = get_block(&mp->bufcache, blocknum);
+	buf = get_buf(&mp->bufcache, blocknum);
 	if (!buf)
 		return NULL;
 
 	memset(buf->block, 0, block_size);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	return blocknum;
 }
@@ -122,8 +122,8 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 			block = &EXT2_DATA(vnode).blocks[tiers[0]];
 		} else {
 			if (buf)
-				release_block(buf, 0);
-			buf = get_block(&vnode->mp->bufcache, le32toh(*block));
+				unref_buf(buf, 0);
+			buf = get_buf(&vnode->mp->bufcache, le32toh(*block));
 			if (!buf)
 				return 0;
 
@@ -134,11 +134,11 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 			if (create) {
 				*block = htole32(ext2_alloc_block(vnode->mp));
 				if (buf) {
-					mark_block_dirty(buf);
+					mark_buf_dirty(buf);
 				}
 			} else {
 				if (buf)
-					release_block(buf, 0);
+					unref_buf(buf, 0);
 				return 0;
 			}
 		}
@@ -146,7 +146,7 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 
 	ret = (ext2_block_t) le32toh(*block);
 	if (buf)
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	return ret;
 }
 
@@ -155,7 +155,7 @@ static void block_free_table(struct mount *mp, ext2_block_t blocknum, uint8_t le
 	if (!blocknum)
 		return;
 
-	struct buf *buf = get_block(&mp->bufcache, blocknum);
+	struct buf *buf = get_buf(&mp->bufcache, blocknum);
 	if (buf)
 		return;
 
@@ -176,7 +176,7 @@ static void block_free_table(struct mount *mp, ext2_block_t blocknum, uint8_t le
 		}
 	}
 
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	ext2_free_block(mp, blocknum);
 

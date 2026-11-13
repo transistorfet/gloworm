@@ -42,7 +42,7 @@ struct vnode_ops sock_vnode_ops = {
 	nop_rename,
 	nop_truncate,
 	nop_update,
-	net_socket_release_vnode,
+	net_socket_unref_vnode,
 };
 
 
@@ -78,7 +78,7 @@ int net_socket_create(int domain, int type, int protocol, uid_t uid, struct vfil
 	return 0;
 }
 
-int net_socket_release_vnode(struct vnode *vnode)
+int net_socket_unref_vnode(struct vnode *vnode)
 {
 	struct socket *sock = SOCKET(vnode);
 

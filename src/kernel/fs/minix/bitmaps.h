@@ -25,7 +25,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 
 	// Set only num_entries bits as free, and the rest of the block as reserved (unallocatable)
 	for (short i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
-		buf = get_block(bufcache, i);
+		buf = get_buf(bufcache, i);
 		if (!buf)
 			return -1;
 		block = buf->block;
@@ -48,10 +48,10 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 		}
 		num_entries -= MINIX_V1_BITS_PER_ZONE;
 
-		release_block(buf, BF_DIRTY);
+		unref_buf(buf, BF_DIRTY);
 	}
 
-	buf = get_block(bufcache, bitmap_start);
+	buf = get_buf(bufcache, bitmap_start);
 	if (!buf)
 		return -1;
 	block = buf->block;
@@ -63,7 +63,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 	}
 	block[i] = bit_mask(reserve & 0x7);
 
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 	return 0;
 }
 
@@ -75,7 +75,7 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 	struct buf *buf;
 
 	for (; zone < bitmap_size; zone++) {
-		buf = get_block(bufcache, bitmap_start + zone);
+		buf = get_buf(bufcache, bitmap_start + zone);
 		if (!buf)
 			return 0;
 		block = buf->block;
@@ -85,12 +85,12 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 			if ((char) ~block[i]) {
 				for (bit = 0; bit < 8 && ((0x01 << bit) & block[i]); bit++) { }
 				block[i] |= (0x01 << bit);
-				release_block(buf, BF_DIRTY);
+				unref_buf(buf, BF_DIRTY);
 				return bit + (i * 8) + (zone * MINIX_V1_ZONE_SIZE * 8);
 			}
 		}
 
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 
 	return 0;
@@ -101,13 +101,13 @@ static inline int bit_free(struct bufcache *bufcache, zone_t bitmap_start, bitnu
 	zone_t zone = (bitnum >> 3) / MINIX_V1_ZONE_SIZE;
 	int i = (bitnum >> 3);
 	char bit = (bitnum & 0x7);
-	struct buf *buf = get_block(bufcache, bitmap_start + zone);
+	struct buf *buf = get_buf(bufcache, bitmap_start + zone);
 	if (!buf)
 		return -1;
 	char *block = buf->block;
 
 	block[i] &= ~(0x01 << bit);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 	return 0;
 }
 

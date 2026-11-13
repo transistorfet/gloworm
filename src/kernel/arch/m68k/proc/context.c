@@ -93,7 +93,7 @@ int arch_init_task_info(struct process *proc)
 	return 0;
 }
 
-int arch_release_task_info(struct process *proc)
+int arch_fini_task_info(struct process *proc)
 {
 	#if defined(CONFIG_M68K_USER_MODE)
 

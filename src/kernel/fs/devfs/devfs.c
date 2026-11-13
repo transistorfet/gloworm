@@ -100,7 +100,7 @@ int devfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 	for (short i = 0; i < DEVFS_DIRENT_MAX; i++) {
 		if (devices[i].vnode && !strcmp(filename, devices[i].name)) {
 			if (*result)
-				vfs_release_vnode(*result);
+				vfs_unref_vnode(*result);
 			*result = devices[i].vnode;
 			return 0;
 		}

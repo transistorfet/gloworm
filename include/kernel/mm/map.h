@@ -116,12 +116,12 @@ struct memory_map {
 #if defined(CONFIG_MMU)
 #define MEMORY_OBJECT_T				struct vfile
 #define MEMORY_OBJECT_ACCESS(cur)		((cur)->file)
-#define MEMORY_OBJECT_MAKE_REF(object)		((object) ? vfs_clone_fileptr((object)) : NULL)
+#define MEMORY_OBJECT_MAKE_REF(object)		((object) ? vfs_ref_fileptr((object)) : NULL)
 #define MEMORY_OBJECT_FREE(object)		vfs_close((object))
 #else
 #define MEMORY_OBJECT_T				struct memory_region
 #define MEMORY_OBJECT_ACCESS(cur)		((cur)->region)
-#define MEMORY_OBJECT_MAKE_REF(object)		((object) ? memory_region_make_ref((object)) : NULL)
+#define MEMORY_OBJECT_MAKE_REF(object)		((object) ? memory_region_ref((object)) : NULL)
 #define MEMORY_OBJECT_FREE(object)		memory_region_free((object))
 #endif
 
@@ -137,7 +137,7 @@ void memory_region_free(struct memory_region *region);
 
 struct memory_map *memory_map_alloc(void);
 void memory_map_free(struct memory_map *map);
-static inline struct memory_map *memory_map_make_ref(struct memory_map *map);
+static inline struct memory_map *memory_map_ref(struct memory_map *map);
 
 int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset);
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
@@ -160,14 +160,14 @@ static inline int memory_map_reset_sbrk(struct memory_map *map)
 	return memory_map_move_sbrk(map, -1 * (map->sbrk - map->heap_start));
 }
 
-static inline struct memory_map *memory_map_make_ref(struct memory_map *map)
+static inline struct memory_map *memory_map_ref(struct memory_map *map)
 {
 	map->refcount++;
 	return map;
 }
 
 #if !defined(CONFIG_MMU)
-static inline struct memory_region *memory_region_make_ref(struct memory_region *region)
+static inline struct memory_region *memory_region_ref(struct memory_region *region)
 {
 	region->refcount++;
 	return region;

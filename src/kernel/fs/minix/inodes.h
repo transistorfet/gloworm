@@ -27,7 +27,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 
 	short inode_offset = (inode_num - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (inode_num - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
-	inode_buf = get_block(&mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
+	inode_buf = get_buf(&mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
 	if (!inode_buf)
 		return ENOMEM;
 
@@ -45,7 +45,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 		inode_table[inode_offset].zones[0] = htole16(rdev);
 	}
 
-	release_block(inode_buf, BF_DIRTY);
+	unref_buf(inode_buf, BF_DIRTY);
 
 	return inode_num;
 }
@@ -65,7 +65,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 
 	short inode_offset = (ino - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (ino - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
-	inode_buf = get_block(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
+	inode_buf = get_buf(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
 	if (!inode_buf)
 		return ENOMEM;
 
@@ -85,7 +85,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	vnode->bits &= ~VBF_DIRTY;
-	release_block(inode_buf, 0);
+	unref_buf(inode_buf, 0);
 	return 0;
 }
 
@@ -98,7 +98,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	super = MINIX_SUPER(vnode->mp->super);
 	short inode_offset = (ino - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (ino - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
-	inode_buf = get_block(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
+	inode_buf = get_buf(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
 	if (!inode_buf)
 		return ENOMEM;
 
@@ -118,7 +118,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	vnode->bits &= ~VBF_DIRTY;
-	release_block(inode_buf, BF_DIRTY);
+	unref_buf(inode_buf, BF_DIRTY);
 	return 0;
 }
 

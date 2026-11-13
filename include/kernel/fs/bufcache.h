@@ -38,8 +38,8 @@ struct buf {
 void init_bufcache(struct bufcache *cache, device_t dev, int block_size);
 void free_bufcache(struct bufcache *cache);
 void sync_bufcache(struct bufcache *cache);
-struct buf *get_block(struct bufcache *cache, block_t num);
-int release_block(struct buf *buf, short dirty);
-void mark_block_dirty(struct buf *buf);
+struct buf *get_buf(struct bufcache *cache, block_t num);
+int unref_buf(struct buf *buf, short dirty);
+void mark_buf_dirty(struct buf *buf);
 
 #endif

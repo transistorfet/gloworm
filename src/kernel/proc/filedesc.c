@@ -22,7 +22,7 @@ void free_fd_table(struct fd_table *table)
 	if (table->refcount < 0) {
 		log_warning("warning: double free of fd table, %x\n", table);
 	} else if (table->refcount == 0) {
-		release_fd_table(table);
+		clear_fd_table(table);
 		kmfree(table);
 	}
 }
@@ -41,7 +41,7 @@ void init_fd_table(struct fd_table *table)
 /// Close all open files
 ///
 /// All files will be closed.  Called when a process exits
-void release_fd_table(struct fd_table *table)
+void clear_fd_table(struct fd_table *table)
 {
 	for (short i = 0; i < OPEN_MAX; i++) {
 		if (table->files[i]) {
@@ -59,8 +59,7 @@ void dup_fd_table(struct fd_table *dest, struct fd_table *source, int limit)
 
 	for (short i = 0; i <= limit; i++) {
 		if (source->files[i]) {
-			// TODO this needs to be replaced with a new vfs_duplicate() function
-			dest->files[i] = vfs_clone_fileptr(source->files[i]);
+			dest->files[i] = vfs_ref_fileptr(source->files[i]);
 		}
 	}
 }
@@ -96,7 +95,7 @@ void dup_fd(struct fd_table *table, int fd, struct vfile *file)
 	if (fd >= OPEN_MAX) {
 		return;
 	}
-	table->files[fd] = vfs_clone_fileptr(file);
+	table->files[fd] = vfs_ref_fileptr(file);
 }
 
 void free_fd(struct fd_table *table, int fd)

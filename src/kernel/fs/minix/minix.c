@@ -95,7 +95,7 @@ int minix_mount(struct mount *mp, struct vnode *parent)
 int minix_unmount(struct mount *mp)
 {
 	free_superblock((struct minix_super *) mp->super);
-	vfs_release_vnode(mp->root_node);
+	vfs_unref_vnode(mp->root_node);
 	mp->root_node = NULL;
 	return 0;
 }
@@ -124,18 +124,18 @@ int minix_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t u
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, 0);
 	if (!newnode) {
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 		return ENOMEM;
 	}
 
 	if (S_ISDIR(mode) && !dir_setup(newnode, vnode)) {
-		vfs_release_vnode(newnode);
-		release_block(buf, 0);
+		vfs_unref_vnode(newnode);
+		unref_buf(buf, 0);
 		return ENOMEM;
 	}
 
 	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	// TODO need to adjust the size of the directory size
 
@@ -160,12 +160,12 @@ int minix_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, dev);
 	if (!newnode) {
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 		return ENOVNODE;
 	}
 
 	dir->inode = htole16((minix_v1_inode_t) newnode->ino);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
@@ -184,9 +184,9 @@ int minix_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 		return ENOENT;
 
 	if (*result)
-		vfs_release_vnode(*result);
+		vfs_unref_vnode(*result);
 	*result = (struct vnode *) get_vnode(vnode->mp, le16toh(entry->inode));
-	release_block(buf, 0);
+	unref_buf(buf, 0);
 	return 0;
 }
 
@@ -204,7 +204,7 @@ int minix_link(struct vnode *oldvnode, struct vnode *newparent, const char *file
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole16((minix_v1_inode_t) oldvnode->ino);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
 	return 0;
@@ -223,7 +223,7 @@ int minix_unlink(struct vnode *parent, struct vnode *vnode, const char *filename
 		return ENOENT;
 
 	dir->inode = htole16(0);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	vnode->nlinks -= 1;
 	if (vnode->nlinks <= 0) {
@@ -243,7 +243,7 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 	newdir = dir_find_entry_by_name(newparent, newname, MFS_LOOKUP_ZONE, &newbuf);
 	if (newdir) {
 		// TODO delete existing file instead of error??
-		release_block(newbuf, 0);
+		unref_buf(newbuf, 0);
 		return EEXIST;
 	} else {
 		newdir = dir_alloc_entry(newparent, newname, &newbuf);
@@ -253,14 +253,14 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 
 	olddir = dir_find_entry_by_name(oldparent, oldname, MFS_LOOKUP_ZONE, &oldbuf);
 	if (!olddir) {
-		release_block(newbuf, 0);
+		unref_buf(newbuf, 0);
 		return ENOENT;
 	}
 
 	newdir->inode = htole16((minix_v1_inode_t) vnode->ino);
 	olddir->inode = htole16(0);
-	release_block(newbuf, BF_DIRTY);
-	release_block(oldbuf, BF_DIRTY);
+	unref_buf(newbuf, BF_DIRTY);
+	unref_buf(oldbuf, BF_DIRTY);
 	vfs_update_time(oldparent, MTIME);
 	vfs_update_time(newparent, MTIME);
 	return 0;
@@ -285,9 +285,9 @@ int minix_update(struct vnode *vnode)
 
 int minix_release(struct vnode *vnode)
 {
-	// NOTE we only free vnodes who's inode has been deleted.  The vnode cache will release other vnodes when they are pushed out by newer nodes
+	// NOTE we only free vnodes who's inode has been deleted.  The vnode cache will free other vnodes when they are pushed out by newer nodes
 	if (vnode->ino == 0) {
-		release_vnode(vnode);
+		free_vnode(vnode);
 	} else if (vnode->bits & VBF_DIRTY) {
 		write_inode(vnode, vnode->ino);
 	}
@@ -329,7 +329,7 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 		zone = zone_lookup(file->vnode, znum, MFS_LOOKUP_ZONE);
 		if (!zone)
 			break;
-		buf = get_block(&file->vnode->mp->bufcache, zone);
+		buf = get_buf(&file->vnode->mp->bufcache, zone);
 		if (!buf)
 			break;
 
@@ -339,7 +339,7 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 		}
 
 		memcpy_into_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -375,7 +375,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 			error = ENOSPC;
 			break;
 		}
-		buf = get_block(&file->vnode->mp->bufcache, zone);
+		buf = get_buf(&file->vnode->mp->bufcache, zone);
 		if (!buf) {
 			error = EIO;
 			break;
@@ -387,7 +387,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 		}
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, BF_DIRTY);
+		unref_buf(buf, BF_DIRTY);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -457,7 +457,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 		zone = zone_lookup(file->vnode, znum, MFS_LOOKUP_ZONE);
 		if (!zone)
 			return 0;
-		buf = get_block(&file->vnode->mp->bufcache, zone);
+		buf = get_buf(&file->vnode->mp->bufcache, zone);
 		if (!buf)
 			return EIO;
 		entries = (struct minix_v1_dirent *) buf->block;
@@ -468,7 +468,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 		if (entries[zpos].inode != 0)
 			break;
 
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 		znum++;
 	}
 
@@ -479,7 +479,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 	dir->d_ino = le16toh(entries[zpos].inode);
 	strncpy(dir->d_name, entries[zpos].filename, max);
 	dir->d_name[max - 1] = '\0';
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	return 1;
 }

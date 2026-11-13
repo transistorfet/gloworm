@@ -77,7 +77,7 @@ struct vnode_ops {
 
 	int (*create)(struct vnode *vnode, const char *filename, mode_t mode, uid_t uid, struct vnode **result);
 	int (*mknod)(struct vnode *vnode, const char *filename, mode_t mode, device_t dev, uid_t uid, struct vnode **result);
-	// NOTE lookup must call vfs_release_vnode on the existing *result vnode if it is non-NULL.  This makes it easier to swap vnode references when resolving paths
+	// NOTE lookup must call vfs_unref_vnode on the existing *result vnode if it is non-NULL.  This makes it easier to swap vnode references when resolving paths
 	int (*lookup)(struct vnode *vnode, const char *filename, struct vnode **result);
 	int (*link)(struct vnode *oldvnode, struct vnode *newparent, const char *filename);
 	int (*unlink)(struct vnode *parent, struct vnode *vnode, const char *filename);
@@ -171,7 +171,7 @@ int vfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter,
 int vfs_poll(struct vfile *file, int events);
 offset_t vfs_seek(struct vfile *file, offset_t position, int whence);
 int vfs_readdir(struct vfile *file, struct dirent *dir);
-struct vfile *vfs_clone_fileptr(struct vfile *file);
+struct vfile *vfs_ref_fileptr(struct vfile *file);
 
 int vfs_create_pipe(struct vfile **rfile, struct vfile **wfile);
 
@@ -211,13 +211,13 @@ static inline void vfs_init_vnode(
 	vnode->ctime = ctime;
 }
 
-static inline struct vnode *vfs_clone_vnode(struct vnode *vnode)
+static inline struct vnode *vfs_ref_vnode(struct vnode *vnode)
 {
 	vnode->refcount++;
 	return vnode;
 }
 
-int vfs_release_vnode(struct vnode *vnode);
+int vfs_unref_vnode(struct vnode *vnode);
 
 static inline void vfs_update_time(struct vnode *vnode, char update)
 {

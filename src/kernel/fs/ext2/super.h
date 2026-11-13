@@ -137,12 +137,12 @@ static int load_superblock(struct mount *mp)
 	for (int group = 0; group < num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
 		if (offset >= mp->block_size) {
 			if (buf) {
-				release_block(buf, 0);
+				unref_buf(buf, 0);
 			}
 
 			offset = 0;
 			descriptor_block_num += 1;
-			buf = get_block(&mp->bufcache, descriptor_block_num);
+			buf = get_buf(&mp->bufcache, descriptor_block_num);
 			if (!buf) {
 				goto fail;
 			}
@@ -158,7 +158,7 @@ static int load_superblock(struct mount *mp)
 
 	}
 	if (buf) {
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 
 	// TODO run some integrity checks on the groups
@@ -183,7 +183,7 @@ static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 {
 	struct buf *buf = NULL;
 
-	buf = get_block(bufcache, super->super.superblock_block);
+	buf = get_buf(bufcache, super->super.superblock_block);
 	if (!buf) {
 		// TODO what do if error?
 		return EIO;
@@ -200,12 +200,12 @@ static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 	for (int group = 0; group < super->num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
 		if (offset >= bufcache->block_size) {
 			if (buf) {
-				release_block(buf, BF_DIRTY);
+				unref_buf(buf, BF_DIRTY);
 			}
 
 			offset = 0;
 			descriptor_block_num += 1;
-			buf = get_block(bufcache, descriptor_block_num);
+			buf = get_buf(bufcache, descriptor_block_num);
 			if (!buf) {
 				// TODO what do if error?
 				return EIO;
@@ -221,7 +221,7 @@ static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 		group_on_disk->used_dirs_count = htole16(super->groups[group].used_dirs_count);
 	}
 	if (buf) {
-		release_block(buf, BF_DIRTY);
+		unref_buf(buf, BF_DIRTY);
 	}
 	return 0;
 }

@@ -96,7 +96,7 @@ int ext2_mount(struct mount *mp, struct vnode *parent)
 int ext2_unmount(struct mount *mp)
 {
 	free_superblock((struct ext2_super *) mp->super);
-	vfs_release_vnode(mp->root_node);
+	vfs_unref_vnode(mp->root_node);
 	mp->root_node = NULL;
 	return 0;
 }
@@ -138,16 +138,16 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 	dir_set_filetype(dir, mode);
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
 
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
 
 fail:
 	if (newnode)
-		vfs_release_vnode(newnode);
+		vfs_unref_vnode(newnode);
 	if (buf)
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	return ENOMEM;
 }
 
@@ -168,14 +168,14 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, dev);
 	if (!newnode) {
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 		return ENOVNODE;
 	}
 
 	dir->inode = htole32((ext2_inode_t) newnode->ino);
 	dir_set_filetype(dir, mode);
 
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	*result = newnode;
 	return 0;
@@ -194,9 +194,9 @@ int ext2_lookup(struct vnode *vnode, const char *filename, struct vnode **result
 		return ENOENT;
 
 	if (*result)
-		vfs_release_vnode(*result);
+		vfs_unref_vnode(*result);
 	*result = (struct vnode *) get_vnode(vnode->mp, le32toh(entry->inode));
-	release_block(buf, 0);
+	unref_buf(buf, 0);
 	return 0;
 }
 
@@ -214,7 +214,7 @@ int ext2_link(struct vnode *oldvnode, struct vnode *newparent, const char *filen
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole32((ext2_inode_t) oldvnode->ino);
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
 	return 0;
@@ -249,7 +249,7 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 	newdir = dir_find_entry_by_name(newparent, newname, EXT2_AF_LOOKUP_BLOCK, &newbuf);
 	if (newdir) {
 		// TODO delete existing file instead of error??
-		release_block(newbuf, 0);
+		unref_buf(newbuf, 0);
 		return EEXIST;
 	} else {
 		newdir = dir_alloc_entry(newparent, newname, &newbuf);
@@ -259,14 +259,14 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 
 	olddir = dir_find_entry_by_name(oldparent, oldname, EXT2_AF_LOOKUP_BLOCK, &oldbuf);
 	if (!olddir) {
-		release_block(newbuf, 0);
+		unref_buf(newbuf, 0);
 		return ENOENT;
 	}
 
 	newdir->inode = htole32((ext2_inode_t) vnode->ino);
 	olddir->inode = htole16(0);
-	release_block(newbuf, BF_DIRTY);
-	release_block(oldbuf, BF_DIRTY);
+	unref_buf(newbuf, BF_DIRTY);
+	unref_buf(oldbuf, BF_DIRTY);
 	vfs_update_time(oldparent, MTIME);
 	vfs_update_time(newparent, MTIME);
 	return 0;
@@ -291,9 +291,9 @@ int ext2_update(struct vnode *vnode)
 
 int ext2_release(struct vnode *vnode)
 {
-	// NOTE we only free vnodes who's inode has been deleted.  The vnode cache will release other vnodes when they are pushed out by newer nodes
+	// NOTE we only free vnodes who's inode has been deleted.  The vnode cache will free other vnodes when they are pushed out by newer nodes
 	if (vnode->ino == 0) {
-		release_vnode(vnode);
+		free_vnode(vnode);
 	} else if (vnode->bits & VBF_DIRTY) {
 		write_inode(vnode, vnode->ino);
 	}
@@ -338,7 +338,7 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 		block = block_lookup(vnode, znum, EXT2_AF_LOOKUP_BLOCK);
 		if (!block)
 			break;
-		buf = get_block(&vnode->mp->bufcache, block);
+		buf = get_buf(&vnode->mp->bufcache, block);
 		if (!buf)
 			break;
 
@@ -347,7 +347,7 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 			zlen = nbytes;
 
 		memcpy_into_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -386,7 +386,7 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 			error = ENOSPC;
 			break;
 		}
-		buf = get_block(&vnode->mp->bufcache, block);
+		buf = get_buf(&vnode->mp->bufcache, block);
 		if (!buf) {
 			error = EIO;
 			break;
@@ -397,7 +397,7 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 			zlen = nbytes;
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
-		release_block(buf, BF_DIRTY);
+		unref_buf(buf, BF_DIRTY);
 
 		wbytes += zlen;
 		nbytes -= zlen;
@@ -473,7 +473,7 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 		if (!block) {
 			return 0;
 		}
-		buf = get_block(&vnode->mp->bufcache, block);
+		buf = get_buf(&vnode->mp->bufcache, block);
 		if (!buf) {
 			return EIO;
 		}
@@ -488,7 +488,7 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 			break;
 		}
 
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 		znum++;
 	}
 
@@ -503,7 +503,7 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 	dir->d_ino = le32toh(current_entry->inode);
 	memcpy(dir->d_name, EXT2_DIRENT_FILENAME(current_entry), max);
 	dir->d_name[current_entry->name_len] = '\0';
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	return 1;
 }

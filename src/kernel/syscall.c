@@ -413,7 +413,7 @@ int do_mknod(const char __user *path, mode_t mode, device_t dev)
 	if (error) {
 		return error;
 	}
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(vnode);
 	return 0;
 }
 
@@ -588,7 +588,7 @@ int do_chdir(const char __user *path)
 		return ENOTDIR;
 	}
 
-	current_proc->cwd = vfs_clone_vnode(vnode);
+	current_proc->cwd = vfs_ref_vnode(vnode);
 	return 0;
 }
 
@@ -635,7 +635,7 @@ int do_stat(const char __user *path, struct stat __user *statbuf)
 
 	memcpy_to_user(statbuf, &kernel_statbuf, sizeof(struct stat));
 
-	vfs_release_vnode(vnode);
+	vfs_unref_vnode(vnode);
 	return 0;
 }
 

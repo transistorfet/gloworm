@@ -78,7 +78,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 
 	const ext2_block_t block_offset = group_inode_num >> super->log_inodes_per_block;
 	const int byte_offset = align_remainder(group_inode_num, 1 << super->log_inodes_per_block) << super->log_inode_size;
-	inode_buf = get_block(&mp->bufcache, super->groups[group].inode_table + block_offset);
+	inode_buf = get_buf(&mp->bufcache, super->groups[group].inode_table + block_offset);
 	if (!inode_buf)
 		return EIO;
 
@@ -96,7 +96,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 		inode->blocks[0] = htole16(rdev);
 	}
 
-	release_block(inode_buf, BF_DIRTY);
+	unref_buf(inode_buf, BF_DIRTY);
 
 	return inodenum;
 }
@@ -123,7 +123,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	struct ext2_inode *inode;
 
 	const struct inode_location result = get_inode_block_and_offset(vnode->mp, ino);
-	inode_buf = get_block(&vnode->mp->bufcache, result.block);
+	inode_buf = get_buf(&vnode->mp->bufcache, result.block);
 	if (!inode_buf)
 		return EIO;
 
@@ -144,7 +144,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	vnode->bits &= ~VBF_DIRTY;
-	release_block(inode_buf, 0);
+	unref_buf(inode_buf, 0);
 	return 0;
 }
 
@@ -156,7 +156,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 
 	const struct inode_location result = get_inode_block_and_offset(vnode->mp, ino);
 
-	inode_buf = get_block(&vnode->mp->bufcache, result.block);
+	inode_buf = get_buf(&vnode->mp->bufcache, result.block);
 	if (!inode_buf)
 		return EIO;
 
@@ -180,7 +180,7 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	vnode->bits &= ~VBF_DIRTY;
-	release_block(inode_buf, BF_DIRTY);
+	unref_buf(inode_buf, BF_DIRTY);
 	return 0;
 }
 

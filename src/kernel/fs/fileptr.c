@@ -48,7 +48,7 @@ void free_fileptr(struct vfile *file)
 	if (file->refcount < 0) {
 		log_warning("warning: double free of file pointer, %x\n", file);
 	} else if (file->refcount == 0) {
-		vfs_release_vnode(file->vnode);
+		vfs_unref_vnode(file->vnode);
 		file->vnode = NULL;
 	}
 }

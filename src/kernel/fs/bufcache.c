@@ -51,7 +51,7 @@ void sync_bufcache(struct bufcache *cache)
 	}
 }
 
-struct buf *get_block(struct bufcache *cache, block_t num)
+struct buf *get_buf(struct bufcache *cache, block_t num)
 {
 	struct buf *cur;
 
@@ -69,10 +69,10 @@ struct buf *get_block(struct bufcache *cache, block_t num)
 	return _load_block(cache, num);
 }
 
-int release_block(struct buf *buf, short dirty)
+int unref_buf(struct buf *buf, short dirty)
 {
 	if (dirty) {
-		mark_block_dirty(buf);
+		mark_buf_dirty(buf);
 	}
 
 	buf->refcount -= 1;
@@ -86,7 +86,7 @@ int release_block(struct buf *buf, short dirty)
 	return 0;
 }
 
-void mark_block_dirty(struct buf *buf)
+void mark_buf_dirty(struct buf *buf)
 {
 	buf->flags |= BF_DIRTY;
 }

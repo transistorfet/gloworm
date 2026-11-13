@@ -6355,3 +6355,34 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   rebuild when using `make O=<something>`, even with a `make O=<something> clean`.  You'd have to do `make clean` as well
 - I'm not sure there's a solution without manually splitting the variable assignments
 
+2026-11-11:
+- I'm coming back to normalizing function names
+- alloc / free is generally good
+- init / release is not uncommon, but release is also used for refcounts
+  - deint, fini, uninit
+- make_ref / release, I've never really liked
+  - ref / unref, inc_ref / dec_ref
+  - honestly, release is pretty popular here
+  - incref / release?  ref / release?
+- clone or duplicate
+  - alternatives?
+  - which of those is better? I think duplicate is less ambiguous, even though it sometime is used for incref *shrug*
+
+- vfs uses clone/release quite a bit, I think
+- filedesc.c uses both free_fd_table and release_fd_table
+- bufcache.h uses release_block, which is maybe not great
+- linux uses release to decref a vnode, but bsd does not, it uses inactive or something else
+
+- I've changed get_block, release_block, mark_block_dirty, to get_buf, unref_buf, mark_buf_dirty, which should make it less
+  confusing when I have lots of "block" names in the filesystem impls
+- lots of places where I have refcounting, like memory_map, I've previously gone with `alloc` to create, `free` to decref, and
+  `make_ref` to incref.  I think I'll keep `free` like it is, and rename `make_ref`
+- `ref` seems a bit too short/ambiguous, but I might still go with it
+- I've replaced `release_fd_table` with `clear_fd_table`, which I think is more meaningful in that context.  It's only used
+  internally by filedesc.c anyways
+
+- left to do are replacing `vfs_clone_vnode` and `vfs_clone_fileptr` with something else, like `vfs_ref_vnode` and
+  `vfs_ref_fileptr`, and also and possibly renaming `make_ref`, oh, and I could/should perhaps think about renaming
+  `arch_release_task_info`
+- it turns out I don't have any `init` counterparts (except arch_release), but I would have renamed them `deinit` or `fini`
+

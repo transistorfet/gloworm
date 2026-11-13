@@ -38,7 +38,7 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 	super_v1->state = 0x0001;
 
 	// Write the superblock
-	super_buf = get_block(&bufcache, MINIX_V1_SUPER_ZONE);
+	super_buf = get_buf(&bufcache, MINIX_V1_SUPER_ZONE);
 	if (!super_buf) {
 		return -1;
 	}
@@ -56,7 +56,7 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 	super_v1->magic = htole16(super_v1_cached.magic);
 	super_v1->state = htole16(super_v1_cached.state);
 
-	release_block(super_buf, BF_DIRTY);
+	unref_buf(super_buf, BF_DIRTY);
 
 	super_v1 = &super_v1_cached;
 
@@ -66,18 +66,18 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	// Zero the inode table
 	for (int i = 0; i < (super_v1->num_inodes >> MINIX_V1_LOG_INODES_PER_ZONE); i++) {
-		struct buf *inode_buf = get_block(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1) + i);
+		struct buf *inode_buf = get_buf(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1) + i);
 		if (!inode_buf)
 			return ENOMEM;
 		memset(inode_buf->block, 0x00, MINIX_V1_ZONE_SIZE);
-		release_block(inode_buf, BF_DIRTY);
+		unref_buf(inode_buf, BF_DIRTY);
 	}
 
 	inode_t root_ino = 1;
 	zone_t dir_zone = super_v1->first_zone;
 
 	// Initialize root inode
-	struct buf *inode_buf = get_block(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1));
+	struct buf *inode_buf = get_buf(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1));
 	if (!inode_buf)
 		return ENOMEM;
 	struct minix_v1_inode *inode_table = inode_buf->block;
@@ -88,10 +88,10 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 	inode_table[0].size = htole32(0);
 	inode_table[0].nlinks = htole16(1);
 	inode_table[0].zones[0] = htole16(dir_zone);
-	release_block(inode_buf, BF_DIRTY);
+	unref_buf(inode_buf, BF_DIRTY);
 
 	// Initialize root directory
-	struct buf *dir_buf = get_block(&bufcache, dir_zone);
+	struct buf *dir_buf = get_buf(&bufcache, dir_zone);
 	if (!dir_buf)
 		return ENOMEM;
 	struct minix_v1_dirent *entries = dir_buf->block;
@@ -102,7 +102,7 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 	entries[1].inode = htole16((minix_v1_inode_t) root_ino);
 	strcpy(entries[1].filename, "..");
 
-	release_block(dir_buf, BF_DIRTY);
+	unref_buf(dir_buf, BF_DIRTY);
 
 	sync_bufcache(&bufcache);
 	free_bufcache(&bufcache);

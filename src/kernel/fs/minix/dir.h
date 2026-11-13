@@ -14,7 +14,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	struct minix_v1_dirent *entries;
 
 	zone = minix_alloc_zone(vnode->mp);
-	buf = get_block(&vnode->mp->bufcache, zone);
+	buf = get_buf(&vnode->mp->bufcache, zone);
 	if (!buf)
 		return 0;
 
@@ -26,7 +26,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	entries[1].inode = htole16(parent ? (minix_v1_inode_t) parent->ino : 1);
 	strcpy(entries[1].filename, "..");
 
-	release_block(buf, BF_DIRTY);
+	unref_buf(buf, BF_DIRTY);
 
 	MINIX_DATA(vnode).zones[0] = htole16(zone);
 	// Set the initial directory size to include the two default entries
@@ -43,17 +43,17 @@ static short dir_is_empty(struct vnode *vnode)
 	struct minix_v1_dirent *entries;
 
 	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
-		buf = get_block(&vnode->mp->bufcache, zone);
+		buf = get_buf(&vnode->mp->bufcache, zone);
 		if (!buf)
 			return EIO;
 		entries = (struct minix_v1_dirent *) buf->block;
 		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (entries[i].inode && strcmp(entries[i].filename, ".") && strcmp(entries[i].filename, "..")) {
-				release_block(buf, 0);
+				unref_buf(buf, 0);
 				return 0;
 			}
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return 1;
 }
@@ -65,7 +65,7 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 	struct minix_v1_dirent *entries;
 
 	for (zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
-		buf = get_block(&dir->mp->bufcache, zone);
+		buf = get_buf(&dir->mp->bufcache, zone);
 		if (!buf)
 			return NULL;
 		entries = (struct minix_v1_dirent *) buf->block;
@@ -81,7 +81,7 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 				return &entries[i];
 			}
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return NULL;
 }
@@ -93,7 +93,7 @@ static struct minix_v1_dirent *dir_find_entry_by_name(struct vnode *dir, const c
 	struct minix_v1_dirent *entries;
 
 	for (zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
-		buf = get_block(&dir->mp->bufcache, zone);
+		buf = get_buf(&dir->mp->bufcache, zone);
 		if (!buf)
 			return NULL;
 		entries = (struct minix_v1_dirent *) buf->block;
@@ -103,7 +103,7 @@ static struct minix_v1_dirent *dir_find_entry_by_name(struct vnode *dir, const c
 				return &entries[i];
 			}
 		}
-		release_block(buf, 0);
+		unref_buf(buf, 0);
 	}
 	return NULL;
 }

@@ -68,7 +68,7 @@ int clone_process_memory(struct process *parent_proc, struct process *proc, int 
 	}
 
 	if (flags & CLONE_VM) {
-		proc->map = memory_map_make_ref(parent_proc->map);
+		proc->map = memory_map_ref(parent_proc->map);
 	} else {
 		// Duplicate the memory map
 		error = duplicate_memory_map(parent_proc, proc);
@@ -77,7 +77,7 @@ int clone_process_memory(struct process *parent_proc, struct process *proc, int 
 	}
 
 	if (flags & CLONE_FILES) {
-		proc->fd_table = make_ref_fd_table(parent_proc->fd_table);
+		proc->fd_table = ref_fd_table(parent_proc->fd_table);
 	} else {
 		if (proc->fd_table) {
 			free_fd_table(proc->fd_table);
@@ -92,7 +92,7 @@ int clone_process_memory(struct process *parent_proc, struct process *proc, int 
 
 	// Copy the relevant process data from the parent to child
 	if (parent_proc->cwd) {
-		proc->cwd = vfs_clone_vnode(parent_proc->cwd);
+		proc->cwd = vfs_ref_vnode(parent_proc->cwd);
 	} else {
 		proc->cwd = NULL;
 	}
