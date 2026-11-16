@@ -40,7 +40,11 @@ int readline(char *buffer, short max)
 				}
 				break;
 			}
+			// fall through to newline case if EOL_CRLF is enabled, or ignore '\r' if EOL_LF is enabled
 			case '\r':
+				#if !defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+				continue;
+				#endif
 			case '\n': {
 				#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
 				putchar('\r');
