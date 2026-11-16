@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <kconfig.h>
 
 // MC68681 Register Addresses
 #define MR1A_MR2A_ADDR	((volatile uint8_t *) 0x700001)
@@ -182,6 +183,12 @@ int getchar(void)
 
 int putchar(int ch)
 {
+	#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+	if (ch == '\n') {
+		while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
+		*TBA_WR_ADDR = (char) '\r';
+	}
+	#endif
 	while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
 	*TBA_WR_ADDR = (char) ch;
 	return ch;

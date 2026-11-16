@@ -37,14 +37,23 @@ struct tty_device {
 };
 
 struct termios default_tio = {
-	.c_iflag = (BRKINT | ICRNL | IXON | IXANY),
+	#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+	.c_iflag = (ICRNL | IXON),
 	.c_oflag = (OPOST | ONLCR),
+	#else
+	.c_iflag = (IXON),
+	.c_oflag = (OPOST),
+	#endif
 	.c_cflag = (CREAD | CS8 | HUPCL),
 	.c_lflag = (ISIG | IEXTEN | ICANON | ECHO | ECHOE),
 	.c_cc = {
 		'\x04',		// VEOF
 		0xff,		// VEOL
+		#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+		'\x7F',		// VERASE
+		#else
 		'\x08',		// VERASE
+		#endif
 		'\x03',		// VINTR
 		'\x15',		// VKILL
 		1,		// VMIN
@@ -146,15 +155,22 @@ static inline void tty_read_input(device_t minor)
 					}
 				}
 			}
-		} else if (ch == '\r') {
+		} else if (ch == '\r' && (tty->tio.c_iflag & IGNCR)) {
 			// Ignore
 		} else {
+			if (ch == '\r' && (tty->tio.c_iflag & ICRNL)) {
+				ch = '\n';
+			} else if (ch == '\n' && (tty->tio.c_iflag & INLCR)) {
+				ch = '\r';
+			}
+
 			tty->buffer[tty->buf_write++] = ch;
 			if ((tty->tio.c_lflag & ECHO)) {
 				iovec_iter_init_simple_kvec(&iter, &kvec, &ch, 1);
-				dev_write(tty->rdev, 0, &iter);
+				tty_write(minor, 0, &iter);
 			}
-			if (ch == '\n') {
+
+			if (ch == '\n' || ch == tty->tio.c_cc[VEOL]) {
 				tty->ready = 1;
 				resume_blocked_procs(VFS_POLL_READ, NULL, DEVNUM(DEVMAJOR_TTY, minor));
 				break;
@@ -299,7 +315,31 @@ int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	if (minor >= TTY_DEVICE_NUM)
 		return ENODEV;
 
-	written = dev_write(tty_devices[minor].rdev, offset, iter);
+	if (!(tty_devices[minor].tio.c_oflag & OPOST)) {
+		written = dev_write(tty_devices[minor].rdev, offset, iter);
+	} else {
+		char byte;
+		struct kvec kvec;
+		struct iovec_iter iter_single;
+
+		for (written = 0; iovec_iter_remaining(iter) > 0; written++) {
+			byte = copy_uint8_out_of_iter(iter);
+
+			if (byte == '\n' && (tty_devices[minor].tio.c_oflag & ONLCR)) {
+				// Map LF to CR-LF
+				iovec_iter_init_simple_kvec(&iter_single, &kvec, "\r\n", 2);
+				dev_write(tty_devices[minor].rdev, 0, &iter_single);
+			} else if (byte == '\r' &&(tty_devices[minor].tio.c_oflag & OCRNL)) {
+				// Map CR to LF
+				iovec_iter_init_simple_kvec(&iter_single, &kvec, "\n", 1);
+				dev_write(tty_devices[minor].rdev, 0, &iter_single);
+			} else {
+				iovec_iter_init_simple_kvec(&iter_single, &kvec, &byte, 1);
+				dev_write(tty_devices[minor].rdev, 0, &iter_single);
+			}
+		}
+	}
+
 	if (!written) {
 		suspend_current_syscall(VFS_POLL_WRITE);
 		return 0;

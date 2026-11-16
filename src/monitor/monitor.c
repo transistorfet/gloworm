@@ -30,6 +30,7 @@ int readline(char *buffer, short max)
 	while (i < max) {
 		buffer[i] = getchar();
 		switch (buffer[i]) {
+			case 0x7f:
 			case 0x08: {
 				if (i >= 1) {
 					putchar(0x08);
@@ -39,8 +40,12 @@ int readline(char *buffer, short max)
 				}
 				break;
 			}
+			case '\r':
 			case '\n': {
-				putchar(buffer[i]);
+				#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+				putchar('\r');
+				#endif
+				putchar('\n');
 				buffer[i] = '\0';
 				return i;
 			}

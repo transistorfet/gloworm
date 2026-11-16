@@ -26,5 +26,29 @@ config CC_OPTIMIZE_FOR_SIZE
 
 endchoice
 
+choice
+	prompt "TTY line termination"
+	default TTY_DEFAULT_EOL_CRLF
+
+config TTY_DEFAULT_EOL_CRLF
+	bool "convert CR input to LF and LF output to CRLF"
+	help
+	  This is the default line termination.  When sending text over serial
+	  to a terminal, the LF character used by unix programs will be
+	  converted to CRLF (\r\n) before sending, and when a CR character is
+	  received from the serial/TTY, it will be converted to LF before being
+	  sent to the program receiving it.  This is the standard for VT100 and
+	  similar terminals.
+
+config TTY_DEFAULT_EOL_LF
+	bool "do not convert LF"
+	help
+	  When text is sent over serial to a terminal, no conversion will be
+	  done to the line terminators.  The LF sent by unix programs will be
+	  sent as LF, and the terminal must send an LF character in order for
+	  the OS or monitor to recognize it as an end-of-line.
+
+endchoice
+
 endmenu
 

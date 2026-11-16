@@ -24,6 +24,11 @@ int vprintk(int buffered, const char *fmt, va_list args)
 
 	vsnprintf(buffer, PRINTK_BUFFER, fmt, args);
 	for (i = 0; i < PRINTK_BUFFER && buffer[i]; i++) {
+		#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+		if (buffer[i] == '\n') {
+			put('\r');
+		}
+		#endif
 		put(buffer[i]);
 	}
 	return i;
