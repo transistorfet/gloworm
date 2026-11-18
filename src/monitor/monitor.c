@@ -30,6 +30,7 @@ int readline(char *buffer, short max)
 	while (i < max) {
 		buffer[i] = getchar();
 		switch (buffer[i]) {
+			case 0x7f:
 			case 0x08: {
 				if (i >= 1) {
 					putchar(0x08);
@@ -39,8 +40,16 @@ int readline(char *buffer, short max)
 				}
 				break;
 			}
+			// fall through to newline case if EOL_CRLF is enabled, or ignore '\r' if EOL_LF is enabled
+			case '\r':
+				#if !defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+				continue;
+				#endif
 			case '\n': {
-				putchar(buffer[i]);
+				#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+				putchar('\r');
+				#endif
+				putchar('\n');
 				buffer[i] = '\0';
 				return i;
 			}

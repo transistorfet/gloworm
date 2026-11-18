@@ -11,7 +11,6 @@
 * add stats of some kind to the page allocator?  Where would the data be displayed, in procfs?
 * add flags to kmalloc too?
 
-* change LF to CR+LF (or make it configurable) in the TTY driver.  The computer should send CR+LF whenever an LF is sent by a user program (unless raw enabled), and CR characters should be ignored, so the terminal could send CR+LF or LF
 * add -Wextra, even though it doesn't seem to catch all the type size issues.  I have to specifically request -Wconversion in order to get the warning I want, but it's over zealous
 
 * make it so the ata device will time out and fail instead of hanging when it doesn't work

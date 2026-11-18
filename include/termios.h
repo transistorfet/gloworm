@@ -33,6 +33,9 @@ struct termios {
 // Output Modes: termios c_oflag
 #define OPOST		0x0001	// Perform output processing
 #define ONLCR		0x0002	// Map NL to CR-NL on output
+#define OCRNL		0x0010  // Map CR to NL on output
+#define ONOCR		0x0020  // No CR output at column 0
+#define ONLRET		0x0040  // NL performs CR function
 
 // Control Modes: termios c_cflag
 #define CLOCAL		0x0001	// Ignore modem status lines

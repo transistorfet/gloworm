@@ -6386,3 +6386,24 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   `arch_release_task_info`
 - it turns out I don't have any `init` counterparts (except arch_release), but I would have renamed them `deinit` or `fini`
 
+
+2026-11-14:
+
+- I'm on to the TTY stuff, and trying to make the line endings more standardized
+- I've gotten distracted looked at other OSes that might have configuration that might effect it.  I'm not sure if I should make a
+  Kconfig setting for the line terminations or not
+- RIOT OS uses kconfig from the looks of it, and it has a setting `CONFIG_NEWLIB_STDOUT_LINE_ENDING_CRLF`, which is for the LIBC
+  implementation itself
+- from a makefile in RIOT, it looks like it's using CRLF line terminations, since it has some commands for picom with `--imap
+  lfcrlf` and miniterm.py with `--eol LF`, which are used when CRLF is used.  There's some other mentions as well.  Not sure about
+  CR only being sent or not, but I'd assume so.  In some ways it's easier to get CR on enter and CRLF on send working in a
+  compatible way, than it is to get LF only work.  The weird thing that might occur with the wrong settings is getting two lines
+  instead of one sometimes
+- I do still need a CONFIG compile-time directive in two places in the monitor to get it working: one in parse line to send both an
+  CR and LF when only a CR is received, and also in putchar where it converts any LFs sent into CRLFs
+- Zephyr OS also uses Kconfig, and has some settings for CRLF: LOG_OUTPUT_FLAG_CRLF_NONE and LOG_OUTPUT_FLAG_CRLF_LFONLY
+- in subsys/shell/Kconfig:
+  SHELL_FLAG_CRLF_DEFAULT = (1<<0),       /*!< Do not map CR or LF */
+  SHELL_FLAG_OLF_CRLF     = (1<<1)        /*!< Map LF to CRLF on output */
+- .editorconfig:61:end_of_line = crlf
+

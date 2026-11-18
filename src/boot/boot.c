@@ -292,6 +292,12 @@ int init_tty(void)
 
 int putchar(int ch)
 {
+	#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
+	if (ch == '\n') {
+		while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
+		*TBA_WR_ADDR = (char) '\r';
+	}
+	#endif
 	while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
 	*TBA_WR_ADDR = (char) ch;
 	return ch;
