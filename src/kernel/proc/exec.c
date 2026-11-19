@@ -17,10 +17,15 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 	int result;
 	offset_t position;
 
-	position = iovec_iter_seek(iter, 0, SEEK_CUR);
+	position = iovec_iter_get_position(iter);
+	if (position < envp->used + argv->used + sizeof(char **) * 2 + sizeof(int)) {
+		log_info("not enough stack space allocated for exec() arguments");
+		return ENOMEM;
+	}
+
 	if (envp) {
 		position -= envp->used;
-		position = iovec_iter_seek(iter, position, SEEK_SET);
+		iovec_iter_set_position(iter, position);
 		result = string_array_copy_to_iter(envp, address_offset + position, iter);
 		if (result < 0)
 			return result;
@@ -31,7 +36,7 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 
 	if (argv) {
 		position -= argv->used;
-		position = iovec_iter_seek(iter, position, SEEK_SET);
+		iovec_iter_set_position(iter, position);
 		result = string_array_copy_to_iter(argv, address_offset + position, iter);
 		if (result < 0)
 			return result;
@@ -39,7 +44,7 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 	} else {
 		map->argv = NULL;
 	}
-	position = iovec_iter_seek(iter, position, SEEK_SET);
+	iovec_iter_set_position(iter, position);
 
 	result = iovec_iter_push_back(iter, &map->envp, sizeof(char **));
 	if (result < 0)
@@ -51,7 +56,7 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 	if (result < 0)
 		return result;
 
-	position = iovec_iter_seek(iter, 0, SEEK_CUR);
+	position = iovec_iter_get_position(iter);
 	return position;
 }
 
@@ -67,7 +72,7 @@ int exec_initialize_stack_with_args(struct process *proc, virtual_address_t stac
 		return result;
 	}
 
-	result = iovec_iter_seek(&iter, 0, SEEK_END);
+	iovec_iter_set_position(&iter, iter.length);
 	if (result < 0) {
 		return result;
 	}

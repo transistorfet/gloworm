@@ -1,6 +1,17 @@
 
 #include <kernel/utils/iovec.h>
 
+static inline int iovec_iter_advance_kvec(struct iovec_iter *iter, size_t advance)
+{
+	iter->seg_offset += advance;
+	while (iter->cur_seg < iter->num_segs - 1 && iter->seg_offset > iter->kvec.segs[iter->cur_seg].bytes) {
+		iter->seg_start += iter->kvec.segs[iter->cur_seg].bytes;
+		iter->seg_offset -= iter->kvec.segs[iter->cur_seg].bytes;
+		iter->cur_seg += 1;
+	}
+	return 0;
+}
+
 int memcpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const void *src, size_t nbytes)
 {
 	int cur_seg = 0;
@@ -135,7 +146,6 @@ int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *d
 
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 {
-	int error;
 	int bytes;
 
 	bytes = (nbytes < iter->length - iter->seg_start - iter->seg_offset) ? nbytes : iter->length - iter->seg_start - iter->seg_offset;
@@ -148,15 +158,12 @@ int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 		case ITER_KVEC: {
 			bytes = memcpy_into_kvec(&iter->kvec.segs[iter->cur_seg], iter->num_segs - iter->cur_seg, iter->seg_offset, buf, bytes);
 			if (bytes > 0) {
-				error = iovec_iter_seek(iter, bytes, SEEK_CUR);
-				if (error < 0) {
-					return error;
-				}
+				iovec_iter_advance(iter, bytes);
 			}
 			return bytes;
 		}
 		default: {
-			log_error("attempting to write into an invalid iovec iter: %d\n", iter->type);
+			log_debug("attempting to write into an invalid iovec iter: %d\n", iter->type);
 			return EINVAL;
 		}
 	}
@@ -164,7 +171,6 @@ int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes)
 
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes)
 {
-	int error;
 	int bytes;
 
 	bytes = (nbytes < iter->length - iter->seg_start - iter->seg_offset) ? nbytes : iter->length - iter->seg_start - iter->seg_offset;
@@ -177,71 +183,80 @@ int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes)
 		case ITER_KVEC: {
 			bytes = memcpy_out_of_kvec(&iter->kvec.segs[iter->cur_seg], iter->num_segs - iter->cur_seg, iter->seg_offset, buf, bytes);
 			if (bytes > 0) {
-				error = iovec_iter_seek(iter, bytes, SEEK_CUR);
-				if (error < 0) {
-					return error;
-				}
+				iovec_iter_advance_kvec(iter, bytes);
 			}
 			return bytes;
 		}
 		default: {
-			log_error("attempting to write into an invalid iovec iter: %d\n", iter->type);
+			log_debug("attempting to write into an invalid iovec iter: %d\n", iter->type);
 			return EINVAL;
 		}
 	}
 }
 
-/// Change the read/write position of an iterator
-size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence)
+int iovec_iter_advance(struct iovec_iter *iter, size_t advance)
 {
-	switch (whence) {
-		case SEEK_SET:
-			break;
-		case SEEK_CUR:
-			offset = iter->seg_start + iter->seg_offset + offset;
-			break;
-		case SEEK_END:
-			offset = iter->length + offset;
-			break;
-		default:
-			return EINVAL;
-	}
-
-	if (offset > iter->length)
-		offset = iter->length;
-
-	if (iter->type == ITER_KVEC) {
-		if (offset >= iter->seg_start + iter->seg_offset) {
-			// Advance the position forward
-			while (iter->cur_seg < iter->num_segs - 1 && offset >= iter->seg_start + iter->kvec.segs[iter->cur_seg].bytes) {
-				iter->seg_start += iter->kvec.segs[iter->cur_seg].bytes;
-				iter->cur_seg += 1;
+	switch (iter->type) {
+		case ITER_USER_BUF: {
+			iter->seg_offset += advance;
+			if (iter->seg_offset > iter->length) {
+				iter->seg_offset = iter->length;
 			}
-		} else {
-			// Rewind the position backwards
-			while (iter->cur_seg > 0 && offset < iter->seg_start) {
-				iter->cur_seg -= 1;
-				iter->seg_start -= iter->kvec.segs[iter->cur_seg].bytes;
-			}
+			return 0;
 		}
-		iter->seg_offset = offset - iter->seg_start;
-	} else {
-		iter->seg_offset = offset;
+		case ITER_KVEC: {
+			return iovec_iter_advance_kvec(iter, advance);
+		}
+		default: {
+			log_debug("attempting to write into an invalid iovec iter: %d\n", iter->type);
+			return EINVAL;
+		}
 	}
-
-	return iter->seg_start + iter->seg_offset;
 }
 
-size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size)
+int iovec_iter_rewind(struct iovec_iter *iter, size_t rewind)
+{
+	switch (iter->type) {
+		case ITER_USER_BUF: {
+			if (iter->seg_offset < rewind) {
+				iter->seg_offset = 0;
+			} else {
+				iter->seg_offset -= rewind;
+			}
+			return 0;
+		}
+		case ITER_KVEC: {
+			if (iter->seg_start + iter->seg_offset < rewind) {
+				iter->cur_seg = 0;
+				iter->seg_start = 0;
+				iter->seg_offset = 0;
+			} else {
+				size_t offset = iter->seg_start + iter->seg_offset - rewind;
+				while (iter->cur_seg > 0 && offset < iter->seg_start) {
+					iter->cur_seg -= 1;
+					iter->seg_start -= iter->kvec.segs[iter->cur_seg].bytes;
+				}
+				iter->seg_offset = offset - iter->seg_start;
+			}
+			return 0;
+		}
+		default: {
+			log_debug("attempting to write into an invalid iovec iter: %d\n", iter->type);
+			return EINVAL;
+		}
+	}
+}
+
+int iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size)
 {
 	int error;
 	int cur_seg;
 	size_t seg_start;
 	offset_t seg_offset;
 
-	error = iovec_iter_seek(iter, -size, SEEK_CUR);
+	error = iovec_iter_rewind(iter, size);
 	if (error < 0) {
-		return iter->seg_start + iter->seg_offset;
+		return error;
 	}
 
 	cur_seg = iter->cur_seg;
@@ -253,6 +268,6 @@ size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size)
 	iter->cur_seg = cur_seg;
 	iter->seg_start = seg_start;
 	iter->seg_offset = seg_offset;
-	return iter->seg_start + iter->seg_offset;
+	return 0;
 }
 

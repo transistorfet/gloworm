@@ -10,15 +10,6 @@
 #include <kernel/utils/usercopy.h>
 #include <asm/addresses.h>
 
-#ifndef SEEK_SET
-#define SEEK_SET	0	// Seek relative to the beginning of file
-#endif
-#ifndef SEEK_CUR
-#define SEEK_CUR	1	// Seek relative to the current position
-#endif
-#ifndef SEEK_END
-#define SEEK_END	2	// Seek relative to the end of file
-#endif
 
 #define IOVEC_READ	0
 #define IOVEC_WRITE	1
@@ -77,8 +68,9 @@ int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *d
 
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes);
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes);
-size_t iovec_iter_seek(struct iovec_iter *iter, offset_t offset, int whence);
-size_t iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size);
+int iovec_iter_advance(struct iovec_iter *iter, size_t advance);
+int iovec_iter_rewind(struct iovec_iter *iter, size_t rewind);
+int iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size);
 
 
 static inline void iovec_iter_init_user_buf(struct iovec_iter *iter, char __user *buf, size_t nbytes)
@@ -124,11 +116,6 @@ static inline void iovec_iter_init_kvec(struct iovec_iter *iter, struct kvec *se
 }
 
 
-static inline size_t iovec_iter_remaining(struct iovec_iter *iter)
-{
-	return iter->length - iter->seg_start - iter->seg_offset;
-}
-
 static inline int copy_uint8_into_iter(struct iovec_iter *iter, uint8_t byte)
 {
 	switch (iter->type) {
@@ -150,7 +137,7 @@ static inline int copy_uint8_into_iter(struct iovec_iter *iter, uint8_t byte)
 			break;
 		}
 		default: {
-			log_error("attempting to write into an invalid iovec iter: %d\n", iter->type);
+			log_debug("attempting to write into an invalid iovec iter: %d\n", iter->type);
 			return EINVAL;
 		}
 	}
@@ -177,11 +164,30 @@ static inline uint8_t copy_uint8_out_of_iter(struct iovec_iter *iter)
 			return byte;
 		}
 		default: {
-			log_error("attempting to write into an invalid iovec iter: %d\n", iter->type);
-			return -1;
+			log_debug("attempting to write into an invalid iovec iter: %d\n", iter->type);
+			return EINVAL;
 		}
 	}
 }
+
+static inline size_t iovec_iter_remaining(struct iovec_iter *iter)
+{
+	return iter->length - iter->seg_start - iter->seg_offset;
+}
+
+static inline size_t iovec_iter_get_position(struct iovec_iter *iter)
+{
+	return iter->seg_start + iter->seg_offset;
+}
+
+static inline void iovec_iter_set_position(struct iovec_iter *iter, size_t position)
+{
+	iter->cur_seg = 0;
+	iter->seg_start = 0;
+	iter->seg_offset = 0;
+	iovec_iter_advance(iter, position);
+}
+
 
 struct memory_map;
 extern int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag);
@@ -193,8 +199,9 @@ static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iove
 	int result;
 
 	result = memory_map_load_pages_into_kvec(map, kvec, max_segs, start, length, write_flag);
-	if (result < 0)
+	if (result < 0) {
 		return result;
+	}
 	iovec_iter_init_kvec(iter, kvec, result);
 	return 0;
 }

@@ -6407,3 +6407,30 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
   SHELL_FLAG_OLF_CRLF     = (1<<1)        /*!< Map LF to CRLF on output */
 - .editorconfig:61:end_of_line = crlf
 
+- I ended up adding a config option to switch.  It's not possible to make the monitor always work correctly for both, but it can get
+  pretty close.  With the CRLF option selected (which works fine with picocom/minicom, but not with pyserial-miniterm), and running
+  miniterm, the monitor will have two newlines for every carriage return pressed, but otherwise work fine for typing and backspace.
+  The OS's TTY driver won't delete properly when using miniterm with CRLF, so in order to keep using it, I'll have to select the LF
+  option instead
+
+
+2026-11-18:
+
+- I'm on to the -Wconversion warnings, trying to fix them, and I came across the fact that I'm using `offset_t` which is unsigned,
+  but it's supposed to use `off_t` for seek/lseek, which is signed.  I've changed it for seek/lseek in the file system and drivers,
+  because it makes sense to allow signed return values there for error purposes
+- linux also uses off_t for file position (well loff_t which is larger, since it supports >2GB files, but I'll go with a 32-bit in
+  gloworm because it's intended for older/smaller hardware).  It sounds like the main justification for a signed number there is to
+  check for overflow when subtracting, and since files aren't going to be that big, it's ok
+- the place it doesn't quite fit is iovec iter... I ended up using a seek function there, but the position is a unsigned size_t, and
+  while I don't expect to have 2GB of memory by any means, it seems odd to convert back and forth.  Maybe I should replace the seek
+  function with something less complex
+- in linux, it uses `advance`, `revert`, `save_state`, `restore` to move the iter around, which maybe is better than
+  overcomplicating things with a single function that does everything.  It'd probably help with code optimization anyways to have
+  smaller single-purpose functions
+- the big question is: do I stash the lint fixes and make that change in its own commit, or roll it into the same commit
+- I answered that before I finished writing it.  I should make the seek change its own commit
+
+- it looks like seek is used by push_back, and the exec.c stack arguments pushing.  It's mostly either saving/restoring the
+  position, seeking to the end, or just moving the current position forward, in the case of kvec (it's reusing code in seek)
+

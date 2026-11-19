@@ -229,10 +229,7 @@ int arch_add_signal_context(struct process *proc, int signum)
 		goto fail;
 	}
 
-	error = iovec_iter_seek(&iter, 0, SEEK_END);
-	if (error < 0) {
-		goto fail;
-	}
+	iovec_iter_set_position(&iter, iter.length);
 
 	error = iovec_iter_push_back(&iter, &signum, sizeof(void *));
 	if (error < 0) {

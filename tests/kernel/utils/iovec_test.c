@@ -21,6 +21,7 @@ void assert_iter_position(struct iovec_iter *iter, int result, int expected_resu
 int test_iovec_kvec_seek()
 {
 	int result;
+	size_t position;
 	struct iovec_iter iter;
 	struct kvec kvec[KVEC_SIZE];
 	char page1[256], page2[256];
@@ -33,47 +34,62 @@ int test_iovec_kvec_seek()
 	printk("length: %d\n", iter.length);
 	assert(iter.length == 512);
 
-	result = iovec_iter_seek(&iter, 10, SEEK_CUR);
-	assert_iter_position(&iter, result, 10, 0, 10);
+	iovec_iter_advance(&iter, 10);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 10, 0, 10);
 
-	result = iovec_iter_seek(&iter, 10, SEEK_CUR);
-	assert_iter_position(&iter, result, 20, 0, 20);
+	iovec_iter_advance(&iter, 10);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 20, 0, 20);
 
-	result = iovec_iter_seek(&iter, 0, SEEK_END);
-	assert_iter_position(&iter, result, 512, 1, 256);
+	iovec_iter_set_position(&iter, iter.length);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 512, 1, 256);
 
 	result = iovec_iter_push_back(&iter, "test", 4);
-	assert_iter_position(&iter, result, 508, 1, 252);
+	assert(result == 0);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 508, 1, 252);
 
 	result = iovec_iter_push_back(&iter, "what", 4);
-	assert_iter_position(&iter, result, 504, 1, 248);
+	assert(result == 0);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 504, 1, 248);
 
-	result = iovec_iter_seek(&iter, -248, SEEK_CUR);
-	assert_iter_position(&iter, result, 256, 1, 0);
+	iovec_iter_rewind(&iter, 248);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 256, 1, 0);
 
 	result = iovec_iter_push_back(&iter, "test", 4);
-	assert_iter_position(&iter, result, 252, 0, 252);
+	assert(result == 0);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 252, 0, 252);
 
-	result = iovec_iter_seek(&iter, 488, SEEK_SET);
-	assert_iter_position(&iter, result, 488, 1, 232);
+	iovec_iter_set_position(&iter, 488);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 488, 1, 232);
 
-	result = iovec_iter_seek(&iter, 0, SEEK_SET);
-	assert_iter_position(&iter, result, 0, 0, 0);
+	iovec_iter_set_position(&iter, 0);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 0, 0, 0);
 
-	result = iovec_iter_seek(&iter, 488, SEEK_SET);
-	assert_iter_position(&iter, result, 488, 1, 232);
+	iovec_iter_set_position(&iter, 488);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 488, 1, 232);
 
-	result = iovec_iter_seek(&iter, 508, SEEK_SET);
-	assert_iter_position(&iter, result, 508, 1, 252);
+	iovec_iter_set_position(&iter, 508);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 508, 1, 252);
 
-	result = memcpy_into_iter(&iter, "0123", 4);
-	assert_iter_position(&iter, result, 4, 1, 256);
+	position = memcpy_into_iter(&iter, "0123", 4);
+	assert_iter_position(&iter, position, 4, 1, 256);
 
-	result = iovec_iter_seek(&iter, 488, SEEK_SET);
-	assert_iter_position(&iter, result, 488, 1, 232);
+	iovec_iter_set_position(&iter, 488);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 488, 1, 232);
 
-	result = memcpy_into_iter(&iter, "01234567890123456789", 20);
-	assert_iter_position(&iter, result, 20, 1, 252);
+	position = memcpy_into_iter(&iter, "01234567890123456789", 20);
+	assert_iter_position(&iter, position, 20, 1, 252);
 
 	// Can we push across page boundaries?
 	kvec[0].buf = page1 + (256 - 0x1C);
@@ -81,10 +97,13 @@ int test_iovec_kvec_seek()
 	kvec[1].buf = page2;
 	kvec[1].bytes = 0x04;
 	iovec_iter_init_kvec(&iter, kvec, 2);
-	result = iovec_iter_seek(&iter, 0, SEEK_END);
+	iovec_iter_set_position(&iter, iter.length);
 	result = iovec_iter_push_back(&iter, "test", 4);
+	assert(result == 0);
 	result = iovec_iter_push_back(&iter, "meep", 4);
-	assert_iter_position(&iter, result, 24, 0, 24);
+	assert(result == 0);
+	position = iovec_iter_get_position(&iter);
+	assert_iter_position(&iter, position, 24, 0, 24);
 	assert(!strncmp(&page1[252], "meep", 4));
 	assert(!strncmp(&page2[0], "test", 4));
 
