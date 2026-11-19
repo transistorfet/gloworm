@@ -530,7 +530,7 @@ size_t do_write(int fd, const char __user *buf, size_t nbytes)
 	return vfs_write(file, &iter);
 }
 
-int do_lseek(int fd, offset_t offset, int whence)
+off_t do_lseek(int fd, off_t offset, int whence)
 {
 	struct vfile *file = get_fd(current_proc->fd_table, fd);
 	if (!file) {

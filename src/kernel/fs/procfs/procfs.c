@@ -212,7 +212,7 @@ int procfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *it
 	return -1;
 }
 
-offset_t procfs_seek(struct vfile *file, offset_t position, int whence)
+off_t procfs_seek(struct vfile *file, off_t position, int whence)
 {
 	return -1;
 }

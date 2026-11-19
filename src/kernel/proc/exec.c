@@ -15,7 +15,7 @@
 static int copy_exec_args(struct memory_map *map, virtual_address_t address_offset, struct iovec_iter *iter, struct string_array *argv, struct string_array *envp)
 {
 	int result;
-	offset_t position;
+	size_t position;
 
 	position = iovec_iter_get_position(iter);
 	if (position < envp->used + argv->used + sizeof(char **) * 2 + sizeof(int)) {

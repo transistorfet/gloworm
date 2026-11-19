@@ -62,7 +62,7 @@ int dev_close(device_t dev)
 	return drv_table[major]->close(minor);
 }
 
-int dev_read(device_t dev, offset_t offset, struct iovec_iter *iter)
+int dev_read(device_t dev, off_t offset, struct iovec_iter *iter)
 {
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
@@ -72,7 +72,7 @@ int dev_read(device_t dev, offset_t offset, struct iovec_iter *iter)
 	return drv_table[major]->read(minor, offset, iter);
 }
 
-int dev_write(device_t dev, offset_t offset, struct iovec_iter *iter)
+int dev_write(device_t dev, off_t offset, struct iovec_iter *iter)
 {
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
@@ -102,7 +102,7 @@ int dev_poll(device_t dev, int events)
 	return drv_table[major]->poll(minor, events);
 }
 
-offset_t dev_seek(device_t dev, offset_t position, int whence, offset_t offset)
+off_t dev_seek(device_t dev, off_t position, int whence, off_t offset)
 {
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);

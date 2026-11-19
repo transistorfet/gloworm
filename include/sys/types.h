@@ -8,7 +8,6 @@ typedef int pid_t;
 typedef short device_t;
 
 typedef unsigned short mode_t;
-typedef unsigned long offset_t;
 typedef unsigned int inode_t;
 typedef unsigned int nlink_t;
 typedef unsigned short uid_t;
@@ -21,5 +20,6 @@ typedef unsigned short gid_t;
 typedef device_t dev_t;
 typedef inode_t ino_t;
 typedef signed long off_t;
+typedef signed long long loff_t;
 
 #endif

@@ -25,11 +25,11 @@ extern const void __kernel_end;
 int mem_init(void);
 int mem_open(devminor_t minor, int access);
 int mem_close(devminor_t minor);
-int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
-int mem_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int mem_read(devminor_t minor, off_t offset, struct iovec_iter *iter);
+int mem_write(devminor_t minor, off_t offset, struct iovec_iter *iter);
 int mem_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int mem_poll(devminor_t minor, int events);
-offset_t mem_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
+off_t mem_seek(devminor_t minor, off_t position, int whence, off_t offset);
 
 
 struct driver mem_driver = {
@@ -99,7 +99,7 @@ int mem_close(devminor_t minor)
 	return 0;
 }
 
-int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int mem_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	if (minor >= num_devices)
 		return ENXIO;
@@ -114,7 +114,7 @@ int mem_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int mem_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int mem_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	if (minor >= num_devices)
 		return ENXIO;
@@ -141,7 +141,7 @@ int mem_poll(devminor_t minor, int events)
 	return events & (VFS_POLL_READ | VFS_POLL_WRITE);
 }
 
-offset_t mem_seek(devminor_t minor, offset_t position, int whence, offset_t offset)
+off_t mem_seek(devminor_t minor, off_t position, int whence, off_t offset)
 {
 	if (minor >= num_devices)
 		return ENXIO;

@@ -73,7 +73,7 @@ physical_address_t file_memory_ops_load_page_at(struct memory_segment *segment, 
 {
 	int error;
 	struct kvec kvec;
-	offset_t file_offset;
+	off_t file_offset;
 	physical_address_t page;
 	struct iovec_iter iter;
 
@@ -383,7 +383,7 @@ static inline void memory_map_adjust_markers(struct memory_map *map, struct memo
 /// NOTE: this will not unmap any previously mapped regions nor will it check for
 /// existing mappings, so it should be paired with an unmap call when modifying
 /// an existing map
-int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset)
+int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, off_t offset)
 {
 	int error = 0;
 	struct memory_segment *segment;

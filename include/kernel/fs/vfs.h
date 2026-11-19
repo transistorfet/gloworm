@@ -94,7 +94,7 @@ struct vfile_ops {
 	int (*write)(struct vfile *file, struct iovec_iter *iter);
 	int (*ioctl)(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 	int (*poll)(struct vfile *file, int events);
-	offset_t (*seek)(struct vfile *file, offset_t position, int whence);
+	off_t (*seek)(struct vfile *file, off_t position, int whence);
 	int (*readdir)(struct vfile *file, struct dirent *dir);
 };
 
@@ -125,7 +125,7 @@ struct vnode {
 	uint16_t bits;
 	device_t rdev;
 	inode_t ino;
-	offset_t size;
+	off_t size;
 
 	time_t atime;
 	time_t mtime;
@@ -139,7 +139,7 @@ struct vfile {
 	struct vnode *vnode;
 	short refcount;
 	short flags;
-	offset_t position;
+	off_t position;
 };
 
 #define VLOOKUP_NORMAL		0000
@@ -169,7 +169,7 @@ int vfs_read(struct vfile *file, struct iovec_iter *iter);
 int vfs_write(struct vfile *file, struct iovec_iter *iter);
 int vfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int vfs_poll(struct vfile *file, int events);
-offset_t vfs_seek(struct vfile *file, offset_t position, int whence);
+off_t vfs_seek(struct vfile *file, off_t position, int whence);
 int vfs_readdir(struct vfile *file, struct dirent *dir);
 struct vfile *vfs_ref_fileptr(struct vfile *file);
 
@@ -189,7 +189,7 @@ static inline void vfs_init_vnode(
 	gid_t gid,
 	device_t rdev,
 	inode_t ino,
-	offset_t size,
+	off_t size,
 	time_t atime,
 	time_t mtime,
 	time_t ctime)

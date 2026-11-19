@@ -424,7 +424,7 @@ int ext2_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter
 	return EINVAL;
 }
 
-offset_t ext2_seek(struct vfile *file, offset_t position, int whence)
+off_t ext2_seek(struct vfile *file, off_t position, int whence)
 {
 	struct vnode *vnode = file->vnode;
 

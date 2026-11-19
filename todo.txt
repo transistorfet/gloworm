@@ -1,6 +1,4 @@
 
-* replace `offset_t` in device file functions
-* replace `seek` in iovec_iter
 * add -Wextra, even though it doesn't seem to catch all the type size issues.  I have to specifically request -Wconversion in order to get the warning I want, but it's over zealous
 * why does procfs use dev=1?  Can I avoid that hack somehow?  Just need to assign some device numbers for special partitions, either with devmajor=0, or devmajor=?
 * normalize using start/end vs start/length (or the other way around?)  Which way?  Length avoids the edgecase of end, but end saves on an addition each step?  Maybe not worth it when you have to do an extra comparison

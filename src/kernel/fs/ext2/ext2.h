@@ -70,7 +70,7 @@ int ext2_close(struct vfile *file);
 int ext2_read(struct vfile *file, struct iovec_iter *iter);
 int ext2_write(struct vfile *file, struct iovec_iter *iter);
 int ext2_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
-offset_t ext2_seek(struct vfile *file, offset_t position, int whence);
+off_t ext2_seek(struct vfile *file, off_t position, int whence);
 int ext2_readdir(struct vfile *file, struct dirent *dir);
 
 

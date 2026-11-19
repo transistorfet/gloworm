@@ -139,7 +139,7 @@ int devfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *ite
 	return dev_ioctl(DEVFS_DATA(file->vnode).device, request, iter, uid);
 }
 
-offset_t devfs_seek(struct vfile *file, offset_t position, int whence)
+off_t devfs_seek(struct vfile *file, off_t position, int whence)
 {
 	return -1;
 }

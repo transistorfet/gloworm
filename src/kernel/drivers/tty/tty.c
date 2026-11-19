@@ -70,11 +70,11 @@ struct termios default_tio = {
 int tty_init(void);
 int tty_open(devminor_t minor, int access);
 int tty_close(devminor_t minor);
-int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
-int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_read(devminor_t minor, off_t offset, struct iovec_iter *iter);
+int tty_write(devminor_t minor, off_t offset, struct iovec_iter *iter);
 int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int tty_poll(devminor_t minor, int events);
-offset_t tty_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
+off_t tty_seek(devminor_t minor, off_t position, int whence, off_t offset);
 
 struct driver tty_driver = {
 	"tty",
@@ -234,7 +234,7 @@ int tty_close(devminor_t minor)
 	return 0;
 }
 
-int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int tty_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	size_t size;
 
@@ -308,7 +308,7 @@ int tty_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	}
 }
 
-int tty_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int tty_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	int written;
 
@@ -400,7 +400,7 @@ int tty_poll(devminor_t minor, int events)
 	return revents;
 }
 
-offset_t tty_seek(devminor_t minor, offset_t position, int whence, offset_t offset)
+off_t tty_seek(devminor_t minor, off_t position, int whence, off_t offset)
 {
 	return -1;
 }

@@ -60,7 +60,7 @@ int device_ops_poll(struct vfile *file, int events)
 	return dev_poll(file->vnode->rdev, events);
 }
 
-offset_t device_ops_seek(struct vfile *file, offset_t position, int whence)
+off_t device_ops_seek(struct vfile *file, off_t position, int whence)
 {
 	int pos;
 

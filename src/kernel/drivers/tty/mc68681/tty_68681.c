@@ -27,11 +27,11 @@
 int tty_68681_init(void);
 int tty_68681_open(devminor_t minor, int access);
 int tty_68681_close(devminor_t minor);
-int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
-int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int tty_68681_read(devminor_t minor, off_t offset, struct iovec_iter *iter);
+int tty_68681_write(devminor_t minor, off_t offset, struct iovec_iter *iter);
 int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int tty_68681_poll(devminor_t minor, int events);
-offset_t tty_68681_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
+off_t tty_68681_seek(devminor_t minor, off_t position, int whence, off_t offset);
 
 struct driver tty_68681_driver = {
 	"mc68681",
@@ -652,7 +652,7 @@ int tty_68681_close(devminor_t minor)
 	return 0;
 }
 
-int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int tty_68681_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	size_t size = iovec_iter_remaining(iter);
 	size_t remain = size;
@@ -677,7 +677,7 @@ int tty_68681_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int tty_68681_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int tty_68681_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	size_t size = iovec_iter_remaining(iter);
 	size_t remain = size;
@@ -737,7 +737,7 @@ int tty_68681_poll(devminor_t minor, int events)
 	return revents;
 }
 
-offset_t tty_68681_seek(devminor_t minor, offset_t position, int whence, offset_t offset)
+off_t tty_68681_seek(devminor_t minor, off_t position, int whence, off_t offset)
 {
 	return -1;
 }

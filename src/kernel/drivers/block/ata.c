@@ -22,11 +22,11 @@
 int ata_init(void);
 int ata_open(devminor_t minor, int access);
 int ata_close(devminor_t minor);
-int ata_read(devminor_t minor, offset_t offset, struct iovec_iter *iter);
-int ata_write(devminor_t minor, offset_t offset, struct iovec_iter *iter);
+int ata_read(devminor_t minor, off_t offset, struct iovec_iter *iter);
+int ata_write(devminor_t minor, off_t offset, struct iovec_iter *iter);
 int ata_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid);
 int ata_poll(devminor_t minor, int events);
-offset_t ata_seek(devminor_t minor, offset_t position, int whence, offset_t offset);
+off_t ata_seek(devminor_t minor, off_t position, int whence, off_t offset);
 
 
 struct driver ata_driver = {
@@ -309,7 +309,7 @@ int ata_close(devminor_t minor)
 	return 0;
 }
 
-int ata_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int ata_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	size_t size;
 	char buffer[512];
@@ -336,7 +336,7 @@ int ata_read(devminor_t minor, offset_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int ata_write(devminor_t minor, offset_t offset, struct iovec_iter *iter)
+int ata_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	size_t size;
 	char buffer[512];
@@ -378,7 +378,7 @@ int ata_poll(devminor_t minor, int events)
 	return events & (VFS_POLL_READ | VFS_POLL_WRITE);
 }
 
-offset_t ata_seek(devminor_t minor, offset_t position, int whence, offset_t offset)
+off_t ata_seek(devminor_t minor, off_t position, int whence, off_t offset)
 {
 	struct partition *device = ata_get_device(minor);
 	if (!device) {

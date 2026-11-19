@@ -252,7 +252,7 @@ int iovec_iter_push_back(struct iovec_iter *iter, void *value, size_t size)
 	int error;
 	int cur_seg;
 	size_t seg_start;
-	offset_t seg_offset;
+	size_t seg_offset;
 
 	error = iovec_iter_rewind(iter, size);
 	if (error < 0) {

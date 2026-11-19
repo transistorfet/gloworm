@@ -71,7 +71,7 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 		entries = (struct minix_v1_dirent *) buf->block;
 		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (le16toh(entries[i].inode) == ino) {
-				offset_t position = ((znum << MINIX_V1_LOG_DIRENTS_PER_ZONE) + i + 1) << __builtin_ctz(sizeof(struct minix_v1_dirent));
+				off_t position = ((znum << MINIX_V1_LOG_DIRENTS_PER_ZONE) + i + 1) << __builtin_ctz(sizeof(struct minix_v1_dirent));
 				if (dir->size < position) {
 					// TODO this is sort of a hack, isn't it?  Also what about shrinking in size
 					dir->size = position;

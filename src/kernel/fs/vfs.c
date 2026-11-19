@@ -713,7 +713,7 @@ int vfs_poll(struct vfile *file, int events)
 	return file->ops->poll(file, events);
 }
 
-offset_t vfs_seek(struct vfile *file, offset_t position, int whence)
+off_t vfs_seek(struct vfile *file, off_t position, int whence)
 {
 	return file->ops->seek(file, position, whence);
 }

@@ -89,7 +89,7 @@ int nop_poll(struct vfile *file, int events)
 	return events & (VFS_POLL_READ | VFS_POLL_WRITE);
 }
 
-offset_t nop_seek(struct vfile *file, offset_t position, int whence)
+off_t nop_seek(struct vfile *file, off_t position, int whence)
 {
 	return 0;
 }

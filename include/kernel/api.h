@@ -60,7 +60,7 @@ extern int do_chown(const char __user *path, uid_t owner, gid_t group);
 extern int do_chmod(const char __user *path, int mode);
 extern int do_stat(const char __user *path, struct stat __user *statbuf);
 extern int do_fstat(int fd, struct stat __user *statbuf);
-extern int do_lseek(int fd, offset_t offset, int whence);
+extern off_t do_lseek(int fd, off_t offset, int whence);
 extern int do_pipe(int pipefd[2]);
 extern int do_dup2(int oldfd, int newfd);
 extern mode_t do_umask(mode_t mask);

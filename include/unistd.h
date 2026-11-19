@@ -72,7 +72,7 @@ int fstat(int fd, struct stat *statbuf);
 int link(const char *oldpath, const char *newpath);
 int symlink(const char *target, const char *linkpath);
 int unlink(const char *path);
-offset_t lseek(int fd, offset_t offset, int whence);
+off_t lseek(int fd, off_t offset, int whence);
 void sync(void);
 mode_t umask(mode_t mask);
 

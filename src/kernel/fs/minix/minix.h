@@ -65,7 +65,7 @@ int minix_close(struct vfile *file);
 int minix_read(struct vfile *file, struct iovec_iter *iter);
 int minix_write(struct vfile *file, struct iovec_iter *iter);
 int minix_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid);
-offset_t minix_seek(struct vfile *file, offset_t position, int whence);
+off_t minix_seek(struct vfile *file, off_t position, int whence);
 int minix_readdir(struct vfile *file, struct dirent *dir);
 
 

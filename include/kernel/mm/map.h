@@ -90,7 +90,7 @@ struct memory_segment {
 	#endif
 
 	/// The offset into either the file, or the memory region where this segment starts
-	offset_t offset;
+	off_t offset;
 };
 
 struct memory_map {
@@ -139,7 +139,7 @@ struct memory_map *memory_map_alloc(void);
 void memory_map_free(struct memory_map *map);
 static inline struct memory_map *memory_map_ref(struct memory_map *map);
 
-int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, offset_t offset);
+int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int flags, MEMORY_OBJECT_T *object, off_t offset);
 int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length);
 int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_map, struct memory_segment *src_segment);
 
