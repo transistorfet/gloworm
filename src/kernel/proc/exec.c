@@ -27,8 +27,9 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 		position -= envp->used;
 		iovec_iter_set_position(iter, position);
 		result = string_array_copy_to_iter(envp, address_offset + position, iter);
-		if (result < 0)
+		if (result < 0) {
 			return result;
+		}
 		map->envp = (const char *const *) (address_offset + position);
 	} else {
 		map->envp = NULL;
@@ -38,8 +39,9 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 		position -= argv->used;
 		iovec_iter_set_position(iter, position);
 		result = string_array_copy_to_iter(argv, address_offset + position, iter);
-		if (result < 0)
+		if (result < 0) {
 			return result;
+		}
 		map->argv = (const char *const *) (address_offset + position);
 	} else {
 		map->argv = NULL;
@@ -47,14 +49,17 @@ static int copy_exec_args(struct memory_map *map, virtual_address_t address_offs
 	iovec_iter_set_position(iter, position);
 
 	result = iovec_iter_push_back(iter, &map->envp, sizeof(char **));
-	if (result < 0)
+	if (result < 0) {
 		return result;
+	}
 	result = iovec_iter_push_back(iter, &map->argv, sizeof(char **));
-	if (result < 0)
+	if (result < 0) {
 		return result;
+	}
 	result = iovec_iter_push_back(iter, &argv->len, sizeof(int));
-	if (result < 0)
+	if (result < 0) {
 		return result;
+	}
 
 	position = iovec_iter_get_position(iter);
 	return position;

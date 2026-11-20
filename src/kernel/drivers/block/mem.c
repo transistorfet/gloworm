@@ -73,66 +73,78 @@ int mem_init(void)
 	num_devices = 0;
 
 	error = mem_add_geometry(MEMDISK0_START, CONFIG_MEMDISK0_SIZE);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	error = register_driver(DEVMAJOR_MEM, &mem_driver);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
-	for (short i = 0; i < num_devices; i++)
+	for (short i = 0; i < num_devices; i++) {
 		log_notice("mem%d: ram disk of %d bytes @ %#p\n", i, devices[i].size, devices[i].base);
+	}
 	return 0;
 }
 
 int mem_open(devminor_t minor, int access)
 {
-	if (minor >= num_devices)
+	if (minor >= num_devices) {
 		return ENXIO;
+	}
 	return 0;
 }
 
 int mem_close(devminor_t minor)
 {
-	if (minor >= num_devices)
+	if (minor >= num_devices) {
 		return ENXIO;
+	}
 	return 0;
 }
 
 int mem_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
-	if (minor >= num_devices)
+	if (minor >= num_devices) {
 		return ENXIO;
+	}
 	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
-	if (offset > geo->size)
+	if (offset > geo->size) {
 		return EINVAL;
-	if (offset + size > geo->size)
+	}
+	if (offset + size > geo->size) {
 		size = geo->size - offset;
+	}
 	memcpy_into_iter(iter, ((uint8_t*) geo->base) + offset, size);
 	return size;
 }
 
 int mem_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
-	if (minor >= num_devices)
+	if (minor >= num_devices) {
 		return ENXIO;
+	}
 	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
-	if (offset > geo->size)
+	if (offset > geo->size) {
 		return EINVAL;
-	if (offset + size > geo->size)
+	}
+	if (offset + size > geo->size) {
 		size = geo->size - offset;
+	}
 	memcpy_out_of_iter(iter, ((uint8_t*) geo->base) + offset, size);
 	return size;
 }
 
 int mem_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
 {
-	if (minor >= num_devices)
+	if (minor >= num_devices) {
 		return ENXIO;
+	}
 	return EINVAL;
 }
 
@@ -143,8 +155,9 @@ int mem_poll(devminor_t minor, int events)
 
 off_t mem_seek(devminor_t minor, off_t position, int whence, off_t offset)
 {
-	if (minor >= num_devices)
+	if (minor >= num_devices) {
 		return ENXIO;
+	}
 	struct mem_geometry *geo = &devices[minor];
 
 	switch (whence) {
@@ -160,8 +173,9 @@ off_t mem_seek(devminor_t minor, off_t position, int whence, off_t offset)
 		return EINVAL;
 	}
 
-	if (position > geo->size)
+	if (position > geo->size) {
 		position = geo->size;
+	}
 	return position;
 }
 

@@ -257,8 +257,9 @@ static inline int tty_68681_getchar_buffered(struct serial_channel *channel)
 	}
 	unsigned char ch = _buf_get_char(&channel->rx);
 
-	if (_buf_free_space(&channel->rx) > 100)
+	if (_buf_free_space(&channel->rx) > 100) {
 		ASSERT_CTS(channel);
+	}
 
 	UNLOCK(saved_status);
 	return ch;
@@ -314,8 +315,9 @@ static void tty_68681_process_input(void *_unused)
 			request_bh_run(channels[i].bh_num);
 
 			// TODO this isn't needed now, since the assert in getchar handles this, but once we have the tty subsystem this might be needed
-			//if (_buf_is_empty(&channels[i].rx))
+			//if (_buf_is_empty(&channels[i].rx)) {
 			//	ASSERT_CTS(&channels[i]);
+			//}
 		}
 
 		// Resume any blocked processes once the transmit buffer has been emptied
@@ -334,15 +336,17 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 	int count = 0;
 
 	// The ISR bits for channel A and B are the same but separated by 4 bits in the same register
-	if (minor == CH_B)
+	if (minor == CH_B) {
 		isr >>= 4;
+	}
 
 	if (isr & ISR_S_RX_READY_FULL) {
 		uint8_t status;
 		for (count = 0; count < 100; count++) {
 			status = *channels[minor].ports->status;
-			if (!(status & SR_RX_READY))
+			if (!(status & SR_RX_READY)) {
 				break;
+			}
 			if (status & (SR_RECEIVED_BREAK | SR_FRAMING_ERROR | SR_PARITY_ERROR | SR_OVERRUN_ERROR)) {
 				channels[minor].error = 1;
 				*channels[minor].ports->command = CMD_RESET_ERROR;
@@ -389,8 +393,9 @@ static inline void handle_channel_io(register char isr, register devminor_t mino
 			*channels[minor].ports->send = (unsigned char) ch;
 		} else {
 			// Disable the channel A transmitter if empty
-			if (*channels[minor].ports->status & SR_TX_EMPTY)
+			if (*channels[minor].ports->status & SR_TX_EMPTY) {
 				*channels[minor].ports->command = CMD_DISABLE_TX;
+			}
 			// Run the bottom half to wake up any processes blocked on writing
 			request_bh_run(BH_TTY68681);
 		}
@@ -406,8 +411,9 @@ void handle_serial_irq(void)
 
 	register char isr = *ISR_RD_ADDR;
 
-	for (short i = 0; i < 2; i++)
+	for (short i = 0; i < 2; i++) {
 		handle_channel_io(isr, i);
+	}
 
 
 	if (isr & ISR_TIMER_CHANGE) {
@@ -618,8 +624,9 @@ int tty_68681_init(void)
 	#endif
 
 	error = register_driver(DEVMAJOR_TTY68681, &tty_68681_driver);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	register_bh(BH_TTY68681, tty_68681_process_input, NULL);
 	enable_bh(BH_TTY68681);
@@ -630,12 +637,15 @@ int tty_68681_open(devminor_t minor, int mode)
 {
 	struct serial_channel *channel = from_minor_dev(minor);
 
-	if (!channel)
+	if (!channel) {
 		return ENODEV;
-	if (!mode)
+	}
+	if (!mode) {
 		return EBUSY;
-	if (channel->opens != 0 && ((channel->open_mode & O_EXCL) || (mode & O_EXCL)))
+	}
+	if (channel->opens != 0 && ((channel->open_mode & O_EXCL) || (mode & O_EXCL))) {
 		return EBUSY;
+	}
 	channel->opens++;
 	channel->open_mode = mode;
 	return 0;
@@ -645,8 +655,9 @@ int tty_68681_close(devminor_t minor)
 {
 	struct serial_channel *channel = from_minor_dev(minor);
 
-	if (!channel)
+	if (!channel) {
 		return ENODEV;
+	}
 	channel->opens--;
 	channel->open_mode = 0;
 	return 0;
@@ -658,11 +669,13 @@ int tty_68681_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
-	if (!channel)
+	if (!channel) {
 		return ENODEV;
+	}
 
-	if (channel->error)
+	if (channel->error) {
 		return EIO;
+	}
 
 	for (; remain > 0; remain--) {
 		if (_buf_is_empty(&channel->rx)) {
@@ -683,8 +696,9 @@ int tty_68681_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	size_t remain = size;
 	struct serial_channel *channel = from_minor_dev(minor);
 
-	if (!channel)
+	if (!channel) {
 		return ENODEV;
+	}
 
 	// TODO with this method, each write's size must always be smaller than buffer size
 	if (_buf_free_space(&channel->tx) < size) {
@@ -704,8 +718,9 @@ int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *i
 {
 	struct serial_channel *channel = from_minor_dev(minor);
 
-	if (!channel)
+	if (!channel) {
 		return ENODEV;
+	}
 
 	switch (request) {
 		#if defined(CONFIG_TTY_68681_GPIO_LEDS)
@@ -729,10 +744,12 @@ int tty_68681_poll(devminor_t minor, int events)
 	int revents = 0;
 	struct serial_channel *channel = from_minor_dev(minor);
 
-	if ((events & VFS_POLL_READ) && channel->opens > 0 && !_buf_is_empty(&channel->rx))
+	if ((events & VFS_POLL_READ) && channel->opens > 0 && !_buf_is_empty(&channel->rx)) {
 		revents |= VFS_POLL_READ;
-	if ((events & VFS_POLL_WRITE) && channel->opens > 0 && !_buf_is_full(&channel->tx))
+	}
+	if ((events & VFS_POLL_WRITE) && channel->opens > 0 && !_buf_is_full(&channel->tx)) {
 		revents |= VFS_POLL_WRITE;
+	}
 
 	return revents;
 }

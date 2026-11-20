@@ -84,8 +84,9 @@ static int load_superblock(struct mount *mp)
 	char super_buf[EXT2_SUPERBLOCK_SIZE];
 
 	error = read_superblock(mp->dev, super_buf);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 	super_on_disk = (struct ext2_superblock *) super_buf;
 
 	if (le16toh(super_on_disk->magic) != EXT2_MAGIC) {
@@ -169,8 +170,9 @@ static int load_superblock(struct mount *mp)
 	return 0;
 
 fail:
-	if (super)
+	if (super) {
 		kmfree(super);
+	}
 	return EINVAL;
 }
 

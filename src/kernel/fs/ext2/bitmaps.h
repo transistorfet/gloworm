@@ -61,8 +61,9 @@ static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknu
 	const int block_size = bufcache->block_size;
 
 	buf = get_buf(bufcache, bitmap_blocknum);
-	if (!buf)
+	if (!buf) {
 		return 0;
+	}
 	data = buf->block;
 
 	for (int i = 0; i < block_size; i++) {
@@ -82,8 +83,9 @@ static inline int bit_free(struct bufcache *bufcache, ext2_block_t bitmap_blockn
 	int byte = (bitnum >> 3);
 	char bit = (bitnum & 0x7);
 	struct buf *buf = get_buf(bufcache, bitmap_blocknum);
-	if (!buf)
+	if (!buf) {
 		return -1;
+	}
 
 	((char *) buf->block)[byte] &= ~(0x01 << bit);
 	unref_buf(buf, BF_DIRTY);

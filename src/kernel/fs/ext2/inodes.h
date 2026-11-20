@@ -64,23 +64,27 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 			break;
 		}
 	}
-	if (group >= super->num_groups)
+	if (group >= super->num_groups) {
 		return ENOSPC;
+	}
 
 	group_inode_num = bit_alloc(&mp->bufcache, super->groups[group].inode_bitmap, 0);
-	if (!group_inode_num)
+	if (!group_inode_num) {
 		return ENOSPC;
+	}
 	super->groups[group].free_inode_count -= 1;
 	super->super.total_unalloc_inodes -= 1;
-	if (S_ISDIR(mode))
+	if (S_ISDIR(mode)) {
 		super->groups[group].used_dirs_count += 1;
+	}
 	const ext2_inode_t inodenum = (super->super.inodes_per_group * group) + group_inode_num + 1;
 
 	const ext2_block_t block_offset = group_inode_num >> super->log_inodes_per_block;
 	const int byte_offset = align_remainder(group_inode_num, 1 << super->log_inodes_per_block) << super->log_inode_size;
 	inode_buf = get_buf(&mp->bufcache, super->groups[group].inode_table + block_offset);
-	if (!inode_buf)
+	if (!inode_buf) {
 		return EIO;
+	}
 
 	inode = (struct ext2_inode *) &((char *) inode_buf->block)[byte_offset];
 	inode->mode = htole16(mode);
@@ -108,12 +112,14 @@ static int free_inode(struct vnode *vnode, inode_t ino)
 	const int group = get_inode_group(vnode->mp, ino);
 	struct ext2_super * const super = EXT2_SUPER(vnode->mp->super);
 	error = bit_free(&vnode->mp->bufcache, super->groups[group].inode_bitmap, ino - (super->super.inodes_per_group * group) - 1);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 	super->groups[group].free_inode_count += 1;
 	super->super.total_unalloc_inodes += 1;
-	if (S_ISDIR(vnode->mode))
+	if (S_ISDIR(vnode->mode)) {
 		super->groups[group].used_dirs_count -= 1;
+	}
 	return 0;
 }
 
@@ -124,8 +130,9 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 
 	const struct inode_location result = get_inode_block_and_offset(vnode->mp, ino);
 	inode_buf = get_buf(&vnode->mp->bufcache, result.block);
-	if (!inode_buf)
+	if (!inode_buf) {
 		return EIO;
+	}
 
 	inode = (struct ext2_inode *) &((char *) inode_buf->block)[result.offset];
 	vnode->mode = le16toh(inode->mode);
@@ -157,8 +164,9 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	const struct inode_location result = get_inode_block_and_offset(vnode->mp, ino);
 
 	inode_buf = get_buf(&vnode->mp->bufcache, result.block);
-	if (!inode_buf)
+	if (!inode_buf) {
 		return EIO;
+	}
 
 	inode = (struct ext2_inode *) &((char *) inode_buf->block)[result.offset];
 	inode->mode = htole16(vnode->mode);

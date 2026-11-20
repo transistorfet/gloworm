@@ -62,17 +62,21 @@ int tar_read(int fd)
 
 	while (1) {
 		error = read(fd, buffer, TAR_BLOCK_SIZE);
-		if (error < 0)
+		if (error < 0) {
 			return error;
-		if (error != TAR_BLOCK_SIZE)
+		}
+		if (error != TAR_BLOCK_SIZE) {
 			break;
+		}
 		header = (struct tar_header *) buffer;
 
 		error = tar_verify_checksum(header, buffer);
-		if (error < 0)
+		if (error < 0) {
 			return error;
-		if (error > 0)
+		}
+		if (error > 0) {
 			continue;
+		}
 
 		filesize = strtol(header->filesize, NULL, 8);
 		mode = strtol(header->mode, NULL, 8);
@@ -81,21 +85,24 @@ int tar_read(int fd)
 
 		// TODO this is a temporary hack because mkdir doesn't support trailing slashes
 		int len = strlen(filename);
-		if (filename[len - 1] == '/')
+		if (filename[len - 1] == '/') {
 			filename[len - 1] = '\0';
+		}
 
 		printf("%s (%x) %c\n", filename, mode, header->type);
 
 		switch (header->type) {
 			case '0':
 				error = tar_read_regular_file(fd, filename, mode, filesize);
-				if (error < 0)
+				if (error < 0) {
 					return error;
+				}
 				break;
 			case '5':
 				error = mkdir(filename, mode);
-				if (error < 0)
+				if (error < 0) {
 					return error;
+				}
 				break;
 			default:
 				printf("Unexpected file type %c\n", header->type);
@@ -115,20 +122,23 @@ int tar_verify_checksum(struct tar_header *header, unsigned char *buffer)
 	// If the checksum is already NUL then don't modify so the zero check still passes
 	if (header->checksum[0] != '\0') {
 		checksum_rec = strtol(header->checksum, NULL, 8);
-		for (short i = 0; i < 8; i++)
+		for (short i = 0; i < 8; i++) {
 			header->checksum[i] = 0x20;
+		}
 	}
 
 	zeros = 1;
 	checksum = 0;
 	for (short i = 0; i < TAR_BLOCK_SIZE; i++) {
-		if (buffer[i])
+		if (buffer[i]) {
 			zeros = 0;
+		}
 		checksum += buffer[i];
 	}
 
-	if (zeros)
+	if (zeros) {
 		return 1;
+	}
 	if (checksum != checksum_rec) {
 		printf("Error: checksum failed: %d but expected %d\n", checksum, checksum_rec);
 		return -1;

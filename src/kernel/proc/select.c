@@ -14,17 +14,22 @@ int select_check_open_fds(struct process *proc, int max, fd_set *readfds, fd_set
 
 	for (short word = 0; word < _FDS_MAX / __FDS_BITS; word++) {
 		mask = 0;
-		if (readfds)
+		if (readfds) {
 			mask |= readfds->fds_bits[word];
-		if (writefds)
+		}
+		if (writefds) {
 			mask |= writefds->fds_bits[word];
-		if (exceptfds)
+		}
+		if (exceptfds) {
 			mask |= exceptfds->fds_bits[word];
+		}
 		for (fd_mask_t bit = 0x01; bit; bit <<= 1, fd++) {
-			if (fd >= max)
+			if (fd >= max) {
 				return 0;
-			if ((mask & bit) && !proc->fd_table->files[fd])
+			}
+			if ((mask & bit) && !proc->fd_table->files[fd]) {
 				return -1;
+			}
 		}
 	}
 	return 0;
@@ -38,8 +43,9 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 
 	for (short word = 0; word < _FDS_MAX / __FDS_BITS; word++) {
 		for (fd_mask_t bit = 0x01; bit; bit <<= 1, fd++) {
-			if (fd >= max)
+			if (fd >= max) {
 				break;
+			}
 
 			// TODO should it just poll for any of the 3, or trim it down to just the ones we're looking for
 			revents = vfs_poll(proc->fd_table->files[fd], VFS_POLL_READ | VFS_POLL_WRITE | VFS_POLL_ERROR);
@@ -66,8 +72,9 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 				}
 			}
 
-			if (!mark_ready && ready)
+			if (!mark_ready && ready) {
 				return 1;
+			}
 		}
 
 	}
@@ -76,8 +83,9 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 
 int select_wait_check(struct process *proc, int events, struct vnode *vnode, device_t rdev)
 {
-	if (select_poll_fds(proc, (int) proc->blocked_call.arg1, (fd_set *) proc->blocked_call.arg2, (fd_set *) proc->blocked_call.arg3, (fd_set *) proc->blocked_call.arg4, 0))
+	if (select_poll_fds(proc, (int) proc->blocked_call.arg1, (fd_set *) proc->blocked_call.arg2, (fd_set *) proc->blocked_call.arg3, (fd_set *) proc->blocked_call.arg4, 0)) {
 		return 1;
+	}
 	return 0;
 }
 
@@ -91,15 +99,17 @@ int enter_select(struct process *proc, int max, fd_set *readfds, fd_set *writefd
 {
 	// When entering select for the first time, we do some initial checks
 	if (!(proc->bits & PB_SELECT)) {
-		if (select_check_open_fds(proc, max, readfds, writefds, exceptfds))
+		if (select_check_open_fds(proc, max, readfds, writefds, exceptfds)) {
 			return -1;
+		}
 
 		// If no files are ready, then suspend the process for the timeout
 		if (!select_poll_fds(proc, max, readfds, writefds, exceptfds, 0)) {
 			if (timeout) {
 				// If a timeout of zero is specified, then return immediately instead of suspending
-				if (timeout->tv_sec == 0 && timeout->tv_usec == 0)
+				if (timeout->tv_sec == 0 && timeout->tv_usec == 0) {
 					return 0;
+				}
 				current_proc->timer.argp = current_proc;
 				current_proc->timer.callback = (timer_callback_t) select_timeout;
 				add_timer(&current_proc->timer, timeout->tv_sec, timeout->tv_usec);

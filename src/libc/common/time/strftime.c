@@ -108,8 +108,9 @@ size_t strftime (char* buffer, size_t max, const char *fmt, const struct tm *tp)
 			if (svalue) {
 				strncpy(&buffer[i], svalue, max - i);
 				i += strlen(svalue);
-				if (i > max)
+				if (i > max) {
 					i = max - 1;
+				}
 			} else if (subfmt) {
 				i += strftime(&buffer[i], max - i, subfmt, tp);
 			} else if (width && width < max - i) {

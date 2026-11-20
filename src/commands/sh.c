@@ -91,8 +91,9 @@ int command_dump(int argc, char **argv, char **envp)
 	} else {
 		short length = 0x40;
 
-		if (argc >= 3)
+		if (argc >= 3) {
 			length = strtol(argv[2], NULL, 16);
+		}
 		dump((const uint16_t *) strtol(argv[1], NULL, 16), length);
 	}
 	return 0;
@@ -200,8 +201,9 @@ int command_hex(int argc, char **argv, char **envp)
 
 	while (1) {
 		result = read(fd, buffer, DUMP_BUF_SIZE);
-		if (result == 0)
+		if (result == 0) {
 			break;
+		}
 
 		if (result < 0) {
 			printf("Error while reading: %d\n", result);
@@ -321,8 +323,9 @@ void init_commands(void)
 main_t find_command(char *name)
 {
 	for (short i = 0; command_list[i].name; i++) {
-		if (!strcmp(name, command_list[i].name))
+		if (!strcmp(name, command_list[i].name)) {
 			return command_list[i].main;
+		}
 	}
 	return NULL;
 }
@@ -331,8 +334,9 @@ int parseline(char *input, char **vargs)
 {
 	short j = 0;
 
-	while (*input == ' ' || *input == '\t')
+	while (*input == ' ' || *input == '\t') {
 		input++;
+	}
 
 	vargs[j++] = input;
 	while (*input != '\0' && *input != '\n' && *input != '\r') {
@@ -343,24 +347,29 @@ int parseline(char *input, char **vargs)
 			}
 			input++;
 
-			while (!iscntrl(*input) && *input != '\"')
+			while (!iscntrl(*input) && *input != '\"') {
 				input++;
+			}
 			*input++ = '\0';
-			while (*input == ' ' || *input == '\t')
+			while (*input == ' ' || *input == '\t') {
 				input++;
+			}
 			vargs[j++] = input;
 		} else if (*input == ' ' || *input == '\t') {
 			*input++ = '\0';
-			while (*input == ' ' || *input == '\t')
+			while (*input == ' ' || *input == '\t') {
 				input++;
+			}
 			vargs[j++] = input;
-		} else
+		} else {
 			input++;
+		}
 	}
 
 	*input = '\0';
-	if (*vargs[j - 1] == '\0')
+	if (*vargs[j - 1] == '\0') {
 		j -= 1;
+	}
 	vargs[j] = NULL;
 
 	return j;
@@ -393,10 +402,11 @@ int parse_command_line(char *input, struct pipe_command *commands)
 			j += 1;
 			commands[j].cmd = input + 1;
 		} else if (*input == '>') {
-			if (*(input + 1) == '>')
+			if (*(input + 1) == '>') {
 				commands[j].append = 1;
+			}
 			*input++ = '\0';
-			for (; *input == ' ' || *input == '>'; input++);
+			for (; *input == ' ' || *input == '>'; input++) { }
 
 			if (commands[j].stdout_file) {
 				printf("parse error: stdout is redirected more than once\n");
@@ -426,8 +436,9 @@ int open_file(char *filename, int flags, int newfd)
 		return -1;
 	}
 
-	if (dup2(fd, newfd))
+	if (dup2(fd, newfd)) {
 		return -1;
+	}
 	close(fd);
 	return 0;
 }
@@ -438,24 +449,28 @@ char *resolve_file_location(char *filename, char *buffer, int max)
 	const char *PATH = "/bin:/sbin";
 
 	if (strchr(filename, '/')) {
-		if (!access(filename, X_OK))
+		if (!access(filename, X_OK)) {
 			return filename;
+		}
 		return NULL;
 	}
 
 	short i;
 	const char *curpath = PATH;
 	while (*curpath != '\0') {
-		for (i = 0; i < max - 1 && *curpath && *curpath != ':'; curpath++, i++)
+		for (i = 0; i < max - 1 && *curpath && *curpath != ':'; curpath++, i++) {
 			buffer[i] = *curpath;
-		if (*curpath == ':')
+		}
+		if (*curpath == ':') {
 			curpath++;
+		}
 		buffer[i++] = '/';
 		strncpy(&buffer[i], filename, max - i);
 		buffer[max - 1] = '\0';
 
-		if (!access(buffer, X_OK))
+		if (!access(buffer, X_OK)) {
 			return buffer;
+		}
 	}
 	return NULL;
 }
@@ -486,21 +501,24 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 		pid_t fgpid = getpgid(0);
 		tcsetpgrp(STDOUT_FILENO, fgpid);
 	} else {
-		if (setpgid(0, 0))
+		if (setpgid(0, 0)) {
 			exit(-1);
+		}
 		pid_t fgpid = getpgid(0);
 		tcsetpgrp(STDOUT_FILENO, fgpid);
 
 		// TODO set the tty's process group to this one? how does it get set back when the process terminates?
 
 		if (command->stdin_file) {
-			if (open_file(command->stdin_file, O_RDONLY, STDIN_FILENO))
+			if (open_file(command->stdin_file, O_RDONLY, STDIN_FILENO)) {
 				exit(-1);
+			}
 		}
 
 		if (command->stdout_file) {
-			if (open_file(command->stdout_file, O_WRONLY | O_CREAT | (command->append ? O_APPEND : O_TRUNC), STDOUT_FILENO))
+			if (open_file(command->stdout_file, O_WRONLY | O_CREAT | (command->append ? O_APPEND : O_TRUNC), STDOUT_FILENO)) {
 				exit(-1);
+			}
 		}
 
 		if (main_func) {
@@ -528,27 +546,31 @@ int read_input(int fin, char *buffer, int max)
 
 	int i;
 
-	if (f_interactive)
+	if (f_interactive) {
 		write(STDOUT_FILENO, "% ", 2);
+	}
 
 	for (i = 0; i < max - 1; i++) {
 		if (pos >= count) {
 			pos = 0;
 			count = read(fin, input_buf, INPUT_SIZE);
 			if (count == 0) {
-				if (i > 0)
+				if (i > 0) {
 					break;
+				}
 				return 0;
 			} else if (count < 0) {
-				if (count != EINTR)
+				if (count != EINTR) {
 					printf("Error: %d\n", count);
+				}
 				return -1;
 			}
 		}
 
 		buffer[i] = input_buf[pos++];
-		if (buffer[i] == '\n')
+		if (buffer[i] == '\n') {
 			break;
+		}
 	}
 	buffer[i] = '\0';
 	return 1;
@@ -577,8 +599,9 @@ int read_loop(int fin)
 			return result;
 		}
 
-		if (parse_command_line(buffer, commands))
+		if (parse_command_line(buffer, commands)) {
 			continue;
+		}
 
 		/*
 		for (int i = 0; i < PIPE_SIZE && commands[i].cmd; i++) {
@@ -606,8 +629,9 @@ int read_loop(int fin)
 
 void handle_signal(int signum)
 {
-	if (signum == SIGINT)
+	if (signum == SIGINT) {
 		puts("^C");
+	}
 }
 
 /**************
@@ -643,13 +667,15 @@ int MAIN(sh_task)(int argc, char **argv, char **env)
 		}
 	}
 
-	if (f_interactive)
+	if (f_interactive) {
 		puts("\n\nThe Pseudo Shell!\n");
+	}
 
 	error = read_loop(fin);
 
-	if (fin != STDIN_FILENO)
+	if (fin != STDIN_FILENO) {
 		close(fin);
+	}
 
 	return error;
 }

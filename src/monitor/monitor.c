@@ -66,24 +66,28 @@ int parseline(char *input, char **vargs)
 {
 	short j = 0;
 
-	while (*input == ' ')
+	while (*input == ' ') {
 		input++;
+	}
 
 	vargs[j++] = input;
 	while (*input != '\0' && *input != '\n' && *input != '\r') {
 		if (*input == ' ') {
 			*input = '\0';
 			input++;
-			while (*input == ' ')
+			while (*input == ' ') {
 				input++;
+			}
 			vargs[j++] = input;
-		} else
+		} else {
 			input++;
+		}
 	}
 
 	*input = '\0';
-	if (*vargs[j - 1] == '\0')
+	if (*vargs[j - 1] == '\0') {
 		j -= 1;
+	}
 	vargs[j] = NULL;
 
 	return j;
@@ -172,8 +176,9 @@ void command_dump(int argc, char **args)
 	} else {
 		short length = 0x40;
 
-		if (argc >= 3)
+		if (argc >= 3) {
 			length = strtol(args[2], NULL, 16);
+		}
 		dump((const uint16_t *) strtol(args[1], NULL, 16), length);
 	}
 }
@@ -325,10 +330,12 @@ void command_writerom(int argc, char **args)
 	uint16_t *dest = (uint16_t *) ROM_ADDR;
 	uint16_t *source = (uint16_t *) RAM_ADDR;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
-	if (argc >= 3)
+	}
+	if (argc >= 3) {
 		source = (uint16_t *) strtol(args[2], NULL, 16);
+	}
 
 	for (int i = 0; i < (ROM_SIZE >> 1); i++) {
 		data = dest[i];
@@ -355,12 +362,15 @@ void command_verifyrom(int argc, char **args)
 	uint16_t *source = (uint16_t *) RAM_ADDR;
 	uint16_t *dest = (uint16_t *) ROM_ADDR;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
-	if (argc >= 3)
+	}
+	if (argc >= 3) {
 		source = (uint16_t *) strtol(args[2], NULL, 16);
-	if (argc >= 4)
+	}
+	if (argc >= 4) {
 		size = strtol(args[3], NULL, 16);
+	}
 
 	for (int i = 0; i < (size >> 1); i++) {
 		if (dest[i] != source[i]) {
@@ -400,8 +410,9 @@ void command_load(int argc, char **args)
 	size >>= 1;
 	//printf("Expecting %x\n", size);
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		mem = (uint16_t *) strtol(args[1], NULL, 16);
+	}
 
 	for (i = 0; i < size; i++) {
 		data = fetch_word(4);
@@ -409,8 +420,9 @@ void command_load(int argc, char **args)
 		mem[i] = data;
 	}
 
-	if (odd_size)
+	if (odd_size) {
 		mem[i] = fetch_word(2);
+	}
 
 	fputs("Load complete\n", stdout);
 }
@@ -420,10 +432,12 @@ void command_boot(int argc, char **args)
 	char *boot_args = "";
 	void (*entry)(char *) = (void (*)(char *)) RAM_ADDR;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		entry = (void (*)(char *)) strtol(args[1], NULL, 16);
-	if (argc >= 3)
+	}
+	if (argc >= 3) {
 		boot_args = args[2];
+	}
 	((void (*)(char *)) entry)(boot_args);
 }
 
@@ -437,10 +451,12 @@ void command_ramtest(int argc, char **args)
 	uint16_t *dest = (uint16_t *) RAM_ADDR;
 	uint32_t length = RAM_SIZE;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
-	if (length >= 3)
+	}
+	if (length >= 3) {
 		length = strtol(args[2], NULL, 16);
+	}
 
 	printf("Testing onboard ram from %x to %x\n", (uint32_t) dest, (uint32_t) dest + length);
 
@@ -546,8 +562,9 @@ void command_atatest(int argc, char **args)
 	uint32_t sector = 46842;
 	char buffer[512];
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		sector = (uint32_t) strtol(args[1], NULL, 10);
+	}
 
 	//printf("Set COMET CompactFlash async mode\n");
 	//*COMET_VME_CF_CONTROL = 0x00;
@@ -598,8 +615,9 @@ void command_atatest(int argc, char **args)
 	printf("Mem %x:\n", sector);
 	for (int i = 0; i < 512; i++) {
 		printf("%02x ", 0xff & buffer[i]);
-		if ((i & 0x1F) == 0x1F)
+		if ((i & 0x1F) == 0x1F) {
 			printf("\n");
+		}
 	}
 
 	return;

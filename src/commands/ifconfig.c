@@ -33,8 +33,9 @@ int main(int argc, char **argv)
 	}
 
 	device = argv[1];
-	if (argc == 4)
+	if (argc == 4) {
 		address = argv[2];
+	}
 
 	sockfd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0) {

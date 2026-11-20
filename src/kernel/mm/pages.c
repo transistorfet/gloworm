@@ -91,8 +91,9 @@ int init_pages(physical_address_t start, size_t size, uint32_t flags)
 	num_global_blocks = 0;
 
 	error = append_global_page_block(start, size, flags);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	return 0;
 }

@@ -25,8 +25,9 @@ int MAIN(command_cat)(int argc, char **argv, char **envp)
 
 	while (1) {
 		result = read(fd, buffer, CAT_BUF_SIZE);
-		if (result == 0)
+		if (result == 0) {
 			break;
+		}
 
 		if (result < 0) {
 			printf("Error while reading: %d\n", result);

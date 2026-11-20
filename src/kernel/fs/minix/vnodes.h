@@ -50,8 +50,9 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 	// TODO this should recycle a cached vnode if it doesn't have a reference and there are more than a certain number of vnodes already loaded
 	//entry = _find_free_entry();
 	vnode = kmalloc(sizeof(struct minix_vnode));
-	if (!vnode)
+	if (!vnode) {
 		return NULL;
+	}
 
 	//printk("L:%x;%d;%d\n", vnode, mp->dev, ino);
 	_queue_insert(&cache, &MINIX_DATA(vnode).node);
@@ -99,8 +100,9 @@ static struct vnode *alloc_vnode(struct mount *mp, mode_t mode, uid_t uid, gid_t
 
 	// TODO this should pass in the mp or superblock, but that would mean alloc_inode couldn't be used by the hacky mkfs function
 	bitnum_t ino = alloc_inode(mp, mode, uid, gid, device);
-	if (!ino)
+	if (!ino) {
 		return NULL;
+	}
 
 	vnode = load_vnode(mp, ino);
 	if (!vnode) {
@@ -141,8 +143,9 @@ static void free_unused_vnodes(void)
 
 	while (nodes_in_cache - 1 >= MAX_VNODES) {
 		for (last = cache.tail; last && MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) { }
-		if (!last || MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0)
+		if (!last || MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0) {
 			break;
+		}
 		free_vnode(MINIX_QUEUE_NODE_TO_VNODE(last));
 	}
 }

@@ -22,14 +22,16 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 
 	super = MINIX_SUPER(mp->super);
 	inode_num = bit_alloc(&mp->bufcache, MINIX_V1_INODE_BITMAP_START, super->super_v1.imap_blocks, 0);
-	if (!inode_num)
+	if (!inode_num) {
 		return ENOSPC;
+	}
 
 	short inode_offset = (inode_num - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (inode_num - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
 	inode_buf = get_buf(&mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
-	if (!inode_buf)
+	if (!inode_buf) {
 		return ENOMEM;
+	}
 
 	inode_table = inode_buf->block;
 	inode_table[inode_offset].mode = htole16(mode);
@@ -66,8 +68,9 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	short inode_offset = (ino - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (ino - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
 	inode_buf = get_buf(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
-	if (!inode_buf)
+	if (!inode_buf) {
 		return ENOMEM;
+	}
 
 	inode_table = inode_buf->block;
 	vnode->mode = le16toh(inode_table[inode_offset].mode);
@@ -99,8 +102,9 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	short inode_offset = (ino - 1) & (MINIX_V1_INODES_PER_ZONE - 1);
 	zone_t block_offset = (ino - 1) >> MINIX_V1_LOG_INODES_PER_ZONE;
 	inode_buf = get_buf(&vnode->mp->bufcache, MINIX_V1_INODE_TABLE_START(&super->super_v1) + block_offset);
-	if (!inode_buf)
+	if (!inode_buf) {
 		return ENOMEM;
+	}
 
 	inode_table = inode_buf->block;
 	inode_table[inode_offset].mode = htole16(vnode->mode);

@@ -900,8 +900,9 @@ int do_accept(int fd, struct sockaddr __user *addr, socklen_t __user *addr_len)
 	}
 
 	length = get_user_uintptr(addr_len);
-	if (length > 256)
+	if (length > 256) {
 		length = 256;
+	}
 	error = net_socket_accept(file, (struct sockaddr *) buffer, &length, current_proc->uid, &newfile);
 	if (error) {
 		return error;
@@ -957,8 +958,9 @@ ssize_t do_sendto(int fd, const void __user *buf, size_t nbytes, int flags, int 
 	addr_len = (socklen_t) get_user_uintptr(&opts[1]);
 
 	#if defined(CONFIG_MMU)
-	if (addr_len > 256)
+	if (addr_len > 256) {
 		addr_len = 256;
+	}
 	char addr_buffer[256];
 	memcpy_from_user(addr_buffer, addr, addr_len);
 	addr = (const struct sockaddr *) addr_buffer;
@@ -1020,8 +1022,9 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 
 	iovec_iter_init_user_buf(&iter, (char *) buf, nbytes);
 	error = net_socket_recvfrom(file, &iter, flags, addr ? (struct sockaddr *) addr_buffer : NULL, &kernel_len);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	if (addr) {
 		memcpy_to_user((char *) addr, addr_buffer, kernel_len);
@@ -1033,8 +1036,9 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 	#else
 
 	error = net_socket_recvfrom(file, &iter, flags, addr, addr_len);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	#endif
 	return error;
@@ -1059,11 +1063,13 @@ int do_getsockopt(int fd, int level, int optname, void __user *optval, socklen_t
 	}
 
 	length = get_user_uintptr(optlen);
-	if (length > 256)
+	if (length > 256) {
 		length = 256;
+	}
 	error = net_socket_get_options(file, level, optname, buffer, &length);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	memcpy_to_user(optval, buffer, length);
 	put_user_uintptr(optlen, length);

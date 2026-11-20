@@ -11,6 +11,6 @@ int main(void)
 	strcpy(data, "Hey there");
 
 	printf("%s\n", data);
-	return(0);
+	return 0;
 }
 

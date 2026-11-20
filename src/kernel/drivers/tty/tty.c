@@ -205,8 +205,9 @@ int tty_init(void)
 	}
 
 	error = register_driver(DEVMAJOR_TTY, &tty_driver);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	register_bh(BH_TTY, tty_process_input, NULL);
 	enable_bh(BH_TTY);
@@ -215,22 +216,27 @@ int tty_init(void)
 
 int tty_open(devminor_t minor, int mode)
 {
-	if (minor >= TTY_DEVICE_NUM)
+	if (minor >= TTY_DEVICE_NUM) {
 		return ENODEV;
+	}
 	// TODO you need to notify the serial driver to request the tty bottom half run after any input
-	if (tty_devices[minor].opens++ == 0)
+	if (tty_devices[minor].opens++ == 0) {
 		return dev_open(tty_devices[minor].rdev, mode | O_NONBLOCK | O_EXCL);
+	}
 	return 0;
 }
 
 int tty_close(devminor_t minor)
 {
-	if (minor >= TTY_DEVICE_NUM)
+	if (minor >= TTY_DEVICE_NUM) {
 		return ENODEV;
-	if (tty_devices[minor].opens == 0)
+	}
+	if (tty_devices[minor].opens == 0) {
 		return EBADF;
-	if (--tty_devices[minor].opens == 0)
+	}
+	if (--tty_devices[minor].opens == 0) {
 		return dev_close(tty_devices[minor].rdev);
+	}
 	return 0;
 }
 
@@ -238,8 +244,9 @@ int tty_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	size_t size;
 
-	if (minor >= TTY_DEVICE_NUM)
+	if (minor >= TTY_DEVICE_NUM) {
 		return ENODEV;
+	}
 
 	// If an error occurred when buffering the data, then return it and clear the error
 	if (tty_devices[minor].error) {
@@ -252,12 +259,14 @@ int tty_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	if (!(tty_devices[minor].tio.c_lflag & ICANON)) {
 		if (tty_devices[minor].buf_read < tty_devices[minor].buf_write) {
 			size_t max = tty_devices[minor].buf_write - tty_devices[minor].buf_read;
-			if (size < max)
+			if (size < max) {
 				max = size;
+			}
 			memcpy_into_iter(iter, &tty_devices[minor].buffer[tty_devices[minor].buf_read], max);
 			tty_devices[minor].buf_read += max;
-			if (tty_devices[minor].buf_read >= tty_devices[minor].buf_write)
+			if (tty_devices[minor].buf_read >= tty_devices[minor].buf_write) {
 				tty_reset_input(minor);
+			}
 			return max;
 		}
 
@@ -280,8 +289,9 @@ int tty_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 
 		// Copy the lesser of the remaining buffered bytes or the requested size
 		max = tty_devices[minor].buf_write - tty_devices[minor].buf_read;
-		if (size < max)
+		if (size < max) {
 			max = size;
+		}
 		for (count = 0; count < max; count++) {
 			byte = tty_devices[minor].buffer[tty_devices[minor].buf_read++];
 			copy_uint8_into_iter(iter, byte);
@@ -312,8 +322,9 @@ int tty_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 {
 	int written;
 
-	if (minor >= TTY_DEVICE_NUM)
+	if (minor >= TTY_DEVICE_NUM) {
 		return ENODEV;
+	}
 
 	if (!(tty_devices[minor].tio.c_oflag & OPOST)) {
 		written = dev_write(tty_devices[minor].rdev, offset, iter);
@@ -329,7 +340,7 @@ int tty_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 				// Map LF to CR-LF
 				iovec_iter_init_simple_kvec(&iter_single, &kvec, "\r\n", 2);
 				dev_write(tty_devices[minor].rdev, 0, &iter_single);
-			} else if (byte == '\r' &&(tty_devices[minor].tio.c_oflag & OCRNL)) {
+			} else if (byte == '\r' && (tty_devices[minor].tio.c_oflag & OCRNL)) {
 				// Map CR to LF
 				iovec_iter_init_simple_kvec(&iter_single, &kvec, "\n", 1);
 				dev_write(tty_devices[minor].rdev, 0, &iter_single);
@@ -351,8 +362,9 @@ int tty_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, u
 {
 	short saved_status;
 
-	if (minor >= TTY_DEVICE_NUM)
+	if (minor >= TTY_DEVICE_NUM) {
 		return ENODEV;
+	}
 
 	switch (request) {
 		case TCGETS: {
@@ -390,12 +402,15 @@ int tty_poll(devminor_t minor, int events)
 	int revents = 0;
 	struct tty_device *tty = &tty_devices[minor];
 
-	if ((events & VFS_POLL_READ) && tty->opens > 0 && tty->ready)
+	if ((events & VFS_POLL_READ) && tty->opens > 0 && tty->ready) {
 		revents |= VFS_POLL_READ;
-	if ((events & VFS_POLL_WRITE) && tty->opens > 0)
+	}
+	if ((events & VFS_POLL_WRITE) && tty->opens > 0) {
 		revents |= dev_poll(tty_devices[minor].rdev, VFS_POLL_WRITE);
-	if ((events & VFS_POLL_ERROR) && tty->opens > 0 && tty->error)
+	}
+	if ((events & VFS_POLL_ERROR) && tty->opens > 0 && tty->error) {
 		revents |= VFS_POLL_ERROR;
+	}
 
 	return revents;
 }

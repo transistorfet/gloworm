@@ -6,8 +6,9 @@ void *memset(void *ptr, int value, size_t num)
 {
 	register unsigned char *dest = ptr;
 
-	for (; num > 0; num--)
+	for (; num > 0; num--) {
 		*dest++ = (char) value;
+	}
 	/*
 	asm volatile(
 	"move.l	%0, %%a0\n"

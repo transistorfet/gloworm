@@ -11,14 +11,17 @@ int inet_aton(const char *str, struct in_addr *ptr)
 	for (short i = 0; i < 4; i++) {
 		addr <<= 8;
 		octet = strtol(str, &endptr, 10);
-		if (octet < 0 || octet > 255)
+		if (octet < 0 || octet > 255) {
 			return 0;
+		}
 		addr |= (octet & 0xFF);
 
-		if (!endptr || *endptr == '\0')
+		if (!endptr || *endptr == '\0') {
 			break;
-		if (*endptr != '.')
+		}
+		if (*endptr != '.') {
 			return 0;
+		}
 		str = endptr + 1;
 	}
 

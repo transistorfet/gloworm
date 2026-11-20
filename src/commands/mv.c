@@ -30,8 +30,9 @@ int MAIN(command_mv)(int argc, char **argv, char **envp)
 	if (!error && S_ISDIR(statbuf.st_mode)) {
 		int end = strlen(destfile) - 1;
 		strncpy(buffer, destfile, MV_BUF_SIZE);
-		if (buffer[end] != '/')
+		if (buffer[end] != '/') {
 			buffer[++end] = '/';
+		}
 		strncpy(&buffer[end + 1], mv_path_last_component(srcfile), MV_BUF_SIZE - (end + 1));
 		destfile = buffer;
 	}
@@ -48,11 +49,13 @@ int MAIN(command_mv)(int argc, char **argv, char **envp)
 static const char *mv_path_last_component(const char *path)
 {
 	short i = strlen(path) - 1;
-	if (path[i] == '/')
+	if (path[i] == '/') {
 		i--;
+	}
 	for (; i >= 0; i--) {
-		if (path[i] == '/')
+		if (path[i] == '/') {
 			break;
+		}
 	}
 	i += 1;
 	return &path[i];

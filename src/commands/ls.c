@@ -13,14 +13,17 @@ void format_file_mode(mode_t mode, char *buffer)
 
 	strcpy(buffer, "-rwxrwxrwx");
 
-	if (S_ISDIR(mode))
+	if (S_ISDIR(mode)) {
 		buffer[0] = 'd';
-	if (S_ISCHR(mode))
+	}
+	if (S_ISCHR(mode)) {
 		buffer[0] = 'c';
+	}
 
 	for (short i = 1; i < 10; i++) {
-		if (!(mode & curbit))
+		if (!(mode & curbit)) {
 			buffer[i] = '-';
+		}
 		curbit >>= 1;
 	}
 }
@@ -44,8 +47,9 @@ int MAIN(command_ls)(int argc, char **argv, char **envp)
 
 	int start = strlen(path) - 1;
 	strcpy(filename, path);
-	if (filename[start] != '/')
+	if (filename[start] != '/') {
 		filename[++start] = '/';
+	}
 	start++;
 
 	while (1) {
@@ -55,8 +59,9 @@ int MAIN(command_ls)(int argc, char **argv, char **envp)
 			return error;
 		}
 
-		if (error == 0)
+		if (error == 0) {
 			break;
+		}
 
 		if (dir.d_name[0] != '.') {
 			strcpy(&filename[start], dir.d_name);

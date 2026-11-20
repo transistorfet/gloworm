@@ -39,8 +39,9 @@ int string_array_copy(struct string_array *array, const char __user *const src_w
 		if (from_user) {
 			str = (char *) get_user_uintptr((void *) &src_words[i]);
 			result = strncpy_from_user(&array->buffer[used], str, EXEC_ARGS_LENGTH_MAX - used);
-			if (result < 0)
+			if (result < 0) {
 				return result;
+			}
 		} else {
 			result = strnlen(src_words[i], EXEC_ARGS_LENGTH_MAX - used);
 			strncpy(&array->buffer[used], src_words[i], EXEC_ARGS_LENGTH_MAX - used);

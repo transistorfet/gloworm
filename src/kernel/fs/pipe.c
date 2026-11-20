@@ -59,8 +59,9 @@ int vfs_create_pipe(struct vfile **rfile, struct vfile **wfile)
 	struct vnode *vnode;
 
 	vnode = kmalloc(sizeof(struct pipe_vnode));
-	if (!vnode)
+	if (!vnode) {
 		return ENOMEM;
+	}
 	// TODO replace uid and gid with valid values based on current proc?
 	vfs_init_vnode(vnode, &pipe_vnode_ops, NULL, 0600, 1, 0, 0, 0, 0, 0, 0, 0, 0);
 

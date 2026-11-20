@@ -20,8 +20,9 @@ static void net_if_process_bh(void *_unused);
 
 void init_net_if(void)
 {
-	for (short i = 0; i < IFDEV_MAX; i++)
+	for (short i = 0; i < IFDEV_MAX; i++) {
 		active_ifdevs[i] = NULL;
+	}
 
 	register_bh(BH_NET, net_if_process_bh, NULL);
 	enable_bh(BH_NET);
@@ -30,8 +31,9 @@ void init_net_if(void)
 int net_if_register_device(struct if_device *ifdev)
 {
 	for (short i = 0; i < IFDEV_MAX; i++) {
-		if (!active_ifdevs[i])
+		if (!active_ifdevs[i]) {
 			active_ifdevs[i] = ifdev;
+		}
 	}
 	return 0;
 }
@@ -39,8 +41,9 @@ int net_if_register_device(struct if_device *ifdev)
 struct if_device *net_if_find(const char *name, struct protocol *proto)
 {
 	for (short i = 0; i < IFDEV_MAX; i++) {
-		if ((!name || !strcmp(active_ifdevs[i]->name, name)) && (!proto || active_ifdevs[i]->incoming_proto == proto))
+		if ((!name || !strcmp(active_ifdevs[i]->name, name)) && (!proto || active_ifdevs[i]->incoming_proto == proto)) {
 			return active_ifdevs[i];
+		}
 	}
 	return NULL;
 }
@@ -56,22 +59,25 @@ int net_if_change_state(struct if_device *ifdev, int state)
 	}
 
 	if (state & IFF_UP) {
-		if (!ifdev->address.ss_family)
+		if (!ifdev->address.ss_family) {
 			// TODO what error should be here?
 			return -1;
+		}
 
 		extern struct protocol ipv4_protocol;
 		ifdev->incoming_proto = &ipv4_protocol;
 
 		log_notice("%s: bringing interface up\n", ifdev->name);
 		error = ifdev->ops->up(ifdev);
-		if (error)
+		if (error) {
 			return error;
+		}
 	} else {
 		log_notice("%s: bringing interface down\n", ifdev->name);
 		error = ifdev->ops->down(ifdev);
-		if (error)
+		if (error) {
 			return error;
+		}
 	}
 
 	ifdev->flags = state & IFF_SET_MASK;
@@ -82,27 +88,31 @@ int net_if_ioctl(int request, struct ifreq *ifreq, uid_t uid)
 {
 	struct if_device *ifdev;
 
-	if (_IO_TYPE(request) != 'I' || _IO_PARAM(request) != sizeof(struct ifreq))
+	if (_IO_TYPE(request) != 'I' || _IO_PARAM(request) != sizeof(struct ifreq)) {
 		return EINVAL;
+	}
 
 	ifdev = net_if_find(ifreq->ifr_name, NULL);
-	if (!ifdev)
+	if (!ifdev) {
 		return ENODEV;
+	}
 
 	switch (request) {
 		case SIOCGIFFLAGS:
 			ifreq->ifr_flags = ifdev->flags;
 			break;
 		case SIOCSIFFLAGS:
-			if (uid != SU_UID)
+			if (uid != SU_UID) {
 				return EPERM;
+			}
 			return net_if_change_state(ifdev, ifreq->ifr_flags);
 		case SIOCGIFADDR:
 			memcpy(&ifreq->ifr_addr, &ifdev->address, sizeof(struct sockaddr_storage));
 			break;
 		case SIOCSIFADDR:
-			if (uid != SU_UID)
+			if (uid != SU_UID) {
 				return EPERM;
+			}
 			memcpy(&ifdev->address, &ifreq->ifr_addr, sizeof(struct sockaddr_storage));
 			break;
 		default:

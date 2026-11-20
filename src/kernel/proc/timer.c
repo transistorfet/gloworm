@@ -25,8 +25,9 @@ int add_timer(struct timer *timer, int seconds, int microseconds)
 {
 	nanos_t uptime;
 
-	if (timer->expires_time)
+	if (timer->expires_time) {
 		_queue_remove(&timer_list, &timer->node);
+	}
 	uptime = get_monotonic_uptime();
 	timer->expires_time = uptime + (seconds * NANOS_PER_SECOND) + (microseconds * 1000);
 	_queue_insert(&timer_list, &timer->node);
@@ -35,8 +36,9 @@ int add_timer(struct timer *timer, int seconds, int microseconds)
 
 int remove_timer(struct timer *timer)
 {
-	if (!timer->expires_time)
+	if (!timer->expires_time) {
 		return -1;
+	}
 	_queue_remove(&timer_list, &timer->node);
 	timer->expires_time = 0;
 	return 0;

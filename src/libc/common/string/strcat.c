@@ -7,8 +7,9 @@ char *strcat(char *dest, const char *src)
 
 	for (; *dest; dest++) { }
 
-	for (; *src; src++, dest++)
+	for (; *src; src++, dest++) {
 		*dest = *src;
+	}
 	*dest = '\0';
 
 	return ret;

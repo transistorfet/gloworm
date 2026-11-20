@@ -16,8 +16,9 @@ int arch_init_mm(void)
 {
 	int error;
 	kernel_memory_map = memory_map_alloc();
-	if (!kernel_memory_map)
+	if (!kernel_memory_map) {
 		return ENOMEM;
+	}
 
 	// Initialize the top-level kernel page table to map directly to real memory
 	error = memory_map_mmap(kernel_memory_map, (uintptr_t) 0x00000000, 0x00700000, SEG_FIXED | SEG_SUPERVISOR | SEG_WRITE, NULL, 0);

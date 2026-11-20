@@ -67,8 +67,9 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 	// Zero the inode table
 	for (int i = 0; i < (super_v1->num_inodes >> MINIX_V1_LOG_INODES_PER_ZONE); i++) {
 		struct buf *inode_buf = get_buf(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1) + i);
-		if (!inode_buf)
+		if (!inode_buf) {
 			return ENOMEM;
+		}
 		memset(inode_buf->block, 0x00, MINIX_V1_ZONE_SIZE);
 		unref_buf(inode_buf, BF_DIRTY);
 	}
@@ -78,8 +79,9 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	// Initialize root inode
 	struct buf *inode_buf = get_buf(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1));
-	if (!inode_buf)
+	if (!inode_buf) {
 		return ENOMEM;
+	}
 	struct minix_v1_inode *inode_table = inode_buf->block;
 
 	inode_table[0].mode = htole16(S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO);
@@ -92,8 +94,9 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 
 	// Initialize root directory
 	struct buf *dir_buf = get_buf(&bufcache, dir_zone);
-	if (!dir_buf)
+	if (!dir_buf) {
 		return ENOMEM;
+	}
 	struct minix_v1_dirent *entries = dir_buf->block;
 	memset(dir_buf->block, 0, MINIX_V1_ZONE_SIZE);
 

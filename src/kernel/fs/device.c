@@ -33,8 +33,9 @@ int device_ops_read(struct vfile *file, struct iovec_iter *iter)
 	int nbytes;
 
 	nbytes = dev_read(file->vnode->rdev, file->position, iter);
-	if (nbytes < 0)
+	if (nbytes < 0) {
 		return nbytes;
+	}
 	file->position += nbytes;
 	return nbytes;
 }
@@ -44,8 +45,9 @@ int device_ops_write(struct vfile *file, struct iovec_iter *iter)
 	int nbytes;
 
 	nbytes = dev_write(file->vnode->rdev, file->position, iter);
-	if (nbytes < 0)
+	if (nbytes < 0) {
 		return nbytes;
+	}
 	file->position += nbytes;
 	return nbytes;
 }
@@ -65,8 +67,9 @@ off_t device_ops_seek(struct vfile *file, off_t position, int whence)
 	int pos;
 
 	pos = dev_seek(file->vnode->rdev, position, whence, file->position);
-	if (pos < 0)
+	if (pos < 0) {
 		return pos;
+	}
 	file->position = pos;
 	return pos;
 }

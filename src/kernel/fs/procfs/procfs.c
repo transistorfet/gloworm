@@ -120,19 +120,22 @@ int procfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resu
 			filenum = PFN_PROCDIR;
 
 			proc = get_proc(pid);
-			if (!proc)
+			if (!proc) {
 				return ENOENT;
+			}
 		} else {
 			filenum = _find_filenum_by_name(root_files, filename);
-			if (filenum < 0)
+			if (filenum < 0) {
 				return ENOENT;
+			}
 		}
 	} else if (PROCFS_DATA(vnode).filenum == PFN_PROCDIR) {
 		pid = PROCFS_DATA(vnode).pid;
 
 		filenum = _find_filenum_by_name(proc_files, filename);
-		if (filenum < 0)
+		if (filenum < 0) {
 			return ENOENT;
+		}
 	} else {
 		return ENOTDIR;
 	}
@@ -225,8 +228,9 @@ int procfs_readdir(struct vfile *file, struct dirent *dir)
 	struct process *proc;
 	struct procfs_position *position = PROCFS_POSITION(file->position);
 
-	if (!S_ISDIR(file->vnode->mode))
+	if (!S_ISDIR(file->vnode->mode)) {
 		return ENOTDIR;
+	}
 
 	if (PROCFS_DATA(file->vnode).filenum == PFN_ROOTDIR) {
 		if (position->slot == 0 && (proc = proc_iter_next(&position->iter))) {
@@ -236,16 +240,18 @@ int procfs_readdir(struct vfile *file, struct dirent *dir)
 		} else {
 			slot = ++position->slot;
 
-			if (!root_files[slot - 1].filename)
+			if (!root_files[slot - 1].filename) {
 				return 0;
+			}
 
 			dir->d_ino = file->position;
 			strncpy(dir->d_name, root_files[slot - 1].filename, NAME_MAX);
 			dir->d_name[NAME_MAX - 1] = '\0';
 		}
 	} else if (PROCFS_DATA(file->vnode).filenum == PFN_PROCDIR) {
-		if (!proc_files[file->position].filename)
+		if (!proc_files[file->position].filename) {
 			return 0;
+		}
 		dir->d_ino = (PROCFS_DATA(file->vnode).pid << 8) | proc_files[file->position].filenum;
 		strncpy(dir->d_name, proc_files[file->position].filename, NAME_MAX);
 		dir->d_name[NAME_MAX - 1] = '\0';

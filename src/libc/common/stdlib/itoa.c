@@ -23,17 +23,20 @@ char *itoa_padded(unsigned int num, char *buffer, int radix, char width, char ze
 
 	do {
 		buffer[i] = (num % radix) + '0';
-		if (buffer[i] > '9')
+		if (buffer[i] > '9') {
 			buffer[i] += 0x07;
+		}
 		num /= radix;
 		i++;
 	} while (num > 0);
 
-	if (sign)
+	if (sign) {
 		buffer[i++] = '-';
+	}
 
-	for (; i < width; i++)
+	for (; i < width; i++) {
 		buffer[i] = zeropad ? '0' : ' ';
+	}
 
 	buffer[i--] = '\0';
 

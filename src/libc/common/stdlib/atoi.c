@@ -6,8 +6,9 @@ int atoi(const char *str)
 {
 	int num = 0, sign = 1;
 
-	while (*str == ' ' || *str == '\n' || *str == '\t' || *str == '\r')
+	while (*str == ' ' || *str == '\n' || *str == '\t' || *str == '\r') {
 		str++;
+	}
 
 	if (*str == '-') {
 		sign = -1;

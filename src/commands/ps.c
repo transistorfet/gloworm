@@ -34,8 +34,9 @@ int MAIN(command_ps)(int argc, char **argv, char **envp)
 			return error;
 		}
 
-		if (error == 0)
+		if (error == 0) {
 			break;
+		}
 
 		pid = strtol(dir.d_name, NULL, 10);
 		if (pid > 0) {

@@ -48,8 +48,9 @@ int init_devfs(void)
 {
 	devfs_root = _new_vnode(0, 0755, &devfs_vnode_ops);
 
-	for (short i = 0; i < DEVFS_DIRENT_MAX; i++)
+	for (short i = 0; i < DEVFS_DIRENT_MAX; i++) {
 		devices[i].vnode = NULL;
+	}
 	return 0;
 }
 
@@ -65,42 +66,49 @@ int devfs_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t
 	struct devfs_dirent *dir;
 
 	// Only support a single level of vnodes below the root vnode
-	if (vnode != devfs_root)
+	if (vnode != devfs_root) {
 		return ENOTDIR;
+	}
 
 	// TODO check for name conflict
 
 	dir = _new_dirent();
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	newnode = _new_vnode(dev, mode, &devfs_vnode_ops);
-	if (!newnode)
+	if (!newnode) {
 		return EMFILE;
+	}
 
 	dir->vnode = newnode;
 	strncpy(dir->name, filename, DEVFS_MAX_FILENAME);
 	dir->name[DEVFS_MAX_FILENAME - 1] = '\0';
 
-	if (result)
+	if (result) {
 		*result = newnode;
+	}
 	return 0;
 }
 
 int devfs_lookup(struct vnode *vnode, const char *filename, struct vnode **result)
 {
 	// If a valid pointer isn't provided, return invalid argument
-	if (!result)
+	if (!result) {
 		return EINVAL;
+	}
 
 	// Only support a single level of vnodes below the root vnode
-	if (vnode != devfs_root)
+	if (vnode != devfs_root) {
 		return ENOTDIR;
+	}
 
 	for (short i = 0; i < DEVFS_DIRENT_MAX; i++) {
 		if (devices[i].vnode && !strcmp(filename, devices[i].name)) {
-			if (*result)
+			if (*result) {
 				vfs_unref_vnode(*result);
+			}
 			*result = devices[i].vnode;
 			return 0;
 		}
@@ -148,8 +156,9 @@ off_t devfs_seek(struct vfile *file, off_t position, int whence)
 static inline struct devfs_dirent *_new_dirent()
 {
 	for (short i = 0; i < DEVFS_DIRENT_MAX; i++) {
-		if (!devices[i].vnode)
+		if (!devices[i].vnode) {
 			return &devices[i];
+		}
 	}
 	return NULL;
 }

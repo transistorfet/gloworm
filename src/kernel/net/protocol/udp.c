@@ -329,14 +329,16 @@ int udp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *
 {
 	switch (optname) {
 		case SO_GETSOCKNAME: {
-			if (!UDP_ENDPOINT(ep)->src.addr)
+			if (!UDP_ENDPOINT(ep)->src.addr) {
 				return ENOTCONN;
+			}
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &UDP_ENDPOINT(ep)->src);
 			return 0;
 		}
 		case SO_GETPEERNAME: {
-			if (!UDP_ENDPOINT(ep)->dest.addr)
+			if (!UDP_ENDPOINT(ep)->dest.addr) {
 				return ENOTCONN;
+			}
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &UDP_ENDPOINT(ep)->dest);
 			return 0;
 		}

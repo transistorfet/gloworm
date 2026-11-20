@@ -93,8 +93,9 @@ int ata_detect(void)
 
 	status = *ATA_REG_STATUS;
 	// If the busy bit is already set, or the two bits that are always 0, then perhaps nothing is connected
-	if (status & (ATA_ST_BUSY | 0x06))
+	if (status & (ATA_ST_BUSY | 0x06)) {
 		return 0;
+	}
 	ATA_DELAY(10);
 
 	// Reset the IDE bus
@@ -175,8 +176,9 @@ int ata_read_sector(int sector, char *buffer)
 	printk("reading sector %x:\n", sector);
 	for (int i = 0; i < 512; i++) {
 		printk("%02x ", 0xff & buffer[i]);
-		if ((i & 0x1F) == 0x1F)
+		if ((i & 0x1F) == 0x1F) {
 			printk("\n");
+		}
 	}
 	*/
 
@@ -270,8 +272,9 @@ int ata_init(void)
 	}
 
 	error = register_driver(DEVMAJOR_ATA, &ata_driver);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	// TODO this doesn't work very well
 	if (!ata_detect()) {

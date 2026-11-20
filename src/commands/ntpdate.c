@@ -52,10 +52,12 @@ int main(int argc, char **argv)
 	char *address = "51.38.105.7";	// pool.ntp.org
 	int port = 123;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		address = argv[1];
-	if (argc >= 3)
+	}
+	if (argc >= 3) {
 		port = strtol(argv[2], NULL, 10);
+	}
 
 	act.sa_handler = handle_alarm;
 	act.sa_flags = 0;

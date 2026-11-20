@@ -15,8 +15,9 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 
 	zone = minix_alloc_zone(vnode->mp);
 	buf = get_buf(&vnode->mp->bufcache, zone);
-	if (!buf)
+	if (!buf) {
 		return 0;
+	}
 
 	entries = (struct minix_v1_dirent *) buf->block;
 
@@ -44,8 +45,9 @@ static short dir_is_empty(struct vnode *vnode)
 
 	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
 		buf = get_buf(&vnode->mp->bufcache, zone);
-		if (!buf)
+		if (!buf) {
 			return EIO;
+		}
 		entries = (struct minix_v1_dirent *) buf->block;
 		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (entries[i].inode && strcmp(entries[i].filename, ".") && strcmp(entries[i].filename, "..")) {
@@ -66,8 +68,9 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 
 	for (zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, zone);
-		if (!buf)
+		if (!buf) {
 			return NULL;
+		}
 		entries = (struct minix_v1_dirent *) buf->block;
 		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (le16toh(entries[i].inode) == ino) {
@@ -94,8 +97,9 @@ static struct minix_v1_dirent *dir_find_entry_by_name(struct vnode *dir, const c
 
 	for (zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, zone);
-		if (!buf)
+		if (!buf) {
 			return NULL;
+		}
 		entries = (struct minix_v1_dirent *) buf->block;
 		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (entries[i].inode && !strcmp(filename, entries[i].filename)) {
@@ -114,8 +118,9 @@ static struct minix_v1_dirent *dir_alloc_entry(struct vnode *vnode, const char *
 	struct minix_v1_dirent *dir;
 
 	dir = dir_find_entry_by_inode(vnode, 0, MFS_CREATE_ZONE, result);
-	if (!dir)
+	if (!dir) {
 		return NULL;
+	}
 
 	strncpy(dir->filename, filename, MINIX_V1_MAX_FILENAME);
 	dir->filename[MINIX_V1_MAX_FILENAME - 1] = '\0';

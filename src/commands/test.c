@@ -11,8 +11,9 @@ int readline(char *buffer, short max)
 		putchar(buffer[i]);
 		if (buffer[i] == '\n') {
 			buffer[i] = '\0';
-			if (i > 0 && buffer[i - 1] == '\r')
+			if (i > 0 && buffer[i - 1] == '\r') {
 				buffer[i - 1] = '\0';
+			}
 			return i;
 		}
 	}

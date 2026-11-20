@@ -50,8 +50,9 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 	// TODO this should recycle a cached vnode if it doesn't have a reference and there are more than a certain number of vnodes already loaded
 	//entry = _find_free_entry();
 	vnode = kmalloc(sizeof(struct ext2_vnode));
-	if (!vnode)
+	if (!vnode) {
 		return NULL;
+	}
 
 	//printk("L:%x;%d;%d\n", vnode, mp->dev, ino);
 	_queue_insert(&cache, &EXT2_DATA(vnode).node);
@@ -98,8 +99,9 @@ static struct vnode *alloc_vnode(struct mount *mp, mode_t mode, uid_t uid, gid_t
 	struct vnode *vnode;
 
 	const ext2_inode_t ino = alloc_inode(mp, mode, uid, gid, device);
-	if (!ino)
+	if (!ino) {
 		return NULL;
+	}
 
 	vnode = load_vnode(mp, ino);
 	if (!vnode) {

@@ -37,8 +37,9 @@ int register_driver(devmajor_t major, struct driver *driver)
 
 struct driver *get_driver(devmajor_t major)
 {
-	if (major >= MAX_DRIVERS)
+	if (major >= MAX_DRIVERS) {
 		return NULL;
+	}
 	return drv_table[major];
 }
 
@@ -47,8 +48,9 @@ int dev_open(device_t dev, int access)
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->open(minor, access);
 }
 
@@ -57,8 +59,9 @@ int dev_close(device_t dev)
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->close(minor);
 }
 
@@ -67,8 +70,9 @@ int dev_read(device_t dev, off_t offset, struct iovec_iter *iter)
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->read(minor, offset, iter);
 }
 
@@ -77,8 +81,9 @@ int dev_write(device_t dev, off_t offset, struct iovec_iter *iter)
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->write(minor, offset, iter);
 }
 
@@ -87,8 +92,9 @@ int dev_ioctl(device_t dev, unsigned int request, struct iovec_iter *iter, uid_t
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->ioctl(minor, request, iter, uid);
 }
 
@@ -97,8 +103,9 @@ int dev_poll(device_t dev, int events)
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->poll(minor, events);
 }
 
@@ -107,8 +114,9 @@ off_t dev_seek(device_t dev, off_t position, int whence, off_t offset)
 	const devmajor_t major = DEVMAJOR(dev);
 	const devminor_t minor = DEVMINOR(dev);
 
-	if (major >= MAX_DRIVERS || !drv_table[major])
+	if (major >= MAX_DRIVERS || !drv_table[major]) {
 		return ENXIO;
+	}
 	return drv_table[major]->seek(minor, position, whence, offset);
 }
 

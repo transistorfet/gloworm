@@ -151,11 +151,13 @@ static inline struct buf *_create_entry(struct bufcache *cache)
 	struct buf *buf;
 
 	buf = kmalloc(sizeof(struct buf));
-	if (!buf)
+	if (!buf) {
 		return NULL;
+	}
 	block = kzalloc(cache->block_size);
-	if (!block)
+	if (!block) {
 		return NULL;
+	}
 	_queue_node_init(&buf->node);
 	buf->refcount = 0;
 	buf->flags = 0;

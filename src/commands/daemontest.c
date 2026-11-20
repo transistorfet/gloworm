@@ -31,8 +31,9 @@ int main(void)
 
 		i = 0;
 		while (1) {
-			if (i >= MAX_INPUT)
+			if (i >= MAX_INPUT) {
 				i = 0;
+			}
 			error = read(fd, &buffer[i], 1);
 
 			if (error < 0) {

@@ -50,8 +50,9 @@ static int load_superblock(struct mount *mp)
 	char super_buf[MINIX_SUPERBLOCK_SIZE];
 
 	error = read_superblock(mp->dev, super_buf);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 	super_v1 = (struct minix_v1_superblock *) super_buf;
 
 	if (le16toh(super_v1->magic) != MINIX_MAGIC) {

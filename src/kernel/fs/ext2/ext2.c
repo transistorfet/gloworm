@@ -79,8 +79,9 @@ int ext2_mount(struct mount *mp, struct vnode *parent)
 	int error;
 
 	error = load_superblock(mp);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	struct vnode *root = get_vnode(mp, EXT2_ROOT_INO);
 	if (!root) {
@@ -115,13 +116,15 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 	struct ext2_dirent *dir;
 	struct vnode *newnode = NULL;
 
-	if (strlen(filename) > EXT2_MAX_FILENAME)
+	if (strlen(filename) > EXT2_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	// The dirent wont be 'in use' until we set the vnode reference
 	dir = dir_alloc_entry(vnode, filename, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, 0);
@@ -144,10 +147,12 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 	return 0;
 
 fail:
-	if (newnode)
+	if (newnode) {
 		vfs_unref_vnode(newnode);
-	if (buf)
+	}
+	if (buf) {
 		unref_buf(buf, 0);
+	}
 	return ENOMEM;
 }
 
@@ -157,13 +162,15 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 	struct vnode *newnode;
 	struct ext2_dirent *dir;
 
-	if (strlen(filename) > EXT2_MAX_FILENAME)
+	if (strlen(filename) > EXT2_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	// The dirent wont be 'in use' until we set the vnode reference
 	dir = dir_alloc_entry(vnode, filename, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, dev);
@@ -186,15 +193,18 @@ int ext2_lookup(struct vnode *vnode, const char *filename, struct vnode **result
 	struct buf *buf;
 	struct ext2_dirent *entry;
 
-	if (strlen(filename) > EXT2_MAX_FILENAME)
+	if (strlen(filename) > EXT2_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	entry = dir_find_entry_by_name(vnode, filename, EXT2_AF_LOOKUP_BLOCK, &buf);
-	if (!entry)
+	if (!entry) {
 		return ENOENT;
+	}
 
-	if (*result)
+	if (*result) {
 		vfs_unref_vnode(*result);
+	}
 	*result = (struct vnode *) get_vnode(vnode->mp, le32toh(entry->inode));
 	unref_buf(buf, 0);
 	return 0;
@@ -205,12 +215,14 @@ int ext2_link(struct vnode *oldvnode, struct vnode *newparent, const char *filen
 	struct buf *buf;
 	struct ext2_dirent *dir;
 
-	if (strlen(filename) > EXT2_MAX_FILENAME)
+	if (strlen(filename) > EXT2_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	dir = dir_alloc_entry(newparent, filename, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole32((ext2_inode_t) oldvnode->ino);
@@ -224,12 +236,14 @@ int ext2_unlink(struct vnode *parent, struct vnode *vnode, const char *filename)
 {
 	int error;
 
-	if (S_ISDIR(vnode->mode) && !dir_is_empty(vnode))
+	if (S_ISDIR(vnode->mode) && !dir_is_empty(vnode)) {
 		return ENOTEMPTY;
+	}
 
 	error = dir_free_entry(parent, vnode, filename);
-	if (error < 0)
+	if (error < 0) {
 		return ENOENT;
+	}
 
 	vnode->nlinks -= 1;
 	if (vnode->nlinks <= 0) {
@@ -253,8 +267,9 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 		return EEXIST;
 	} else {
 		newdir = dir_alloc_entry(newparent, newname, &newbuf);
-		if (!newdir)
+		if (!newdir) {
 			return ENOSPC;
+		}
 	}
 
 	olddir = dir_find_entry_by_name(oldparent, oldname, EXT2_AF_LOOKUP_BLOCK, &oldbuf);
@@ -274,8 +289,9 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 
 int ext2_truncate(struct vnode *vnode)
 {
-	if (S_ISDIR(vnode->mode))
+	if (S_ISDIR(vnode->mode)) {
 		return EISDIR;
+	}
 	block_free_all(vnode);
 	vnode->size = 0;
 	vfs_update_time(vnode, MTIME);
@@ -313,8 +329,9 @@ int ext2_close(struct vfile *file)
 
 int ext2_read(struct vfile *file, struct iovec_iter *iter)
 {
-	if (S_ISDIR(file->vnode->mode))
+	if (S_ISDIR(file->vnode->mode)) {
 		return EISDIR;
+	}
 
 	short zpos;
 	short zlen;
@@ -328,23 +345,27 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	nbytes = iovec_iter_remaining(iter);
-	if (nbytes > vnode->size - file->position)
+	if (nbytes > vnode->size - file->position) {
 		nbytes = vnode->size - file->position;
+	}
 
 	znum = file->position >> log_block_size;
 	zpos = file->position & (block_size - 1);
 
 	do {
 		block = block_lookup(vnode, znum, EXT2_AF_LOOKUP_BLOCK);
-		if (!block)
+		if (!block) {
 			break;
+		}
 		buf = get_buf(&vnode->mp->bufcache, block);
-		if (!buf)
+		if (!buf) {
 			break;
+		}
 
 		zlen = block_size - zpos;
-		if (zlen > nbytes)
+		if (zlen > nbytes) {
 			zlen = nbytes;
+		}
 
 		memcpy_into_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		unref_buf(buf, 0);
@@ -361,8 +382,9 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 
 int ext2_write(struct vfile *file, struct iovec_iter *iter)
 {
-	if (S_ISDIR(file->vnode->mode))
+	if (S_ISDIR(file->vnode->mode)) {
 		return EISDIR;
+	}
 
 	short zpos;
 	short zlen;
@@ -393,8 +415,9 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 		}
 
 		zlen = block_size - zpos;
-		if (zlen > nbytes)
+		if (zlen > nbytes) {
 			zlen = nbytes;
+		}
 
 		memcpy_out_of_iter(iter, &(((char *) buf->block)[zpos]), zlen);
 		unref_buf(buf, BF_DIRTY);
@@ -411,11 +434,13 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 		mark_vnode_dirty(vnode);
 	}
 
-	if (wbytes)
+	if (wbytes) {
 		vfs_update_time(vnode, MTIME);
+	}
 
-	if (error)
+	if (error) {
 		return error;
+	}
 	return wbytes;
 }
 
@@ -442,8 +467,9 @@ off_t ext2_seek(struct vfile *file, off_t position, int whence)
 	}
 
 	// TODO this is a hack for now so I don't have to deal with gaps in files
-	if (position > vnode->size)
+	if (position > vnode->size) {
 		position = vnode->size;
+	}
 
 	file->position = position;
 	return file->position;
@@ -496,8 +522,9 @@ int ext2_readdir(struct vfile *file, struct dirent *dir)
 
 	max = current_entry->name_len;
 	#if NAME_MAX < EXT2_MAX_FILENAME
-	if ((int) current_entry->name_len > NAME_MAX)
+	if ((int) current_entry->name_len > NAME_MAX) {
 		max = NAME_MAX;
+	}
 	#endif
 
 	dir->d_ino = le32toh(current_entry->inode);

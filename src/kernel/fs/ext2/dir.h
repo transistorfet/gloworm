@@ -36,13 +36,15 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	struct buf *buf;
 	struct ext2_dirent *current_entry;
 
-	if (!parent)
+	if (!parent) {
 		parent = vnode->mp->root_node;
+	}
 
 	block = ext2_alloc_block(vnode->mp);
 	buf = get_buf(&vnode->mp->bufcache, block);
-	if (!buf)
+	if (!buf) {
 		return 0;
+	}
 	data = buf->block;
 
 	const uint16_t dot_entry_len = sizeof(struct ext2_dirent) + 4;
@@ -84,8 +86,9 @@ static short dir_is_empty(struct vnode *vnode)
 
 	for (ext2_block_t znum = 0; (block = block_lookup(vnode, znum, EXT2_AF_LOOKUP_BLOCK)) != 0; znum++) {
 		buf = get_buf(&vnode->mp->bufcache, block);
-		if (!buf)
+		if (!buf) {
 			return EIO;
+		}
 		data = buf->block;
 		for (int i = 0; i < block_size; i += le16toh(current_entry->entry_len)) {
 			current_entry = (struct ext2_dirent *) &data[i];
@@ -112,8 +115,9 @@ static struct ext2_dirent *dir_find_entry_by_name(struct vnode *dir, const char 
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, create)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, block);
-		if (!buf)
+		if (!buf) {
 			return NULL;
+		}
 		data = buf->block;
 		for (int i = 0; i < block_size; i += le16toh(current_entry->entry_len)) {
 			current_entry = (struct ext2_dirent *) &data[i];
@@ -138,8 +142,9 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, EXT2_AF_CREATE_BLOCK)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, block);
-		if (!buf)
+		if (!buf) {
 			return NULL;
+		}
 		data = buf->block;
 		for (int i = 0; i < block_size; i += le16toh(current_entry->entry_len)) {
 			current_entry = (struct ext2_dirent *) &data[i];
@@ -182,8 +187,9 @@ static struct ext2_dirent *dir_alloc_entry(struct vnode *vnode, const char *file
 	const short filename_len = strlen(filename);
 
 	dir = dir_find_empty_entry(vnode, filename_len, result);
-	if (!dir)
+	if (!dir) {
 		return NULL;
+	}
 
 	entry_filename = EXT2_DIRENT_FILENAME(dir);
 	memcpy(entry_filename, filename, filename_len);
@@ -204,8 +210,9 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 
 	for (ext2_block_t znum = 0; (block = block_lookup(parent, znum, EXT2_AF_LOOKUP_BLOCK)) != 0; znum++) {
 		buf = get_buf(&parent->mp->bufcache, block);
-		if (!buf)
+		if (!buf) {
 			return ENOENT;
+		}
 		data = buf->block;
 		prev = NULL;
 		for (int i = 0; i < block_size; i += le16toh(cur->entry_len)) {

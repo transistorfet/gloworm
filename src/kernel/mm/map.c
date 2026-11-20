@@ -27,12 +27,14 @@ struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile 
 	size = align_up(size, PAGE_SIZE);
 
 	region = kzalloc(sizeof(struct memory_region));
-	if (!region)
+	if (!region) {
 		goto fail;
+	}
 
 	memory = (char *) page_alloc(size, PAGE_F_USER);
-	if (!memory)
+	if (!memory) {
 		goto fail;
+	}
 
 	region->refcount = 1;
 	region->file = file;
@@ -42,17 +44,20 @@ struct memory_region *memory_region_alloc_user_memory(size_t size, struct vfile 
 	return region;
 
 fail:
-	if (file)
+	if (file) {
 		vfs_close(file);
-	if (memory)
+	}
+	if (memory) {
 		kmfree(memory);
+	}
 	return NULL;
 }
 
 void memory_region_free(struct memory_region *region)
 {
-	if (!region)
+	if (!region) {
 		return;
+	}
 
 	region->refcount -= 1;
 	if (region->refcount < 0) {
@@ -536,8 +541,9 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 		#if defined(CONFIG_MMU)
 		if (sub_start) {
 			error = mmu_table_map(map->root_table, sub_start, sub_end - sub_start, MMU_OP_UNMAP | (cur->flags & SEG_FIXED ? MMU_TYPE_FIXED : 0));
-			if (error < 0)
+			if (error < 0) {
 				return error;
+			}
 		}
 		#endif
 	}
@@ -545,12 +551,15 @@ int memory_map_unmap(struct memory_map *map, uintptr_t start, size_t length)
 	// TODO this is wrong, they should find the next lowest valid mapped address to assign
 	// it's also not clear what to do when the sbrk or stack_end are unmapped, so maybe
 	// making them NULL is the better option, even though that can cause its own issues
-	if (map->code_start >= start && map->code_start <= end)
+	if (map->code_start >= start && map->code_start <= end) {
 		map->code_start = start;
-	if (map->data_start >= start && map->data_start <= end)
+	}
+	if (map->data_start >= start && map->data_start <= end) {
 		map->data_start = start;
-	if (map->heap_start >= start && map->heap_start <= end)
+	}
+	if (map->heap_start >= start && map->heap_start <= end) {
 		map->heap_start = start;
+	}
 
 	return 0;
 }
@@ -581,8 +590,9 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 	}
 
 	error = mmu_table_copy(dest_map->root_table, src_map->root_table, src_segment->start, src_segment->end - src_segment->start, mmu_flags);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	#else
 
@@ -709,8 +719,9 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 	struct memory_region *region = NULL;
 
 	region = memory_region_alloc_user_memory(stack_size, NULL);
-	if (!region)
+	if (!region) {
 		return ENOMEM;
+	}
 
 	start = (uintptr_t) region->mem_start;
 	heap_object = MEMORY_OBJECT_MAKE_REF(region);
@@ -719,11 +730,13 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 	#endif
 
 	error = memory_map_mmap(map, start, 0, SEG_TYPE_HEAP | SEG_READ | SEG_WRITE | SEG_ANONYMOUS, heap_object, 0);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 	error = memory_map_mmap(map, start, stack_size, SEG_TYPE_STACK | SEG_GROWSDOWN | SEG_READ | SEG_WRITE | SEG_ANONYMOUS, stack_object, 0);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 	map->heap_start = start;
 	map->sbrk = start;
 	map->stack_end = start + stack_size;
@@ -732,8 +745,9 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 
 fail:
 	#if !defined(CONFIG_MMU)
-	if (region)
+	if (region) {
 		memory_region_free(region);
+	}
 	#endif
 	return error;
 }

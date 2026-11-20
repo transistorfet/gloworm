@@ -33,11 +33,13 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 	struct vfile *file;
 	struct memory_map *map = NULL;
 
-	if (vfs_access(proc->cwd, path, X_OK, proc->uid))
+	if (vfs_access(proc->cwd, path, X_OK, proc->uid)) {
 		return EPERM;
+	}
 
-	if ((error = vfs_open(proc->cwd, path, O_RDONLY, 0, proc->uid, &file)) < 0)
+	if ((error = vfs_open(proc->cwd, path, O_RDONLY, 0, proc->uid, &file)) < 0) {
 		return error;
+	}
 
 	if (!S_ISREG(file->vnode->mode)) {
 		vfs_close(file);
@@ -46,8 +48,9 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 
 	// Allocate the process memory and initialize the memory maps
 	map = memory_map_alloc();
-	if (!map)
+	if (!map) {
 		return ENOMEM;
+	}
 
 	error = load_elf_binary(proc, file, map, &entry);
 	// If the file was not a valid ELF binary, then execute it as a flat binary
@@ -62,8 +65,9 @@ int load_binary(const char *path, struct process *proc, struct string_array *arg
 	vfs_close(file);
 
 	if (error < 0) {
-		if (map)
+		if (map) {
 			memory_map_free(map);
+		}
 		return error;
 	}
 
@@ -162,24 +166,29 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 	Elf32_Phdr prog_headers[PROG_HEADER_MAX];
 
 	iovec_iter_init_simple_kvec(&iter, kvec, (char *) &header, sizeof(Elf32_Ehdr));
-	if (!(error = vfs_read(file, &iter)))
+	if (!(error = vfs_read(file, &iter))) {
 		return error;
+	}
 
 	// Look for the ELF signature, 32-bit Big Endian ELF Version 1
-	if (memcmp(header.e_ident, "\x7F\x45\x4C\x46\x01\x02\x01", 7))
+	if (memcmp(header.e_ident, "\x7F\x45\x4C\x46\x01\x02\x01", 7)) {
 		return ENOEXEC;
+	}
 
 	// Make sure it's an executable for the the current machine
-	if (header.e_type != ET_EXEC || header.e_machine != ELF_MACHINE || header.e_phentsize != sizeof(Elf32_Phdr))
+	if (header.e_type != ET_EXEC || header.e_machine != ELF_MACHINE || header.e_phentsize != sizeof(Elf32_Phdr)) {
 		return ENOEXEC;
+	}
 
 	// Load the program headers from the ELF file
 	num_ph = header.e_phnum <= PROG_HEADER_MAX ? header.e_phnum : PROG_HEADER_MAX;
-	if (!(error = vfs_seek(file, header.e_phoff, SEEK_SET)))
+	if (!(error = vfs_seek(file, header.e_phoff, SEEK_SET))) {
 		return error;
+	}
 	iovec_iter_init_simple_kvec(&iter, kvec, (char *) prog_headers, sizeof(Elf32_Phdr) * num_ph);
-	if (!(error = vfs_read(file, &iter)))
+	if (!(error = vfs_read(file, &iter))) {
 		return error;
+	}
 
 	#if defined(CONFIG_MMU)
 	int preload = 0;
@@ -195,20 +204,23 @@ int load_elf_binary(struct process *proc, struct vfile *file, struct memory_map 
 			// to allocate all of memory if we didn't check.  This binary has accidentally been
 			// compiled without a proper --entry start -Ttext=0x0000
 			#if !defined(CONFIG_MMU)
-			if (prog_headers[i].p_vaddr >= 0x80000000)
+			if (prog_headers[i].p_vaddr >= 0x80000000) {
 				return EFAULT;
+			}
 			#endif
 
-			if (prog_headers[i].p_vaddr > mem_size)
+			if (prog_headers[i].p_vaddr > mem_size) {
 				mem_size = prog_headers[i].p_vaddr;
+			}
 			segment_size = align_remainder(prog_headers[i].p_vaddr, PAGE_SIZE) + prog_headers[i].p_memsz;
 			mem_size += align_up(segment_size, PAGE_SIZE);
 		} else if (prog_headers[i].p_type == PT_GNU_RELRO) {
 			preload = 1;
 		}
 	}
-	if (mem_size == 0)
+	if (mem_size == 0) {
 		return ENOEXEC;
+	}
 
 	#if defined(CONFIG_MMU)
 

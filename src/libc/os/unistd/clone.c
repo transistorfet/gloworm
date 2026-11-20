@@ -23,8 +23,9 @@ pid_t clone(int (*fn)(void *), void *stack, int flags, void *arg)
 		user_args->arg = arg;
 
 		pid_t result = SYSCALL2(SYS_CLONE, (unsigned long) stack, flags);
-		if (result)
+		if (result) {
 			return result;
+		}
 
 		STACK_POINTER(user_args);
 		int return_code = user_args->fn(user_args->arg);

@@ -31,8 +31,9 @@ int MAIN(command_cp)(int argc, char **argv, char **envp)
 	if (!result && S_ISDIR(statbuf.st_mode)) {
 		int end = strlen(destfile) - 1;
 		strncpy(buffer, destfile, CP_BUF_SIZE);
-		if (buffer[end] != '/')
+		if (buffer[end] != '/') {
 			buffer[++end] = '/';
+		}
 		strncpy(&buffer[end + 1], cp_path_last_component(srcfile), CP_BUF_SIZE - (end + 1));
 		destfile = buffer;
 	}
@@ -50,8 +51,9 @@ int MAIN(command_cp)(int argc, char **argv, char **envp)
 
 	while (1) {
 		result = read(src_fd, buffer, CP_BUF_SIZE);
-		if (result == 0)
+		if (result == 0) {
 			break;
+		}
 
 		if (result < 0) {
 			printf("Error while reading: %d\n", result);
@@ -75,11 +77,13 @@ int MAIN(command_cp)(int argc, char **argv, char **envp)
 static const char *cp_path_last_component(const char *path)
 {
 	short i = strlen(path) - 1;
-	if (path[i] == '/')
+	if (path[i] == '/') {
 		i--;
+	}
 	for (; i >= 0; i--) {
-		if (path[i] == '/')
+		if (path[i] == '/') {
 			break;
+		}
 	}
 	i += 1;
 	return &path[i];

@@ -72,8 +72,9 @@ int clone_process_memory(struct process *parent_proc, struct process *proc, int 
 	} else {
 		// Duplicate the memory map
 		error = duplicate_memory_map(parent_proc, proc);
-		if (error < 0)
+		if (error < 0) {
 			return error;
+		}
 	}
 
 	if (flags & CLONE_FILES) {
@@ -108,17 +109,20 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 
 	// Check that the parent has a map and
 	// that new proc does *not* have a map
-	if (!parent_proc->map || proc->map)
+	if (!parent_proc->map || proc->map) {
 		goto fail;
+	}
 
 	new_map = memory_map_alloc();
-	if (!new_map)
+	if (!new_map) {
 		return ENOMEM;
+	}
 
 	for (cur = memory_map_iter_first(parent_proc->map); cur; cur = memory_map_iter_next(cur)) {
 		error = memory_map_copy_segment(new_map, parent_proc->map, cur);
-		if (error < 0)
+		if (error < 0) {
 			goto fail;
+		}
 	}
 
 	new_map->heap_start = parent_proc->map->heap_start;
@@ -131,8 +135,9 @@ static inline int duplicate_memory_map(struct process *parent_proc, struct proce
 	return 0;
 
 fail:
-	if (new_map)
+	if (new_map) {
 		memory_map_free(new_map);
+	}
 	return error;
 }
 

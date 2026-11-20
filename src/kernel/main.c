@@ -212,15 +212,18 @@ int main(void)
 	parse_boot_args();
 
 	error = init_pages(PAGES_START, PAGES_END - PAGES_START, PAGE_F_LOCAL | PAGE_F_SHARED);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	error = init_kernel_heap();
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 	error = arch_init_mm();
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	init_bh();
 	init_irqs();
@@ -233,19 +236,22 @@ int main(void)
 	// Initialize drivers before VFS
 	for (driver_num = 0; drivers[driver_num]; driver_num++) {
 		error = drivers[driver_num]->init();
-		if (error < 0)
+		if (error < 0) {
 			goto fail;
+		}
 	}
 
 	error = init_vfs();
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	// Initialize specific filesystems
 	for (filesystem_num = 0; filesystems[filesystem_num]; filesystem_num++) {
 		error = filesystems[filesystem_num]->init();
-		if (error < 0)
+		if (error < 0) {
 			goto fail;
+		}
 	}
 
 	// Initialize the networking subsystem
@@ -256,15 +262,17 @@ int main(void)
 	// Initialize specific network interfaces
 	for (interface_num = 0; interfaces[interface_num]; interface_num++) {
 		error = interfaces[interface_num]->init();
-		if (error < 0)
+		if (error < 0) {
 			goto fail;
+		}
 	}
 
 	// Initialize specific network protocols
 	for (protocol_num = 0; protocols[protocol_num]; protocol_num++) {
 		error = protocols[protocol_num]->init();
-		if (error < 0)
+		if (error < 0) {
 			goto fail;
+		}
 	}
 	#endif
 	log_debug("subsystem initialization complete\n");
@@ -275,8 +283,9 @@ int main(void)
 	if (error < 0) {
 		#if defined(CONFIG_BOOTSTRAP_DISK)
 		error = bootstrap_disk(root_dev, root_filesystem_type);
-		if (error < 0)
+		if (error < 0) {
 			goto fail;
+		}
 		#else
 		goto fail;
 		#endif
@@ -284,8 +293,9 @@ int main(void)
 
 	// TODO device number here is an issue because 0 is used to indicated a mount slot is not used, which when mounting after this causes a /proc error
 	error = vfs_mount(NULL, "/proc", 1, &procfs_mount_ops, VFS_MBF_READ_ONLY, SU_UID);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 	log_debug("configuring mounts complete\n");
 
 	#if defined(CONFIG_NET)

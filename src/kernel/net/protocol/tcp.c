@@ -364,14 +364,16 @@ int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *
 {
 	switch (optname) {
 		case SO_GETSOCKNAME: {
-			if (!TCP_ENDPOINT(ep)->local.addr)
+			if (!TCP_ENDPOINT(ep)->local.addr) {
 				return ENOTCONN;
+			}
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &TCP_ENDPOINT(ep)->local);
 			return 0;
 		}
 		case SO_GETPEERNAME: {
-			if (!TCP_ENDPOINT(ep)->remote.addr)
+			if (!TCP_ENDPOINT(ep)->remote.addr) {
 				return ENOTCONN;
+			}
 			inet_load_sockaddr((struct sockaddr *) optval, optlen, &TCP_ENDPOINT(ep)->remote);
 			return 0;
 		}

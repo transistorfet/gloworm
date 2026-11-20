@@ -58,10 +58,12 @@ int MAIN(command_ns)(int argc, char **argv)
 
 	//printf("%s %s:%d using %s\n", f_listen ? "listening on" : "connecting to", address, port, f_udp ? "UDP" : "TCP");
 
-	if (!f_listen && optind < argc)
+	if (!f_listen && optind < argc) {
 		address = argv[optind++];
-	if (optind < argc)
+	}
+	if (optind < argc) {
 		port = strtol(argv[optind++], NULL, 10);
+	}
 
 	// On SIGINT, cause the syscall to cancel
 	act.sa_handler = handle_signal;
@@ -113,14 +115,16 @@ int client_loop(int sockfd, int f_udp, char *address, int port, int f_verbose)
 		}
 	}
 
-	if (f_verbose)
+	if (f_verbose) {
 		printf("connected to %s:%d\n", address, port);
+	}
 
 	while (1) {
 		nbytes = read(STDIN_FILENO, buffer, MAX_INPUT);
 		if (nbytes < 0) {
-			if (nbytes != EINTR)
+			if (nbytes != EINTR) {
 				printf("Error reading: %d\n", nbytes);
+			}
 			break;
 		}
 
@@ -165,8 +169,9 @@ int listen_loop(int sockfd, int f_udp, int port, int f_verbose)
 			return -1;
 		}
 
-		if (f_verbose)
+		if (f_verbose) {
 			printf("listening on port %d\n", port);
+		}
 
 		sa_len = sizeof(struct sockaddr_in);
 		sockfd = accept(sockfd, (struct sockaddr *) &addr, &sa_len);
@@ -175,8 +180,9 @@ int listen_loop(int sockfd, int f_udp, int port, int f_verbose)
 			return -1;
 		}
 
-		if (f_verbose)
+		if (f_verbose) {
 			printf("connection from %s:%d\n", inet_ntoa(addr.sin_addr), addr.sin_port);
+		}
 	}
 
 	while (1) {
@@ -188,8 +194,9 @@ int listen_loop(int sockfd, int f_udp, int port, int f_verbose)
 		}
 
 		if (nbytes <= 0) {
-			if (nbytes != 0 && nbytes != EINTR)
+			if (nbytes != 0 && nbytes != EINTR) {
 				printf("Error receiving: %d\n", nbytes);
+			}
 			return -1;
 		}
 		buffer[nbytes] = '\0';

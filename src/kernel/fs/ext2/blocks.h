@@ -35,20 +35,23 @@ static ext2_block_t ext2_alloc_block(struct mount *mp)
 			break;
 		}
 	}
-	if (group >= super->num_groups)
+	if (group >= super->num_groups) {
 		return ENOSPC;
+	}
 
 	bit = bit_alloc(&mp->bufcache, super->groups[group].block_bitmap, 0);
-	if (!bit)
+	if (!bit) {
 		return NULL;
+	}
 	super->groups[group].free_block_count -= 1;
 	super->super.total_unalloc_blocks -= 1;
 
 	const ext2_block_t blocknum = (super->super.inodes_per_group * group) + bit;
 
 	buf = get_buf(&mp->bufcache, blocknum);
-	if (!buf)
+	if (!buf) {
 		return NULL;
+	}
 
 	memset(buf->block, 0, block_size);
 	unref_buf(buf, BF_DIRTY);
@@ -114,18 +117,21 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 	const int block_size = vnode->mp->block_size;
 
 	ntiers = block_calculate_tier(tiers, znum, block_size, EXT2_SUPER(vnode->mp->super)->log_blocknums_per_block);
-	if (ntiers < 0)
+	if (ntiers < 0) {
 		return 0;
+	}
 
 	for (short tier = 0; tier < ntiers; tier++) {
 		if (tier == 0) {
 			block = &EXT2_DATA(vnode).blocks[tiers[0]];
 		} else {
-			if (buf)
+			if (buf) {
 				unref_buf(buf, 0);
+			}
 			buf = get_buf(&vnode->mp->bufcache, le32toh(*block));
-			if (!buf)
+			if (!buf) {
 				return 0;
+			}
 
 			block = &EXT2_BLOCKNUM_TABLE(buf->block)[tiers[tier]];
 		}
@@ -137,27 +143,31 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 					mark_buf_dirty(buf);
 				}
 			} else {
-				if (buf)
+				if (buf) {
 					unref_buf(buf, 0);
+				}
 				return 0;
 			}
 		}
 	}
 
 	ret = (ext2_block_t) le32toh(*block);
-	if (buf)
+	if (buf) {
 		unref_buf(buf, 0);
+	}
 	return ret;
 }
 
 static void block_free_table(struct mount *mp, ext2_block_t blocknum, uint8_t levels_below)
 {
-	if (!blocknum)
+	if (!blocknum) {
 		return;
+	}
 
 	struct buf *buf = get_buf(&mp->bufcache, blocknum);
-	if (buf)
+	if (buf) {
 		return;
+	}
 
 	const ext2_block_t *entries = buf->block;
 	const int blocks_per_group = 1 << EXT2_SUPER(mp->super)->log_blocknums_per_block;
@@ -188,8 +198,9 @@ static void block_free_all(struct vnode *vnode)
 	// NOTE this can only be used with files or empty directories
 
 	// If this is a device file, then the block is the device number, so just return
-	if (S_ISDEV(vnode->mode))
+	if (S_ISDEV(vnode->mode)) {
 		return;
+	}
 
 	block_free_table(vnode->mp, EXT2_DATA(vnode).blocks[EXT2_DIRECT_BLOCKNUMS_IN_INODE + 2], 2);
 	block_free_table(vnode->mp, EXT2_DATA(vnode).blocks[EXT2_DIRECT_BLOCKNUMS_IN_INODE + 1], 1);

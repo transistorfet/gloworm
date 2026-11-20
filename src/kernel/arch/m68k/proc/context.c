@@ -332,16 +332,19 @@ static inline int copy_stack(struct process *parent_proc, struct process *proc)
 	stack_size = parent_proc->map->stack_end - parent_proc->map->heap_start;
 
 	error = memory_map_unmap(proc->map, parent_proc->map->heap_start, parent_proc->map->stack_end - parent_proc->map->heap_start);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	error = memory_map_insert_heap_stack(proc->map, heap_start, stack_size);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	error = memory_map_move_sbrk(proc->map, parent_proc->map->sbrk - parent_proc->map->heap_start);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	memcpy((char *) proc->map->heap_start, (char *) parent_proc->map->heap_start, stack_size);
 

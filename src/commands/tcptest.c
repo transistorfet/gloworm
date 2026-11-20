@@ -19,10 +19,12 @@ int main(int argc, char **argv)
 	char *address = "192.168.1.102";
 	int port = 3904;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		address = argv[1];
-	if (argc >= 3)
+	}
+	if (argc >= 3) {
 		port = strtol(argv[2], NULL, 10);
+	}
 
 	sockfd = socket(PF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {

@@ -26,8 +26,9 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 	// Set only num_entries bits as free, and the rest of the block as reserved (unallocatable)
 	for (short i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
 		buf = get_buf(bufcache, i);
-		if (!buf)
+		if (!buf) {
 			return -1;
+		}
 		block = buf->block;
 
 		if (num_entries < MINIX_V1_BITS_PER_ZONE) {
@@ -52,8 +53,9 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 	}
 
 	buf = get_buf(bufcache, bitmap_start);
-	if (!buf)
+	if (!buf) {
 		return -1;
+	}
 	block = buf->block;
 
 	// Reserve entries at the beginning of table
@@ -76,8 +78,9 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 
 	for (; zone < bitmap_size; zone++) {
 		buf = get_buf(bufcache, bitmap_start + zone);
-		if (!buf)
+		if (!buf) {
 			return 0;
+		}
 		block = buf->block;
 
 		for (int i = 0; i < MINIX_V1_ZONE_SIZE; i++) {
@@ -102,8 +105,9 @@ static inline int bit_free(struct bufcache *bufcache, zone_t bitmap_start, bitnu
 	int i = (bitnum >> 3);
 	char bit = (bitnum & 0x7);
 	struct buf *buf = get_buf(bufcache, bitmap_start + zone);
-	if (!buf)
+	if (!buf) {
 		return -1;
+	}
 	char *block = buf->block;
 
 	block[i] &= ~(0x01 << bit);

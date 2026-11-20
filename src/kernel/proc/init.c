@@ -40,16 +40,19 @@ struct process *create_init_task(void)
 	struct process *proc;
 
 	proc = new_proc(INIT_PID, SU_UID);
-	if (!proc)
+	if (!proc) {
 		goto fail;
+	}
 
 	proc->map = memory_map_alloc();
-	if (!proc->map)
+	if (!proc->map) {
 		goto fail;
+	}
 
 	proc->fd_table = alloc_fd_table();
-	if (!proc->fd_table)
+	if (!proc->fd_table) {
 		goto fail;
+	}
 
 	#if defined(CONFIG_SHELL_IN_KERNEL)
 
@@ -58,8 +61,9 @@ struct process *create_init_task(void)
 
 	extern void init_task(void);
 	error = launch_user_task_in_kernel(proc, init_task, argv, envp);
-	if (error)
+	if (error) {
 		goto fail;
+	}
 
 	#else
 
@@ -71,16 +75,18 @@ struct process *create_init_task(void)
 	string_array_copy(&envp_buffer, envp, FROM_KERNEL);
 
 	error = load_binary(argv[0], proc, &argv_buffer, &envp_buffer);
-	if (error)
+	if (error) {
 		goto fail;
+	}
 
 	#endif
 
 	return proc;
 
 fail:
-	if (proc)
+	if (proc) {
 		exit_proc(proc, -1);
+	}
 	panic("failed to create init task, %d; stopping\n", error);
 	while (1) {}
 }
@@ -97,13 +103,15 @@ int launch_user_task_in_kernel(struct process *proc, void (*entry)(), const char
 	// Add a code segment for this process, which is the entire kernel
 	extern int __kernel_start, __kernel_end;
 	error = memory_map_mmap(proc->map, (uintptr_t) &__kernel_start, ((uintptr_t) &__kernel_end) - ((uintptr_t) &__kernel_start), SEG_TYPE_CODE | SEG_READ | SEG_WRITE | SEG_EXECUTABLE | SEG_FIXED, NULL, 0);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	// Add the heap and stack segments
 	error = memory_map_insert_heap_stack(proc->map, (uintptr_t) 0x00000000 - CONFIG_USER_STACK_SIZE - PAGE_SIZE, CONFIG_USER_STACK_SIZE);
-	if (error < 0)
+	if (error < 0) {
 		return error;
+	}
 
 	// Initialize the stack pointer first, so that the check in memory_map_move_sbrk will pass
 	exec_initialize_stack_with_args(proc, proc->map->stack_end, entry, &argv_buffer, &envp_buffer);
@@ -126,21 +134,24 @@ struct process *create_idle_thread(void)
 	}
 
 	proc = new_proc(0, SU_UID);
-	if (!proc)
+	if (!proc) {
 		goto fail;
+	}
 
 	extern struct memory_map *kernel_memory_map;
 	proc->map = kernel_memory_map;
 
 	proc->fd_table = alloc_fd_table();
-	if (!proc->fd_table)
+	if (!proc->fd_table) {
 		goto fail;
+	}
 
 	primordial_process = proc;
 
 	error = alloc_kernel_stack(proc, idle_task, argv, envp);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	return proc;
 
@@ -164,18 +175,21 @@ struct process *clone_kernel_thread(int (*thread_start)(), const char *const arg
 	args.stack = NULL;
 
 	error = clone_process(primordial_process, &args, &proc);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	error = alloc_kernel_stack(proc, thread_start, argv, envp);
-	if (error < 0)
+	if (error < 0) {
 		goto fail;
+	}
 
 	return proc;
 
 fail:
-	if (proc)
+	if (proc) {
 		exit_proc(proc, -1);
+	}
 	log_error("error when creating kernel task: %d\n", error);
 	return NULL;
 }

@@ -12,14 +12,15 @@ FILE *fopen(const char *filename, const char *mode)
 	int modebits = 0;
 
 	// Parse the first mode character or exit if an invalid mode string is found
-	if (!*mode)
+	if (!*mode) {
 		return NULL;
-	else if (*mode == 'w')
+	} else if (*mode == 'w') {
 		modebits |= O_WRONLY | O_CREAT;
-	else if (*mode == 'a')
+	} else if (*mode == 'a') {
 		modebits |= O_WRONLY | O_CREAT | O_APPEND;
-	else if (*mode != 'r')
+	} else if (*mode != 'r') {
 		return NULL;
+	}
 	mode++;
 
 	// Parse out the optional '+' character
@@ -35,8 +36,9 @@ FILE *fopen(const char *filename, const char *mode)
 	}
 
 	// If the string isn't terminated here, then it must be an invalid mode string
-	if (*mode)
+	if (*mode) {
 		return NULL;
+	}
 
 	fd = open(filename, modebits, 0644);
 	if (fd < 0) {

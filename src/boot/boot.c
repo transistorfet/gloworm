@@ -48,8 +48,9 @@ int start(char *boot_args)
 {
 	struct boot_drive drive;
 
-	if (!boot_args[0])
+	if (!boot_args[0]) {
 		boot_args = "ata0";
+	}
 
 	drive.drive_type = boot_args[0] == 'a' ? 2 : 1;
 	drive.partition = boot_args[3] - '0';
@@ -79,8 +80,9 @@ char *copy_zone_data(struct boot_drive *drive, char *dest, minix_v1_zone_t zone)
 char *load_zones(struct boot_drive *drive, minix_v1_zone_t *zones, int max, char *dest)
 {
 	for (short i = 0; i < max; i++) {
-		if (!zones[i])
+		if (!zones[i]) {
 			return NULL;
+		}
 		copy_zone_data(drive, dest, le16toh(zones[i]));
 		dest += MINIX_V1_ZONE_SIZE;
 		putchar('.');
@@ -191,8 +193,9 @@ int ata_read_sector(int sector, char *buffer)
 	ata_wait();
 
 	char status = (*ATA_REG_STATUS);
-	if (status & 0x01)
+	if (status & 0x01) {
 		return 0;
+	}
 
 	ata_wait();
 	ATA_WAIT_FOR_DATA();

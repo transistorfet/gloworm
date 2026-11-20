@@ -14,8 +14,9 @@ int init_tty(void)
 int getchar(void)
 {
 	while (1) {
-		if (*tty_status & 0x01)
+		if (*tty_status & 0x01) {
 			return *tty_in;
+		}
 	}
 }
 

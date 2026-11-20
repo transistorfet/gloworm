@@ -139,8 +139,9 @@ int getchar(void)
 	// Assert CTS
 	*OUT_SET_ADDR = 0x01;
 	while (1) {
-		//if (tty_read_out < tty_read_in)
+		//if (tty_read_out < tty_read_in) {
 		//	return tty_read_buffer[tty_read_out++];
+		//}
 		status = *SRA_RD_ADDR;
 		if (status & SR_RX_READY) {
 			// De-Assert CTS

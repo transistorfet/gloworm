@@ -22,8 +22,9 @@ static struct mount mountpoints[VFS_MOUNT_MAX];
 static struct mount *_find_mount_by_vnode(struct vnode *mount)
 {
 	for (short i = 0; i < VFS_MOUNT_MAX; i++) {
-		if (mountpoints[i].mount_node == mount)
+		if (mountpoints[i].mount_node == mount) {
 			return &mountpoints[i];
+		}
 	}
 	return NULL;
 }
@@ -52,8 +53,9 @@ struct mount *vfs_mount_iter_next(struct mount_iter *iter)
 	struct mount *mp;
 
 	do {
-		if (iter->slot >= VFS_MOUNT_MAX)
+		if (iter->slot >= VFS_MOUNT_MAX) {
 			return NULL;
+		}
 		mp = &mountpoints[iter->slot++];
 	} while (mp->dev == 0);
 	return mp;
@@ -67,15 +69,17 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 
 	log_info("%s: mounting (%s%d) at %s\n", ops->fstype, get_driver_name(dev), DEVMINOR(dev), path);
 
-	if (uid != SU_UID)
+	if (uid != SU_UID) {
 		return EPERM;
+	}
 
 	if (!root_fs) {
 		vnode = NULL;
 	} else {
 		error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
-		if (error)
+		if (error) {
 			return error;
+		}
 	}
 
 	if (vnode && (vnode->bits & VBF_MOUNTED)) {
@@ -84,8 +88,9 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 	}
 
 	for (short i = 0; i < VFS_MOUNT_MAX; i++) {
-		if (mountpoints[i].dev == dev)
+		if (mountpoints[i].dev == dev) {
 			return EBUSY;
+		}
 	}
 
 	for (short i = 0; i < VFS_MOUNT_MAX; i++) {
@@ -109,8 +114,9 @@ int vfs_mount(struct vnode *cwd, const char *path, device_t dev, struct mount_op
 				vnode->bits |= VBF_MOUNTED;
 			} else {
 				root_fs = &mountpoints[i];
-				if (!mountpoints[i].mount_node && mountpoints[i].root_node)
+				if (!mountpoints[i].mount_node && mountpoints[i].root_node) {
 					mountpoints[i].mount_node = vfs_ref_vnode(mountpoints[i].root_node);
+				}
 			}
 			return 0;
 		}
@@ -130,27 +136,32 @@ int vfs_unmount(device_t dev, uid_t uid)
 		}
 	}
 
-	if (!mp)
+	if (!mp) {
 		return ENODEV;
+	}
 
-	if (uid != SU_UID)
+	if (uid != SU_UID) {
 		return EPERM;
+	}
 
 	error = mp->ops->sync(mp);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	error = mp->ops->unmount(mp);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (mp->mount_node->bits & VBF_MOUNTED) {
 		mp->mount_node->bits &= ~VBF_MOUNTED;
 	} else {
 		root_fs = NULL;
 	}
-	if (mp->mount_node)
+	if (mp->mount_node) {
 		vfs_unref_vnode(mp->mount_node);
+	}
 	mp->ops = NULL;
 	mp->dev = 0;
 	return 0;
@@ -176,8 +187,9 @@ int vfs_sync(device_t dev)
 		}
 
 		error = mountpoints[i].ops->sync(&mountpoints[i]);
-		if (error)
+		if (error) {
 			return error;
+		}
 	}
 	return 0;
 }
@@ -191,8 +203,9 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 	struct vnode *cur;
 	char component[NAME_MAX];
 
-	if (!result)
+	if (!result) {
 		return EINVAL;
+	}
 
 	cur = (cwd && path[0] != VFS_SEP) ? cwd : root_fs->root_node;
 	if (path[0] == VFS_SEP) {
@@ -206,8 +219,9 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 		if (cur->bits & VBF_MOUNTED) {
 			mp = _find_mount_by_vnode(cur);
 			vfs_unref_vnode(cur);
-			if (!mp)
+			if (!mp) {
 				return ENXIO;
+			}
 			cur = vfs_ref_vnode(mp->root_node);
 		}
 
@@ -229,10 +243,12 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 			return EPERM;
 		}
 
-		for (j = 0; j < NAME_MAX - 1 && path[i] && path[i] != VFS_SEP; i++, j++)
+		for (j = 0; j < NAME_MAX - 1 && path[i] && path[i] != VFS_SEP; i++, j++) {
 			component[j] = path[i];
-		if (path[i] == VFS_SEP)
+		}
+		if (path[i] == VFS_SEP) {
 			i += 1;
+		}
 		component[j] = '\0';
 
 		if (j >= NAME_MAX) {
@@ -241,8 +257,9 @@ int vfs_lookup(struct vnode *cwd, const char *path, int flags, uid_t uid, struct
 		}
 
 		// If we're supposed to stop before the last component, then skip the lookup and we'll exit from the loop at the top
-		if (flags & VLOOKUP_PARENT_OF && path[i] == '\0')
+		if (flags & VLOOKUP_PARENT_OF && path[i] == '\0') {
 			continue;
+		}
 
 		// If we're at the root of a mounted fs and are accessing "..", then swap the root node for the mounted node before lookup
 		if (cur == cur->mp->root_node && !strcmp(component, "..")) {
@@ -272,12 +289,14 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 	struct dirent dir;
 	struct vfile *file;
 
-	if (!cwd)
+	if (!cwd) {
 		cwd = root_fs->root_node;
+	}
 
 	// TODO this only works for directories, but if we took another vnode arg, we could optionally include its filename
-	if (!S_ISDIR(cwd->mode))
+	if (!S_ISDIR(cwd->mode)) {
 		return ENOTDIR;
+	}
 
 	j = size;
 	buf[--j] = '\0';
@@ -328,8 +347,9 @@ int vfs_reverse_lookup(struct vnode *cwd, char *buf, size_t size, uid_t uid)
 	}
 	vfs_unref_vnode(cur);
 
-	if (buf[j] != '/')
+	if (buf[j] != '/') {
 		buf[--j] = VFS_SEP;
+	}
 
 	strcpy(buf, &buf[j]);
 	return 0;
@@ -342,8 +362,9 @@ int vfs_access(struct vnode *cwd, const char *path, int mode, uid_t uid)
 	struct vnode *vnode;
 
 	error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (mode && !verify_mode_access(uid, mode, vnode->uid, vnode->gid, vnode->mode)) {
 		error = EPERM;
@@ -361,15 +382,17 @@ int vfs_chmod(struct vnode *cwd, const char *path, int mode, uid_t uid)
 	struct vnode *vnode;
 
 	error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
 		return EROFS;
 	}
 
-	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode))
+	if (!verify_mode_access(uid, W_OK, vnode->uid, vnode->gid, vnode->mode)) {
 		return EPERM;
+	}
 
 	vnode->mode = (vnode->mode & ~07777) | (mode & 07777);
 	error = vnode->ops->update(vnode);
@@ -383,8 +406,9 @@ int vfs_chown(struct vnode *cwd, const char *path, uid_t owner, gid_t group, uid
 	struct vnode *vnode;
 
 	error = vfs_lookup(cwd, path, VLOOKUP_NORMAL, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
 		return EROFS;
@@ -408,8 +432,9 @@ int vfs_mknod(struct vnode *cwd, const char *path, mode_t mode, device_t dev, ui
 	struct vnode *tmp = NULL;
 
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
 		return EROFS;
@@ -451,8 +476,9 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 	}
 
 	error = vfs_lookup(cwd, oldpath, VLOOKUP_NORMAL, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	error = vfs_lookup(cwd, newpath, VLOOKUP_PARENT_OF, uid, &parent);
 	if (error) {
@@ -467,18 +493,21 @@ int vfs_link(struct vnode *cwd, const char *oldpath, const char *newpath, uid_t 
 	if (error == ENOENT) {
 		error = 0;
 	} else {
-		if (!error)
+		if (!error) {
 			vfs_unref_vnode(tmpvnode);
+		}
 		error = EEXIST;
 	}
 
 	// Verify that parent directory is writable
-	if (!error && !verify_mode_access(uid, W_OK, parent->uid, parent->gid, parent->mode))
+	if (!error && !verify_mode_access(uid, W_OK, parent->uid, parent->gid, parent->mode)) {
 		error = EACCES;
+	}
 
 	// Verify they're on the same mount point
-	if (!error && (vnode->mp != parent->mp))
+	if (!error && (vnode->mp != parent->mp)) {
 		error = EXDEV;
+	}
 
 	if (error) {
 		vfs_unref_vnode(vnode);
@@ -500,8 +529,9 @@ int vfs_unlink(struct vnode *cwd, const char *path, uid_t uid)
 	struct vnode *vnode = NULL;
 
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &parent);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
 		return EROFS;
@@ -543,8 +573,9 @@ static inline int _rename_find_parent(struct vnode *cwd, const char *path, uid_t
 
 	// Look up the parent (if it's not a directory, we'll return with an error)
 	error = vfs_lookup(cwd, path, VLOOKUP_PARENT_OF, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
 		return EROFS;
@@ -568,16 +599,19 @@ int vfs_rename(struct vnode *cwd, const char *oldpath, const char *newpath, uid_
 	struct vnode *oldparent, *newparent;
 
 	oldname = path_last_component(oldpath);
-	if (*oldname == '\0' || !strcmp(oldname, ".") || !strcmp(oldname, ".."))
+	if (*oldname == '\0' || !strcmp(oldname, ".") || !strcmp(oldname, "..")) {
 		return EINVAL;
+	}
 
 	newname = path_last_component(newpath);
-	if (*newname == '\0' || !strcmp(newname, ".") || !strcmp(newname, ".."))
+	if (*newname == '\0' || !strcmp(newname, ".") || !strcmp(newname, "..")) {
 		return EINVAL;
+	}
 
 	error = _rename_find_parent(cwd, oldpath, uid, &oldparent);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	error = _rename_find_parent(cwd, newpath, uid, &newparent);
 	if (error) {
@@ -607,15 +641,18 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 	mode_t required_mode = 0;
 	struct vnode *vnode = NULL;
 
-	if (!file)
+	if (!file) {
 		return EINVAL;
+	}
 
-	if (!(mode & S_IFMT))
+	if (!(mode & S_IFMT)) {
 		mode |= S_IFREG;
+	}
 
 	error = vfs_lookup(cwd, path, (flags & O_CREAT) ? VLOOKUP_PARENT_OF : VLOOKUP_NORMAL, uid, &vnode);
-	if (error)
+	if (error) {
 		return error;
+	}
 
 	if (flags & O_CREAT) {
 		const char *filename = path_last_component(path);
@@ -647,31 +684,38 @@ int vfs_open(struct vnode *cwd, const char *path, int flags, mode_t mode, uid_t 
 	}
 
 	// Verify the permissions before proceeding
-	if ((flags & O_ACCMODE) != O_WRONLY)
+	if ((flags & O_ACCMODE) != O_WRONLY) {
 		required_mode |= R_OK;
-	if ((flags & O_ACCMODE) != O_RDONLY)
+	}
+	if ((flags & O_ACCMODE) != O_RDONLY) {
 		required_mode |= W_OK;
+	}
 	if (!verify_mode_access(uid, required_mode, vnode->uid, vnode->gid, vnode->mode)) {
 		vfs_unref_vnode(vnode);
 		return EPERM;
 	}
 
 	*file = new_fileptr(vnode, flags);
-	if (!*file)
+	if (!*file) {
 		return ENFILE;
+	}
 
-	if (flags & O_TRUNC && S_ISREG(vnode->mode))
+	if (flags & O_TRUNC && S_ISREG(vnode->mode)) {
 		vnode->ops->truncate(vnode);
+	}
 
-	if (flags & O_APPEND && S_ISREG(vnode->mode))
+	if (flags & O_APPEND && S_ISREG(vnode->mode)) {
 		(*file)->position = (*file)->vnode->size;
+	}
 
-	if (S_ISDEV(vnode->mode))
+	if (S_ISDEV(vnode->mode)) {
 		(*file)->ops = &device_vfile_ops;
+	}
 
 	error = (*file)->ops->open(*file, flags);
-	if (error)
+	if (error) {
 		free_fileptr(*file);
+	}
 	return error;
 }
 
@@ -681,25 +725,29 @@ int vfs_close(struct vfile *file)
 
 	// Only free the file if refcount == 1 or else it's a double free and
 	// you'll jump to a random location in memory
-	if (file->refcount == 1)
+	if (file->refcount == 1) {
 		error = file->ops->close(file);
+	}
 	free_fileptr(file);
 	return error;
 }
 
 int vfs_read(struct vfile *file, struct iovec_iter *iter)
 {
-	if ((file->flags & O_ACCMODE) == O_WRONLY)
+	if ((file->flags & O_ACCMODE) == O_WRONLY) {
 		return EACCES;
+	}
 	return file->ops->read(file, iter);
 }
 
 int vfs_write(struct vfile *file, struct iovec_iter *iter)
 {
-	if ((file->vnode->mp->bits & VFS_MBF_READ_ONLY) && (S_ISREG(file->vnode->mode) || S_ISDIR(file->vnode->mode)))
+	if ((file->vnode->mp->bits & VFS_MBF_READ_ONLY) && (S_ISREG(file->vnode->mode) || S_ISDIR(file->vnode->mode))) {
 		return EROFS;
-	if ((file->flags & O_ACCMODE) == O_RDONLY)
+	}
+	if ((file->flags & O_ACCMODE) == O_RDONLY) {
 		return EACCES;
+	}
 	return file->ops->write(file, iter);
 }
 
@@ -730,8 +778,9 @@ struct vfile *vfs_ref_fileptr(struct vfile *file)
 
 int vfs_unref_vnode(struct vnode *vnode)
 {
-	if (!vnode)
+	if (!vnode) {
 		return 0;
+	}
 	vnode->refcount--;
 	if (vnode->refcount < 0) {
 		log_warning("warning: double free of vnode, %x\n", vnode);
@@ -746,11 +795,13 @@ int vfs_unref_vnode(struct vnode *vnode)
 const char *path_last_component(const char *path)
 {
 	short i = strlen(path) - 1;
-	if (path[i] == VFS_SEP)
+	if (path[i] == VFS_SEP) {
 		i--;
+	}
 	for (; i >= 0; i--) {
-		if (path[i] == VFS_SEP)
+		if (path[i] == VFS_SEP) {
 			break;
+		}
 	}
 	i += 1;
 	return &path[i];
@@ -758,11 +809,13 @@ const char *path_last_component(const char *path)
 
 int path_valid_component(const char *path)
 {
-	if (*path == '\0')
+	if (*path == '\0') {
 		return 0;
+	}
 	for (; *path; path++) {
-		if (*path <= 0x20 || *path == '/')
+		if (*path <= 0x20 || *path == '/') {
 			return 0;
+		}
 	}
 	return 1;
 }

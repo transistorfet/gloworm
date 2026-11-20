@@ -49,8 +49,9 @@ void run_bh_handlers(void)
 	for (short i = 0; i < BH_MAX; i++, bit <<= 1) {
 		if (requested & bit) {
 			bh_requested &= ~bit;
-			if (!bh_handlers[i].fn)
+			if (!bh_handlers[i].fn) {
 				continue;
+			}
 			bh_handlers[i].fn(bh_handlers[i].data);
 		}
 	}

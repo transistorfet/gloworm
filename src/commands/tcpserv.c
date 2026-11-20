@@ -22,8 +22,9 @@ int main(int argc, char **argv)
 
 	int port = 3904;
 
-	if (argc >= 2)
+	if (argc >= 2) {
 		port = strtol(argv[1], NULL, 10);
+	}
 
 	act.sa_handler = NULL;
 	act.sa_flags = 0;

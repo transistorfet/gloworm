@@ -9,8 +9,9 @@ int fgetc(FILE *stream)
 		// If the stream is unbuffered, then do a direct read and return
 		if (stream->flags & _IONBF) {
 			unsigned char ch;
-			if (fread(&ch, 1, 1, stream) > 0)
+			if (fread(&ch, 1, 1, stream) > 0) {
 				return ch;
+			}
 			return EOF;
 		}
 

@@ -113,13 +113,15 @@ int minix_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t u
 	struct vnode *newnode;
 	struct minix_v1_dirent *dir;
 
-	if (strlen(filename) > MINIX_V1_MAX_FILENAME)
+	if (strlen(filename) > MINIX_V1_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	// The dirent wont be 'in use' until we set the vnode reference
 	dir = dir_alloc_entry(vnode, filename, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, 0);
@@ -149,13 +151,15 @@ int minix_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t
 	struct vnode *newnode;
 	struct minix_v1_dirent *dir;
 
-	if (strlen(filename) > MINIX_V1_MAX_FILENAME)
+	if (strlen(filename) > MINIX_V1_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	// The dirent wont be 'in use' until we set the vnode reference
 	dir = dir_alloc_entry(vnode, filename, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	// TODO this needs the uid/gid from vfs
 	newnode = (struct vnode *) alloc_vnode(vnode->mp, mode, uid, 0, dev);
@@ -176,15 +180,18 @@ int minix_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 	struct buf *buf;
 	struct minix_v1_dirent *entry;
 
-	if (strlen(filename) > MINIX_V1_MAX_FILENAME)
+	if (strlen(filename) > MINIX_V1_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	entry = dir_find_entry_by_name(vnode, filename, MFS_LOOKUP_ZONE, &buf);
-	if (!entry)
+	if (!entry) {
 		return ENOENT;
+	}
 
-	if (*result)
+	if (*result) {
 		vfs_unref_vnode(*result);
+	}
 	*result = (struct vnode *) get_vnode(vnode->mp, le16toh(entry->inode));
 	unref_buf(buf, 0);
 	return 0;
@@ -195,12 +202,14 @@ int minix_link(struct vnode *oldvnode, struct vnode *newparent, const char *file
 	struct buf *buf;
 	struct minix_v1_dirent *dir;
 
-	if (strlen(filename) > MINIX_V1_MAX_FILENAME)
+	if (strlen(filename) > MINIX_V1_MAX_FILENAME) {
 		return ENAMETOOLONG;
+	}
 
 	dir = dir_alloc_entry(newparent, filename, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOSPC;
+	}
 
 	oldvnode->nlinks += 1;
 	dir->inode = htole16((minix_v1_inode_t) oldvnode->ino);
@@ -215,12 +224,14 @@ int minix_unlink(struct vnode *parent, struct vnode *vnode, const char *filename
 	struct buf *buf;
 	struct minix_v1_dirent *dir;
 
-	if (S_ISDIR(vnode->mode) && !dir_is_empty(vnode))
+	if (S_ISDIR(vnode->mode) && !dir_is_empty(vnode)) {
 		return ENOTEMPTY;
+	}
 
 	dir = dir_find_entry_by_name(parent, filename, MFS_LOOKUP_ZONE, &buf);
-	if (!dir)
+	if (!dir) {
 		return ENOENT;
+	}
 
 	dir->inode = htole16(0);
 	unref_buf(buf, BF_DIRTY);
@@ -247,8 +258,9 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 		return EEXIST;
 	} else {
 		newdir = dir_alloc_entry(newparent, newname, &newbuf);
-		if (!newdir)
+		if (!newdir) {
 			return ENOSPC;
+		}
 	}
 
 	olddir = dir_find_entry_by_name(oldparent, oldname, MFS_LOOKUP_ZONE, &oldbuf);
@@ -268,8 +280,9 @@ int minix_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldna
 
 int minix_truncate(struct vnode *vnode)
 {
-	if (S_ISDIR(vnode->mode))
+	if (S_ISDIR(vnode->mode)) {
 		return EISDIR;
+	}
 	zone_free_all(vnode);
 	vnode->size = 0;
 	vfs_update_time(vnode, MTIME);
@@ -307,8 +320,9 @@ int minix_close(struct vfile *file)
 
 int minix_read(struct vfile *file, struct iovec_iter *iter)
 {
-	if (S_ISDIR(file->vnode->mode))
+	if (S_ISDIR(file->vnode->mode)) {
 		return EISDIR;
+	}
 
 	short zpos;
 	short zlen;
@@ -319,19 +333,22 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 	size_t wbytes = 0;
 
 	nbytes = iovec_iter_remaining(iter);
-	if (nbytes > file->vnode->size - file->position)
+	if (nbytes > file->vnode->size - file->position) {
 		nbytes = file->vnode->size - file->position;
+	}
 
 	znum = file->position >> MINIX_V1_LOG_ZONE_SIZE;
 	zpos = file->position & (MINIX_V1_ZONE_SIZE - 1);
 
 	do {
 		zone = zone_lookup(file->vnode, znum, MFS_LOOKUP_ZONE);
-		if (!zone)
+		if (!zone) {
 			break;
+		}
 		buf = get_buf(&file->vnode->mp->bufcache, zone);
-		if (!buf)
+		if (!buf) {
 			break;
+		}
 
 		zlen = MINIX_V1_ZONE_SIZE - zpos;
 		if (zlen > nbytes) {
@@ -353,8 +370,9 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 
 int minix_write(struct vfile *file, struct iovec_iter *iter)
 {
-	if (S_ISDIR(file->vnode->mode))
+	if (S_ISDIR(file->vnode->mode)) {
 		return EISDIR;
+	}
 
 	short zpos;
 	short zlen;
@@ -401,11 +419,13 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 		mark_vnode_dirty(file->vnode);
 	}
 
-	if (wbytes)
+	if (wbytes) {
 		vfs_update_time(file->vnode, MTIME);
+	}
 
-	if (error)
+	if (error) {
 		return error;
+	}
 	return wbytes;
 }
 
@@ -447,26 +467,30 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
-	if (!S_ISDIR(file->vnode->mode))
+	if (!S_ISDIR(file->vnode->mode)) {
 		return ENOTDIR;
+	}
 
 	znum = file->position >> MINIX_V1_LOG_DIRENTS_PER_ZONE;
 	zpos = file->position & (MINIX_V1_DIRENTS_PER_ZONE - 1);
 
 	while (1) {
 		zone = zone_lookup(file->vnode, znum, MFS_LOOKUP_ZONE);
-		if (!zone)
+		if (!zone) {
 			return 0;
+		}
 		buf = get_buf(&file->vnode->mp->bufcache, zone);
-		if (!buf)
+		if (!buf) {
 			return EIO;
+		}
 		entries = (struct minix_v1_dirent *) buf->block;
 
 		// Advance to the next valid directory entry in the block
 		for (; zpos < MINIX_V1_DIRENTS_PER_ZONE - 1 && entries[zpos].inode == 0; zpos++) { }
 
-		if (entries[zpos].inode != 0)
+		if (entries[zpos].inode != 0) {
 			break;
+		}
 
 		unref_buf(buf, 0);
 		znum++;

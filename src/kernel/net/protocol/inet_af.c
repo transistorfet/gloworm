@@ -30,10 +30,12 @@ int inet_resolve_address(const struct sockaddr *requested, socklen_t len, const 
 
 	// Validate the sockaddr and initialize the src address
 	if (requested_sin) {
-		if (len != sizeof(struct sockaddr_in))
+		if (len != sizeof(struct sockaddr_in)) {
 			return EINVAL;
-		if (requested_sin->sin_addr.s_addr != INADDR_ANY && requested_sin->sin_addr.s_addr != actual_sin->sin_addr.s_addr)
+		}
+		if (requested_sin->sin_addr.s_addr != INADDR_ANY && requested_sin->sin_addr.s_addr != actual_sin->sin_addr.s_addr) {
 			return EINVAL;
+		}
 		ipv4->addr = requested_sin->sin_addr.s_addr;
 		ipv4->port = requested_sin->sin_port;
 	} else {
@@ -42,12 +44,14 @@ int inet_resolve_address(const struct sockaddr *requested, socklen_t len, const 
 	}
 
 	// Get the real IP and port to send from
-	if (ipv4->addr == INADDR_ANY)
+	if (ipv4->addr == INADDR_ANY) {
 		ipv4->addr = actual_sin->sin_addr.s_addr;
+	}
 
 	// TODO should this be in the udp code to ensure the ephemeral port isn't already in use?
-	if (ipv4->port == 0)
+	if (ipv4->port == 0) {
 		ipv4->port = EPHEMERAL_BASE + (rand() & EPHEMERAL_RANGE);
+	}
 
 	return 0;
 }

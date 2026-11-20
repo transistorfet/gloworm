@@ -26,12 +26,14 @@ static zone_t minix_alloc_zone(struct mount *mp)
 
 	super = MINIX_SUPER(mp->super);
 	bit = bit_alloc(&mp->bufcache, MINIX_V1_ZONE_BITMAP_START(&super->super_v1), super->super_v1.zmap_blocks, 0);
-	if (!bit)
+	if (!bit) {
 		return NULL;
+	}
 	bit += super->super_v1.first_zone - 1;
 	buf = get_buf(&mp->bufcache, bit);
-	if (!buf)
+	if (!buf) {
 		return NULL;
+	}
 
 	memset(buf->block, 0, MINIX_V1_ZONE_SIZE);
 	unref_buf(buf, BF_DIRTY);
@@ -83,8 +85,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 	struct buf *buf = NULL;
 
 	ntiers = zone_calculate_tier(tiers, znum);
-	if (ntiers < 0)
+	if (ntiers < 0) {
 		return 0;
+	}
 
 	for (short tier = 0; tier < ntiers; tier++) {
 		if (tier == 0) {
@@ -94,8 +97,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 				unref_buf(buf, 0);
 			}
 			buf = get_buf(&vnode->mp->bufcache, le16toh(*zone));
-			if (!buf)
+			if (!buf) {
 				return 0;
+			}
 
 			zone = &MINIX_V1_ZONENUM_TABLE(buf->block)[tiers[tier]];
 		}
@@ -107,8 +111,9 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 					mark_buf_dirty(buf);
 				}
 			} else {
-				if (buf)
+				if (buf) {
 					unref_buf(buf, 0);
+				}
 				return 0;
 			}
 		}
@@ -128,8 +133,9 @@ static void zone_free_all(struct vnode *vnode)
 	// NOTE this can only be used with files or empty directories
 
 	// If this is a device file, then the zone is the device number, so just return
-	if (S_ISDEV(vnode->mode))
+	if (S_ISDEV(vnode->mode)) {
 		return;
+	}
 
 	// Traverse all zones and free each
 	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {

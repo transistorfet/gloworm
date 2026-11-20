@@ -29,8 +29,9 @@ struct tm *gmtime(const time_t *t)
 	tp->tm_yday = daynum;
 	while (1) {
 		register int days = LEAPYEAR(tp->tm_year) ? 366 : 365;
-		if (tp->tm_yday < days)
+		if (tp->tm_yday < days) {
 			break;
+		}
 		tp->tm_yday -= days;
 		tp->tm_year++;
 	}
@@ -40,8 +41,9 @@ struct tm *gmtime(const time_t *t)
 	tp->tm_mday = tp->tm_yday + 1;
 	while (1) {
 		register int days = (tp->tm_mon == 1 && LEAPYEAR(tp->tm_year)) ? _monthdays[tp->tm_mon] + 1 : _monthdays[tp->tm_mon];
-		if (tp->tm_mday < days)
+		if (tp->tm_mday < days) {
 			break;
+		}
 		tp->tm_mday -= days;
 		tp->tm_mon++;
 	}

@@ -12,8 +12,9 @@ char *fgets(char *str, int max, FILE *stream)
 			i += 1;
 			break;
 		} else if (str[i] == EOF) {
-			if (!i)
+			if (!i) {
 				return NULL;
+			}
 			break;
 		}
 	}

@@ -90,8 +90,9 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 				break;
 			    }
 			    case 'c': {
-				if (!width)
+				if (!width) {
 					width = 1;
+				}
 
 				if (ignore) {
 					i += width;
