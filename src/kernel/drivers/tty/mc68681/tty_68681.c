@@ -272,7 +272,7 @@ static inline int tty_68681_putchar_direct(struct serial_channel *channel, int c
 	LOCK(saved_status);
 
 	*channel->ports->command = CMD_ENABLE_TX;
-	while (!(*channel->ports->status & SR_TX_READY)) { }
+	while (!(*channel->ports->status & SR_TX_READY)) {}
 	*channel->ports->send = (unsigned char) ch;
 
 	UNLOCK(saved_status);

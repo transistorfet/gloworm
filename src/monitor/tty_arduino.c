@@ -22,7 +22,7 @@ int getchar(void)
 
 int putchar(int ch)
 {
-	while (!(*tty_status & 0x04)) { }
+	while (!(*tty_status & 0x04)) {}
 	*tty_out = ch;
 	return ch;
 }

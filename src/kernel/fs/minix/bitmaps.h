@@ -86,7 +86,7 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 		for (int i = 0; i < MINIX_V1_ZONE_SIZE; i++) {
 			//printk("Bitsearch %d: %x\n", i, block[i]);
 			if ((char) ~block[i]) {
-				for (bit = 0; bit < 8 && ((0x01 << bit) & block[i]); bit++) { }
+				for (bit = 0; bit < 8 && ((0x01 << bit) & block[i]); bit++) {}
 				block[i] |= (0x01 << bit);
 				unref_buf(buf, BF_DIRTY);
 				return bit + (i * 8) + (zone * MINIX_V1_ZONE_SIZE * 8);

@@ -32,22 +32,22 @@ int MAIN(command_ns)(int argc, char **argv)
 
 	while ((opt = getopt(argc, argv, "ulv")) != EOF) {
 		switch (opt) {
-		    case '?':
-			puts(usage);
-			return -1;
-		    case 'u':
-			f_udp = 1;
-			break;
-		    case 'l':
-			f_listen = 1;
-			break;
-		    case 'v':
-			f_verbose = 1;
-			break;
-		    default:
-			// TODO this is for debugging
-			printf(">> %c\n", opt);
-			break;
+			case '?':
+				puts(usage);
+				return -1;
+			case 'u':
+				f_udp = 1;
+				break;
+			case 'l':
+				f_listen = 1;
+				break;
+			case 'v':
+				f_verbose = 1;
+				break;
+			default:
+				// TODO this is for debugging
+				printf(">> %c\n", opt);
+				break;
 		}
 	}
 

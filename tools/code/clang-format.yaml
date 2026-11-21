@@ -1,0 +1,46 @@
+---
+AlignAfterOpenBracket: BlockIndent
+AlignArrayOfStructures: Left
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 1
+  AlignPPAndNotPP: true
+AlignConsecutiveMacros:
+  Enabled:         true
+  AcrossEmptyLines: true
+  AcrossComments:  true
+  AlignCompound:   true
+  AlignFunctionDeclarations: true
+  AlignFunctionPointers: true
+  PadOperators:    true
+AllowShortFunctionsOnASingleLine: None
+AllowAllArgumentsOnNextLine: false
+BasedOnStyle: WebKit
+BinPackArguments: false
+BinPackParameters: false
+BitFieldColonSpacing: After
+BreakBeforeInlineASMColon: OnlyMultiline
+ColumnLimit:     0
+CommentPragmas: ^[^ ]
+ContinuationIndentWidth: 8
+IncludeBlocks: Preserve
+IndentCaseLabels: true
+IndentPPDirectives: Leave
+IndentWidth: 8
+InsertBraces: true
+InsertNewlineAtEOF: true
+KeepEmptyLines:
+  AtEndOfFile: true
+MaxEmptyLinesToKeep: 3
+PointerAlignment: Right
+ReflowComments: false
+SortIncludes: false
+SpaceAfterCStyleCast: true
+SpacesBeforeTrailingComments: 8
+SpaceInEmptyBraces: Never
+SpacesInLineCommentPrefix:
+  Minimum: 0
+  Maximum: -1
+TabWidth: 8
+UseTab: Always
+...

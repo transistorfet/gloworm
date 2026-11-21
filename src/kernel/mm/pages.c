@@ -61,7 +61,7 @@ int init_page_block(struct page_block *block, physical_address_t addr, size_t si
 	#endif
 
 	allocatable_pages = total_pages - bitmap_pages - descriptors_pages;
-	pages_addr = (physical_address_t) &((page_t *) addr)[bitmap_pages + descriptors_pages];
+	pages_addr = (physical_address_t) (&((page_t *) addr)[bitmap_pages + descriptors_pages]);
 
 	log_trace("bitmaps at %x, size %d, pages %d, after %x\n", addr, bitmap_size, bitmap_pages, pages_addr);
 	#if defined(CONFIG_MMU)
@@ -189,7 +189,7 @@ physical_address_t page_block_alloc(struct page_block *block, size_t size)
 			}
 			block->free_pages -= contiguous_pages;
 
-			return (physical_address_t) &((page_t *) block->base)[start_bit];
+			return (physical_address_t) (&((page_t *) block->base)[start_bit]);
 		}
 	}
 

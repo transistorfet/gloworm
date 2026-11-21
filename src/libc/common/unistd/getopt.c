@@ -8,7 +8,7 @@ int opterr = 0;
 int optopt;
 char *optarg;
 
-int getopt(int argc, char * const argv[], const char *optstring)
+int getopt(int argc, char *const argv[], const char *optstring)
 {
 	static int nextchar = 1;
 	const char *chopt;

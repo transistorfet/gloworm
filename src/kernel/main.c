@@ -71,7 +71,8 @@ struct driver *drivers[] = {
 	#if defined(CONFIG_ATA)
 	&ata_driver,
 	#endif
-	NULL	// Null Termination
+	// null-terminated list
+	NULL,
 };
 
 extern struct mount_ops procfs_mount_ops;
@@ -86,7 +87,8 @@ struct mount_ops *filesystems[] = {
 	#if defined(CONFIG_EXT2_FS)
 	&ext2_mount_ops,
 	#endif
-	NULL	// Null Termination
+	// null-terminated list
+	NULL,
 };
 
 #if defined(CONFIG_NET)
@@ -96,7 +98,8 @@ struct if_ops *interfaces[] = {
 	#if defined(CONFIG_SLIP)
 	&slip_if_ops,
 	#endif
-	NULL	// Null Termination
+	// null-terminated list
+	NULL,
 };
 
 extern struct protocol_ops ipv4_protocol_ops;
@@ -109,7 +112,8 @@ struct protocol_ops *protocols[] = {
 	&icmp_protocol_ops,
 	&udp_protocol_ops,
 	&tcp_protocol_ops,
-	NULL	// Null Termination
+	// null-terminated list
+	NULL,
 };
 #endif
 

@@ -8,7 +8,9 @@
 
 static inline void inline_delay(int count)
 {
-	while (--count > 0) { asm volatile(""); }
+	while (--count > 0) {
+		asm volatile("");
+	}
 }
 
 #endif

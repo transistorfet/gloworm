@@ -31,7 +31,7 @@ int MAIN(init_task)(void)
 	char *argv[3] = { NULL };
 	char *envp[2] = { NULL };
 
- 	pid = fork();
+	pid = fork();
 	if (!pid) {
 		// TODO create a new session
 		setpgid(0, 0);
@@ -45,7 +45,7 @@ int MAIN(init_task)(void)
 		// Run the builtin shell if compiled inside the kernel
 		extern int sh_task(int argc, char *argv[], char *envp[]);
 		argv[0] = "sh";
-		status = (sh_task)(1, argv, envp);
+		status = sh_task(1, argv, envp);
 		exit(status);
 
 		#else

@@ -76,7 +76,6 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 				return 1;
 			}
 		}
-
 	}
 	return ready;
 }

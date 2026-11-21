@@ -235,10 +235,10 @@ struct process *proc_iter_next(struct process_iter *iter)
 	struct process *proc;
 
 	do {
-	        if (iter->slotnum >= CONFIG_MAX_PROCESSES) {
-	                return NULL;
+		if (iter->slotnum >= CONFIG_MAX_PROCESSES) {
+			return NULL;
 		}
-	        proc = process_list[iter->slotnum];
+		proc = process_list[iter->slotnum];
 		iter->slotnum += 1;
 	} while (!proc);
 	return proc;

@@ -454,16 +454,16 @@ off_t ext2_seek(struct vfile *file, off_t position, int whence)
 	struct vnode *vnode = file->vnode;
 
 	switch (whence) {
-	    case SEEK_SET:
-		break;
-	    case SEEK_CUR:
-		position = file->position + position;
-		break;
-	    case SEEK_END:
-		position = vnode->size + position;
-		break;
-	    default:
-		return EINVAL;
+		case SEEK_SET:
+			break;
+		case SEEK_CUR:
+			position = file->position + position;
+			break;
+		case SEEK_END:
+			position = vnode->size + position;
+			break;
+		default:
+			return EINVAL;
 	}
 
 	// TODO this is a hack for now so I don't have to deal with gaps in files

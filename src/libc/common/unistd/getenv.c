@@ -12,7 +12,7 @@ const char *getenv(const char *name)
 		return NULL;
 	}
 	for (; *envp; envp++) {
-		for (ech = *envp, nch = name; *nch && *ech == *nch; ech++, nch++) { }
+		for (ech = *envp, nch = name; *nch && *ech == *nch; ech++, nch++) {}
 		if (!*nch && *ech == '=') {
 			return ++ech;
 		}

@@ -29,10 +29,11 @@ static inline void _queue_node_init(struct queue_node *node)
 
 static inline void _queue_insert(struct queue *queue, struct queue_node *node)
 {
-	if (queue->head)
+	if (queue->head) {
 		queue->head->prev = node;
-	else
+	} else {
 		queue->tail = node;
+	}
 	node->next = queue->head;
 	node->prev = NULL;
 	queue->head = node;
@@ -43,37 +44,42 @@ static inline void _queue_insert_after(struct queue *queue, struct queue_node *n
 	struct queue_node *tail;
 
 	// If `after` is NULL then insert at the start of the list (ie. queue->head)
-	if (after)
+	if (after) {
 		tail = after->next;
-	else
+	} else {
 		tail = queue->head;
+	}
 
 	// Connect the tail of the list to the node
-	if (tail)
+	if (tail) {
 		tail->prev = node;
-	else
+	} else {
 		queue->tail = node;
+	}
 	node->next = tail;
 
 	// Connect the list up to and including `after` to the node
-	if (after)
+	if (after) {
 		after->next = node;
-	else
+	} else {
 		queue->head = node;
+	}
 	node->prev = after;
 }
 
 static inline void _queue_remove(struct queue *queue, struct queue_node *node)
 {
-	if (node->next)
+	if (node->next) {
 		node->next->prev = node->prev;
-	else
+	} else {
 		queue->tail = node->prev;
+	}
 
-	if (node->prev)
+	if (node->prev) {
 		node->prev->next = node->next;
-	else
+	} else {
 		queue->head = node->next;
+	}
 
 	node->next = NULL;
 	node->prev = NULL;

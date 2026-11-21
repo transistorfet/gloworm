@@ -24,7 +24,7 @@ struct tm {
 time_t time(time_t *t);
 int stime(const time_t *t);
 struct tm *gmtime(const time_t *t);
-size_t strftime (char* buffer, size_t max, const char *fmt, const struct tm *tp);
+size_t strftime(char *buffer, size_t max, const char *fmt, const struct tm *tp);
 
 #endif
 

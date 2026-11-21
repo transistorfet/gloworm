@@ -123,7 +123,7 @@ static inline struct buf *_find_free_entry(struct bufcache *cache)
 	struct buf *last;
 
 	// Recycle the last used entry
-	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node)) { }
+	for (last = _queue_tail(&cache->blocks); last && last->refcount > 0; last = _queue_prev(&last->node)) {}
 
 	if (cache->num_entries < BUFCACHE_MAX) {
 		// We haven't reached the limit, so create a new entry instead

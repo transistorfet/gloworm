@@ -7,7 +7,7 @@
 #define JMP_BUF_LENGTH		2
 #define JMP_BUF_RETURN_ADDR	0
 
- struct jmp_buf_data {
+struct jmp_buf_data {
 	uint32_t pc;
 	//uint32_t d0;
 	//uint32_t d1;

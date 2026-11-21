@@ -58,11 +58,13 @@ static inline int _buf_get_char(struct ringbuffer *cb)
 {
 	register unsigned char ch;
 
-	if (cb->out == cb->in)
+	if (cb->out == cb->in) {
 		return -1;
+	}
 	ch = cb->buffer[cb->out++];
-	if (cb->out >= cb->max)
+	if (cb->out >= cb->max) {
 		cb->out = 0;
+	}
 	return ch;
 }
 
@@ -71,8 +73,9 @@ static inline int _buf_put_char(struct ringbuffer *cb, unsigned char ch)
 	register short next;
 
 	next = _buf_next_in(cb);
-	if (next == cb->out)
+	if (next == cb->out) {
 		return -1;
+	}
 	cb->buffer[cb->in] = ch;
 	cb->in = next;
 	return ch;
@@ -84,11 +87,13 @@ static inline short _buf_get(struct ringbuffer *cb, unsigned char *data, short s
 	short i;
 
 	for (i = 0; i < size; i++) {
-		if (cb->out == cb->in)
+		if (cb->out == cb->in) {
 			return i;
+		}
 		data[i] = cb->buffer[cb->out++];
-		if (cb->out >= cb->max)
+		if (cb->out >= cb->max) {
 			cb->out = 0;
+		}
 	}
 	return i;
 }
@@ -99,18 +104,22 @@ static inline short _buf_peek(struct ringbuffer *cb, unsigned char *data, short 
 	short avail;
 
 	avail = _buf_used_space(cb);
-	if (offset > avail)
+	if (offset > avail) {
 		offset = avail;
+	}
 	j = cb->out + offset;
-	if (j > cb->max)
+	if (j > cb->max) {
 		j -= cb->max;
+	}
 
 	for (i = 0; i < size; i++) {
-		if (j == cb->in)
+		if (j == cb->in) {
 			return i;
+		}
 		data[i] = cb->buffer[j++];
-		if (j >= cb->max)
+		if (j >= cb->max) {
 			j = 0;
+		}
 	}
 	return i;
 }
@@ -123,8 +132,9 @@ static inline short _buf_put(struct ringbuffer *cb, const unsigned char *data, s
 	for (i = 0; i < size; i++) {
 		cb->buffer[cb->in] = data[i];
 		next = _buf_next_in(cb);
-		if (next == cb->out)
+		if (next == cb->out) {
 			return i;
+		}
 		cb->in = next;
 	}
 	return i;
@@ -134,12 +144,14 @@ static inline short _buf_drop(struct ringbuffer *cb, short size)
 {
 	short avail = _buf_used_space(cb);
 
-	if (size > avail)
+	if (size > avail) {
 		size = avail;
+	}
 
 	cb->out += size;
-	if (cb->out >= cb->max)
+	if (cb->out >= cb->max) {
 		cb->out -= cb->max;
+	}
 	return size;
 }
 
@@ -162,13 +174,15 @@ static inline short _buf_get_iter(struct ringbuffer *cb, struct iovec_iter *iter
 	memcpy_into_iter(iter, (char *) &cb->buffer[cb->out], chunk1);
 
 	cb->out += chunk1;
-	if (cb->out >= cb->max)
+	if (cb->out >= cb->max) {
 		cb->out = 0;
+	}
 
 	// If we've read the full size, or the buffer is empty, then return early
 	size -= chunk1;
-	if (size <= 0 || cb->out == cb->in)
+	if (size <= 0 || cb->out == cb->in) {
 		return chunk1;
+	}
 
 	// Calculate the maximum readable second chunk, from the bottom of the buffer to
 	// the in pointer, or the remaining size if there's more data available than requested

@@ -68,7 +68,7 @@ static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknu
 
 	for (int i = 0; i < block_size; i++) {
 		if ((char) ~data[i]) {
-			for (bit = 0; bit < 8 && ((0x01 << bit) & data[i]); bit++) { }
+			for (bit = 0; bit < 8 && ((0x01 << bit) & data[i]); bit++) {}
 			data[i] |= (0x01 << bit);
 			unref_buf(buf, BF_DIRTY);
 			return bit + (i * 8);

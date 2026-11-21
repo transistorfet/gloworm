@@ -437,16 +437,16 @@ int minix_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *ite
 off_t minix_seek(struct vfile *file, off_t position, int whence)
 {
 	switch (whence) {
-	    case SEEK_SET:
-		break;
-	    case SEEK_CUR:
-		position = file->position + position;
-		break;
-	    case SEEK_END:
-		position = file->vnode->size + position;
-		break;
-	    default:
-		return EINVAL;
+		case SEEK_SET:
+			break;
+		case SEEK_CUR:
+			position = file->position + position;
+			break;
+		case SEEK_END:
+			position = file->vnode->size + position;
+			break;
+		default:
+			return EINVAL;
 	}
 
 	// TODO this is a hack for now so I don't have to deal with gaps in files
@@ -486,7 +486,7 @@ int minix_readdir(struct vfile *file, struct dirent *dir)
 		entries = (struct minix_v1_dirent *) buf->block;
 
 		// Advance to the next valid directory entry in the block
-		for (; zpos < MINIX_V1_DIRENTS_PER_ZONE - 1 && entries[zpos].inode == 0; zpos++) { }
+		for (; zpos < MINIX_V1_DIRENTS_PER_ZONE - 1 && entries[zpos].inode == 0; zpos++) {}
 
 		if (entries[zpos].inode != 0) {
 			break;

@@ -106,7 +106,7 @@ static struct vnode *alloc_vnode(struct mount *mp, mode_t mode, uid_t uid, gid_t
 
 	vnode = load_vnode(mp, ino);
 	if (!vnode) {
-		free_inode(mp, ino);;
+		free_inode(mp, ino);
 		return NULL;
 	}
 
@@ -142,7 +142,7 @@ static void free_unused_vnodes(void)
 	struct queue_node *last;
 
 	while (nodes_in_cache - 1 >= MAX_VNODES) {
-		for (last = cache.tail; last && MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) { }
+		for (last = cache.tail; last && MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) {}
 		if (!last || MINIX_QUEUE_NODE_TO_VNODE(last)->refcount > 0) {
 			break;
 		}

@@ -5,7 +5,7 @@ char *strncat(char *dest, const char *src, unsigned long max)
 {
 	char *ret = dest;
 
-	for (; *dest; dest++) { }
+	for (; *dest; dest++) {}
 
 	for (; *src && max > 0; src++, dest++, max--) {
 		*dest = *src;

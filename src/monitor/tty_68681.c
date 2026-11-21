@@ -128,7 +128,9 @@ int init_tty(void)
 
 void spin_loop(int count)
 {
-	while (--count > 0) { asm volatile (""); }
+	while (--count > 0) {
+		asm volatile("");
+	}
 }
 
 int getchar(void)
@@ -186,11 +188,11 @@ int putchar(int ch)
 {
 	#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
 	if (ch == '\n') {
-		while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
+		while (!(*SRA_RD_ADDR & SR_TX_READY)) {}
 		*TBA_WR_ADDR = (char) '\r';
 	}
 	#endif
-	while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
+	while (!(*SRA_RD_ADDR & SR_TX_READY)) {}
 	*TBA_WR_ADDR = (char) ch;
 	return ch;
 }

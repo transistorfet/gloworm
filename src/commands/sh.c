@@ -38,8 +38,11 @@ int main(int argc, char **argv, char **env)
 #endif
 
 
-void delay(int count) {
-	while (--count > 0) { asm volatile(""); }
+void delay(int count)
+{
+	while (--count > 0) {
+		asm volatile("");
+	}
 }
 
 char hexchar(uint8_t byte)
@@ -213,7 +216,6 @@ int command_hex(int argc, char **argv, char **envp)
 		printf("%04x: ", pos);
 		pos += result;
 		dump_line((uint16_t *) buffer, result >> 1);
-
 	}
 
 	putchar('\n');
@@ -379,11 +381,11 @@ char *parse_word(char **input)
 {
 	char *start;
 
-	for (; **input != '\0' && isspace(**input); (*input)++) { }
+	for (; **input != '\0' && isspace(**input); (*input)++) {}
 
 	start = *input;
 
-	for (; **input != '\0' && !isspace(**input); (*input)++) { }
+	for (; **input != '\0' && !isspace(**input); (*input)++) {}
 	**input = '\0';
 	(*input)++;
 
@@ -406,7 +408,7 @@ int parse_command_line(char *input, struct pipe_command *commands)
 				commands[j].append = 1;
 			}
 			*input++ = '\0';
-			for (; *input == ' ' || *input == '>'; input++) { }
+			for (; *input == ' ' || *input == '>'; input++) {}
 
 			if (commands[j].stdout_file) {
 				printf("parse error: stdout is redirected more than once\n");
@@ -522,7 +524,7 @@ int execute_command(struct pipe_command *command, int argc, char **argv, char **
 		}
 
 		if (main_func) {
-			status = (main_func)(argc, argv, envp);
+			status = main_func(argc, argv, envp);
 			exit(status);
 		} else {
 			status = execve(argv[0], argv, envp);

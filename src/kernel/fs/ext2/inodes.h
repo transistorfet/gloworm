@@ -110,7 +110,7 @@ static int free_inode(struct vnode *vnode, inode_t ino)
 	int error;
 
 	const int group = get_inode_group(vnode->mp, ino);
-	struct ext2_super * const super = EXT2_SUPER(vnode->mp->super);
+	struct ext2_super *const super = EXT2_SUPER(vnode->mp->super);
 	error = bit_free(&vnode->mp->bufcache, super->groups[group].inode_bitmap, ino - (super->super.inodes_per_group * group) - 1);
 	if (error < 0) {
 		return error;

@@ -27,7 +27,7 @@ int MAIN(command_echo)(int argc, char **argv, char **envp)
 				open_quote = !open_quote;
 			} else if (argv[i][j] == '$') {
 				int l;
-				for (l = ++j; argv[i][l] && isalnum(argv[i][l]); l++) { }
+				for (l = ++j; argv[i][l] && isalnum(argv[i][l]); l++) {}
 				tmp = argv[i][l];
 				argv[i][l] = '\0';
 				value = getenv(&argv[i][j]);

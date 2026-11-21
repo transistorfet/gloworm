@@ -62,58 +62,59 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 
 			// Fetch the data and format it accordingly
 			switch (type) {
-			    case 's': {
-				const char *s;
+				case 's': {
+					const char *s;
 
-				s = va_arg(args, const char *);
-				len = strlen(s);
-				strncpy(&buffer[i], s, n - i - 1);
-				i += len;
-				break;
-			    }
-			    case 'i':
-				type = 'd';
-			    case 'p':
-			    case 'd':
-			    case 'u':
-			    case 'o':
-			    case 'x':
-			    case 'X': {
-				// Extract the data from args based on the requested length
-				unsigned long long d;
-				if (length <= sizeof(int)) {
-					d = va_arg(args, unsigned int);
-				} else {
-					d = va_arg(args, unsigned long long);
+					s = va_arg(args, const char *);
+					len = strlen(s);
+					strncpy(&buffer[i], s, n - i - 1);
+					i += len;
+					break;
 				}
-
-				// Determine what base to display the number in
-				int radix = 10;
-				if (type == 'x' || type == 'X' || type == 'p') {
-					if (numprefix && d) {
-						buffer[i++] = '0';
-						buffer[i++] = 'x';
+				case 'i':
+					type = 'd';
+				case 'p':
+				case 'd':
+				case 'u':
+				case 'o':
+				case 'x':
+				case 'X': {
+					// Extract the data from args based on the requested length
+					unsigned long long d;
+					if (length <= sizeof(int)) {
+						d = va_arg(args, unsigned int);
+					} else {
+						d = va_arg(args, unsigned long long);
 					}
-					radix = 16;
-				} else if (type == 'o') {
-					if (numprefix && d)
-						buffer[i++] = '0';
-					radix = 8;
+
+					// Determine what base to display the number in
+					int radix = 10;
+					if (type == 'x' || type == 'X' || type == 'p') {
+						if (numprefix && d) {
+							buffer[i++] = '0';
+							buffer[i++] = 'x';
+						}
+						radix = 16;
+					} else if (type == 'o') {
+						if (numprefix && d) {
+							buffer[i++] = '0';
+						}
+						radix = 8;
+					}
+
+					itoa_padded(d, &buffer[i], radix, width, zeropad, type == 'd' ? 1 : 0);
+					i += strlen(&buffer[i]);
+					break;
 				}
+				case 'c': {
+					int c;
 
-				itoa_padded(d, &buffer[i], radix, width, zeropad, type == 'd' ? 1 : 0);
-				i += strlen(&buffer[i]);
-				break;
-			    }
-			    case 'c': {
-				int c;
-
-				c = va_arg(args, int);
-				buffer[i++] = (char) c;
-				break;
-			    }
-			    default:
-				break;
+					c = va_arg(args, int);
+					buffer[i++] = (char) c;
+					break;
+				}
+				default:
+					break;
 			}
 		} else {
 			buffer[i++] = fmt[j];

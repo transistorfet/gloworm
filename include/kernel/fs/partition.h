@@ -11,7 +11,7 @@ typedef unsigned long sector_t;
 struct partition {
 	sector_t base;
 	sector_t size;
-	uint8_t	fstype;
+	uint8_t fstype;
 	uint8_t flags;
 };
 

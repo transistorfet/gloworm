@@ -128,7 +128,9 @@ void load_kernel(struct boot_drive *drive, char *offset)
 
 	putchar('\n');
 	// Delay to let the last character get written
-	for (short i = 0; i < 1000; i++) { asm volatile(""); }
+	for (short i = 0; i < 1000; i++) {
+		asm volatile("");
+	}
 }
 
 #define ATA_REG_BASE		CONFIG_ATA_BASE
@@ -297,11 +299,11 @@ int putchar(int ch)
 {
 	#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
 	if (ch == '\n') {
-		while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
+		while (!(*SRA_RD_ADDR & SR_TX_READY)) {}
 		*TBA_WR_ADDR = (char) '\r';
 	}
 	#endif
-	while (!(*SRA_RD_ADDR & SR_TX_READY)) { }
+	while (!(*SRA_RD_ADDR & SR_TX_READY)) {}
 	*TBA_WR_ADDR = (char) ch;
 	return ch;
 }

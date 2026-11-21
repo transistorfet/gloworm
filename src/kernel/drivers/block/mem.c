@@ -53,7 +53,8 @@ struct mem_geometry {
 static int num_devices = 0;
 static struct mem_geometry devices[MAX_DEVICES];
 
-int mem_add_geometry(physical_address_t base, size_t size) {
+int mem_add_geometry(physical_address_t base, size_t size)
+{
 	if (num_devices >= MAX_DEVICES) {
 		log_error("%s: exceeded maximum number of disk devices\n", mem_driver.name);
 		return EINVAL;
@@ -161,16 +162,16 @@ off_t mem_seek(devminor_t minor, off_t position, int whence, off_t offset)
 	struct mem_geometry *geo = &devices[minor];
 
 	switch (whence) {
-	    case SEEK_SET:
-		break;
-	    case SEEK_CUR:
-		position = offset + position;
-		break;
-	    case SEEK_END:
-		position = geo->size + position;
-		break;
-	    default:
-		return EINVAL;
+		case SEEK_SET:
+			break;
+		case SEEK_CUR:
+			position = offset + position;
+			break;
+		case SEEK_END:
+			position = geo->size + position;
+			break;
+		default:
+			return EINVAL;
 	}
 
 	if (position > geo->size) {

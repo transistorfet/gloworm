@@ -22,7 +22,7 @@ void _start(void)
 	asm volatile("stop	#0x2700\n");
 }
 
-void __assert_fail(const char * assertion, const char * file, unsigned int line, const char * function)
+void __assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
 {
 	printf("%s:%d: %s: Assertion failed `%s`\n", file, line, function, assertion);
 

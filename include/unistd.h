@@ -16,7 +16,7 @@
 #define	STDERR_FILENO	2	// Standard error
 
 // WHENCE argument to lseek
-#ifndef	STDIO_H			// These same definitions are in stdio.h for fseek
+#ifndef STDIO_H			// These same definitions are in stdio.h for fseek
 #define SEEK_SET	0	// Seek relative to the beginning of file
 #define SEEK_CUR	1	// Seek relative to the current position
 #define SEEK_END	2	// Seek relative to the end of file
@@ -86,9 +86,10 @@ extern char *optarg;
 extern int optind, opterr, optopt;
 
 char *getenv(const char *name);
-int getopt(int argc, char * const argv[], const char *optstring);
+int getopt(int argc, char *const argv[], const char *optstring);
 
 pid_t tcgetpgrp(int fd);
 int tcsetpgrp(int fd, pid_t pgrp);
 
 #endif
+

@@ -52,7 +52,7 @@ int test_kmalloc_alloc_free(void)
 	uintptr_t *data4 = kmalloc(sizeof(uintptr_t) * 10);
 	printf("%lx %ld\n", (uintptr_t) data4, PEEK_AT_KMALLOC_BLOCK_OF(data4)->size);
 	assert((uintptr_t) data4 == (uintptr_t) data);
-	
+
 	//print_free();
 	return 0;
 }

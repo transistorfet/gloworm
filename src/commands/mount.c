@@ -15,15 +15,15 @@ int MAIN(command_mount)(int argc, char **argv, char **envp)
 	optind = 1;
 	while ((opt = getopt(argc, argv, "t:")) != EOF) {
 		switch (opt) {
-		    case '?':
-			puts(usage);
-			return -1;
-		    case 't':
-			fstype = optarg;
-			break;
-		    default:
-			printf(">> %c\n", opt);
-			break;
+			case '?':
+				puts(usage);
+				return -1;
+			case 't':
+				fstype = optarg;
+				break;
+			default:
+				printf(">> %c\n", opt);
+				break;
 		}
 	}
 

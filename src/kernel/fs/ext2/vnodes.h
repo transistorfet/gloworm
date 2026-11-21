@@ -141,7 +141,7 @@ static void free_unused_vnodes(void)
 	struct queue_node *last;
 
 	while (nodes_in_cache - 1 >= MAX_VNODES) {
-		for (last = cache.tail; last && EXT2_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) { }
+		for (last = cache.tail; last && EXT2_QUEUE_NODE_TO_VNODE(last)->refcount > 0; last = last->prev) {}
 		if (!last || EXT2_QUEUE_NODE_TO_VNODE(last)->refcount > 0) {
 			break;
 		}

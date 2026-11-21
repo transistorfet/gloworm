@@ -57,7 +57,7 @@ int net_incoming_packet(struct protocol *proto, struct packet *pack)
 	if (error == PACKET_DELIVERED) {
 		return PACKET_DELIVERED;
 	}
-	
+
 	packet_free(pack);
 	return PACKET_DROPPED;
 }

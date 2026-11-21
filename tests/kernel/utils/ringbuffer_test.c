@@ -18,8 +18,9 @@ int test_ringbuffer_insert_wrap_around(void)
 
 	for (int i = 0; i < BUF_SIZE + 1; i++) {
 		int res = _buf_put_char(&buffer, '0' + (i % 10));
-		if (res == -1)
+		if (res == -1) {
 			printf("Full\n");
+		}
 	}
 
 	printf("Empty?: %d\n", _buf_is_empty(&buffer));
@@ -42,8 +43,9 @@ int test_ringbuffer_insert_wrap_around(void)
 
 	for (int i = 0; i < 4; i++) {
 		int res = _buf_put_char(&buffer, '0' + i);
-		if (res == -1)
+		if (res == -1) {
 			printf("Full\n");
+		}
 	}
 
 	printf("Empty?: %d\n", _buf_is_empty(&buffer));

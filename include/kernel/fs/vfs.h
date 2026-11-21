@@ -222,16 +222,20 @@ int vfs_unref_vnode(struct vnode *vnode);
 static inline void vfs_update_time(struct vnode *vnode, char update)
 {
 	// Only update timestamps if the filesystem is not mounted read-only
-	if (vnode->mp->bits & VFS_MBF_READ_ONLY)
+	if (vnode->mp->bits & VFS_MBF_READ_ONLY) {
 		return;
+	}
 
 	time_t t = get_system_time();
-	if (update & ATIME)
+	if (update & ATIME) {
 		vnode->atime = t;
-	if (update & MTIME)
+	}
+	if (update & MTIME) {
 		vnode->mtime = t;
-	if (update & CTIME)
+	}
+	if (update & CTIME) {
 		vnode->ctime = t;
+	}
 	vnode->bits |= VBF_DIRTY;
 }
 

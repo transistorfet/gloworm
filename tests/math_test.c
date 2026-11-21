@@ -34,8 +34,9 @@ int test_math()
 		rem = __modsi3(div_pairs[i][0], div_pairs[i][1]);
 
 		ch = ' ';
-		if (div != div_pairs[i][2] || rem != div_pairs[i][3])
+		if (div != div_pairs[i][2] || rem != div_pairs[i][3]) {
 			ch = 'F';
+		}
 		printf("%d / %d = (%d %d) expected (%d %d)  %c\n", div_pairs[i][0], div_pairs[i][1], div, rem, div_pairs[i][2], div_pairs[i][3], ch);
 	}
 
@@ -44,8 +45,9 @@ int test_math()
 		mul = __mulsi3(mul_pairs[i][0], mul_pairs[i][1]);
 
 		ch = ' ';
-		if (mul != mul_pairs[i][2])
+		if (mul != mul_pairs[i][2]) {
 			ch = 'F';
+		}
 		printf("%d * %d = %d expected %d  %c\n", mul_pairs[i][0], mul_pairs[i][1], mul, mul_pairs[i][2], ch);
 	}
 

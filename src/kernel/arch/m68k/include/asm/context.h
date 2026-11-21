@@ -64,7 +64,7 @@ struct arch_task_info {
 
 	#if defined(CONFIG_M68K_USER_MODE)
 	/// A pointer to the start of the kernel stack for this process
-	char* kernel_stack_start;
+	char *kernel_stack_start;
 	#endif
 };
 

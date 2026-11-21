@@ -71,7 +71,7 @@ struct driver ata_driver = {
 
 
 #define ATA_DELAY(x)		{ for (int delay = 0; delay < (x); delay++) { asm volatile(""); } }
-#define ATA_WAIT()		{ ATA_DELAY(8); while (*ATA_REG_STATUS & ATA_ST_BUSY) { } }
+#define ATA_WAIT()		{ ATA_DELAY(8); while (*ATA_REG_STATUS & ATA_ST_BUSY) {} }
 #define ATA_WAIT_FOR_DATA()	{ while (!((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) { ATA_DELAY(8); } }
 
 /*
@@ -83,7 +83,7 @@ static inline void ATA_DELAY(short delay)
 static inline void ATA_WAIT(void)
 {
 	ATA_DELAY(4);
-	while (*ATA_REG_STATUS & ATA_ST_BUSY) { }
+	while (*ATA_REG_STATUS & ATA_ST_BUSY) {}
 }
 */
 
@@ -127,7 +127,7 @@ int ata_reset(void)
 	ATA_DELAY(16);
 	(*ATA_REG_DEV_CONTROL) = 0x00;
 	ATA_DELAY(16);
-	while (*ATA_REG_STATUS & ATA_ST_BUSY) { }
+	while (*ATA_REG_STATUS & ATA_ST_BUSY) {}
 	return 0;
 }
 */
@@ -221,7 +221,7 @@ int ata_write_sector(int sector, const char *buffer)
 
 	for (int i = 0; i < 512; i++) {
 		ATA_WAIT();
-		//while (((*ATA_REG_STATUS) & ATA_ST_BUSY) || !((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) { }
+		//while (((*ATA_REG_STATUS) & ATA_ST_BUSY) || !((*ATA_REG_STATUS) & ATA_ST_DATA_READY)) {}
 
 		//((uint16_t *) buffer)[i] = (*ATA_REG_DATA);
 		//asm volatile("rol.w	#8, %0\n" : "+g" (((uint16_t *) buffer)[i]));
@@ -389,16 +389,16 @@ off_t ata_seek(devminor_t minor, off_t position, int whence, off_t offset)
 	}
 
 	switch (whence) {
-	    case SEEK_SET:
-		break;
-	    case SEEK_CUR:
-		position = offset + position;
-		break;
-	    case SEEK_END:
-		position = device->size + position;
-		break;
-	    default:
-		return EINVAL;
+		case SEEK_SET:
+			break;
+		case SEEK_CUR:
+			position = offset + position;
+			break;
+		case SEEK_END:
+			position = device->size + position;
+			break;
+		default:
+			return EINVAL;
 	}
 
 	if (position > device->size) {
