@@ -19,7 +19,7 @@ struct sigcontext {
 
 
 #if !defined(CONFIG_M68K_USER_MODE)
-static inline int clone_context(struct process *parent_proc, struct process *proc, char **child_user_sp);
+static inline int clone_context(struct process *parent_proc, char **child_user_sp);
 #endif
 
 #if !defined(CONFIG_MMU)
@@ -102,6 +102,10 @@ int arch_fini_task_info(struct process *proc)
 		page_free((physical_address_t) proc->task_info.kernel_stack_start, KERNEL_STACK_SIZE);
 	}
 
+	#else
+
+	((void) proc);
+
 	#endif
 
 	return 0;
@@ -168,7 +172,7 @@ int arch_clone_task_info(struct process *parent_proc, struct process *proc, char
 		#if !defined(CONFIG_M68K_USER_MODE)
 		// If a user stack was provided, then we need to copy the context on the parent's user stack to this stack,
 		// so that we'll restore the context correctly the next time we switch to the child process
-		clone_context(parent_proc, proc, &user_sp);
+		clone_context(parent_proc, &user_sp);
 		#endif
 	}
 
@@ -294,6 +298,8 @@ void arch_extended_switch_context(__unused struct process *previous_proc, struct
 {
 	#if defined(CONFIG_MMU)
 	mmu_table_switch(next_proc->map->root_table);
+	#else
+	((void) next_proc);
 	#endif
 }
 
@@ -303,7 +309,7 @@ void arch_extended_switch_context(__unused struct process *previous_proc, struct
 // This is meant to be used when a thread is started, and an alternate stack is provided rather
 // than cloning the stack.  In order to correctly return to the child process (which only has a
 // single user/kernel stack), the context must be copied
-static inline int clone_context(struct process *parent_proc, struct process *proc, char **child_user_sp)
+static inline int clone_context(struct process *parent_proc, char **child_user_sp)
 {
 	size_t size;
 	char *parent_user_sp;

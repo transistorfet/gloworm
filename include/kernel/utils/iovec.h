@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <sys/types.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <kernel/printk.h>
@@ -208,7 +209,7 @@ static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iove
 
 #else
 
-static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
+static inline int iovec_iter_load_pages_iter(__unused struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, __unused int max_segs, virtual_address_t start, size_t length, __unused int write_flag)
 {
 	iovec_iter_init_simple_kvec(iter, kvec, (char *) start, length);
 	return 0;

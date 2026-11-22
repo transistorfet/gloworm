@@ -1012,6 +1012,7 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 
 	addr = (struct sockaddr *) get_user_uintptr(&opts[0]);
 	addr_len = (socklen_t *) get_user_uintptr(&opts[1]);
+	iovec_iter_init_user_buf(&iter, (char *) buf, nbytes);
 
 	#if defined(CONFIG_MMU)
 
@@ -1023,7 +1024,6 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 		}
 	}
 
-	iovec_iter_init_user_buf(&iter, (char *) buf, nbytes);
 	error = net_socket_recvfrom(file, &iter, flags, addr ? (struct sockaddr *) addr_buffer : NULL, &kernel_len);
 	if (error < 0) {
 		return error;

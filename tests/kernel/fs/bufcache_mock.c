@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include <kernel/fs/bufcache.h>
+#include <attributes.h>
 
 #define MAX_TEST_BUFS		100
 
@@ -23,7 +24,7 @@ void init_bufcache(struct bufcache *cache, device_t dev, int block_size)
 	}
 }
 
-void free_bufcache(struct bufcache *cache)
+void free_bufcache(__unused struct bufcache *cache)
 {
 	log_info("free_bufcache called\n");
 	for (int i = 0; i < MAX_TEST_BUFS; i++) {
@@ -31,12 +32,12 @@ void free_bufcache(struct bufcache *cache)
 	}
 }
 
-void sync_bufcache(struct bufcache *cache)
+void sync_bufcache(__unused struct bufcache *cache)
 {
 	log_info("sync_bufcache called\n");
 }
 
-struct buf *get_buf(struct bufcache *cache, block_t num)
+struct buf *get_buf(__unused struct bufcache *cache, block_t num)
 {
 	if (num > MAX_TEST_BUFS) {
 		log_error("error: invalid block number %d\n", num);
@@ -47,7 +48,7 @@ struct buf *get_buf(struct bufcache *cache, block_t num)
 	return &mock_bufs[num];
 }
 
-int unref_buf(struct buf *buf, short dirty)
+int unref_buf(struct buf *buf, __unused short dirty)
 {
 	if (--buf->refcount == 0) {
 		log_info("would write back block %d\n", buf->num);

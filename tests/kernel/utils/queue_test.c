@@ -71,10 +71,10 @@ int test_queue_container_of(void)
 	struct queue queue1;
 	struct queue queue2;
 
-	struct test_item item1 = { 1 };
-	struct test_item item2 = { 2 };
-	struct test_item item3 = { 3 };
-	struct test_item item4 = { 4 };
+	struct test_item item1 = { 1, 5, { NULL, NULL }, { NULL, NULL } };
+	struct test_item item2 = { 2, 6, { NULL, NULL }, { NULL, NULL } };
+	struct test_item item3 = { 3, 7, { NULL, NULL }, { NULL, NULL } };
+	struct test_item item4 = { 4, 8, { NULL, NULL }, { NULL, NULL } };
 
 	_queue_init(&queue1);
 	_queue_init(&queue2);

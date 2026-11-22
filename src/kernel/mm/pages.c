@@ -27,6 +27,8 @@ int init_page_block_with_bitmap(struct page_block *block, size_t size, physical_
 	#if defined(CONFIG_MMU)
 	block->page_descriptors = descriptors;
 	memset(block->page_descriptors, '\0', block->total_pages);
+	#else
+	((void) descriptors);
 	#endif
 
 	log_trace("pages %x to %x, %d pages, %d bitmap size\n", addr, addr + size, block->total_pages, block->bitmap_size);

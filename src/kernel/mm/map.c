@@ -458,6 +458,8 @@ int memory_map_mmap(struct memory_map *map, uintptr_t start, size_t length, int 
 
 	#else
 
+	((void) offset);
+
 	segment->region = object;
 
 	#endif
@@ -597,6 +599,8 @@ int memory_map_copy_segment(struct memory_map *dest_map, struct memory_map *src_
 
 	#else
 
+	((void) src_map);
+
 	segment->region = MEMORY_OBJECT_MAKE_REF(src_segment->region);
 
 	#endif
@@ -727,6 +731,9 @@ int memory_map_insert_heap_stack(struct memory_map *map, uintptr_t heap_start, s
 	start = (uintptr_t) region->mem_start;
 	heap_object = MEMORY_OBJECT_MAKE_REF(region);
 	stack_object = region;
+
+	// the heap will always start after the loaded binary, so it's unused
+	((void) heap_start);
 
 	#endif
 
