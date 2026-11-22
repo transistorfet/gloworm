@@ -5,7 +5,7 @@
 
 #include "prototype.h"
 
-int MAIN(command_chmod)(int argc, char **argv, char **envp)
+int MAIN(command_chmod)(int argc, char **argv)
 {
 	if (argc <= 2) {
 		puts("Usage: chmod <mode> <file>");

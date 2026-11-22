@@ -1,4 +1,5 @@
 
+#include <attributes.h>
 #include <kernel/time.h>
 #include <kernel/irq/bh.h>
 #include <kernel/proc/timer.h>
@@ -57,7 +58,7 @@ void check_timers(nanos_t uptime)
 	}
 }
 
-void check_timers_bh(void *_unused)
+void check_timers_bh(__unused void *_unused)
 {
 	nanos_t uptime;
 

@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <asm/addresses.h>
@@ -272,6 +273,9 @@ static inline int memory_map_validate_address_range(struct memory_map *map, uint
 
 	#else
 
+	((void) map);
+	((void) address);
+	((void) length);
 	return 0;
 
 	#endif

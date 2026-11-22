@@ -8,7 +8,7 @@
 
 #define DATE_BUF_SIZE		100
 
-int MAIN(command_date)(int argc, char **argv, char **envp)
+int MAIN(command_date)(int argc, char **argv)
 {
 	time_t t;
 	struct tm *current_time;

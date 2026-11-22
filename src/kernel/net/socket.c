@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <attributes.h>
 #include <kernel/syscall.h>
 #include <kernel/fs/vfs.h>
 #include <kernel/fs/nop.h>
@@ -227,7 +228,7 @@ int net_socket_write(struct vfile *file, struct iovec_iter *iter)
 	return net_socket_send(file, iter, 0);
 }
 
-ssize_t net_socket_send(struct vfile *file, struct iovec_iter *iter, int flags)
+ssize_t net_socket_send(struct vfile *file, struct iovec_iter *iter, __unused int flags)
 {
 	int result;
 	struct socket *sock = SOCKET(file->vnode);
@@ -247,7 +248,7 @@ ssize_t net_socket_send(struct vfile *file, struct iovec_iter *iter, int flags)
 	return result;
 }
 
-ssize_t net_socket_recv(struct vfile *file, struct iovec_iter *iter, int flags)
+ssize_t net_socket_recv(struct vfile *file, struct iovec_iter *iter, __unused int flags)
 {
 	int result;
 	struct socket *sock = SOCKET(file->vnode);
@@ -268,7 +269,7 @@ ssize_t net_socket_recv(struct vfile *file, struct iovec_iter *iter, int flags)
 	return result;
 }
 
-ssize_t net_socket_sendto(struct vfile *file, struct iovec_iter *iter, int flags, const struct sockaddr *addr, socklen_t addr_len)
+ssize_t net_socket_sendto(struct vfile *file, struct iovec_iter *iter, __unused int flags, const struct sockaddr *addr, socklen_t addr_len)
 {
 	struct socket *sock = SOCKET(file->vnode);
 
@@ -291,7 +292,7 @@ ssize_t net_socket_sendto(struct vfile *file, struct iovec_iter *iter, int flags
 	return sock->ep->ops->send_to(sock->ep, iter, addr, addr_len);
 }
 
-ssize_t net_socket_recvfrom(struct vfile *file, struct iovec_iter *iter, int flags, struct sockaddr *addr, socklen_t *addr_len)
+ssize_t net_socket_recvfrom(struct vfile *file, struct iovec_iter *iter, __unused int flags, struct sockaddr *addr, socklen_t *addr_len)
 {
 	int result;
 	struct socket *sock = SOCKET(file->vnode);

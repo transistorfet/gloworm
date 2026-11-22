@@ -10,7 +10,7 @@
 
 int thread(void *arg);
 
-int main(int argc, char **argv)
+int main(void)
 {
 	int pid;
 	char *stack;

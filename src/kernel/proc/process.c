@@ -1,5 +1,6 @@
 
 #include <stddef.h>
+#include <attributes.h>
 
 #include <asm/irqs.h>
 #include <kernel/api.h>
@@ -204,7 +205,7 @@ struct process *find_exited_child(pid_t parent, pid_t child)
 	return NULL;
 }
 
-static int on_alarm(struct timer *timer, struct process *proc)
+static int on_alarm(__unused struct timer *timer, struct process *proc)
 {
 	proc->bits &= ~PB_ALARM_ON;
 	send_signal(proc->pid, SIGALRM);

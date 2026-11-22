@@ -68,7 +68,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 		return ENOSPC;
 	}
 
-	group_inode_num = bit_alloc(&mp->bufcache, super->groups[group].inode_bitmap, 0);
+	group_inode_num = bit_alloc(&mp->bufcache, super->groups[group].inode_bitmap);
 	if (!group_inode_num) {
 		return ENOSPC;
 	}

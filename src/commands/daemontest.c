@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <attributes.h>
 
 #define MAX_INPUT	100
 
@@ -59,7 +60,7 @@ int main(void)
 	return 0;
 }
 
-int process_input(char *input)
+int process_input(__unused char *input)
 {
 	// TODO process the input
 	return 0;

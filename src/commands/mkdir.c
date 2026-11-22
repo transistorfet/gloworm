@@ -5,7 +5,7 @@
 
 #include "prototype.h"
 
-int MAIN(command_mkdir)(int argc, char **argv, char **envp)
+int MAIN(command_mkdir)(int argc, char **argv)
 {
 	if (argc <= 1) {
 		puts("Usage: mkdir <dir>");

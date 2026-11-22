@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <kernel/drivers.h>
@@ -96,7 +97,7 @@ int procfs_init(void)
 	return 0;
 }
 
-int procfs_mount(struct mount *mp, struct vnode *parent)
+int procfs_mount(struct mount *mp, __unused struct vnode *parent)
 {
 	mp->root_node = _alloc_vnode(0, 0, S_IFDIR | 0755, mp);
 	return 0;
@@ -147,12 +148,12 @@ int procfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resu
 	return 0;
 }
 
-int procfs_release(struct vnode *vnode)
+int procfs_release(__unused struct vnode *vnode)
 {
 	return 0;
 }
 
-int procfs_open(struct vfile *file, int flags)
+int procfs_open(struct vfile *file, __unused int flags)
 {
 	struct procfs_position *position = PROCFS_POSITION(file->position);
 
@@ -165,7 +166,7 @@ int procfs_open(struct vfile *file, int flags)
 	return 0;
 }
 
-int procfs_close(struct vfile *file)
+int procfs_close(__unused struct vfile *file)
 {
 	return 0;
 }
@@ -205,17 +206,17 @@ int procfs_read(struct vfile *file, struct iovec_iter *iter)
 	return nbytes;
 }
 
-int procfs_write(struct vfile *file, struct iovec_iter *iter)
+int procfs_write(__unused struct vfile *file, __unused struct iovec_iter *iter)
 {
 	return 0;
 }
 
-int procfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
+int procfs_ioctl(__unused struct vfile *file, __unused unsigned int request, __unused struct iovec_iter *iter, __unused uid_t uid)
 {
 	return -1;
 }
 
-off_t procfs_seek(struct vfile *file, off_t position, int whence)
+off_t procfs_seek(__unused struct vfile *file, __unused off_t position, __unused int whence)
 {
 	return -1;
 }

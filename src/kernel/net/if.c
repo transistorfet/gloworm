@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <attributes.h>
 
 #include <kernel/printk.h>
 #include <kernel/drivers.h>
@@ -130,7 +131,7 @@ int net_if_send_packet(struct if_device *ifdev, struct packet *pack)
 	return 0;
 }
 
-static void net_if_process_bh(void *_unused)
+static void net_if_process_bh(__unused void *_unused)
 {
 	int error;
 

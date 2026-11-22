@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <kconfig.h>
+#include <attributes.h>
 
 #if defined(CONFIG_SINGLE_AM29F040)
 #define BOARD	"k30"
@@ -139,13 +140,13 @@ void dump(const uint16_t *addr, short len)
 #define SUPERVISOR_ADDR	0x200000
 
 
-void command_version(int argc, char **args)
+void command_version(__unused int argc, __unused char **args)
 {
 	printf("version: %s\n", VERSION);
 	return;
 }
 
-void command_info(int argc, char **args)
+void command_info(__unused int argc, __unused char **args)
 {
 	uint32_t pc;
 	uint32_t sp;
@@ -183,7 +184,7 @@ void command_dump(int argc, char **args)
 	}
 }
 
-void command_dumpram(int argc, char **args)
+void command_dumpram(__unused int argc, __unused char **args)
 {
 	dump((uint16_t *) RAM_ADDR, 0x1800);
 }
@@ -482,7 +483,7 @@ void command_ramtest(int argc, char **args)
 	printf("\nErrors: %d\n", errors);
 }
 
-void command_vmetest(int argc, char **args)
+void command_vmetest(__unused int argc, __unused char **args)
 {
 	// Test different VME bus accesses
 	//volatile uint16_t *vme_address = (uint16_t *) 0xff8ABCDE;

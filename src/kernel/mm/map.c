@@ -5,6 +5,7 @@
 #include <kconfig.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <attributes.h>
 
 #include <kernel/printk.h>
 #include <kernel/mm/map.h>
@@ -112,7 +113,7 @@ struct memory_ops file_memory_ops = {
 };
 
 
-physical_address_t anonymous_memory_ops_load_page_at(struct memory_segment *segment, virtual_address_t vaddr)
+physical_address_t anonymous_memory_ops_load_page_at(__unused struct memory_segment *segment, __unused virtual_address_t vaddr)
 {
 	physical_address_t page;
 

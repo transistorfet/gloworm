@@ -5,7 +5,7 @@
 
 #include "prototype.h"
 
-int MAIN(command_mount)(int argc, char **argv, char **envp)
+int MAIN(command_mount)(int argc, char **argv)
 {
 	int opt;
 	int error;

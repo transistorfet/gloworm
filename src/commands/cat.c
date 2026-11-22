@@ -7,7 +7,7 @@
 
 #define CAT_BUF_SIZE	256
 
-int MAIN(command_cat)(int argc, char **argv, char **envp)
+int MAIN(command_cat)(int argc, char **argv)
 {
 	int fd;
 	int result;

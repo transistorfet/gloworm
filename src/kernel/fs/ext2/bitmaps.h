@@ -10,7 +10,7 @@
 
 typedef int bitnum_t;
 
-static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, ext2_block_t near);
+static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum);
 
 static inline char bit_mask(char bits)
 {
@@ -53,7 +53,7 @@ static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, 
 	return 0;
 }
 
-static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, ext2_block_t near)
+static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum)
 {
 	char bit;
 	char *data;

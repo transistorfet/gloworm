@@ -1,6 +1,7 @@
 
 #include <sys/types.h>
 #include <sys/select.h>
+#include <attributes.h>
 
 #include <kernel/fs/vfs.h>
 #include <kernel/proc/process.h>
@@ -80,7 +81,7 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 	return ready;
 }
 
-int select_wait_check(struct process *proc, int events, struct vnode *vnode, device_t rdev)
+int select_wait_check(struct process *proc, __unused int events, __unused struct vnode *vnode, __unused device_t rdev)
 {
 	if (select_poll_fds(proc, (int) proc->blocked_call.arg1, (fd_set *) proc->blocked_call.arg2, (fd_set *) proc->blocked_call.arg3, (fd_set *) proc->blocked_call.arg4, 0)) {
 		return 1;
@@ -88,7 +89,7 @@ int select_wait_check(struct process *proc, int events, struct vnode *vnode, dev
 	return 0;
 }
 
-static int select_timeout(struct timer *timer, struct process *proc)
+static int select_timeout(__unused struct timer *timer, struct process *proc)
 {
 	resume_proc(proc);
 	return 0;

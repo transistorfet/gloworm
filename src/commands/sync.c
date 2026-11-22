@@ -3,7 +3,7 @@
 
 #include "prototype.h"
 
-int MAIN(command_sync)(int argc, char **argv, char **envp)
+int MAIN(command_sync)(void)
 {
 	sync();
 	return 0;

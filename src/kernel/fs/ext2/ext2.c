@@ -6,6 +6,7 @@
 #include <endian.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <kernel/drivers.h>
@@ -74,7 +75,7 @@ int ext2_init(void)
 }
 
 
-int ext2_mount(struct mount *mp, struct vnode *parent)
+int ext2_mount(struct mount *mp, __unused struct vnode *parent)
 {
 	int error;
 
@@ -317,12 +318,12 @@ int ext2_release(struct vnode *vnode)
 }
 
 
-int ext2_open(struct vfile *file, int flags)
+int ext2_open(__unused struct vfile *file, __unused int flags)
 {
 	return 0;
 }
 
-int ext2_close(struct vfile *file)
+int ext2_close(__unused struct vfile *file)
 {
 	return 0;
 }
@@ -444,12 +445,12 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 	return wbytes;
 }
 
-int ext2_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
+int ext2_ioctl(__unused struct vfile *file, __unused unsigned int request, __unused struct iovec_iter *iter, __unused uid_t uid)
 {
 	return EINVAL;
 }
 
-off_t ext2_seek(struct vfile *file, off_t position, int whence)
+off_t ext2_seek(__unused struct vfile *file, __unused off_t position, __unused int whence)
 {
 	struct vnode *vnode = file->vnode;
 

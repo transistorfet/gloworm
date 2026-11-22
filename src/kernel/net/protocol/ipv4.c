@@ -2,6 +2,7 @@
 #include <endian.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <attributes.h>
 
 #include <kernel/net/protocol.h>
 
@@ -53,7 +54,7 @@ int ipv4_init(void)
 	return 0;
 }
 
-int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)
+int ipv4_decode_header(__unused struct protocol *proto, struct packet *pack, uint16_t offset)
 {
 	int error;
 	uint16_t checksum;

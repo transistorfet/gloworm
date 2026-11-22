@@ -11,7 +11,7 @@
 
 static const char *cp_path_last_component(const char *path);
 
-int MAIN(command_cp)(int argc, char **argv, char **envp)
+int MAIN(command_cp)(int argc, char **argv)
 {
 	int result;
 	struct stat statbuf;

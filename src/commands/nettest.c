@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <attributes.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -126,7 +127,7 @@ int serverloop(void)
 	return 0;
 }
 
-int process_input(char *input)
+int process_input(__unused char *input)
 {
 	// TODO process the input
 	return 0;

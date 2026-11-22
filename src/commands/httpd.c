@@ -220,7 +220,7 @@ int read_loop(int listenfd)
 		}
 
 		for (int i = 0; i < MAX_CONNECTIONS; i++) {
-			if (clients[i] > 0 && FD_ISSET(clients[i]->fd, &rd)) {
+			if (clients[i] && FD_ISSET(clients[i]->fd, &rd)) {
 				if (handle_read(clients[i])) {
 					close_connection(clients[i]);
 				}

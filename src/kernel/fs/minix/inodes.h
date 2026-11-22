@@ -21,7 +21,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	struct minix_v1_inode *inode_table;
 
 	super = MINIX_SUPER(mp->super);
-	inode_num = bit_alloc(&mp->bufcache, MINIX_V1_INODE_BITMAP_START, super->super_v1.imap_blocks, 0);
+	inode_num = bit_alloc(&mp->bufcache, MINIX_V1_INODE_BITMAP_START, super->super_v1.imap_blocks);
 	if (!inode_num) {
 		return ENOSPC;
 	}

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <attributes.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -89,7 +90,7 @@ int MAIN(command_ns)(int argc, char **argv)
 	return 0;
 }
 
-void handle_signal(int signum)
+void handle_signal(__unused int signum)
 {
 	printf("Received Ctrl-C\n");
 	return;

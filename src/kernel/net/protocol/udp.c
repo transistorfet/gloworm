@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <attributes.h>
 
 #include <kernel/mm/kmalloc.h>
 #include <kernel/utils/queue.h>
@@ -239,7 +240,7 @@ int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 	return 0;
 }
 
-static struct udp_endpoint *udp_lookup_endpoint(struct protocol *proto, uint32_t addr, uint16_t port)
+static struct udp_endpoint *udp_lookup_endpoint(__unused struct protocol *proto, uint32_t addr, uint16_t port)
 {
 	for (struct udp_endpoint *cur = _queue_head(&udp_endpoints); cur; cur = _queue_next(&cur->ep.node)) {
 		if (cur->src.addr == addr && cur->src.port == port) {
@@ -268,6 +269,14 @@ int udp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, s
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *) sockaddr;
 
+	if (UDP_ENDPOINT(ep)->dest.port) {
+		return EISCONN;
+	}
+
+	if (!sockaddr || len < sizeof(struct sockaddr_in)) {
+		return EINVAL;
+	}
+
 	UDP_ENDPOINT(ep)->dest.addr = addr->sin_addr.s_addr;
 	UDP_ENDPOINT(ep)->dest.port = addr->sin_port;
 	return NULL;
@@ -284,6 +293,9 @@ int udp_endpoint_send_to(struct endpoint *ep, struct iovec_iter *iter, const str
 	}
 
 	if (sockaddr) {
+		if (len < sizeof(struct sockaddr_in)) {
+			return EINVAL;
+		}
 		dest.addr = ((struct sockaddr_in *) sockaddr)->sin_addr.s_addr;
 		dest.port = ((struct sockaddr_in *) sockaddr)->sin_port;
 	} else {
@@ -325,7 +337,7 @@ int udp_endpoint_recv_from(struct endpoint *ep, struct iovec_iter *iter, struct 
 	return nbytes;
 }
 
-int udp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen)
+int udp_endpoint_get_options(struct endpoint *ep, __unused int level, int optname, void *optval, socklen_t *optlen)
 {
 	switch (optname) {
 		case SO_GETSOCKNAME: {
@@ -348,7 +360,7 @@ int udp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *
 	}
 }
 
-int udp_endpoint_set_options(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen)
+int udp_endpoint_set_options(__unused struct endpoint *ep, __unused int level, int optname, __unused const void *optval, __unused socklen_t optlen)
 {
 	switch (optname) {
 		default:

@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <attributes.h>
 #include <kernel/drivers.h>
 #include <kernel/fs/nop.h>
 #include <kernel/fs/vfs.h>
@@ -54,13 +55,13 @@ int init_devfs(void)
 	return 0;
 }
 
-int devfs_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t uid, struct vnode **result)
+int devfs_create(__unused struct vnode *vnode, __unused const char *filename, __unused mode_t mode, __unused uid_t uid, __unused struct vnode **result)
 {
 
 	return 0;
 }
 
-int devfs_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t dev, uid_t uid, struct vnode **result)
+int devfs_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t dev, __unused uid_t uid, struct vnode **result)
 {
 	struct vnode *newnode;
 	struct devfs_dirent *dir;
@@ -116,13 +117,13 @@ int devfs_lookup(struct vnode *vnode, const char *filename, struct vnode **resul
 	return ENOENT;
 }
 
-int devfs_release(struct vnode *vnode)
+int devfs_release(__unused struct vnode *vnode)
 {
 
 	return 0;
 }
 
-int devfs_open(struct vfile *file, int flags)
+int devfs_open(__unused struct vfile *file, __unused int flags)
 {
 	return 0;
 }
@@ -147,7 +148,7 @@ int devfs_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *ite
 	return dev_ioctl(DEVFS_DATA(file->vnode).device, request, iter, uid);
 }
 
-off_t devfs_seek(struct vfile *file, off_t position, int whence)
+off_t devfs_seek(__unused struct vfile *file, __unused off_t position, __unused int whence)
 {
 	return -1;
 }

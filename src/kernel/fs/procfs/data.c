@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/param.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <kernel/mm/map.h>
@@ -168,7 +169,7 @@ int get_data_maps(struct process *proc, char *buffer, int max)
 }
 
 #if defined(CONFIG_MMU)
-int get_data_pagedump(struct process *proc, char *buffer, int max)
+int get_data_pagedump(struct process *proc, __unused char *buffer, __unused int max)
 {
 	if (proc->map) {
 		mmu_table_print(proc->map->root_table);
@@ -206,7 +207,7 @@ static inline size_t get_proc_size(struct process *proc)
 	return size;
 }
 
-int get_data_mounts(struct process *proc, char *buffer, int max)
+int get_data_mounts(__unused struct process *proc, char *buffer, int max)
 {
 	size_t i = 0;
 	char name[100];

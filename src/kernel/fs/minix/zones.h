@@ -25,7 +25,7 @@ static zone_t minix_alloc_zone(struct mount *mp)
 	struct minix_super *super;
 
 	super = MINIX_SUPER(mp->super);
-	bit = bit_alloc(&mp->bufcache, MINIX_V1_ZONE_BITMAP_START(&super->super_v1), super->super_v1.zmap_blocks, 0);
+	bit = bit_alloc(&mp->bufcache, MINIX_V1_ZONE_BITMAP_START(&super->super_v1), super->super_v1.zmap_blocks);
 	if (!bit) {
 		return NULL;
 	}

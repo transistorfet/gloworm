@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <attributes.h>
 
 #include <kernel/net/if.h>
 #include <kernel/mm/kmalloc.h>
@@ -280,6 +281,10 @@ int tcp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, s
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 	struct sockaddr_in *addr = (struct sockaddr_in *) sockaddr;
 
+	if (!sockaddr || len < sizeof(struct sockaddr_in)) {
+		return EINVAL;
+	}
+
 	if (tep->state == TS_ESTABLISHED && tep->connect_return != 0) {
 		return tep->connect_return < 0 ? tep->connect_return : 0;
 	}
@@ -299,7 +304,7 @@ int tcp_endpoint_connect(struct endpoint *ep, const struct sockaddr *sockaddr, s
 	return EWOULDBLOCK;
 }
 
-int tcp_endpoint_shutdown(struct endpoint *ep, int how)
+int tcp_endpoint_shutdown(struct endpoint *ep, __unused int how)
 {
 	struct tcp_endpoint *tep = TCP_ENDPOINT(ep);
 
@@ -307,6 +312,7 @@ int tcp_endpoint_shutdown(struct endpoint *ep, int how)
 		return 0;
 	}
 
+	// TODO add support for `how` method of shutdown
 	tep->fin_sent = 1;
 	tcp_send_packet(tep, FIN | ACK, 0, 0);
 	if (tep->state == TS_CLOSE_WAIT) {
@@ -360,7 +366,7 @@ int tcp_endpoint_recv(struct endpoint *ep, struct iovec_iter *iter)
 	return nbytes;
 }
 
-int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *optval, socklen_t *optlen)
+int tcp_endpoint_get_options(struct endpoint *ep, __unused int level, int optname, void *optval, socklen_t *optlen)
 {
 	switch (optname) {
 		case SO_GETSOCKNAME: {
@@ -382,7 +388,7 @@ int tcp_endpoint_get_options(struct endpoint *ep, int level, int optname, void *
 	}
 }
 
-int tcp_endpoint_set_options(struct endpoint *ep, int level, int optname, const void *optval, socklen_t optlen)
+int tcp_endpoint_set_options(__unused struct endpoint *ep, __unused int level, int optname, __unused const void *optval, __unused socklen_t optlen)
 {
 	switch (optname) {
 		default:
@@ -453,7 +459,7 @@ static struct tcp_endpoint *tcp_alloc_endpoint(struct protocol *proto, struct so
 	return tep;
 }
 
-static struct endpoint *tcp_lookup_endpoint(struct protocol *proto, struct ipv4_address *local, struct ipv4_address *remote)
+static struct endpoint *tcp_lookup_endpoint(__unused struct protocol *proto, struct ipv4_address *local, struct ipv4_address *remote)
 {
 	for (struct tcp_endpoint *cur = _queue_head(&tcp_endpoints); cur; cur = _queue_next(&cur->ep.node)) {
 		if (cur->local.port == local->port && (cur->state == TS_LISTEN || (remote && cur->remote.addr == remote->addr && cur->remote.port == remote->port))) {
@@ -463,7 +469,7 @@ static struct endpoint *tcp_lookup_endpoint(struct protocol *proto, struct ipv4_
 	return NULL;
 }
 
-static int tcp_create_client_endpoint(struct tcp_endpoint *tep, struct packet *pack, struct endpoint **result)
+static int tcp_create_client_endpoint(__unused struct tcp_endpoint *tep, struct packet *pack, struct endpoint **result)
 {
 	struct tcp_endpoint *client_ep;
 	struct ipv4_custom_data *custom = (struct ipv4_custom_data *) pack->custom_data;

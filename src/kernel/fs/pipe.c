@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <attributes.h>
 
 #include <errno.h>
 #include <kernel/syscall.h>
@@ -97,7 +98,7 @@ int pipe_release(struct vnode *vnode)
 	return 0;
 }
 
-int pipe_close(struct vfile *file)
+int pipe_close(__unused struct vfile *file)
 {
 	// TODO decrement listeners (what listeners was I talking about?)
 	return 0;

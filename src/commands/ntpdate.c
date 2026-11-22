@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <signal.h>
+#include <attributes.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -33,7 +34,7 @@ struct ntp_packet {
 	uint32_t transmit_ts_f;
 };
 
-void handle_alarm(int signum)
+void handle_alarm(__unused int signum)
 {
 	printf("timeout\n");
 }

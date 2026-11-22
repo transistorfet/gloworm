@@ -29,11 +29,11 @@ int f_interactive = 1;
 
 // NOTE: When compiling without utils, MAIN(sh_task) will expand to main, so this extra main is not needed.
 #if !defined(IN_KERNEL) && defined(CONFIG_SHELL_WITH_UTILS)
-int sh_task(int argc, char **argv, char **env);
+int sh_task(int argc, char **argv);
 
-int main(int argc, char **argv, char **env)
+int main(int argc, char **argv)
 {
-	return sh_task(argc, argv, env);
+	return sh_task(argc, argv);
 }
 #endif
 
@@ -87,7 +87,7 @@ void dump(const uint16_t *addr, short len)
  * Commands *
  ************/
 
-int command_dump(int argc, char **argv, char **envp)
+int command_dump(int argc, char **argv)
 {
 	if (argc <= 1) {
 		puts("You need an address");
@@ -102,7 +102,7 @@ int command_dump(int argc, char **argv, char **envp)
 	return 0;
 }
 
-int command_poke(int argc, char **args, char **envp)
+int command_poke(int argc, char **args)
 {
 	if (argc <= 2) {
 		puts("You need an address and byte to poke");
@@ -127,7 +127,7 @@ uint16_t fetch_word(char max)
 }
 
 
-int command_send(int argc, char **argv, char **envp)
+int command_send(int argc, char **argv)
 {
 	int fd;
 	char odd_size;
@@ -184,7 +184,7 @@ int command_send(int argc, char **argv, char **envp)
 
 #define DUMP_BUF_SIZE	0x10
 
-int command_hex(int argc, char **argv, char **envp)
+int command_hex(int argc, char **argv)
 {
 	int fd;
 	int result;
@@ -226,7 +226,7 @@ int command_hex(int argc, char **argv, char **envp)
 }
 
 
-int command_chdir(int argc, char **argv, char **envp)
+int command_chdir(int argc, char **argv)
 {
 	if (argc <= 1) {
 		puts("You need file name");
@@ -285,9 +285,9 @@ struct command {
 int num_commands;
 struct command command_list[30];
 
-#define add_command(n, f)	{			\
-	command_list[num_commands].name = (n);		\
-	command_list[num_commands++].main = (f);	\
+#define add_command(n, f)	{						\
+	command_list[num_commands].name = (n);					\
+	command_list[num_commands++].main = (main_t) (void (*)(void)) (f);	\
 }
 
 void init_commands(void)
@@ -620,7 +620,7 @@ int read_loop(int fin)
 		} else if (!strcmp(argv[0], "exit")) {
 			break;
 		} else if (!strcmp(argv[0], "cd")) {
-			command_chdir(argc, argv, envp);
+			command_chdir(argc, argv);
 		} else {
 			execute_command(&commands[0], argc, argv, envp);
 		}
@@ -640,7 +640,7 @@ void handle_signal(int signum)
  * Main Entry *
  **************/
 
-int MAIN(sh_task)(int argc, char **argv, char **env)
+int MAIN(sh_task)(int argc, char **argv)
 {
 	int error = 0;
 	int fin = STDIN_FILENO;

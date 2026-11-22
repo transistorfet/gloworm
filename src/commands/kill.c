@@ -5,7 +5,7 @@
 
 #include "prototype.h"
 
-int MAIN(command_kill)(int argc, char **argv, char **envp)
+int MAIN(command_kill)(int argc, char **argv)
 {
 	int error;
 	int i = 1;

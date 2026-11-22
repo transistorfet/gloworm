@@ -5,6 +5,7 @@
 #include <termios.h>
 #include <sys/types.h>
 #include <sys/ioc_tty.h>
+#include <attributes.h>
 
 #include <kernel/drivers.h>
 #include <kernel/syscall.h>
@@ -179,7 +180,7 @@ static inline void tty_read_input(device_t minor)
 	}
 }
 
-static void tty_process_input(void *_unused)
+static void tty_process_input(__unused void *_unused)
 {
 	for (short minor = 0; minor < TTY_DEVICE_NUM; minor++) {
 		if (tty_devices[minor].opens && (tty_devices[minor].tio.c_lflag & ICANON)) {
@@ -415,7 +416,7 @@ int tty_poll(devminor_t minor, int events)
 	return revents;
 }
 
-off_t tty_seek(devminor_t minor, off_t position, int whence, off_t offset)
+off_t tty_seek(__unused devminor_t minor, __unused off_t position, __unused int whence, __unused off_t offset)
 {
 	return -1;
 }

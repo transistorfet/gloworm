@@ -202,7 +202,7 @@ void cancel_syscall(struct process *proc)
 	UNLOCK(saved_status);
 }
 
-static int syscall_wait_check(struct process *proc, int events, struct vnode *vnode, device_t rdev)
+static int syscall_wait_check(struct process *proc, __unused int events, struct vnode *vnode, device_t rdev)
 {
 	int fd;
 

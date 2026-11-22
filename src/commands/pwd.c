@@ -7,7 +7,7 @@
 
 #define PWD_BUF_SIZE		256
 
-int MAIN(command_pwd)(int argc, char **argv, char **envp)
+int MAIN(command_pwd)(void)
 {
 	char buffer[PWD_BUF_SIZE];
 

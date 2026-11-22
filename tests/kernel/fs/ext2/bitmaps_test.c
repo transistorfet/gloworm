@@ -25,15 +25,15 @@ int test_bitmap_alloc_free(void)
 	printk_dump_bytes(bitmap_data, 4);
 	assert(!memcmp(bitmap_data, "\x01\x00\x0F\xFF", 4));
 
-	bit = bit_alloc(&bufcache, bitmap_blocknum, 0);
+	bit = bit_alloc(&bufcache, bitmap_blocknum);
 	assert(bit != 0);
 	printk("allocated %d\n", bit);
 
-	bit = bit_alloc(&bufcache, bitmap_blocknum, 0);
+	bit = bit_alloc(&bufcache, bitmap_blocknum);
 	assert(bit != 0);
 	printk("allocated %d\n", bit);
 
-	bit = bit_alloc(&bufcache, bitmap_blocknum, 0);
+	bit = bit_alloc(&bufcache, bitmap_blocknum);
 	assert(bit != 0);
 	printk("allocated %d\n", bit);
 
@@ -45,7 +45,7 @@ int test_bitmap_alloc_free(void)
 	printk_dump_bytes(bitmap_data, 4);
 	assert(!memcmp(bitmap_data, "\x0D\x00\x0F\xFF", 4));
 
-	bit = bit_alloc(&bufcache, bitmap_blocknum, 0);
+	bit = bit_alloc(&bufcache, bitmap_blocknum);
 	assert(bit != 0);
 	printk("allocated %d\n", bit);
 	printk_dump_bytes(bitmap_data, 4);

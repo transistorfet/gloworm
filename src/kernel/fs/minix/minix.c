@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <kernel/drivers.h>
@@ -72,7 +73,7 @@ int minix_init(void)
 }
 
 
-int minix_mount(struct mount *mp, struct vnode *parent)
+int minix_mount(struct mount *mp, __unused struct vnode *parent)
 {
 	int error;
 
@@ -308,12 +309,12 @@ int minix_release(struct vnode *vnode)
 }
 
 
-int minix_open(struct vfile *file, int flags)
+int minix_open(__unused struct vfile *file, __unused int flags)
 {
 	return 0;
 }
 
-int minix_close(struct vfile *file)
+int minix_close(__unused struct vfile *file)
 {
 	return 0;
 }
@@ -429,7 +430,7 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 	return wbytes;
 }
 
-int minix_ioctl(struct vfile *file, unsigned int request, struct iovec_iter *iter, uid_t uid)
+int minix_ioctl(__unused struct vfile *file, __unused unsigned int request, __unused struct iovec_iter *iter, __unused uid_t uid)
 {
 	return EINVAL;
 }

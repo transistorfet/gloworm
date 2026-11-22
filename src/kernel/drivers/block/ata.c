@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <asm/irqs.h>
@@ -296,7 +297,7 @@ int ata_init(void)
 	return 0;
 }
 
-int ata_open(devminor_t minor, int access)
+int ata_open(devminor_t minor, __unused int access)
 {
 	if (!ata_get_device(minor)) {
 		return ENXIO;
@@ -366,7 +367,7 @@ int ata_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int ata_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
+int ata_ioctl(devminor_t minor, __unused unsigned int request, __unused struct iovec_iter *iter, __unused uid_t uid)
 {
 	struct partition *device = ata_get_device(minor);
 	if (!device) {
@@ -375,7 +376,7 @@ int ata_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, u
 	return EINVAL;
 }
 
-int ata_poll(devminor_t minor, int events)
+int ata_poll(__unused devminor_t minor, int events)
 {
 	// TODO this could maybe do a hardware check to make sure the drive is accessible?
 	return events & (VFS_POLL_READ | VFS_POLL_WRITE);

@@ -7,7 +7,11 @@ build-file			:= $(dir)/Makefile
 include-dir			:= $(src-root)/include
 config-h			:= $(src-root)/include/generated/config.h
 config-dir			:= $(dir $(config-h))
-linker-file			+= arch/$(SRCARCH)/kernel.ld
+
+export kconfig-file config-h build-file
+
+
+## Target Compiler Configuration
 
 AR				:= $(GCC_PREFIX)ar
 AS				:= $(GCC_PREFIX)gcc$(GCC_SUFFIX)
@@ -19,23 +23,14 @@ OBJCOPY				:= $(GCC_PREFIX)objcopy
 RANLIB				:= $(GCC_PREFIX)ranlib
 
 asflags-y			+= -I$(include-dir)
-ccflags-y			+= -I$(include-dir) -g -Wall
-ccflags-y			+= -nostartfiles -nostdlib -nostdinc -fno-zero-initialized-in-bss
+ccflags-y			+= -I$(include-dir)
+linker-file			+= arch/$(SRCARCH)/kernel.ld
+
+# don't use the standard library, and suppress the host libc mismatch warnings that result from that
+ccflags-y			+= -nostartfiles -nostdlib -nostdinc -Wno-builtin-declaration-mismatch
+# never assume data in the .bss section will be zero-initialized
+ccflags-y			+= -fno-zero-initialized-in-bss
 ldflags-y 			+= -Wl,--build-id=none
-
-ccflags-$(CONFIG_CC_OPTIMIZE_FOR_SIZE)			+= -Os
-ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE)		+= -O2
-ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3)	+= -O3
-
-ccflags-$(CONFIG_MC68030)	+= -m68030 -msoft-float
-asflags-$(CONFIG_MC68030) 	+= -m68030
-
-ccflags-$(CONFIG_MC68010) 	+= -m68010
-asflags-$(CONFIG_MC68010) 	+= -m68010
-
-userprogs-ccflags-$(CONFIG_M68K)+= -mpcrel
-firmware-ccflags-$(CONFIG_M68K)	+= -mpcrel
-
 # reduce the elf output size by reducing the alignment
 ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
 # TODO not sure if these should be kept or not.  align-int specifically will generate structs with padding
@@ -45,13 +40,37 @@ ccflags-y			+= -z max-page-size=$(CONFIG_PAGE_SIZE)
 #ccflags-$(CONFIG_GC_SECTIONS)	+= -ffunction-sections -fdata-sections
 #ldflags-$(CONFIG_GC_SECTIONS)	+= -Wl,--gc-sections -Wl,--print-gc-sections
 
+# architecture options
+ccflags-$(CONFIG_MC68030)	+= -m68030 -msoft-float
+asflags-$(CONFIG_MC68030) 	+= -m68030
+
+ccflags-$(CONFIG_MC68010) 	+= -m68010
+asflags-$(CONFIG_MC68010) 	+= -m68010
+
+userprogs-ccflags-$(CONFIG_M68K)+= -mpcrel
+firmware-ccflags-$(CONFIG_M68K)	+= -mpcrel
+
+# optimizations options
+ccflags-$(CONFIG_CC_OPTIMIZE_FOR_SIZE)			+= -Os
+ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE)		+= -O2
+ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3)	+= -O3
+
+# debugging options
+ccflags-$(CONFIG_DEBUG)		+= -g
+
+# warnings
+ccflags-y			+= -Wall -Wextra -Wno-sign-compare #-Wconversion
+
 ifeq ($(strict), y)
 	ccflags-y		+= -Werror
 endif
 
-export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS kconfig-file config-h build-file
+export AS AR CC LD STRIP OBJDUMP OBJCOPY RANLIB INCLUDE ASFLAGS CFLAGS LDFLAGS
 
-HOST_ARCH			= testapp
+
+## Host Compiler Configuration
+
+HOST_ARCH			:= testapp
 HOST_LD				:= gcc
 HOST_CC				:= gcc
 HOST_CFLAGS			:=
@@ -65,6 +84,9 @@ ifeq ($(strict), y)
 endif
 
 export HOST_ARCH HOST_LD HOST_CC HOST_GCC HOST_CFLAGS HOST_LDFLAGS
+
+
+## Disk Image Configuration
 
 SUDO				:= sudo
 COPY_TO_DISKIMAGE		:= $(SUDO) cp

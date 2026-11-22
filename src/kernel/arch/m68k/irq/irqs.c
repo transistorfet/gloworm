@@ -96,7 +96,7 @@ extern struct process *current_proc;
 
 void user_error(struct exception_frame *frame, int signal)
 {
-	log_error("\nError in pid %d at %x (status: %x, vector: %d)\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2);
+	log_error("\nError in pid %d at %x (status: %x, vector: %d), sending signal %d\n", current_proc->pid, frame->pc, frame->status, (frame->vector & 0xFFF) >> 2, signal);
 	printk("pid %d memory map:\n", current_proc->pid);
 	memory_map_print_segments(current_proc->map);
 
@@ -138,7 +138,7 @@ void user_error(struct exception_frame *frame, int signal)
 
 	#endif
 
-	dispatch_signal(current_proc, SIGABRT);
+	dispatch_signal(current_proc, signal);
 }
 
 void fatal_error(struct exception_frame *frame)

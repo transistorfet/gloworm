@@ -11,7 +11,7 @@
 
 static const char *mv_path_last_component(const char *path);
 
-int MAIN(command_mv)(int argc, char **argv, char **envp)
+int MAIN(command_mv)(int argc, char **argv)
 {
 	int error;
 	struct stat statbuf;

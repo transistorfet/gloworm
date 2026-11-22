@@ -5,7 +5,7 @@
 
 #include "prototype.h"
 
-int MAIN(command_ln)(int argc, char **argv, char **envp)
+int MAIN(command_ln)(int argc, char **argv)
 {
 	if (argc <= 2) {
 		puts("Usage: ln <source> <target>");

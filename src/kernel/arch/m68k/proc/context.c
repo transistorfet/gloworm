@@ -1,6 +1,7 @@
 
 #include <string.h>
 #include <signal.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <asm/context.h>
@@ -289,7 +290,7 @@ int arch_remove_signal_context(struct process *proc)
 	return signum;
 }
 
-void arch_extended_switch_context(struct process *previous_proc, struct process *next_proc)
+void arch_extended_switch_context(__unused struct process *previous_proc, struct process *next_proc)
 {
 	#if defined(CONFIG_MMU)
 	mmu_table_switch(next_proc->map->root_table);

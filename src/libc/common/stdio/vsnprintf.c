@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <attributes.h>
 
 
 extern char *itoa_padded(unsigned int num, char *buffer, int radix, char width, char zeropad, char is_signed);
@@ -73,6 +74,7 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 				}
 				case 'i':
 					type = 'd';
+					__FALLTHROUGH__;
 				case 'p':
 				case 'd':
 				case 'u':

@@ -69,7 +69,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 	return 0;
 }
 
-static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start, int bitmap_size, zone_t near)
+static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start, int bitmap_size)
 {
 	char bit;
 	char *block;

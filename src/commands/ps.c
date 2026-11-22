@@ -9,7 +9,7 @@
 
 #define PS_BUFFER_SIZE	100
 
-int MAIN(command_ps)(int argc, char **argv, char **envp)
+int MAIN(command_ps)(void)
 {
 	pid_t pid;
 	int error;

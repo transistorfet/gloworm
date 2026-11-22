@@ -28,7 +28,7 @@ void format_file_mode(mode_t mode, char *buffer)
 	}
 }
 
-int MAIN(command_ls)(int argc, char **argv, char **envp)
+int MAIN(command_ls)(int argc, char **argv)
 {
 	int fd;
 	int error;

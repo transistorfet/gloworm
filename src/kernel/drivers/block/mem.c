@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 
@@ -89,7 +90,7 @@ int mem_init(void)
 	return 0;
 }
 
-int mem_open(devminor_t minor, int access)
+int mem_open(devminor_t minor, __unused int access)
 {
 	if (minor >= num_devices) {
 		return ENXIO;
@@ -141,7 +142,7 @@ int mem_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int mem_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
+int mem_ioctl(devminor_t minor, __unused unsigned int request, __unused struct iovec_iter *iter, __unused uid_t uid)
 {
 	if (minor >= num_devices) {
 		return ENXIO;
@@ -149,7 +150,7 @@ int mem_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, u
 	return EINVAL;
 }
 
-int mem_poll(devminor_t minor, int events)
+int mem_poll(__unused devminor_t minor, int events)
 {
 	return events & (VFS_POLL_READ | VFS_POLL_WRITE);
 }

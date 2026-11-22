@@ -39,7 +39,7 @@ static ext2_block_t ext2_alloc_block(struct mount *mp)
 		return ENOSPC;
 	}
 
-	bit = bit_alloc(&mp->bufcache, super->groups[group].block_bitmap, 0);
+	bit = bit_alloc(&mp->bufcache, super->groups[group].block_bitmap);
 	if (!bit) {
 		return NULL;
 	}
@@ -71,7 +71,7 @@ static void ext2_free_block(struct mount *mp, ext2_block_t blocknum)
 }
 
 
-static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, int block_size, int log_blocknums_per_block)
+static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, int log_blocknums_per_block)
 {
 	const int blocknums_per_block = 1 << log_blocknums_per_block;
 
@@ -114,9 +114,8 @@ static ext2_block_t block_lookup(struct vnode *vnode, ext2_block_t znum, char cr
 	ext2_block_t *block;
 	struct buf *buf = NULL;
 	ext2_block_t tiers[EXT2_TIERS];
-	const int block_size = vnode->mp->block_size;
 
-	ntiers = block_calculate_tier(tiers, znum, block_size, EXT2_SUPER(vnode->mp->super)->log_blocknums_per_block);
+	ntiers = block_calculate_tier(tiers, znum, EXT2_SUPER(vnode->mp->super)->log_blocknums_per_block);
 	if (ntiers < 0) {
 		return 0;
 	}

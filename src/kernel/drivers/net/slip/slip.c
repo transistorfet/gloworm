@@ -1,6 +1,7 @@
 
 #include <fcntl.h>
 #include <string.h>
+#include <attributes.h>
 
 #include <kernel/printk.h>
 #include <kernel/drivers.h>
@@ -81,6 +82,7 @@ int slip_if_up(struct if_device *ifdev)
 		return error;
 	}
 	enable_bh(BH_SLIP);
+
 	return 0;
 }
 
@@ -249,7 +251,7 @@ static void slip_if_read_data(struct slip_if_device *ifdev)
 	ifdev->rx_read = ifdev->rx_write;
 }
 
-static void slip_if_process_input(void *_unused)
+static void slip_if_process_input(__unused void *_unused)
 {
 	for (short i = 0; i < SLIP_DEVICES; i++) {
 		slip_if_read_data(&slip_devices[i]);

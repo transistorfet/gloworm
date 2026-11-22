@@ -2,6 +2,8 @@
 #include <endian.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <attributes.h>
+
 #include <kernel/printk.h>
 #include <kernel/net/protocol.h>
 
@@ -84,7 +86,7 @@ static struct packet *icmp_create_packet(struct protocol *proto, uint8_t type, u
 	return pack;
 }
 
-int icmp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)
+int icmp_decode_header(__unused struct protocol *proto, struct packet *pack, uint16_t offset)
 {
 	uint16_t checksum;
 	struct icmp_header *hdr;

@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/ioc_tty.h>
 #include <bits/macros.h>
+#include <attributes.h>
 
 #include <asm/irqs.h>
 #include <kernel/time.h>
@@ -257,7 +258,7 @@ static inline int tty_68681_getchar_buffered(struct serial_channel *channel)
 	}
 	unsigned char ch = _buf_get_char(&channel->rx);
 
-	if (_buf_free_space(&channel->rx) > 100) {
+	if (_buf_free_space(&channel->rx) >= 100) {
 		ASSERT_CTS(channel);
 	}
 
@@ -291,14 +292,14 @@ static inline int tty_68681_putchar_buffered(struct serial_channel *channel, int
 
 	_buf_put_char(&channel->tx, ch);
 
-	// Enable the channel A transmitter
+	// Enable the transmitter
 	*channel->ports->command = CMD_ENABLE_TX;
 
 	UNLOCK(saved_status);
 	return ch;
 }
 
-static void tty_68681_process_input(void *_unused)
+static void tty_68681_process_input(__unused void *_unused)
 {
 	#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 	if (handle_timer) {
@@ -418,7 +419,7 @@ void handle_serial_irq(void)
 
 	if (isr & ISR_TIMER_CHANGE) {
 		// Clear the interrupt bit by reading the stop address
-		volatile register uint8_t reset = *STOP_RD_ADDR;
+		register volatile uint8_t reset = *STOP_RD_ADDR;
 		reset;	// make the compiler happy
 
 		#if defined(CONFIG_TTY_68681_CLOCKSOURCE)
@@ -434,7 +435,7 @@ void handle_serial_irq(void)
 
 	if (isr & ISR_INPUT_CHANGE) {
 		// Reading from the IPCR register will clear the interrupt
-		volatile register uint8_t status = *IPCR_RD_ADDR;
+		register volatile uint8_t status = *IPCR_RD_ADDR;
 		status;	// make the compiler happy
 
 		/*
@@ -586,12 +587,12 @@ void tty_68681_preinit(void)
 
 #if defined(CONFIG_TTY_68681_CLOCKSOURCE)
 
-cycles_t tty_68681_read_clock(struct clocksource *clk)
+cycles_t tty_68681_read_clock(__unused struct clocksource *clk)
 {
 	return clock_cycles;
 }
 
-nanos_t tty_68681_cycles_to_nanos(struct clocksource *clk, cycles_t cycles)
+nanos_t tty_68681_cycles_to_nanos(__unused struct clocksource *clk, cycles_t cycles)
 {
 	// NOTE the TTY_68681_CLOCK_MAX_CYCLES value is selected to never overflow a 32-bit number
 	// so we can convert the cycles to 32-bit and speed this calculation up
@@ -664,7 +665,7 @@ int tty_68681_close(devminor_t minor)
 	return 0;
 }
 
-int tty_68681_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
+int tty_68681_read(devminor_t minor, __unused off_t offset, struct iovec_iter *iter)
 {
 	size_t size = iovec_iter_remaining(iter);
 	size_t remain = size;
@@ -691,7 +692,7 @@ int tty_68681_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int tty_68681_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
+int tty_68681_write(devminor_t minor, __unused off_t offset, struct iovec_iter *iter)
 {
 	size_t size = iovec_iter_remaining(iter);
 	size_t remain = size;
@@ -715,7 +716,7 @@ int tty_68681_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	return size;
 }
 
-int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, uid_t uid)
+int tty_68681_ioctl(devminor_t minor, unsigned int request, struct iovec_iter *iter, __unused uid_t uid)
 {
 	struct serial_channel *channel = from_minor_dev(minor);
 
@@ -755,7 +756,7 @@ int tty_68681_poll(devminor_t minor, int events)
 	return revents;
 }
 
-off_t tty_68681_seek(devminor_t minor, off_t position, int whence, off_t offset)
+off_t tty_68681_seek(__unused devminor_t minor, __unused off_t position, __unused int whence, __unused off_t offset)
 {
 	return -1;
 }

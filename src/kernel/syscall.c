@@ -7,6 +7,7 @@
 #include <sys/sched.h>
 #include <sys/ioc_tty.h>
 #include <sys/socket.h>
+#include <attributes.h>
 
 #include <kconfig.h>
 #include <asm/irqs.h>
@@ -149,9 +150,11 @@ int do_exec(const char __user *path, const char __user *const argv[], const char
 	return 0;
 }
 
-pid_t do_waitpid(pid_t pid, int __user *status, int options)
+pid_t do_waitpid(pid_t pid, int __user *status, __unused int options)
 {
 	struct process *proc;
+
+	// TODO implement options
 
 	// Must be a valid pid, or -1 to wait for any process
 	if (pid <= 0 && pid != -1) {
@@ -568,7 +571,7 @@ int do_ioctl(int fd, unsigned int request, void __user *argp)
 	return vfs_ioctl(file, request, &iter, current_proc->uid);
 }
 
-extern int do_fcntl(int fd, int cmd, void __user *argp)
+extern int do_fcntl(__unused int fd, __unused int cmd, __unused void __user *argp)
 {
 	// TODO what are the arguments it can take?
 	return -1;
@@ -839,7 +842,7 @@ int do_socket(int domain, int type, int protocol)
 	return fd;
 }
 
-int do_socketpair(int domain, int type, int protocol, int fds[2])
+int do_socketpair(__unused int domain, __unused int type, __unused int protocol, __unused int fds[2])
 {
 	// TODO implement
 	return -1;
@@ -970,7 +973,7 @@ ssize_t do_sendto(int fd, const void __user *buf, size_t nbytes, int flags, int 
 	return net_socket_sendto(file, &iter, flags, addr, addr_len);
 }
 
-ssize_t do_sendmsg(int fd, const struct msghdr __user *message, int flags)
+ssize_t do_sendmsg(__unused int fd, __unused const struct msghdr __user *message, __unused int flags)
 {
 	// TODO implement
 	return -1;
@@ -1044,7 +1047,7 @@ ssize_t do_recvfrom(int fd, void __user *buf, size_t nbytes, int flags, int opts
 	return error;
 }
 
-ssize_t do_recvmsg(int fd, struct msghdr __user *message, int flags)
+ssize_t do_recvmsg(__unused int fd, __unused struct msghdr __user *message, __unused int flags)
 {
 	// TODO implement
 	return -1;
