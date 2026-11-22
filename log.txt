@@ -6434,3 +6434,95 @@ with short descriptors, initial shift: 4, levels: 1, table entries: 8192, page: 
 - it looks like seek is used by push_back, and the exec.c stack arguments pushing.  It's mostly either saving/restoring the
   position, seeking to the end, or just moving the current position forward, in the case of kvec (it's reusing code in seek)
 
+
+2026-11-21:
+
+- I was trying to turn on more warnings and fix things, and in the process of fixing unused parametrs in functions, I saw that the
+  UDP lookup_endpoint function didn't quite seem right because it wasn't checking the address; only the port.  Since I changed it, I
+  figured I should test it before commit, and then struggled to get networking/slip working
+- It seemed like it wasn't sending packets to the device from my main computer.  I tried various things in linux to get it working.
+  At one point I tried `-L` which disables flow control and sets the CLOCAL flag
+- it was showing in ifconfig that there were packets being sent, but nothing received.  At some point it started receiving packets
+  and I'm not sure what I did, if anything more than fiddling, but it was showing packets come in, so it was almost certainly
+  transmitting from the k30p
+- it was sending packets in according to linux, but nothing was being received, and when I added a debug putchar, and also setting
+  one of the LEDs when only the 68681 channel B was receiving, and nothing happened.  It worked with channel A setting an LED on rx
+  but not channel B
+- I eventually realized I could use the oscilloscope to see if things were coming in and out, and it was showing that packets were
+  being transmitted to the computer (at least with -L on slattach), and the k30p would send a packet when running commands to send
+  one, but it wasn't receiving the packets that were on the wire
+- looking through the code, I saw there was one place where `*CRA_WR_ADDR = CMD_ENABLE_RX;` to enable the receiver for channel A,
+  but I couldn't find anything for channel B.  I added one and at first that didn't seem to fix the problem (I don't think), but
+  somewhere along the line, it started working
+- So the receiver for channel B not being enabled was very likely part of the problem
+- hmm... there's a commit from Feb 17, 2026, 85492fc9e446c2ba19132b5b5942c41b97e9cba5, where there was previously a line:
+  `*channel->ports->command = CMD_ENABLE_TX_RX;` which was done on both channels
+- that commit removed that line and added the explicit `*CRA_WR_ADDR = CMD_ENABLE_RX;` line
+- I honestly don't know why I made this change.  It was during that tough debugging where the problem turned out to be hardware/CPLD
+  related.  It added the change where I loop 100 times checking status, which I'm also not sure why I added that permanently
+
+- one of the things that came up during this was checking `syslog` and `dmesg` to see if there was anything there.  I think this was
+  when trying to debug why messages weren't being sent.  The TX packets statistic was going up in ifconfig, but I wasn't seeing data
+  on the wire with the oscilloscope.  syslog showed something like:
+  ```
+  2026-11-21T13:16:21.407870-07:00 kitty kernel: sl0: NETDEV WATCHDOG: CPU: 4: transmit queue 0 timed out 21504 ms
+  2026-11-21T13:16:21.407888-07:00 kitty kernel: sl0: transmit timed out, bad line quality?
+  2026-11-21T13:16:52.895883-07:00 kitty kernel: sl0: NETDEV WATCHDOG: CPU: 1: transmit queue 0 timed out 20296 ms
+  2026-11-21T13:16:52.895903-07:00 kitty kernel: sl0: transmit timed out, bad line quality?
+  ```
+- that indicates that there was an issue with flow control, which led me to the `-L` option for slattach
+- with flow control disabled, and some fiddling, it started working.  I investigated the flow control.  For some reason I have DTR
+  and CTS hooked up, but not RTS.  I think that's a carry over from when I was using the separate FT232RL boards.  I was worried I'd
+  have to rework that on the new rev.2 boards that I've already ordered, but it works fine for channel A, so maybe not an issue.
+  It's really only the k30p which needs to deassert CTS to tell the host/terminal to stop sending data temporarily
+- I don't know how I actually fix this problem, but after more fiddling, and without `-L`, I was able to get it working.  I'm not
+  sure if that's related to me putting the oscilloscope probe on those pins on channel B.  It seems to work without that, but I'm
+  not sure if that's only because I've started it *shrug*
+
+- Ok, once I had things sort of working: I'm getting packets in.  I can run ns on the k30p and send messages to the host running
+  `nc -l`, but when I send from the host to the k30p, I'm getting nothing.  I can ping just fine from the host, so data is getting
+  through, but I'm getting a lot of `packet dropped` messages on the k30p, indicating that it's rejecting the packets during packet
+  forwarding
+
+- I'm getting OP6 LED after booting often, and it seems like when that happens, the networking won't work.  When that LED is not
+  lit, I think it tends to work
+- I'm having to kill slattach, restart it, reboot gloworm, and sometimes it will work.  Right now it's mostly not working
+- I killed slattach, then rebooted gloworm, and no LED this time.  Then I started slattach and up'd the interface, and now it's
+  receiving packets.  It must be something about power off/reset/initialization that's throwing off slattach
+
+- it was working, but then the OP6 light came on, and it stopped responding to packets going in! =(
+- OP6 is CTS assert/deassert
+
+- I just can't get it working again.  I tried adding a "\xC0\xC0\xC0" send at the start, and that didn't help.  If anything it's
+  partly to blame for it not working
+- I think the problem is waking up.  I think it's actually receiving the data over nc/ns but it never gets read in and printed
+  because the process isn't woken up to do that.  The print statements I added should have printed something if the tcp message of
+  sending the response from nc on linux to ns on gloworm, so that means the packet must have been received and processed
+
+
+2026-11-22:
+
+- hmm.... it seems "down"ing the netwokr before rebooting the OS, and then "up"ing after seemed to avoid the connection getting
+  messed up.  I also got it booting in the first place by starting slattach, but not upping the network, booting, and then upping
+  afterwards
+- although, I said that, but actually I'm getting "packet error" constantly, and not "packet dropped" so it's still gotten out of
+  sync
+- fuuuck I'm just getting packet error now, no matter what I do.  Did the log messages I added to the kernel mess something up?  I'm
+  not even getting CTS going low.  It's just not working
+
+- it's still giving errors, but it seems most reliable to get it working by being in the monitor, starting slattach but not upping,
+  booting the os, and then upping the network
+- it does seem to be a wakeup issue.  I have a print statement that shows me which pid wakes up.  When I start ns, pid 7 (ns) wakes
+  up.  When I enter a string and press enter, I get another wakeup and the message shows up on the linux host.  When I send a
+  message back from host, it shows `resuming` (resume_waiting_procs is called), and there's a `sock 127A3C 1` which is in
+  `tcp_forward_established` which puts the packet's data into the receive queue, but now `w7` indicating that the process woke up.
+  Even pressing enter again on the k30p wakes up the process but doesn't read the data, probably because...
+- *facepalm* was looking at the source for `ns` to see if it uses select or something else, and it looks like `ns` doesn't actually
+  read data... it only sends data (probably why I named in `ns` for net send instead of `nc` for netcat since it's not actually a
+  clone of netcat)
+- so if that's the case, then everything's working?  Well I need to test udp a bit more
+
+- ok, so `ns -u` (where it defaults to port 3904) works, and `nc -u 192.168.1.200 3904` from linux host, data will be received and
+  displayed correctly on the k30p
+- now, I think I left out that change to udp receive filter, so I need to test that
+

@@ -242,7 +242,7 @@ int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struc
 static struct udp_endpoint *udp_lookup_endpoint(struct protocol *proto, uint32_t addr, uint16_t port)
 {
 	for (struct udp_endpoint *cur = _queue_head(&udp_endpoints); cur; cur = _queue_next(&cur->ep.node)) {
-		if (cur->src.port == port) {
+		if (cur->src.addr == addr && cur->src.port == port) {
 			return cur;
 		}
 	}

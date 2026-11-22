@@ -564,6 +564,7 @@ void tty_68681_normal_mode(void)
 
 	*CRA_WR_ADDR = CMD_ENABLE_RX;
 	ASSERT_CTS(&channels[CH_A]);
+	*CRB_WR_ADDR = CMD_ENABLE_RX;
 	ASSERT_CTS(&channels[CH_B]);
 }
 
