@@ -703,7 +703,7 @@ int tty_68681_write(devminor_t minor, __unused off_t offset, struct iovec_iter *
 	}
 
 	// TODO with this method, each write's size must always be smaller than buffer size
-	if (_buf_free_space(&channel->tx) < size) {
+	if ((size_t) _buf_free_space(&channel->tx) < size) {
 		if (!(channel->open_mode & O_NONBLOCK)) {
 			suspend_current_syscall(VFS_POLL_WRITE);
 		}

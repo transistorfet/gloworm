@@ -10,7 +10,7 @@
 
 
 int ipv4_init(void);
-int ipv4_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
+int ipv4_decode_header(struct protocol *proto, struct packet *pack, int offset);
 int ipv4_forward_packet(struct protocol *proto, struct packet *pack);
 
 
@@ -54,7 +54,7 @@ int ipv4_init(void)
 	return 0;
 }
 
-int ipv4_decode_header(__unused struct protocol *proto, struct packet *pack, uint16_t offset)
+int ipv4_decode_header(__unused struct protocol *proto, struct packet *pack, int offset)
 {
 	int error;
 	uint16_t checksum;
@@ -65,7 +65,7 @@ int ipv4_decode_header(__unused struct protocol *proto, struct packet *pack, uin
 	pack->network_offset = offset;
 	hdr = (struct ipv4_header *) &pack->data[pack->network_offset];
 
-	if (pack->length - offset < sizeof(struct ipv4_header)) {
+	if ((size_t) (pack->length - offset) < sizeof(struct ipv4_header)) {
 		return -1;
 	}
 	if (hdr->version != 4 || hdr->ihl < 5 || hdr->ihl > 9) {
@@ -96,7 +96,7 @@ int ipv4_decode_header(__unused struct protocol *proto, struct packet *pack, uin
 	}
 	pack->proto = next;
 
-	pack->transport_offset = offset + (((uint16_t) hdr->ihl) << 2);
+	pack->transport_offset = offset + (((int) hdr->ihl) << 2);
 	error = next->ops->decode_header(next, pack, pack->transport_offset);
 	if (error) {
 		return error;
@@ -121,7 +121,7 @@ int ipv4_encode_header(struct packet *pack, const struct ipv4_address *src, cons
 		return -1;
 	}
 
-	if (pack->capacity < pack->length + sizeof(struct ipv4_header) + length) {
+	if ((size_t) pack->capacity < (size_t) pack->length + sizeof(struct ipv4_header) + length) {
 		return -2;
 	}
 	pack->network_offset = pack->length;

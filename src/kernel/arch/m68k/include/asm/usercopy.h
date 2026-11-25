@@ -178,7 +178,7 @@ static inline int strncpy_from_user(char *dest, const char __user *src, int max)
 
 	strncpy(dest, src, max);
 	size = strnlen(dest, max);
-	if (size == max) {
+	if (size == (size_t) max) {
 		dest[max - 1] = '\0';
 	}
 	return size;
@@ -190,7 +190,7 @@ static inline int strncpy_to_user(char __user *dest, const char *src, int max)
 
 	strncpy(dest, src, max);
 	size = strnlen(dest, max);
-	if (size == max) {
+	if (size == (size_t) max) {
 		dest[max - 1] = '\0';
 	}
 	return size;

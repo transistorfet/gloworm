@@ -157,11 +157,11 @@ struct get_page_result {
 int init_mmu(mmu_descriptor_t *supervisor_table);
 mmu_descriptor_t *mmu_table_alloc(void);
 void mmu_table_free(mmu_descriptor_t *root);
-int mmu_table_map(mmu_descriptor_t *root, uintptr_t address, size_t length, int flags);
-int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, uintptr_t virtual_addr, size_t length, int flags);
-int mmu_table_get_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, struct get_page_result *result);
-int mmu_table_set_page(mmu_descriptor_t *root_table, uintptr_t virtual_addr, uintptr_t physical_addr, size_t page_size, int flags);
-int mmu_table_validate_user_address(mmu_descriptor_t *root_table, uintptr_t virtual_addr);
+int mmu_table_map(mmu_descriptor_t *root, virtual_address_t virtual_addr, size_t length, int flags);
+int mmu_table_copy(mmu_descriptor_t *dest_table, mmu_descriptor_t *src_table, virtual_address_t virtual_addr, size_t length, int flags);
+int mmu_table_get_page(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, struct get_page_result *result);
+int mmu_table_set_page(mmu_descriptor_t *root_table, virtual_address_t virtual_addr, physical_address_t physical_addr, size_t page_size, int flags);
+int mmu_table_validate_user_address(mmu_descriptor_t *root_table, virtual_address_t virtual_addr);
 int mmu_table_print(mmu_descriptor_t *root);
 
 static inline void mmu_table_switch(mmu_descriptor_t *root)
@@ -170,7 +170,7 @@ static inline void mmu_table_switch(mmu_descriptor_t *root)
 
 	root_pointer.limit = 0x7fff;
 	root_pointer.status = MMU_DT_TABLE;
-	root_pointer.table = (uint32_t) root;
+	root_pointer.table = (physical_address_t) root;
 	MMU_MOVE_TO_CRP(root_pointer);
 
 	MMU_FLUSH_USER_TLB();

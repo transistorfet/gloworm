@@ -12,14 +12,14 @@ static char *_monthnames[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", 
 
 size_t strftime(char *buffer, size_t max, const char *fmt, const struct tm *tp)
 {
-	int i = 0;
+	char width;
+	size_t i = 0;
 	int value = 0;
-	short width;
 	char padding;
 	char *svalue;
 	char *subfmt;
 
-	for (int j = 0; fmt[j] != '\0' && i < max; j++) {
+	for (size_t j = 0; fmt[j] != '\0' && i < max; j++) {
 		if (fmt[j] == '%') {
 			svalue = NULL;
 			subfmt = NULL;
@@ -114,7 +114,7 @@ size_t strftime(char *buffer, size_t max, const char *fmt, const struct tm *tp)
 				}
 			} else if (subfmt) {
 				i += strftime(&buffer[i], max - i, subfmt, tp);
-			} else if (width && width < max - i) {
+			} else if (width && (size_t) width < max - i) {
 				itoa_padded(value, &buffer[i], 10, width, padding, 0);
 				i += width;
 			}

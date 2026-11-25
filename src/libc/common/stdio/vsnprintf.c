@@ -10,10 +10,10 @@ extern char *itoa_padded(unsigned int num, char *buffer, int radix, char width, 
 
 int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 {
-	int len;
-	int i = 0;
+	size_t len;
+	size_t i = 0;
 
-	for (int j = 0; i < n - 1 && fmt[j] != '\0'; j++) {
+	for (size_t j = 0; i < n - 1 && fmt[j] != '\0'; j++) {
 		if (fmt[j] == '%') {
 			char type;
 			char width = 0;
@@ -83,7 +83,7 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 				case 'X': {
 					// Extract the data from args based on the requested length
 					unsigned long long d;
-					if (length <= sizeof(int)) {
+					if (length <= (char) sizeof(int)) {
 						d = va_arg(args, unsigned int);
 					} else {
 						d = va_arg(args, unsigned long long);
@@ -124,6 +124,6 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 	}
 	buffer[i] = '\0';
 
-	return i;
+	return (int) i;
 }
 

@@ -27,7 +27,7 @@ struct udp_header {
 
 
 int udp_init(void);
-int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
+int udp_decode_header(struct protocol *proto, struct packet *pack, int offset);
 int udp_forward_packet(struct protocol *proto, struct packet *pack);
 int udp_create_endpoint(struct protocol *proto, struct socket *sock, const struct sockaddr *sockaddr, socklen_t len, struct endpoint **result);
 
@@ -93,13 +93,13 @@ int udp_init(void)
 	return 0;
 }
 
-int udp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)
+int udp_decode_header(struct protocol *proto, struct packet *pack, int offset)
 {
 	uint16_t checksum;
 	struct udp_header *hdr;
 	struct ipv4_custom_data *custom;
 
-	if (pack->length - offset < sizeof(struct udp_header)) {
+	if ((size_t) (pack->length - offset) < sizeof(struct udp_header)) {
 		return -5;
 	}
 
@@ -323,7 +323,7 @@ int udp_endpoint_recv_from(struct endpoint *ep, struct iovec_iter *iter, struct 
 	_queue_remove(&uep->recv_queue, &pack->node);
 
 	nbytes = iovec_iter_remaining(iter);
-	if (pack->length - pack->data_offset < nbytes) {
+	if ((size_t) (pack->length - pack->data_offset) < nbytes) {
 		nbytes = pack->length - pack->data_offset;
 	}
 	memcpy_into_iter(iter, &pack->data[pack->data_offset], nbytes);

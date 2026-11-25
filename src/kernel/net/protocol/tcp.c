@@ -23,7 +23,7 @@
 
 
 int tcp_init(void);
-int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
+int tcp_decode_header(struct protocol *proto, struct packet *pack, int offset);
 int tcp_forward_packet(struct protocol *proto, struct packet *pack);
 int tcp_create_endpoint(struct protocol *proto, struct socket *sock, const struct sockaddr *sockaddr, socklen_t len, struct endpoint **result);
 
@@ -102,13 +102,13 @@ int tcp_init(void)
 	return 0;
 }
 
-int tcp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset)
+int tcp_decode_header(struct protocol *proto, struct packet *pack, int offset)
 {
 	uint16_t checksum;
 	struct tcp_header *hdr;
 	struct ipv4_custom_data *custom;
 
-	if (pack->length - offset < sizeof(struct tcp_header)) {
+	if ((size_t) (pack->length - offset) < sizeof(struct tcp_header)) {
 		return -5;
 	}
 
@@ -332,7 +332,7 @@ int tcp_endpoint_send(struct endpoint *ep, struct iovec_iter *iter)
 		return ENOTCONN;
 	}
 
-	if (tep->state != TS_ESTABLISHED || _buf_free_space(tep->tx) < iovec_iter_remaining(iter)) {
+	if (tep->state != TS_ESTABLISHED || (size_t) _buf_free_space(tep->tx) < iovec_iter_remaining(iter)) {
 		return EWOULDBLOCK;
 	}
 
@@ -730,7 +730,7 @@ static int tcp_forward_established(struct tcp_endpoint *tep, struct packet *pack
 
 	if (hdr->flags & ACK) {
 		// Discard the data that's been acknowledged
-		int last_acked = tep->tx_last_seq - _buf_used_space(tep->tx);
+		uint32_t last_acked = tep->tx_last_seq - _buf_used_space(tep->tx);
 		if (hdr->acknum > last_acked) {
 			tep->tx_acks_repeated = 0;
 			_buf_drop(tep->tx, hdr->acknum - last_acked);

@@ -9,9 +9,9 @@
 
 int string_array_copy(struct string_array *array, const char __user *const src_words[], int from_user)
 {
-	size_t i;
+	int i;
+	int len = 0;
 	size_t result;
-	size_t len = 0;
 	size_t used = 0;
 	const char *str;
 
@@ -52,7 +52,7 @@ int string_array_copy(struct string_array *array, const char __user *const src_w
 
 void string_array_add_offset(struct string_array *array, uintptr_t offset)
 {
-	size_t i;
+	int i;
 
 	for (i = 0; i < array->len; i++) {
 		array->strings[i] += offset;
@@ -61,7 +61,7 @@ void string_array_add_offset(struct string_array *array, uintptr_t offset)
 
 void string_array_remove_offset(struct string_array *array, uintptr_t offset)
 {
-	size_t i;
+	int i;
 
 	for (i = 0; i < array->len; i++) {
 		array->strings[i] -= offset;

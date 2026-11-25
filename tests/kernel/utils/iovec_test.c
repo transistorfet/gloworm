@@ -7,7 +7,7 @@
 
 #define KVEC_SIZE	10
 
-void assert_iter_position(struct iovec_iter *iter, int result, int expected_result, int expected_cur_seg, int expected_seg_offset)
+void assert_iter_position(struct iovec_iter *iter, int result, int expected_result, int expected_cur_seg, size_t expected_seg_offset)
 {
 	printk("result: %d\n", result);
 	assert(result == expected_result);

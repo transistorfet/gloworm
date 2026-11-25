@@ -114,7 +114,7 @@ void printk_dump_bytes(void *ptr, size_t length)
 void printk_dump_user(struct memory_map *map, virtual_address_t vaddr, size_t length)
 {
 	short i;
-	short index = 0;
+	size_t index = 0;
 	struct kvec kvec[3];
 	short seg = 0, max_segs;
 

@@ -13,7 +13,7 @@ int select_check_open_fds(struct process *proc, int max, fd_set *readfds, fd_set
 	int fd = 0;
 	fd_mask_t mask;
 
-	for (short word = 0; word < _FDS_MAX / __FDS_BITS; word++) {
+	for (short word = 0; word < (short) (_FDS_MAX / __FDS_BITS); word++) {
 		mask = 0;
 		if (readfds) {
 			mask |= readfds->fds_bits[word];
@@ -42,7 +42,7 @@ int select_poll_fds(struct process *proc, int max, fd_set *readfds, fd_set *writ
 	int revents;
 	int ready = 0;
 
-	for (short word = 0; word < _FDS_MAX / __FDS_BITS; word++) {
+	for (short word = 0; word < (short) (_FDS_MAX / __FDS_BITS); word++) {
 		for (fd_mask_t bit = 0x01; bit; bit <<= 1, fd++) {
 			if (fd >= max) {
 				break;

@@ -17,7 +17,7 @@
 
 struct string_array {
 	int len;
-	int used;
+	uintptr_t used;
 	uintptr_t *strings;
 	char buffer[EXEC_ARGS_LENGTH_MAX];
 };

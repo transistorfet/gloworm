@@ -334,20 +334,20 @@ int ext2_read(struct vfile *file, struct iovec_iter *iter)
 		return EISDIR;
 	}
 
-	short zpos;
-	short zlen;
+	size_t nbytes;
+	size_t wbytes = 0;
+	ext2_block_t zpos;
+	ext2_block_t zlen;
 	ext2_block_t znum;
 	ext2_block_t block;
 	struct buf *buf;
-	size_t nbytes;
-	size_t wbytes = 0;
 	struct vnode *vnode = file->vnode;
-	const int block_size = vnode->mp->bufcache.block_size;
+	const size_t block_size = (size_t) vnode->mp->bufcache.block_size;
 	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	nbytes = iovec_iter_remaining(iter);
-	if (nbytes > vnode->size - file->position) {
-		nbytes = vnode->size - file->position;
+	if (nbytes > (size_t) (vnode->size - file->position)) {
+		nbytes = (size_t) (vnode->size - file->position);
 	}
 
 	znum = file->position >> log_block_size;
@@ -387,16 +387,16 @@ int ext2_write(struct vfile *file, struct iovec_iter *iter)
 		return EISDIR;
 	}
 
-	short zpos;
-	short zlen;
 	int error = 0;
+	size_t nbytes;
+	size_t wbytes = 0;
+	ext2_block_t zpos;
+	ext2_block_t zlen;
 	ext2_block_t znum;
 	ext2_block_t block;
 	struct buf *buf;
-	size_t nbytes;
-	size_t wbytes = 0;
 	struct vnode *vnode = file->vnode;
-	const int block_size = vnode->mp->bufcache.block_size;
+	const size_t block_size = (size_t) vnode->mp->bufcache.block_size;
 	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	nbytes = iovec_iter_remaining(iter);
@@ -479,13 +479,13 @@ off_t ext2_seek(__unused struct vfile *file, __unused off_t position, __unused i
 int ext2_readdir(struct vfile *file, struct dirent *dir)
 {
 	int max;
-	short zpos;
+	struct buf *buf;
+	ext2_block_t zpos;
 	ext2_block_t znum;
 	ext2_block_t block;
-	struct buf *buf;
 	struct ext2_dirent *current_entry;
 	struct vnode *vnode = file->vnode;
-	const int block_size = vnode->mp->bufcache.block_size;
+	const size_t block_size = (size_t) vnode->mp->bufcache.block_size;
 	const int log_block_size = EXT2_SUPER(vnode->mp->super)->log_block_size;
 
 	if (!S_ISDIR(vnode->mode)) {

@@ -325,16 +325,16 @@ int ata_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 		return ENXIO;
 	}
 
-	if (offset > (device->size << 9)) {
+	if ((size_t) offset > (device->size << 9)) {
 		return EINVAL;
 	}
-	if (offset + size > (device->size << 9)) {
-		size = (device->size << 9) - offset;
+	if ((size_t) offset + size > (device->size << 9)) {
+		size = (device->size << 9) - (size_t) offset;
 	}
 
 	offset >>= 9;
 	for (int count = size >> 9; count > 0; count--, offset++) {
-		ata_read_sector(device->base + offset, buffer);
+		ata_read_sector(device->base + (size_t) offset, buffer);
 		memcpy_into_iter(iter, buffer, 512);
 	}
 	return size;
@@ -352,17 +352,17 @@ int ata_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 		return ENXIO;
 	}
 
-	if (offset > (device->size << 9)) {
+	if ((size_t) offset > (device->size << 9)) {
 		return EINVAL;
 	}
-	if (offset + size > (device->size << 9)) {
-		size = (device->size << 9) - offset;
+	if ((size_t) offset + size > (device->size << 9)) {
+		size = (device->size << 9) - (size_t) offset;
 	}
 
 	offset >>= 9;
 	for (int count = size >> 9; count > 0; count--, offset++) {
 		memcpy_out_of_iter(iter, buffer, 512);
-		ata_write_sector(device->base + offset, buffer);
+		ata_write_sector(device->base + (size_t) offset, buffer);
 	}
 	return size;
 }
@@ -402,8 +402,8 @@ off_t ata_seek(devminor_t minor, off_t position, int whence, off_t offset)
 			return EINVAL;
 	}
 
-	if (position > device->size) {
-		position = device->size;
+	if (position > (off_t) device->size) {
+		position = (off_t) device->size;
 	}
 	return position;
 

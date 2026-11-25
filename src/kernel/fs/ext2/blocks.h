@@ -25,7 +25,7 @@ static ext2_block_t ext2_alloc_block(struct mount *mp)
 	bitnum_t bit;
 	struct buf *buf;
 	struct ext2_super *super;
-	const int block_size = mp->block_size;
+	const size_t block_size = (size_t) mp->block_size;
 
 	super = EXT2_SUPER(mp->super);
 
@@ -73,7 +73,7 @@ static void ext2_free_block(struct mount *mp, ext2_block_t blocknum)
 
 static inline char block_calculate_tier(ext2_block_t *tiers, ext2_block_t znum, int log_blocknums_per_block)
 {
-	const int blocknums_per_block = 1 << log_blocknums_per_block;
+	const ext2_block_t blocknums_per_block = 1U << log_blocknums_per_block;
 
 	if (znum < EXT2_DIRECT_BLOCKNUMS_IN_INODE) {
 		tiers[0] = znum;
@@ -169,17 +169,17 @@ static void block_free_table(struct mount *mp, ext2_block_t blocknum, uint8_t le
 	}
 
 	const ext2_block_t *entries = buf->block;
-	const int blocks_per_group = 1 << EXT2_SUPER(mp->super)->log_blocknums_per_block;
+	const ext2_block_t blocks_per_group = 1U << EXT2_SUPER(mp->super)->log_blocknums_per_block;
 
 	if (levels_below > 0) {
-		for (short i = 0; i < blocks_per_group; i++) {
+		for (ext2_block_t i = 0; i < blocks_per_group; i++) {
 			if (entries[i]) {
 				block_free_table(mp, le32toh(entries[i]), levels_below - 1);
 			}
 		}
 	}
 
-	for (short i = 0; i < blocks_per_group; i++) {
+	for (ext2_block_t i = 0; i < blocks_per_group; i++) {
 		if (entries[i]) {
 			ext2_free_block(mp, le32toh(entries[i]));
 		}
@@ -206,7 +206,7 @@ static void block_free_all(struct vnode *vnode)
 	block_free_table(vnode->mp, EXT2_DATA(vnode).blocks[EXT2_DIRECT_BLOCKNUMS_IN_INODE], 0);
 
 	// Go through the tier 1 blocknum tables and free each
-	for (short i = 0; i < EXT2_DIRECT_BLOCKNUMS_IN_INODE; i++) {
+	for (int i = 0; i < EXT2_DIRECT_BLOCKNUMS_IN_INODE; i++) {
 		if (EXT2_DATA(vnode).blocks[i]) {
 			ext2_free_block(vnode->mp, le32toh(EXT2_DATA(vnode).blocks[i]));
 		}

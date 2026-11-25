@@ -62,10 +62,10 @@ struct iovec_iter {
 };
 
 
-int memcpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const void *src, size_t nbytes);
-int memcpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, void *dest, size_t nbytes);
-int strncpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const char *src, size_t max);
-int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *dest, size_t max);
+int memcpy_into_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, const void *src, size_t nbytes);
+int memcpy_out_of_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, void *dest, size_t nbytes);
+int strncpy_into_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, const char *src, size_t max);
+int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, char *dest, size_t max);
 
 int memcpy_into_iter(struct iovec_iter *iter, const void *buf, size_t nbytes);
 int memcpy_out_of_iter(struct iovec_iter *iter, void *buf, size_t nbytes);
@@ -100,7 +100,7 @@ static inline void iovec_iter_init_simple_kvec(struct iovec_iter *iter, struct k
 	iter->length = nbytes;
 }
 
-static inline void iovec_iter_init_kvec(struct iovec_iter *iter, struct kvec *segs, size_t num_segs)
+static inline void iovec_iter_init_kvec(struct iovec_iter *iter, struct kvec *segs, int num_segs)
 {
 	size_t length = 0;
 

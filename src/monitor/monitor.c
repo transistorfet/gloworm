@@ -198,7 +198,7 @@ void command_move(int argc, char **args)
 		uint16_t *dest = (uint16_t *) strtol(args[2], NULL, 16);
 		uint32_t size = strtol(args[3], NULL, 16);
 
-		for (int i = 0; i < (size >> 1); i++) {
+		for (uint32_t i = 0; i < (size >> 1); i++) {
 			dest[i] = source[i];
 		}
 
@@ -373,7 +373,7 @@ void command_verifyrom(int argc, char **args)
 		size = strtol(args[3], NULL, 16);
 	}
 
-	for (int i = 0; i < (size >> 1); i++) {
+	for (uint32_t i = 0; i < (size >> 1); i++) {
 		if (dest[i] != source[i]) {
 			printf("@%lx expected %x but found %x\n", (unsigned long) &dest[i], source[i], dest[i]);
 			if (++errors > 100) {
@@ -400,7 +400,7 @@ uint16_t fetch_word(char max)
 
 void command_load(int argc, char **args)
 {
-	int i;
+	uint32_t i;
 	char odd_size;
 	uint32_t size;
 	uint16_t data;
@@ -462,7 +462,7 @@ void command_ramtest(int argc, char **args)
 	printf("Testing onboard ram from %x to %x\n", (uint32_t) dest, (uint32_t) dest + length);
 
 	uint16_t *mem = (uint16_t *) dest;
-	for (int i = 0; i < (length >> 1); i++) {
+	for (uint32_t i = 0; i < (length >> 1); i++) {
 		mem[i] = (uint16_t) i;
 	}
 
@@ -472,7 +472,7 @@ void command_ramtest(int argc, char **args)
 	//}
 
 
-	for (int i = 0; i < (length >> 1); i++) {
+	for (uint32_t i = 0; i < (length >> 1); i++) {
 		data = (uint16_t) mem[i];
 		if (data != (uint16_t) i) {
 			printf("%08x: %x\n", (unsigned int) &mem[i], data);

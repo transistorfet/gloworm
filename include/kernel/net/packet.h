@@ -18,14 +18,14 @@ struct packet {
 	struct protocol *proto;
 	struct if_device *ifdev;
 
-	uint16_t network_offset;
-	uint16_t transport_offset;
-	uint16_t data_offset;
+	int network_offset;
+	int transport_offset;
+	int data_offset;
 
 	char custom_data[PACKET_CUSTOM_DATA];
 
-	uint16_t length;
-	uint16_t capacity;
+	int length;
+	int capacity;
 	unsigned char data[0];
 };
 

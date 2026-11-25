@@ -12,7 +12,7 @@ static inline int iovec_iter_advance_kvec(struct iovec_iter *iter, size_t advanc
 	return 0;
 }
 
-int memcpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const void *src, size_t nbytes)
+int memcpy_into_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, const void *src, size_t nbytes)
 {
 	int cur_seg = 0;
 	char *dest_buf;
@@ -44,7 +44,7 @@ int memcpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const void
 	return src_index;
 }
 
-int memcpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, void *dest, size_t nbytes)
+int memcpy_out_of_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, void *dest, size_t nbytes)
 {
 	int cur_seg = 0;
 	char *src_buf;
@@ -76,7 +76,7 @@ int memcpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, void *de
 	return dest_index;
 }
 
-int strncpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const char *src, size_t max)
+int strncpy_into_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, const char *src, size_t max)
 {
 	int cur_seg = 0;
 	char *dest_buf;
@@ -110,7 +110,7 @@ int strncpy_into_kvec(struct kvec *kvec, int num_segs, int seg_offset, const cha
 	return src_index;
 }
 
-int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, int seg_offset, char *dest, size_t max)
+int strncpy_out_of_kvec(struct kvec *kvec, int num_segs, size_t seg_offset, char *dest, size_t max)
 {
 	int cur_seg = 0;
 	char *src_buf;

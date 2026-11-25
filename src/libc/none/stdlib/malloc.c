@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 struct block {
-	int size;
+	size_t size;
 	struct block *next;
 };
 
@@ -15,7 +15,7 @@ struct heap {
 static struct heap main_heap = { 0 };
 
 
-void init_heap(void *addr, unsigned long size)
+void init_heap(void *addr, size_t size)
 {
 	struct block *space = (struct block *) addr;
 
@@ -25,7 +25,7 @@ void init_heap(void *addr, unsigned long size)
 	main_heap.free_blocks = space;
 }
 
-void *malloc(unsigned long size)
+void *malloc(size_t size)
 {
 	struct block *prev = NULL;
 	struct block *nextfree = NULL;
@@ -33,7 +33,7 @@ void *malloc(unsigned long size)
 
 	// Align the size to 4 bytes
 	size += ((4 - (size & 0x3)) & 0x3);
-	int block_size = size + sizeof(struct block);
+	size_t block_size = size + sizeof(struct block);
 
 	for (; cur; prev = cur, cur = cur->next) {
 		if (cur->size >= block_size) {

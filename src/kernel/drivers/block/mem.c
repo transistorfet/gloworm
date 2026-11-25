@@ -114,13 +114,13 @@ int mem_read(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
-	if (offset > geo->size) {
+	if ((size_t) offset > geo->size) {
 		return EINVAL;
 	}
-	if (offset + size > geo->size) {
-		size = geo->size - offset;
+	if ((size_t) offset + size > geo->size) {
+		size = geo->size - (size_t) offset;
 	}
-	memcpy_into_iter(iter, ((uint8_t*) geo->base) + offset, size);
+	memcpy_into_iter(iter, ((uint8_t*) geo->base) + (size_t) offset, size);
 	return size;
 }
 
@@ -132,13 +132,13 @@ int mem_write(devminor_t minor, off_t offset, struct iovec_iter *iter)
 	size_t size = iovec_iter_remaining(iter);
 	struct mem_geometry *geo = &devices[minor];
 
-	if (offset > geo->size) {
+	if ((size_t) offset > geo->size) {
 		return EINVAL;
 	}
-	if (offset + size > geo->size) {
-		size = geo->size - offset;
+	if ((size_t) offset + size > geo->size) {
+		size = geo->size - (size_t) offset;
 	}
-	memcpy_out_of_iter(iter, ((uint8_t*) geo->base) + offset, size);
+	memcpy_out_of_iter(iter, ((uint8_t*) geo->base) + (size_t) offset, size);
 	return size;
 }
 
@@ -175,8 +175,8 @@ off_t mem_seek(devminor_t minor, off_t position, int whence, off_t offset)
 			return EINVAL;
 	}
 
-	if (position > geo->size) {
-		position = geo->size;
+	if (position > (off_t) geo->size) {
+		position = (off_t) geo->size;
 	}
 	return position;
 }

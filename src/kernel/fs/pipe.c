@@ -12,7 +12,7 @@
 #include <kernel/proc/scheduler.h>
 #include <kernel/utils/iovec.h>
 
-#define PIPE_BUFFER_MAX		512
+#define PIPE_BUFFER_MAX		512U
 
 int pipe_close(struct vfile *file);
 int pipe_read(struct vfile *file, struct iovec_iter *iter);
@@ -123,8 +123,8 @@ int pipe_read(struct vfile *file, struct iovec_iter *iter)
 	}
 
 	nbytes = iovec_iter_remaining(iter);
-	if (nbytes > vnode->size - file->position) {
-		nbytes = vnode->size - file->position;
+	if (nbytes > (size_t) (vnode->size - file->position)) {
+		nbytes = (size_t) (vnode->size - file->position);
 	}
 	memcpy_into_iter(iter, &buffer[file->position], nbytes);
 	file->position += nbytes;
@@ -154,7 +154,7 @@ int pipe_write(struct vfile *file, struct iovec_iter *iter)
 	// TODO you need to detect a broken pipe and raise SIGPIPE
 
 	nbytes = iovec_iter_remaining(iter);
-	if (nbytes > PIPE_BUFFER_MAX - file->position) {
+	if (nbytes > PIPE_BUFFER_MAX - (size_t) file->position) {
 		// TODO this will work for now, but any write operation that's larger than the buffer size wont ever complete
 		// Trying to write more bytes than are available in the buffer, so block until the reader has caught up
 		suspend_current_syscall(VFS_POLL_WRITE);
@@ -182,7 +182,7 @@ int pipe_poll(struct vfile *file, int events)
 	if ((events & VFS_POLL_READ) && (vnode->size - file->position > 0)) {
 		revents |= VFS_POLL_READ;
 	}
-	if ((events & VFS_POLL_WRITE) && vnode->size >= PIPE_BUFFER_MAX) {
+	if ((events & VFS_POLL_WRITE) && vnode->size >= (off_t) PIPE_BUFFER_MAX) {
 		revents |= VFS_POLL_WRITE;
 	}
 	return revents;

@@ -24,7 +24,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 	struct buf *buf;
 
 	// Set only num_entries bits as free, and the rest of the block as reserved (unallocatable)
-	for (short i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
+	for (zone_t i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
 		buf = get_buf(bufcache, i);
 		if (!buf) {
 			return -1;

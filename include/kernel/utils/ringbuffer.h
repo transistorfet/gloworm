@@ -7,21 +7,21 @@
 #define RING_BUFFER_SIZE	512
 
 struct ringbuffer {
-	short max;
-	volatile short in;
-	volatile short out;
+	int max;
+	volatile int in;
+	volatile int out;
 	volatile unsigned char buffer[RING_BUFFER_SIZE];
 };
 
 
-static inline void _buf_init(struct ringbuffer *cb, short total_size)
+static inline void _buf_init(struct ringbuffer *cb, int total_size)
 {
-	cb->max = total_size ? total_size - sizeof(short) * 3 : RING_BUFFER_SIZE;
+	cb->max = total_size ? total_size - sizeof(int) * 3 : RING_BUFFER_SIZE;
 	cb->in = 0;
 	cb->out = 0;
 }
 
-static inline short _buf_next_in(struct ringbuffer *cb)
+static inline int _buf_next_in(struct ringbuffer *cb)
 {
 	return cb->in + 1 < cb->max ? cb->in + 1 : 0;
 }
@@ -36,7 +36,7 @@ static inline int _buf_is_empty(struct ringbuffer *cb)
 	return cb->in == cb->out;
 }
 
-static inline short _buf_used_space(struct ringbuffer *cb)
+static inline int _buf_used_space(struct ringbuffer *cb)
 {
 	if (cb->in >= cb->out) {
 		return cb->in - cb->out;
@@ -45,7 +45,7 @@ static inline short _buf_used_space(struct ringbuffer *cb)
 	}
 }
 
-static inline short _buf_free_space(struct ringbuffer *cb)
+static inline int _buf_free_space(struct ringbuffer *cb)
 {
 	if (cb->out > cb->in) {
 		return cb->out - cb->in - 1;
@@ -70,7 +70,7 @@ static inline int _buf_get_char(struct ringbuffer *cb)
 
 static inline int _buf_put_char(struct ringbuffer *cb, unsigned char ch)
 {
-	register short next;
+	register int next;
 
 	next = _buf_next_in(cb);
 	if (next == cb->out) {
@@ -82,9 +82,9 @@ static inline int _buf_put_char(struct ringbuffer *cb, unsigned char ch)
 }
 
 
-static inline short _buf_get(struct ringbuffer *cb, unsigned char *data, short size)
+static inline int _buf_get(struct ringbuffer *cb, unsigned char *data, int size)
 {
-	short i;
+	int i;
 
 	for (i = 0; i < size; i++) {
 		if (cb->out == cb->in) {
@@ -98,10 +98,10 @@ static inline short _buf_get(struct ringbuffer *cb, unsigned char *data, short s
 	return i;
 }
 
-static inline short _buf_peek(struct ringbuffer *cb, unsigned char *data, short offset, short size)
+static inline int _buf_peek(struct ringbuffer *cb, unsigned char *data, int offset, int size)
 {
-	short i, j;
-	short avail;
+	int i, j;
+	int avail;
 
 	avail = _buf_used_space(cb);
 	if (offset > avail) {
@@ -124,10 +124,10 @@ static inline short _buf_peek(struct ringbuffer *cb, unsigned char *data, short 
 	return i;
 }
 
-static inline short _buf_put(struct ringbuffer *cb, const unsigned char *data, short size)
+static inline int _buf_put(struct ringbuffer *cb, const unsigned char *data, int size)
 {
-	short i;
-	register short next;
+	int i;
+	register int next;
 
 	for (i = 0; i < size; i++) {
 		cb->buffer[cb->in] = data[i];
@@ -140,9 +140,9 @@ static inline short _buf_put(struct ringbuffer *cb, const unsigned char *data, s
 	return i;
 }
 
-static inline short _buf_drop(struct ringbuffer *cb, short size)
+static inline int _buf_drop(struct ringbuffer *cb, int size)
 {
-	short avail = _buf_used_space(cb);
+	int avail = _buf_used_space(cb);
 
 	if (size > avail) {
 		size = avail;
@@ -155,10 +155,10 @@ static inline short _buf_drop(struct ringbuffer *cb, short size)
 	return size;
 }
 
-static inline short _buf_get_iter(struct ringbuffer *cb, struct iovec_iter *iter)
+static inline int _buf_get_iter(struct ringbuffer *cb, struct iovec_iter *iter)
 {
-	size_t size;
-	short chunk1, chunk2;
+	int size;
+	int chunk1, chunk2;
 
 	size = iovec_iter_remaining(iter);
 
@@ -194,10 +194,10 @@ static inline short _buf_get_iter(struct ringbuffer *cb, struct iovec_iter *iter
 	return chunk1 + chunk2;
 }
 
-static inline short _buf_put_iter(struct ringbuffer *cb, struct iovec_iter *iter)
+static inline int _buf_put_iter(struct ringbuffer *cb, struct iovec_iter *iter)
 {
-	size_t size;
-	short chunk1, chunk2;
+	int size;
+	int chunk1, chunk2;
 
 	size = iovec_iter_remaining(iter);
 

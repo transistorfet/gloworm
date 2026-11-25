@@ -133,10 +133,10 @@ static int load_superblock(struct mount *mp)
 	// Load the block groups, starting with the first block after the superblock
 	struct buf *buf = NULL;
 	struct ext2_group_descriptor *group_on_disk;
-	size_t offset = mp->block_size; // force an update on the first iteration
+	size_t offset = (size_t) mp->block_size; // force an update on the first iteration
 	ext2_block_t descriptor_block_num = super->super.superblock_block; // start at the superblock, since it will be incremented on the first iteration
 	for (int group = 0; group < num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
-		if (offset >= mp->block_size) {
+		if (offset >= (size_t) mp->block_size) {
 			if (buf) {
 				unref_buf(buf, 0);
 			}
@@ -197,10 +197,10 @@ static int sync_superblock(struct bufcache *bufcache, struct ext2_super *super)
 	superblock_to_from_le(super_on_disk);
 
 	struct ext2_group_descriptor *group_on_disk;
-	size_t offset = bufcache->block_size; // force an update on the first iteration
+	size_t offset = (size_t) bufcache->block_size; // force an update on the first iteration
 	ext2_block_t descriptor_block_num = super->super.superblock_block; // start at the superblock, since it will be incremented on the first iteration
 	for (int group = 0; group < super->num_groups; group++, offset += sizeof(struct ext2_group_descriptor)) {
-		if (offset >= bufcache->block_size) {
+		if (offset >= (size_t) bufcache->block_size) {
 			if (buf) {
 				unref_buf(buf, BF_DIRTY);
 			}

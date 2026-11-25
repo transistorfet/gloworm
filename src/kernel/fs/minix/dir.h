@@ -49,7 +49,7 @@ static short dir_is_empty(struct vnode *vnode)
 			return EIO;
 		}
 		entries = (struct minix_v1_dirent *) buf->block;
-		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
+		for (unsigned int i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (entries[i].inode && strcmp(entries[i].filename, ".") && strcmp(entries[i].filename, "..")) {
 				unref_buf(buf, 0);
 				return 0;
@@ -72,7 +72,7 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 			return NULL;
 		}
 		entries = (struct minix_v1_dirent *) buf->block;
-		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
+		for (unsigned int i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (le16toh(entries[i].inode) == ino) {
 				off_t position = ((znum << MINIX_V1_LOG_DIRENTS_PER_ZONE) + i + 1) << __builtin_ctz(sizeof(struct minix_v1_dirent));
 				if (dir->size < position) {
@@ -101,7 +101,7 @@ static struct minix_v1_dirent *dir_find_entry_by_name(struct vnode *dir, const c
 			return NULL;
 		}
 		entries = (struct minix_v1_dirent *) buf->block;
-		for (short i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
+		for (unsigned int i = 0; i < MINIX_V1_DIRENTS_PER_ZONE; i++) {
 			if (entries[i].inode && !strcmp(filename, entries[i].filename)) {
 				*result = buf;
 				return &entries[i];

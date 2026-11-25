@@ -1,10 +1,11 @@
 
 #include <stdio.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <unistd.h>
 
 struct block {
-	int size;
+	size_t size;
 	struct block *next;
 };
 
@@ -13,10 +14,10 @@ struct heap {
 };
 
 
-static int last_increase = 1024;
+static intptr_t last_increase = 1024;
 static struct heap main_heap = { 0 };
 
-void *malloc(unsigned long size)
+void *malloc(size_t size)
 {
 	struct block *prev = NULL;
 	struct block *nextfree = NULL;
@@ -24,7 +25,7 @@ void *malloc(unsigned long size)
 
 	// Align the size to 4 bytes
 	size += ((4 - (size & 0x3)) & 0x3);
-	int block_size = size + sizeof(struct block);
+	size_t block_size = size + sizeof(struct block);
 
 retry:
 	for (; cur; prev = cur, cur = cur->next) {
@@ -55,7 +56,7 @@ retry:
 	// Double the last increase (and if it's not big enough to allocate the requested size, keep doubling until it can)
 	do {
 		last_increase <<= 1;
-	} while (last_increase < block_size);
+	} while ((size_t) last_increase < block_size);
 
 	// Ask the kernel to increase the data segment
 	cur = sbrk(0);
@@ -66,7 +67,7 @@ retry:
 	}
 
 	// Add the new block to the free list
-	cur->size = last_increase;
+	cur->size = (size_t) last_increase;
 	if (prev) {
 		prev->next = cur;
 	} else {

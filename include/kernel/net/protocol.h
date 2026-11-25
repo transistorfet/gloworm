@@ -23,7 +23,7 @@ struct iovec_iter;
 struct protocol_ops {
 	int (*init)();
 	//int (*transform_packet)(struct protocol *proto, struct packet *pack, int request, void *argp);
-	int (*decode_header)(struct protocol *proto, struct packet *pack, uint16_t offset);
+	int (*decode_header)(struct protocol *proto, struct packet *pack, int offset);
 	int (*forward_packet)(struct protocol *proto, struct packet *pack);
 	int (*create_endpoint)(struct protocol *proto, struct socket *sock, const struct sockaddr *sockaddr, socklen_t len, struct endpoint **result);
 };

@@ -14,7 +14,7 @@
 
 
 int icmp_init(void);
-int icmp_decode_header(struct protocol *proto, struct packet *pack, uint16_t offset);
+int icmp_decode_header(struct protocol *proto, struct packet *pack, int offset);
 int icmp_forward_packet(struct protocol *proto, struct packet *pack);
 
 
@@ -86,12 +86,12 @@ static struct packet *icmp_create_packet(struct protocol *proto, uint8_t type, u
 	return pack;
 }
 
-int icmp_decode_header(__unused struct protocol *proto, struct packet *pack, uint16_t offset)
+int icmp_decode_header(__unused struct protocol *proto, struct packet *pack, int offset)
 {
 	uint16_t checksum;
 	struct icmp_header *hdr;
 
-	if (pack->length - offset < sizeof(struct icmp_header)) {
+	if ((size_t) (pack->length - offset) < sizeof(struct icmp_header)) {
 		return -1;
 	}
 

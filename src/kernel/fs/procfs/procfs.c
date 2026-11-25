@@ -196,7 +196,7 @@ int procfs_read(struct vfile *file, struct iovec_iter *iter)
 	}
 
 	nbytes = iovec_iter_remaining(iter);
-	if (file->position + nbytes >= limit) {
+	if (file->position + nbytes >= (size_t) limit) {
 		nbytes = limit - file->position;
 	}
 	if (nbytes) {
