@@ -33,7 +33,7 @@ int init_page_block_with_bitmap(struct page_block *block, size_t size, physical_
 
 	log_trace("pages %x to %x, %d pages, %d bitmap size\n", addr, addr + size, block->total_pages, block->bitmap_size);
 	// Check that the bitmap is big enough, and return an error if it's too small
-	if ((bitmap_size << LOG_OF_PAGES_PER_INDEX) < block->total_pages) {
+	if (((uintptr_t) bitmap_size << LOG_OF_PAGES_PER_INDEX) < block->total_pages) {
 		return -1;
 	}
 
@@ -42,34 +42,37 @@ int init_page_block_with_bitmap(struct page_block *block, size_t size, physical_
 
 int init_page_block(struct page_block *block, physical_address_t addr, size_t size, uint32_t flags)
 {
-	physical_address_t pages_addr;
-	int descriptors_pages = 0;
-	int total_pages, allocatable_pages;
-	int bitmap_size, bitmap_pages;
-	void *descriptors_addr = NULL;
-	#if defined(CONFIG_MMU)
-	int descriptors_size = 0;
-	#endif
+	uintptr_t header_pages;
+	uintptr_t bitmap_nbytes;
+	uintptr_t descriptors_nbytes = 0;
+	physical_address_t start_of_descriptors = NULL;
 
-	total_pages = size >> PAGE_ADDR_BITS;
+	const uintptr_t total_pages = size >> PAGE_ADDR_BITS;
+	if (total_pages == 0) {
+		return EINVAL;
+	}
 
-	bitmap_size = align_up(total_pages >> LOG_OF_PAGES_PER_INDEX, PAGES_PER_INDEX);
-	bitmap_pages = align_up(bitmap_size, PAGE_SIZE) >> PAGE_ADDR_BITS;
+	bitmap_nbytes = align_up(total_pages > 8 ? total_pages >> 3 : 1, PAGES_PER_INDEX);
 
 	#if defined(CONFIG_MMU)
-	descriptors_size = (total_pages - bitmap_pages) * sizeof(struct page_descriptor);
-	descriptors_pages = align_up(descriptors_size, PAGE_SIZE) >> PAGE_ADDR_BITS;
-	descriptors_addr = &((page_t *) addr)[bitmap_pages];
+	bitmap_nbytes = align_up(bitmap_nbytes, sizeof(struct page_descriptor));
+	start_of_descriptors = addr + bitmap_nbytes;
+	descriptors_nbytes = total_pages * sizeof(struct page_descriptor);
 	#endif
 
-	allocatable_pages = total_pages - bitmap_pages - descriptors_pages;
-	pages_addr = (physical_address_t) (&((page_t *) addr)[bitmap_pages + descriptors_pages]);
+	header_pages = align_up(bitmap_nbytes + descriptors_nbytes, PAGE_SIZE) >> PAGE_ADDR_BITS;
+	if (header_pages == 0) {
+		header_pages = 1;
+	}
 
-	log_trace("bitmaps at %x, size %d, pages %d, after %x\n", addr, bitmap_size, bitmap_pages, pages_addr);
+	const uintptr_t allocatable_nbytes = (total_pages - header_pages) << PAGE_ADDR_BITS;
+	const physical_address_t start_of_pages = addr + (header_pages << PAGE_ADDR_BITS);
+
+	log_trace("bitmaps at %lx, size %d, header pages %d, after %lx\n", addr, bitmap_nbytes, header_pages, start_of_pages);
 	#if defined(CONFIG_MMU)
-	log_trace("descriptors at %x, size %d, pages %d, after %x\n", descriptors_addr, descriptors_size, descriptors_pages, pages_addr);
+	log_trace("descriptors at %lx, size %d, after %lx\n", start_of_descriptors, descriptors_nbytes, start_of_pages);
 	#endif
-	return init_page_block_with_bitmap(block, allocatable_pages << PAGE_ADDR_BITS, pages_addr, (bitmap_t *) addr, bitmap_size, descriptors_addr, flags);
+	return init_page_block_with_bitmap(block, allocatable_nbytes, start_of_pages, (bitmap_t *) addr, bitmap_nbytes, (struct page_descriptor *) start_of_descriptors, flags);
 }
 
 int append_global_page_block(physical_address_t start, size_t size, uint32_t flags)
@@ -102,7 +105,7 @@ int init_pages(physical_address_t start, size_t size, uint32_t flags)
 
 physical_address_t page_alloc(size_t size, uint32_t flags)
 {
-	const int contiguous_pages = size >> PAGE_ADDR_BITS;
+	const uintptr_t contiguous_pages = size >> PAGE_ADDR_BITS;
 
 	for (int i = 0; i < num_global_blocks; i++) {
 		if ((global_blocks[i].flags & (PAGE_F_TYPE & flags)) == (PAGE_F_TYPE & flags) && global_blocks[i].free_pages > contiguous_pages) {
@@ -154,7 +157,7 @@ int page_get_ref_single(physical_address_t ptr)
 /// separately
 physical_address_t page_block_alloc(struct page_block *block, size_t size)
 {
-	int contiguous_pages = size >> PAGE_ADDR_BITS;
+	uintptr_t contiguous_pages = size >> PAGE_ADDR_BITS;
 	uint32_t bit, start_bit, end_bit;
 	bitmap_t *bitmap = block->bitmap;
 
@@ -200,7 +203,7 @@ physical_address_t page_block_alloc(struct page_block *block, size_t size)
 
 void page_block_free(struct page_block *block, physical_address_t ptr, size_t size)
 {
-	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
+	uintptr_t page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
 	for (; size >= PAGE_SIZE; page_number++, size -= PAGE_SIZE) {
 		#if defined(CONFIG_MMU)
@@ -219,7 +222,7 @@ void page_block_free(struct page_block *block, physical_address_t ptr, size_t si
 #if defined(CONFIG_MMU)
 physical_address_t page_block_ref(struct page_block *block, physical_address_t ptr, size_t size)
 {
-	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
+	uintptr_t page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
 	for (; size >= PAGE_SIZE; page_number++, size -= PAGE_SIZE) {
 		block->page_descriptors[page_number].refcount++;
@@ -230,7 +233,7 @@ physical_address_t page_block_ref(struct page_block *block, physical_address_t p
 
 int page_block_get_ref_single(struct page_block *block, physical_address_t ptr)
 {
-	int page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
+	uintptr_t page_number = (((uintptr_t) ptr) - ((uintptr_t) block->base)) >> PAGE_ADDR_BITS;
 
 	return block->page_descriptors[page_number].refcount;
 }

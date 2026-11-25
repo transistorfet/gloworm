@@ -28,7 +28,7 @@
 #define PAGE_ADDR_BITS	16
 #endif
 
-#define PAGE_SIZE	(1 << PAGE_ADDR_BITS)
+#define PAGE_SIZE	(1U << PAGE_ADDR_BITS)
 
 #define PAGE_F_NOFAIL		0x8000		/// Always return a page (using pages allocated for emergencies)
 #define PAGE_F_SUPERVISOR	0x4000		/// A page used by the kernel itself
@@ -38,9 +38,9 @@
 #define PAGE_F_USER		0x0000		/// The default settings for user memory
 
 
-#define ALL_PAGES_AT_INDEX	((uint16_t) 0xffffffff)
-#define PAGES_PER_INDEX		16
-#define LOG_OF_PAGES_PER_INDEX	4
+#define ALL_PAGES_AT_INDEX	((bitmap_t) -1)
+#define PAGES_PER_INDEX		(sizeof(bitmap_t) << 3)
+#define LOG_OF_PAGES_PER_INDEX	(__builtin_ctz(PAGES_PER_INDEX))
 #define BIT_INDEX(bit)		((bit) >> LOG_OF_PAGES_PER_INDEX)
 #define BIT_MASK(bit)		(1 << ((bit) & (PAGES_PER_INDEX - 1)))
 
@@ -58,8 +58,8 @@ struct page_domain {
 struct page_block {
 	struct queue_node node;
 	uint32_t flags;
-	int total_pages;
-	int free_pages;
+	uintptr_t total_pages;
+	uintptr_t free_pages;
 	physical_address_t base;
 	size_t end;
 	int bitmap_size;
@@ -90,8 +90,6 @@ static inline void zero_page(physical_address_t ptr)
 {
 	memset((void *) ptr, 0, PAGE_SIZE);
 }
-
-extern struct page_block pages;
 
 #endif
 
