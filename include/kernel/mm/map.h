@@ -127,8 +127,8 @@ struct memory_map {
 #endif
 
 #if defined(CONFIG_MMU)
-int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_flag);
-int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int pages, virtual_address_t start, size_t length, int write_flag);
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, char write_flag);
+int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int pages, virtual_address_t start, size_t length, char write_flag);
 #endif
 
 #if !defined(CONFIG_MMU)
@@ -158,7 +158,7 @@ void memory_map_print_segments(struct memory_map *map);
 static inline int memory_map_reset_sbrk(struct memory_map *map)
 {
 	// Reset sbrk to the start of the heap
-	return memory_map_move_sbrk(map, -1 * (map->sbrk - map->heap_start));
+	return memory_map_move_sbrk(map, -1 * (int) (map->sbrk - map->heap_start));
 }
 
 static inline struct memory_map *memory_map_ref(struct memory_map *map)

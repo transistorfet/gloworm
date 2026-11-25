@@ -191,11 +191,11 @@ static inline void iovec_iter_set_position(struct iovec_iter *iter, size_t posit
 
 
 struct memory_map;
-extern int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag);
+extern int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, char write_flag);
 
 #if defined(CONFIG_MMU)
 
-static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
+static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, char write_flag)
 {
 	int result;
 
@@ -209,7 +209,7 @@ static inline int iovec_iter_load_pages_iter(struct memory_map *map, struct iove
 
 #else
 
-static inline int iovec_iter_load_pages_iter(__unused struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, __unused int max_segs, virtual_address_t start, size_t length, __unused int write_flag)
+static inline int iovec_iter_load_pages_iter(__unused struct memory_map *map, struct iovec_iter *iter, struct kvec *kvec, __unused int max_segs, virtual_address_t start, size_t length, __unused char write_flag)
 {
 	iovec_iter_init_simple_kvec(iter, kvec, (char *) start, length);
 	return 0;

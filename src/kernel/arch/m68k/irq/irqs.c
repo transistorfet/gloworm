@@ -207,7 +207,7 @@ static void page_fault_handler(struct exception_frame *frame)
 	int df = ssw & SSW_DATA_FAULT;
 	int ff = (ssw & SSW_FAULT_STAGE_C) || (ssw & SSW_FAULT_STAGE_B);
 	char rwm_type = !df ? 'r' : (!(ssw & SSW_READ_WRITE) ? 'w' : ((ssw & SSW_READ_MODIFY_WRITE) ? 'm' : 'r'));
-	int write_flag = df && (!(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE));
+	char write_flag = df && (!(ssw & SSW_READ_WRITE) || (ssw & SSW_READ_MODIFY_WRITE));
 
 	if (current_proc && current_proc->map) {
 		if (rwm_type == 'r') {

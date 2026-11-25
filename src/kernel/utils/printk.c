@@ -116,7 +116,7 @@ void printk_dump_user(struct memory_map *map, virtual_address_t vaddr, size_t le
 	short i;
 	size_t index = 0;
 	struct kvec kvec[3];
-	short seg = 0, max_segs;
+	int seg = 0, max_segs;
 
 	max_segs = memory_map_load_pages_into_kvec(map, kvec, 3, vaddr, length, 0);
 	if (max_segs < 0) {

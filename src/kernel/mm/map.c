@@ -151,7 +151,7 @@ static inline int memory_map_convert_copy_on_write(struct memory_map *map, virtu
 }
 
 // TODO rename to something inclusive of CoW
-int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uint16_t write_error)
+int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, char write_flag)
 {
 	int error;
 	uintptr_t page_address;
@@ -168,14 +168,14 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 		page_address = align_down(vaddr, PAGE_SIZE);
 		error = mmu_table_get_page(map->root_table, page_address, &result);
 		if (!error) {
-			if (write_error && (segment->flags & SEG_WRITE)) {
+			if (write_flag && (segment->flags & SEG_WRITE)) {
 				return memory_map_convert_copy_on_write(map, page_address, result.phys, result.size);
 			} else {
 				log_error("attempting to read in data space a page that already exists\n");
 				return EEXIST;
 			}
 		} else {
-			if (write_error && !(segment->flags & SEG_WRITE)) {
+			if (write_flag && !(segment->flags & SEG_WRITE)) {
 				log_error("attempting to write to a read-only segment %x to %x\n", segment->start, segment->end);
 				return EPERM;
 			}
@@ -197,7 +197,7 @@ int memory_map_load_page_at(struct memory_map *map, virtual_address_t vaddr, uin
 	}
 }
 
-int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, int write_flag)
+int memory_map_load_pages_into_kvec(struct memory_map *map, struct kvec *kvec, int max_segs, virtual_address_t start, size_t length, char write_flag)
 {
 	int i;
 	int error;

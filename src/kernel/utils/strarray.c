@@ -31,14 +31,14 @@ int string_array_copy(struct string_array *array, const char __user *const src_w
 	// Set up the array of word offsets inside the buffer
 	array->len = len;
 	array->strings = (uintptr_t *) &array->buffer[0];
-	used = (len + 1) * sizeof(uintptr_t);
+	used = ((size_t) len + 1) * sizeof(uintptr_t);
 
 	// Copy the strings into the remaining buffer, and record the offsets
 	for (i = 0; i < len && used < EXEC_ARGS_LENGTH_MAX; i++) {
 		array->strings[i] = used;
 		if (from_user) {
 			str = (char *) get_user_uintptr((void *) &src_words[i]);
-			result = strncpy_from_user(&array->buffer[used], str, EXEC_ARGS_LENGTH_MAX - used);
+			result = (size_t) strncpy_from_user(&array->buffer[used], str, EXEC_ARGS_LENGTH_MAX - (int) used);
 		} else {
 			result = strnlen(src_words[i], EXEC_ARGS_LENGTH_MAX - used);
 			strncpy(&array->buffer[used], src_words[i], EXEC_ARGS_LENGTH_MAX - used);

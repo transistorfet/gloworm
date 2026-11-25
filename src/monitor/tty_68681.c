@@ -135,8 +135,8 @@ void spin_loop(int count)
 
 int getchar(void)
 {
-	char in = 0;
-	char status;
+	uint8_t in = 0;
+	uint8_t status;
 
 	// Assert CTS
 	*OUT_SET_ADDR = 0x01;
@@ -189,11 +189,11 @@ int putchar(int ch)
 	#if defined(CONFIG_TTY_DEFAULT_EOL_CRLF)
 	if (ch == '\n') {
 		while (!(*SRA_RD_ADDR & SR_TX_READY)) {}
-		*TBA_WR_ADDR = (char) '\r';
+		*TBA_WR_ADDR = (uint8_t) '\r';
 	}
 	#endif
 	while (!(*SRA_RD_ADDR & SR_TX_READY)) {}
-	*TBA_WR_ADDR = (char) ch;
+	*TBA_WR_ADDR = (uint8_t) ch;
 	return ch;
 }
 

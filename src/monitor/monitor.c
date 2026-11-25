@@ -29,7 +29,7 @@ int readline(char *buffer, short max)
 	short i = 0;
 
 	while (i < max) {
-		buffer[i] = getchar();
+		buffer[i] = (char) getchar();
 		switch (buffer[i]) {
 			case 0x7f:
 			case 0x08: {
@@ -63,7 +63,7 @@ int readline(char *buffer, short max)
 	return i;
 }
 
-int parseline(char *input, char **vargs)
+short parseline(char *input, char **vargs)
 {
 	short j = 0;
 
@@ -94,7 +94,7 @@ int parseline(char *input, char **vargs)
 	return j;
 }
 
-char hexchar(uint8_t byte)
+char hexchar(char byte)
 {
 	if (byte < 10) {
 		return byte + 0x30;
@@ -103,7 +103,7 @@ char hexchar(uint8_t byte)
 	}
 }
 
-void dump(const uint16_t *addr, short len)
+void dump(const uint16_t *addr, uint16_t len)
 {
 	char buffer[6];
 
@@ -175,10 +175,10 @@ void command_dump(int argc, char **args)
 	if (argc <= 1) {
 		fputs("You need an address\n", stdout);
 	} else {
-		short length = 0x40;
+		uint16_t length = 0x40;
 
 		if (argc >= 3) {
-			length = strtol(args[2], NULL, 16);
+			length = (uint16_t) strtol(args[2], NULL, 16);
 		}
 		dump((const uint16_t *) strtol(args[1], NULL, 16), length);
 	}
@@ -196,7 +196,7 @@ void command_move(int argc, char **args)
 	} else {
 		uint16_t *source = (uint16_t *) strtol(args[1], NULL, 16);
 		uint16_t *dest = (uint16_t *) strtol(args[2], NULL, 16);
-		uint32_t size = strtol(args[3], NULL, 16);
+		uint32_t size = (uint32_t) strtol(args[3], NULL, 16);
 
 		for (uint32_t i = 0; i < (size >> 1); i++) {
 			dest[i] = source[i];
@@ -278,7 +278,7 @@ void command_eraserom(int argc, char **args)
 	uint32_t sector = 0;
 
 	if (argc >= 2) {
-		sector = strtol(args[1], NULL, 16);
+		sector = (uint32_t) strtol(args[1], NULL, 16);
 		if ((sector & (SECTOR_SIZE - 1)) || (sector >= RAM_ADDR)) {
 			printf("Invalid sector address to erase (%x)\n", sector);
 			return;
@@ -370,7 +370,7 @@ void command_verifyrom(int argc, char **args)
 		source = (uint16_t *) strtol(args[2], NULL, 16);
 	}
 	if (argc >= 4) {
-		size = strtol(args[3], NULL, 16);
+		size = (uint32_t) strtol(args[3], NULL, 16);
 	}
 
 	for (uint32_t i = 0; i < (size >> 1); i++) {
@@ -391,11 +391,11 @@ uint16_t fetch_word(char max)
 	char buffer[4];
 
 	for (short i = 0; i < max; i++) {
-		buffer[i] = getchar();
+		buffer[i] = (char) getchar();
 		buffer[i] = buffer[i] <= '9' ? buffer[i] - 0x30 : buffer[i] - 0x37;
 	}
 
-	return (buffer[0] << 12) | (buffer[1] << 8) | (buffer[2] << 4) | buffer[3];
+	return ((uint16_t) buffer[0] << 12) | ((uint16_t) buffer[1] << 8) | ((uint16_t) buffer[2] << 4) | (uint16_t) buffer[3];
 }
 
 void command_load(int argc, char **args)
@@ -456,7 +456,7 @@ void command_ramtest(int argc, char **args)
 		dest = (uint16_t *) strtol(args[1], NULL, 16);
 	}
 	if (length >= 3) {
-		length = strtol(args[2], NULL, 16);
+		length = (uint32_t) strtol(args[2], NULL, 16);
 	}
 
 	printf("Testing onboard ram from %x to %x\n", (uint32_t) dest, (uint32_t) dest + length);
@@ -560,8 +560,8 @@ void command_vmetest(__unused int argc, __unused char **args)
 
 void command_atatest(int argc, char **args)
 {
+	uint8_t buffer[512];
 	uint32_t sector = 46842;
-	char buffer[512];
 
 	if (argc >= 2) {
 		sector = (uint32_t) strtol(args[1], NULL, 10);
@@ -591,7 +591,7 @@ void command_atatest(int argc, char **args)
 	ATA_WAIT();
 
 	//printf("Read status\n");
-	char status = (*ATA_REG_STATUS);
+	uint8_t status = (*ATA_REG_STATUS);
 	if (status & 0x01) {
 		printf("Error while reading ata: %x\n", (*ATA_REG_ERROR));
 		return;
