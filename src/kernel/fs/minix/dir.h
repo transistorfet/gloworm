@@ -9,7 +9,7 @@
 
 static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 {
-	zone_t zone;
+	minix_zone_t zone;
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
@@ -39,11 +39,11 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 
 static short dir_is_empty(struct vnode *vnode)
 {
-	zone_t zone;
+	minix_zone_t zone;
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
-	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
+	for (minix_zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
 		buf = get_buf(&vnode->mp->bufcache, zone);
 		if (!buf) {
 			return EIO;
@@ -60,13 +60,13 @@ static short dir_is_empty(struct vnode *vnode)
 	return 1;
 }
 
-static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_t ino, char create, struct buf **result)
+static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, minix_inode_t ino, char create, struct buf **result)
 {
-	zone_t zone;
+	minix_zone_t zone;
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
-	for (zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
+	for (minix_zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, zone);
 		if (!buf) {
 			return NULL;
@@ -91,11 +91,11 @@ static struct minix_v1_dirent *dir_find_entry_by_inode(struct vnode *dir, inode_
 
 static struct minix_v1_dirent *dir_find_entry_by_name(struct vnode *dir, const char *filename, char create, struct buf **result)
 {
-	zone_t zone;
+	minix_zone_t zone;
 	struct buf *buf;
 	struct minix_v1_dirent *entries;
 
-	for (zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
+	for (minix_zone_t znum = 0; (zone = zone_lookup(dir, znum, create)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, zone);
 		if (!buf) {
 			return NULL;

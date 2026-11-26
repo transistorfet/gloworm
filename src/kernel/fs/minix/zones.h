@@ -18,7 +18,7 @@
 #define MFS_CREATE_ZONE		1
 
 
-static zone_t minix_alloc_zone(struct mount *mp)
+static minix_zone_t minix_alloc_zone(struct mount *mp)
 {
 	bitnum_t bit;
 	struct buf *buf;
@@ -41,7 +41,7 @@ static zone_t minix_alloc_zone(struct mount *mp)
 	return bit;
 }
 
-static void minix_free_zone(struct mount *mp, zone_t zonenum)
+static void minix_free_zone(struct mount *mp, minix_zone_t zonenum)
 {
 	struct minix_super *super;
 
@@ -50,7 +50,7 @@ static void minix_free_zone(struct mount *mp, zone_t zonenum)
 }
 
 
-static inline char zone_calculate_tier(zone_t *tiers, zone_t znum)
+static inline char zone_calculate_tier(minix_zone_t *tiers, minix_zone_t znum)
 {
 	if (znum < MINIX_V1_TIER1_ZONENUMS) {
 		tiers[0] = znum;
@@ -76,12 +76,12 @@ static inline char zone_calculate_tier(zone_t *tiers, zone_t znum)
 	return -1;
 }
 
-static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
+static minix_zone_t zone_lookup(struct vnode *vnode, minix_zone_t znum, char create)
 {
-	zone_t ret;
+	minix_zone_t ret;
 	char ntiers;
 	minix_v1_zone_t *zone;
-	zone_t tiers[MINIX_V1_TIERS];
+	minix_zone_t tiers[MINIX_V1_TIERS];
 	struct buf *buf = NULL;
 
 	ntiers = zone_calculate_tier(tiers, znum);
@@ -119,7 +119,7 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 		}
 	}
 
-	ret = (zone_t) le16toh(*zone);
+	ret = (minix_zone_t) le16toh(*zone);
 	if (buf) {
 		unref_buf(buf, 0);
 	}
@@ -128,7 +128,7 @@ static zone_t zone_lookup(struct vnode *vnode, zone_t znum, char create)
 
 static void zone_free_all(struct vnode *vnode)
 {
-	zone_t zone;
+	minix_zone_t zone;
 
 	// NOTE this can only be used with files or empty directories
 
@@ -138,7 +138,7 @@ static void zone_free_all(struct vnode *vnode)
 	}
 
 	// Traverse all zones and free each
-	for (zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
+	for (minix_zone_t znum = 0; (zone = zone_lookup(vnode, znum, MFS_LOOKUP_ZONE)) != 0; znum++) {
 		minix_free_zone(vnode->mp, zone);
 	}
 
@@ -147,7 +147,7 @@ static void zone_free_all(struct vnode *vnode)
 		struct buf *buf = get_buf(&vnode->mp->bufcache, le16toh(MINIX_DATA(vnode).zones[8]));
 		if (buf) {
 			minix_v1_zone_t *entries = buf->block;
-			for (zone_t i = 0; i < MINIX_V1_ZONENUMS_PER_ZONE; i++) {
+			for (minix_zone_t i = 0; i < MINIX_V1_ZONENUMS_PER_ZONE; i++) {
 				if (entries[i]) {
 					minix_free_zone(vnode->mp, le16toh(entries[i]));
 				}

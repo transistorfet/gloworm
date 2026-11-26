@@ -6,7 +6,7 @@
 #include <sys/types.h>
 
 struct dirent {
-	inode_t d_ino;
+	ino_t d_ino;
 	char d_name[NAME_MAX];
 };
 

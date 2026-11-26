@@ -12,9 +12,9 @@ typedef int bitnum_t;
 
 static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum);
 
-static inline char bit_mask(char bits)
+static inline uint8_t bit_mask(char bits)
 {
-	char byte = 0x00;
+	uint8_t byte = 0x00;
 	for (short j = 0; j < bits; j++) {
 		byte = (byte << 1) | 0x01;
 	}
@@ -23,7 +23,7 @@ static inline char bit_mask(char bits)
 
 static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, int num_entries, int reserve)
 {
-	char *block;
+	uint8_t *block;
 	struct buf *buf;
 
 	buf = get_buf(bufcache, bitmap_blocknum);
@@ -33,7 +33,7 @@ static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, 
 	block = buf->block;
 
 	const int last_byte = num_entries >> 3;
-	const int last_bits = num_entries & 0x07;
+	const char last_bits = (char) (num_entries & 0x07);
 	memset(block, 0x00, last_byte);
 	if (last_byte < bufcache->block_size) {
 		block[last_byte] = bit_mask(last_bits);
@@ -47,7 +47,7 @@ static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, 
 		block[i++] = 0xFF;
 		reserve -= 8;
 	}
-	block[i++] = bit_mask(reserve);
+	block[i++] = bit_mask((char) reserve);
 
 	unref_buf(buf, BF_DIRTY);
 	return 0;
@@ -56,7 +56,7 @@ static int bitmap_init(struct bufcache *bufcache, ext2_block_t bitmap_blocknum, 
 static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknum)
 {
 	char bit;
-	char *data;
+	uint8_t *data;
 	struct buf *buf;
 	const int block_size = bufcache->block_size;
 
@@ -67,7 +67,7 @@ static bitnum_t bit_alloc(struct bufcache *bufcache, ext2_block_t bitmap_blocknu
 	data = buf->block;
 
 	for (int i = 0; i < block_size; i++) {
-		if ((char) ~data[i]) {
+		if ((uint8_t) ~data[i]) {
 			for (bit = 0; bit < 8 && ((0x01 << bit) & data[i]); bit++) {}
 			data[i] |= (0x01 << bit);
 			unref_buf(buf, BF_DIRTY);
@@ -87,7 +87,7 @@ static inline int bit_free(struct bufcache *bufcache, ext2_block_t bitmap_blockn
 		return -1;
 	}
 
-	((char *) buf->block)[byte] &= ~(0x01 << bit);
+	((uint8_t *) buf->block)[byte] &= (uint8_t) ~(0x01 << bit);
 	unref_buf(buf, BF_DIRTY);
 	return 0;
 }

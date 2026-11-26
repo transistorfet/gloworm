@@ -119,12 +119,12 @@ struct vnode {
 	int refcount;			// Number of references to this vnode currently in use
 
 	mode_t mode;
-	short nlinks;
+	nlink_t nlinks;
 	uid_t uid;
 	gid_t gid;
 	uint16_t bits;
 	device_t rdev;
-	inode_t ino;
+	ino_t ino;
 	off_t size;
 
 	time_t atime;
@@ -184,11 +184,11 @@ static inline void vfs_init_vnode(
 	struct vnode_ops *ops,
 	struct mount *mp,
 	mode_t mode,
-	short nlinks,
+	nlink_t nlinks,
 	uid_t uid,
 	gid_t gid,
 	device_t rdev,
-	inode_t ino,
+	ino_t ino,
 	off_t size,
 	time_t atime,
 	time_t mtime,

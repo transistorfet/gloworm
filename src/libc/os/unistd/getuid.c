@@ -4,6 +4,6 @@
 
 uid_t getuid(void)
 {
-	return SYSCALL1(SYS_GETUID, 0);
+	return (uid_t) SYSCALL1(SYS_GETUID, 0);
 }
 

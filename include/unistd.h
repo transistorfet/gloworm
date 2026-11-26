@@ -54,7 +54,7 @@ int mkdir(const char *path, mode_t mode);
 char *getcwd(char *buf, size_t size);
 int rename(const char *oldpath, const char *newpath);
 
-int mknod(const char *path, mode_t mode, device_t dev);
+int mknod(const char *path, mode_t mode, dev_t dev);
 int creat(const char *path, mode_t mode);
 int open(const char *path, int flags, mode_t mode);
 int close(int fd);

@@ -24,7 +24,7 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 			// Parse the width to read
 			if (isdigit(fmt[j + 1])) {
 				char *endptr;
-				width = strtol(&fmt[j + 1], &endptr, 10);
+				width = (char) strtol(&fmt[j + 1], &endptr, 10);
 				j += endptr - &fmt[j] - 1;
 			}
 
@@ -61,13 +61,13 @@ int vsscanf(const char *str, const char *fmt, va_list args)
 						void *ptr = va_arg(args, void *);
 						switch (length) {
 							case 2:
-								*((unsigned short *) ptr) = number;
+								*((unsigned short *) ptr) = (unsigned short) number;
 								break;
 							case 4:
-								*((unsigned int *) ptr) = number;
+								*((unsigned int *) ptr) = (unsigned int) number;
 								break;
 							case 8:
-								*((unsigned long long *) ptr) = number;
+								*((unsigned long long *) ptr) = (unsigned long long) number;
 								break;
 							default:
 								// If there's an invalid character, return immediately

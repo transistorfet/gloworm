@@ -23,7 +23,8 @@
 
 #define MBF_DIRTY		0x0001
 
-typedef unsigned int zone_t;
+typedef unsigned int minix_zone_t;
+typedef unsigned int minix_inode_t;
 
 struct minix_super {
 	char max_filename;

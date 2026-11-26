@@ -59,7 +59,7 @@ ccflags-$(CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3)	+= -O3
 ccflags-$(CONFIG_DEBUG)		+= -g
 
 # warnings
-ccflags-y			+= -Wall -Wextra #-Wconversion
+ccflags-y			+= -Wall -Wextra #-Wno-sign-conversion -Wconversion
 
 ifeq ($(strict), y)
 	ccflags-y		+= -Werror

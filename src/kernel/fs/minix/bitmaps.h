@@ -9,22 +9,22 @@
 
 typedef int bitnum_t;
 
-static inline char bit_mask(char bits)
+static inline uint8_t bit_mask(char bits)
 {
-	char byte = 0x00;
+	uint8_t byte = 0x00;
 	for (short j = 0; j < bits; j++) {
 		byte = (byte << 1) | 0x01;
 	}
 	return byte;
 }
 
-static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, int bitmap_size, int num_entries, short reserve)
+static inline int bitmap_init(struct bufcache *bufcache, minix_zone_t bitmap_start, int bitmap_size, int num_entries, short reserve)
 {
-	char *block;
+	uint8_t *block;
 	struct buf *buf;
 
 	// Set only num_entries bits as free, and the rest of the block as reserved (unallocatable)
-	for (zone_t i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
+	for (minix_zone_t i = bitmap_start; i < bitmap_start + bitmap_size; i++) {
 		buf = get_buf(bufcache, i);
 		if (!buf) {
 			return -1;
@@ -33,7 +33,7 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 
 		if (num_entries < MINIX_V1_BITS_PER_ZONE) {
 			int bytes = (num_entries >> 3);
-			char bits = (num_entries & 0x07);
+			uint8_t bits = (num_entries & 0x07);
 
 			if (bits) {
 				bytes += 1;
@@ -69,11 +69,11 @@ static inline int bitmap_init(struct bufcache *bufcache, zone_t bitmap_start, in
 	return 0;
 }
 
-static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start, int bitmap_size)
+static inline bitnum_t bit_alloc(struct bufcache *bufcache, minix_zone_t bitmap_start, int bitmap_size)
 {
 	char bit;
-	char *block;
 	int zone = 0;
+	uint8_t *block;
 	struct buf *buf;
 
 	for (; zone < bitmap_size; zone++) {
@@ -85,7 +85,7 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 
 		for (int i = 0; i < MINIX_V1_ZONE_SIZE; i++) {
 			//printk("Bitsearch %d: %x\n", i, block[i]);
-			if ((char) ~block[i]) {
+			if ((uint8_t) ~block[i]) {
 				for (bit = 0; bit < 8 && ((0x01 << bit) & block[i]); bit++) {}
 				block[i] |= (0x01 << bit);
 				unref_buf(buf, BF_DIRTY);
@@ -99,16 +99,16 @@ static inline bitnum_t bit_alloc(struct bufcache *bufcache, zone_t bitmap_start,
 	return 0;
 }
 
-static inline int bit_free(struct bufcache *bufcache, zone_t bitmap_start, bitnum_t bitnum)
+static inline int bit_free(struct bufcache *bufcache, minix_zone_t bitmap_start, bitnum_t bitnum)
 {
-	zone_t zone = (bitnum >> 3) / MINIX_V1_ZONE_SIZE;
+	minix_zone_t zone = (bitnum >> 3) / MINIX_V1_ZONE_SIZE;
 	int i = (bitnum >> 3);
 	char bit = (bitnum & 0x7);
 	struct buf *buf = get_buf(bufcache, bitmap_start + zone);
 	if (!buf) {
 		return -1;
 	}
-	char *block = buf->block;
+	uint8_t *block = buf->block;
 
 	block[i] &= ~(0x01 << bit);
 	unref_buf(buf, BF_DIRTY);

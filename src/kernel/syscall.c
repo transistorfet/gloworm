@@ -406,7 +406,7 @@ int do_sync(void)
 	return vfs_sync(0);
 }
 
-int do_mknod(const char __user *path, mode_t mode, device_t dev)
+int do_mknod(const char __user *path, mode_t mode, dev_t dev)
 {
 	int error;
 	struct vnode *vnode;

@@ -19,7 +19,7 @@ int MAIN(command_chmod)(int argc, char **argv)
 		}
 	}
 
-	mode_t mode = strtol(argv[1], NULL, 8);
+	mode_t mode = (mode_t) strtol(argv[1], NULL, 8);
 
 	int error = chmod(argv[2], mode);
 	if (error < 0) {

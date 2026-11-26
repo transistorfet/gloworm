@@ -103,12 +103,12 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 		groups[group].block_bitmap = group_start + superblock_blocknum + 1 + group_descriptor_blocks;
 		groups[group].inode_bitmap = groups[group].block_bitmap + 1;
 		groups[group].inode_table = groups[group].block_bitmap + 2;
-		groups[group].free_block_count = super.super.blocks_per_group;
-		groups[group].free_inode_count = super.super.inodes_per_group;
+		groups[group].free_block_count = (uint16_t) super.super.blocks_per_group;
+		groups[group].free_inode_count = (uint16_t) super.super.inodes_per_group;
 		groups[group].used_dirs_count = 0;
 
 		if (group_start + super.super.blocks_per_group > super.super.total_blocks) {
-			groups[group].free_block_count = super.super.total_blocks - group_start;
+			groups[group].free_block_count = (uint16_t) (super.super.total_blocks - group_start);
 		}
 
 		if (groups[group].inode_table + inode_table_blocks > super.super.total_blocks) {
@@ -127,8 +127,8 @@ static int ext2_mkfs(device_t dev, const struct mkfs_options *opts)
 			goto fail;
 		}
 
-		groups[group].free_block_count -= group_reserved_blocks;
-		groups[group].free_inode_count -= group_reserved_inodes;
+		groups[group].free_block_count -= (uint16_t) group_reserved_blocks;
+		groups[group].free_inode_count -= (uint16_t) group_reserved_inodes;
 		super.super.total_unalloc_blocks -= group_reserved_blocks;
 		super.super.total_unalloc_inodes -= group_reserved_inodes;
 

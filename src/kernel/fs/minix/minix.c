@@ -325,13 +325,13 @@ int minix_read(struct vfile *file, struct iovec_iter *iter)
 		return EISDIR;
 	}
 
-	zone_t zpos;
-	zone_t zlen;
-	zone_t znum;
-	zone_t zone;
 	struct buf *buf;
 	size_t nbytes;
 	size_t wbytes = 0;
+	minix_zone_t zpos;
+	minix_zone_t zlen;
+	minix_zone_t znum;
+	minix_zone_t zone;
 
 	nbytes = iovec_iter_remaining(iter);
 	if (nbytes > (size_t) (file->vnode->size - file->position)) {
@@ -375,14 +375,14 @@ int minix_write(struct vfile *file, struct iovec_iter *iter)
 		return EISDIR;
 	}
 
-	zone_t zpos;
-	zone_t zlen;
 	int error = 0;
-	zone_t znum;
-	zone_t zone;
 	struct buf *buf;
 	size_t nbytes;
 	size_t wbytes = 0;
+	minix_zone_t zpos;
+	minix_zone_t zlen;
+	minix_zone_t znum;
+	minix_zone_t zone;
 
 	nbytes = iovec_iter_remaining(iter);
 	znum = file->position >> MINIX_V1_LOG_ZONE_SIZE;
@@ -462,10 +462,10 @@ off_t minix_seek(struct vfile *file, off_t position, int whence)
 int minix_readdir(struct vfile *file, struct dirent *dir)
 {
 	int max;
-	zone_t zpos;
-	zone_t znum;
-	zone_t zone;
 	struct buf *buf;
+	minix_zone_t zpos;
+	minix_zone_t znum;
+	minix_zone_t zone;
 	struct minix_v1_dirent *entries;
 
 	if (!S_ISDIR(file->vnode->mode)) {

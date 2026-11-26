@@ -40,7 +40,7 @@ static void sync_vnodes(void)
 	}
 }
 
-static struct vnode *load_vnode(struct mount *mp, inode_t ino)
+static struct vnode *load_vnode(struct mount *mp, minix_inode_t ino)
 {
 	int error;
 	struct vnode *vnode;
@@ -73,7 +73,7 @@ static struct vnode *load_vnode(struct mount *mp, inode_t ino)
 	return vnode;
 }
 
-static struct vnode *get_vnode(struct mount *mp, inode_t ino)
+static struct vnode *get_vnode(struct mount *mp, minix_inode_t ino)
 {
 	struct vnode *vnode;
 

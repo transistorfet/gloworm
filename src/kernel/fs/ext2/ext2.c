@@ -140,7 +140,7 @@ int ext2_create(struct vnode *vnode, const char *filename, mode_t mode, uid_t ui
 	}
 
 	dir_set_filetype(dir, mode);
-	dir->inode = htole32((ext2_inode_t) newnode->ino);
+	dir->inode = htole32((uint32_t) newnode->ino);
 
 	unref_buf(buf, BF_DIRTY);
 
@@ -180,7 +180,7 @@ int ext2_mknod(struct vnode *vnode, const char *filename, mode_t mode, device_t 
 		return ENOVNODE;
 	}
 
-	dir->inode = htole32((ext2_inode_t) newnode->ino);
+	dir->inode = htole32((uint32_t) newnode->ino);
 	dir_set_filetype(dir, mode);
 
 	unref_buf(buf, BF_DIRTY);
@@ -226,7 +226,7 @@ int ext2_link(struct vnode *oldvnode, struct vnode *newparent, const char *filen
 	}
 
 	oldvnode->nlinks += 1;
-	dir->inode = htole32((ext2_inode_t) oldvnode->ino);
+	dir->inode = htole32((uint32_t) oldvnode->ino);
 	unref_buf(buf, BF_DIRTY);
 	write_inode(oldvnode, oldvnode->ino);
 
@@ -279,8 +279,8 @@ int ext2_rename(struct vnode *vnode, struct vnode *oldparent, const char *oldnam
 		return ENOENT;
 	}
 
-	newdir->inode = htole32((ext2_inode_t) vnode->ino);
-	olddir->inode = htole16(0);
+	newdir->inode = (ino_t) htole32((uint32_t) vnode->ino);
+	olddir->inode = (ino_t) htole32(0);
 	unref_buf(newbuf, BF_DIRTY);
 	unref_buf(oldbuf, BF_DIRTY);
 	vfs_update_time(oldparent, MTIME);

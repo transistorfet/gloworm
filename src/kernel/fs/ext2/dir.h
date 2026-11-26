@@ -58,7 +58,7 @@ static struct vnode *dir_setup(struct vnode *vnode, struct vnode *parent)
 	current_entry = (struct ext2_dirent *) &data[dot_entry_len];
 	current_entry->inode = htole32(parent->ino);
 	current_entry->filetype = EXT2_FT_DIR;
-	current_entry->entry_len = htole16(vnode->mp->block_size - dot_entry_len);
+	current_entry->entry_len = htole16((uint16_t) (vnode->mp->block_size - dot_entry_len));
 	current_entry->name_len = 2;
 	memcpy(EXT2_DIRENT_FILENAME(current_entry), "..", current_entry->name_len);
 
@@ -111,7 +111,7 @@ static struct ext2_dirent *dir_find_entry_by_name(struct vnode *dir, const char 
 	struct buf *buf;
 	struct ext2_dirent *current_entry;
 	const int block_size = dir->mp->block_size;
-	const uint8_t filename_len = strlen(filename);
+	const uint8_t filename_len = (uint8_t) strnlen(filename, 0xFF);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, create)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, block);
@@ -138,7 +138,7 @@ static struct ext2_dirent *dir_find_empty_entry(struct vnode *dir, uint16_t file
 	struct buf *buf;
 	struct ext2_dirent *current_entry;
 	const int block_size = dir->mp->block_size;
-	const short new_entry_len = align_up(sizeof(struct ext2_dirent) + filename_len, 4);
+	const uint16_t new_entry_len = (uint16_t) align_up(sizeof(struct ext2_dirent) + filename_len, 4);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(dir, znum, EXT2_AF_CREATE_BLOCK)) != 0; znum++) {
 		buf = get_buf(&dir->mp->bufcache, block);
@@ -184,7 +184,7 @@ static struct ext2_dirent *dir_alloc_entry(struct vnode *vnode, const char *file
 {
 	char *entry_filename;
 	struct ext2_dirent *dir;
-	const short filename_len = strlen(filename);
+	const uint8_t filename_len = (uint8_t) strnlen(filename, 0xFF);
 
 	dir = dir_find_empty_entry(vnode, filename_len, result);
 	if (!dir) {
@@ -206,7 +206,7 @@ static int dir_free_entry(struct vnode *parent, struct vnode *vnode, const char 
 	struct buf *buf;
 	struct ext2_dirent *cur, *prev;
 	const int block_size = parent->mp->block_size;
-	const uint8_t filename_len = strlen(filename);
+	const uint8_t filename_len = (uint8_t) strnlen(filename, 0xFF);
 
 	for (ext2_block_t znum = 0; (block = block_lookup(parent, znum, EXT2_AF_LOOKUP_BLOCK)) != 0; znum++) {
 		buf = get_buf(&parent->mp->bufcache, block);

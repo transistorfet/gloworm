@@ -21,7 +21,7 @@ struct inode_location {
 	int offset;
 };
 
-static inline int get_inode_group(struct mount *mp, inode_t ino)
+static inline int get_inode_group(struct mount *mp, ext2_inode_t ino)
 {
 	const struct ext2_super *super = EXT2_SUPER(mp->super);
 	const int group = (ino - 1) >> super->log_inodes_per_group;
@@ -31,7 +31,7 @@ static inline int get_inode_group(struct mount *mp, inode_t ino)
 	return group;
 }
 
-static inline struct inode_location get_inode_block_and_offset(struct mount *mp, inode_t ino)
+static inline struct inode_location get_inode_block_and_offset(struct mount *mp, ext2_inode_t ino)
 {
 	const struct ext2_super *super = EXT2_SUPER(mp->super);
 	const int group = (ino - 1) >> super->log_inodes_per_group;
@@ -48,7 +48,7 @@ static inline struct inode_location get_inode_block_and_offset(struct mount *mp,
 	return result;
 }
 
-static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, device_t rdev)
+static ext2_inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, device_t rdev)
 {
 	int group;
 	struct buf *inode_buf;
@@ -105,7 +105,7 @@ static inode_t alloc_inode(struct mount *mp, mode_t mode, uid_t uid, gid_t gid, 
 	return inodenum;
 }
 
-static int free_inode(struct vnode *vnode, inode_t ino)
+static int free_inode(struct vnode *vnode, ext2_inode_t ino)
 {
 	int error;
 
@@ -123,7 +123,7 @@ static int free_inode(struct vnode *vnode, inode_t ino)
 	return 0;
 }
 
-static int read_inode(struct vnode *vnode, inode_t ino)
+static int read_inode(struct vnode *vnode, ext2_inode_t ino)
 {
 	struct buf *inode_buf;
 	struct ext2_inode *inode;
@@ -135,14 +135,14 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	inode = (struct ext2_inode *) &((char *) inode_buf->block)[result.offset];
-	vnode->mode = le16toh(inode->mode);
-	vnode->uid = le16toh(inode->uid);
+	vnode->mode = (mode_t) le16toh(inode->mode);
+	vnode->uid = (uid_t) le16toh(inode->uid);
 	vnode->size = le32toh(inode->size);
-	vnode->atime = le32toh(inode->atime);
-	vnode->mtime = le32toh(inode->mtime);
-	vnode->ctime = le32toh(inode->ctime);
-	vnode->gid = le16toh(inode->gid);
-	vnode->nlinks = le16toh(inode->nlinks);
+	vnode->atime = (time_t) le32toh(inode->atime);
+	vnode->mtime = (time_t) le32toh(inode->mtime);
+	vnode->ctime = (time_t) le32toh(inode->ctime);
+	vnode->gid = (gid_t) le16toh(inode->gid);
+	vnode->nlinks = (nlink_t) le16toh(inode->nlinks);
 	vnode->rdev = (device_t) le32toh(S_ISDEV(vnode->mode) ? inode->blocks[0] : 0);
 	for (short j = 0; j < EXT2_BLOCKNUMS_IN_INODE; j++) {
 		// NOTE: the block numbers are not converted, and instead kept in
@@ -155,7 +155,7 @@ static int read_inode(struct vnode *vnode, inode_t ino)
 	return 0;
 }
 
-static int write_inode(struct vnode *vnode, inode_t ino)
+static int write_inode(struct vnode *vnode, ext2_inode_t ino)
 {
 	struct buf *inode_buf;
 	struct ext2_inode *inode;
@@ -169,15 +169,15 @@ static int write_inode(struct vnode *vnode, inode_t ino)
 	}
 
 	inode = (struct ext2_inode *) &((char *) inode_buf->block)[result.offset];
-	inode->mode = htole16(vnode->mode);
-	inode->uid = htole16(vnode->uid);
+	inode->mode = htole16((uint16_t) vnode->mode);
+	inode->uid = htole16((uint16_t) vnode->uid);
 	inode->size = htole32(vnode->size);
 	inode->nblocks = htole32(((vnode->size >> 9) + (vnode->size & (block_size - 1) ? 1 : 0)));	// total number of 512-byte blocks
-	inode->atime = htole32(vnode->atime);
-	inode->mtime = htole32(vnode->mtime);
-	inode->ctime = htole32(vnode->ctime);
-	inode->gid = htole16(vnode->gid);
-	inode->nlinks = htole16(vnode->nlinks);
+	inode->atime = htole32((uint32_t) vnode->atime);
+	inode->mtime = htole32((uint32_t) vnode->mtime);
+	inode->ctime = htole32((uint32_t) vnode->ctime);
+	inode->gid = htole16((uint16_t) vnode->gid);
+	inode->nlinks = htole16((uint16_t) (uint16_t) vnode->nlinks);
 	if (S_ISCHR(vnode->mode) || S_ISBLK(vnode->mode)) {
 		EXT2_DATA(vnode).blocks[0] = htole32(vnode->rdev);
 	}

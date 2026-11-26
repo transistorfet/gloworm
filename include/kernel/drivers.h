@@ -12,10 +12,11 @@ struct iovec_iter;
 #define DEVMAJOR_MEM		3
 #define DEVMAJOR_ATA		4
 
-#define DEVNUM(major, minor)	((major) << 8 | (minor))
-#define DEVMAJOR(dev)		((dev) >> 8)
+#define DEVNUM(major, minor)	(((device_t) (major)) << 8 | ((device_t) (minor)))
+#define DEVMAJOR(dev)		((devmajor_t) ((dev) >> 8))
 #define DEVMINOR(dev)		((devminor_t) ((dev) & 0xFF))
 
+typedef unsigned short device_t;
 typedef unsigned char devmajor_t;
 typedef unsigned char devminor_t;
 

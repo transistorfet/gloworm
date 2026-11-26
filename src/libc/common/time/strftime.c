@@ -101,7 +101,7 @@ size_t strftime(char *buffer, size_t max, const char *fmt, const struct tm *tp)
 					} else {
 						value = fmt[j];
 					}
-					buffer[i++] = value;
+					buffer[i++] = (char) value;
 					break;
 				}
 			}

@@ -33,7 +33,7 @@ int vsnprintf(char *buffer, size_t n, const char *fmt, va_list args)
 			// Parse the width to pad the data to
 			if (isdigit(fmt[j + 1])) {
 				char *endptr;
-				width = strtol(&fmt[j + 1], &endptr, 10);
+				width = (char) strtol(&fmt[j + 1], &endptr, 10);
 				j += endptr - &fmt[j] - 1;
 			}
 

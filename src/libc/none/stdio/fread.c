@@ -10,7 +10,7 @@ size_t fread(void *ptr, size_t size, size_t count, __unused FILE *stream)
 
 	size = count * size;
 	for (size_t i = 0; i < size; i++) {
-		str[i] = getchar();
+		str[i] = (char) getchar();
 	}
 	return count;
 }

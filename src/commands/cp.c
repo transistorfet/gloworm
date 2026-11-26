@@ -76,11 +76,11 @@ int MAIN(command_cp)(int argc, char **argv)
 
 static const char *cp_path_last_component(const char *path)
 {
-	short i = strlen(path) - 1;
+	size_t i = strlen(path) - 1;
 	if (path[i] == '/') {
 		i--;
 	}
-	for (; i >= 0; i--) {
+	for (; i == 0; i--) {
 		if (path[i] == '/') {
 			break;
 		}

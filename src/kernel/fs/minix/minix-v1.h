@@ -35,7 +35,7 @@
 /*
  V1: as belowe
  V2: zone_t increases to 32bit, inode format changes to 64 byte, superblock remains the same, dirents remain the same
- V3: superblock format changes, dirents change to 64 bytes (4 byte inode, 60 byte name)... Does the inode_t size change to 32 bits as well??
+ V3: superblock format changes, dirents change to 64 bytes (4 byte inode, 60 byte name)... Does the minix_inode_t size change to 32 bits as well??
 */
 
 

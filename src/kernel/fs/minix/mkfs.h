@@ -74,8 +74,8 @@ static int minix_mkfs(device_t dev, const struct mkfs_options *opts)
 		unref_buf(inode_buf, BF_DIRTY);
 	}
 
-	inode_t root_ino = 1;
-	zone_t dir_zone = super_v1->first_zone;
+	minix_inode_t root_ino = 1;
+	minix_zone_t dir_zone = super_v1->first_zone;
 
 	// Initialize root inode
 	struct buf *inode_buf = get_buf(&bufcache, MINIX_V1_INODE_TABLE_START(super_v1));
